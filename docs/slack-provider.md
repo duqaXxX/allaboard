@@ -34,6 +34,12 @@ follows; when the part closes they get the space all the same. A new file's prev
 (`blocks.previewBlocks`) and a session's title in a link (`escape.markdownEscape`) get the space
 too.
 
+A fenced code block indented under a list item, as CommonMark writes it, is stored by Slack as the
+item's plain text, its lines run together. The sink moves such a block to the start of the line
+(`markdown.codeOutOfLists`), with the item's lines after it, and puts a blank line before the item
+that follows: Slack then stores the block as code and the list goes on from the next number. A
+line still arriving waits while it may turn into a fence or an item.
+
 ### Retries and writes in flight
 
 The retries of a Slack call are the daemon's own policy, in `clients`. Both clients are built with

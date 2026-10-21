@@ -472,6 +472,21 @@ test("words added after a reply ended cannot finish a mention its end began", as
   assert.deepEqual(slack.messageTexts(), [`a <${ZWSP}!here> b`]);
 });
 
+test("a code block in a list item reaches Slack at the start of the line, streamed or not", async () => {
+  // #37: indented under its item, Slack stores it as the item's plain text (measured 2026-10-22).
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("1. Run it:\n   ``");
+  await settled();
+  await sink.text("`\n   ls -la\n   ```\n   Then paste it.\n2. Next");
+  await settled();
+  await sink.finish([]);
+  await sink.closeOut();
+  const moved = "1. Run it:\n```\nls -la\n```\nThen paste it.\n\n2. Next";
+  assert.equal(streamedText(slack), moved);
+  assert.deepEqual(slack.messageTexts(), [moved]);
+});
+
 test("a line of the daemon's own is quieted too: some carry Claude's words", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);

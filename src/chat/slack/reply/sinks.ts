@@ -104,7 +104,7 @@ import {
 } from "./errors.ts";
 import { mrkdwnEscape, quietMentions } from "./escape.ts";
 import type { Limiter } from "./limiter.ts";
-import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
+import { bannerText, codeOutOfLists, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
 import { positionOf, ThreadPlaces } from "./places.ts";
 import { Task } from "./tasks.ts";
 
@@ -174,13 +174,18 @@ class Text {
   }
 
   /**
-   * More words, quieted (`quietMentions`), the daemon's lines too, since some carry Claude's (an
-   * agent's description): an end that may still become a mention waits for the words after it,
-   * so the shown text only ever grows.
+   * More words, with a code block in a list item moved out of it (`codeOutOfLists`) and quieted
+   * (`quietMentions`), the daemon's lines too, since some carry Claude's (an agent's
+   * description): what may still change waits for the words after it, so the shown text only
+   * ever grows.
    */
   add(more: string): void {
     this.raw += more;
-    this.text = this.settled + quietMentions(this.raw, false);
+    this.text = this.settled + Text.shown(this.raw, false);
+  }
+
+  private static shown(raw: string, whole: boolean): string {
+    return quietMentions(codeOutOfLists(raw, whole), whole);
   }
 
   /**
@@ -189,7 +194,7 @@ class Text {
    */
   close(): boolean {
     const before = this.text;
-    this.text = this.settled + quietMentions(this.raw, true);
+    this.text = this.settled + Text.shown(this.raw, true);
     this.settled = this.text;
     this.raw = "";
     return this.text !== before;

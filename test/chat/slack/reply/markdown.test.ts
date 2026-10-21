@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { plainWords } from "../../../../src/chat/slack/reply/markdown.ts";
+import { codeOutOfLists, plainWords } from "../../../../src/chat/slack/reply/markdown.ts";
 
 // The pattern `plainWords` read a labelled link with until it was replaced, kept here as the
 // definition of the result: quadratic on a run of `<`, and right on every input.
@@ -56,3 +56,62 @@ for (const [name, text] of [
     assert.ok(performance.now() - began < 500);
   });
 }
+
+// A fence indented under its list item is stored as the item's plain text, its lines run
+// together; at column 0, with the item's later lines there too and a blank line before the next
+// item, it is stored as code and the list goes on from the next number (measured 2026-10-22,
+// dev app, private channel, by post, stream and edit).
+const IN_LIST = [
+  "1. **Now:** run test A:",
+  "   ```",
+  "   php -d memory_limit=64M /tmp/p.php",
+  "   cat /tmp/m",
+  "   ```",
+  "   Paste what it prints.",
+  "2. Test B comes **later**.",
+].join("\n");
+const OUT_OF_LIST = [
+  "1. **Now:** run test A:",
+  "```",
+  "php -d memory_limit=64M /tmp/p.php",
+  "cat /tmp/m",
+  "```",
+  "Paste what it prints.",
+  "",
+  "2. Test B comes **later**.",
+].join("\n");
+
+test("a code block in a list item moves to the start of the line, and the list goes on", () => {
+  assert.equal(codeOutOfLists(IN_LIST, true), OUT_OF_LIST);
+  const bullets = "- a:\n  ~~~\n  x\n  ~~~\n- b";
+  assert.equal(codeOutOfLists(bullets, true), "- a:\n~~~\nx\n~~~\n\n- b");
+});
+
+test("text with no code block in a list is left as written", () => {
+  for (const text of [
+    "1. one\n   two\n2. three",
+    "intro\n```\n  indented code\n```\n- a\n- b",
+    "- a\n\n```\nx\n```\nafter",
+    "plain words, no list",
+    // A list written as an example inside a code block of its own.
+    "Example:\n```md\n1. a\n   ```js\n   x\n   ```\n2. b\n```\n",
+  ]) {
+    assert.equal(codeOutOfLists(text, true), text);
+  }
+});
+
+test("text cut anywhere moves code to a prefix of what the whole text gives", () => {
+  for (const text of [IN_LIST, `${IN_LIST}\n\nAfter the list.`, "- a:\n  ```\n  x\n  ```\n- b\n"]) {
+    const whole = codeOutOfLists(text, true);
+    let last = "";
+    for (let cut = 0; cut <= text.length; cut += 1) {
+      const part = codeOutOfLists(text.slice(0, cut), false);
+      assert.ok(
+        whole.startsWith(part),
+        `${JSON.stringify(text)} cut at ${cut}: ${JSON.stringify(part)}`,
+      );
+      assert.ok(part.startsWith(last), `${JSON.stringify(text)} cut at ${cut} shrank`);
+      last = part;
+    }
+  }
+});
