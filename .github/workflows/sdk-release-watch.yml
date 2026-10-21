@@ -11,9 +11,9 @@ name: SDK release watch
 
 on:
   schedule:
-    # Daily. A scheduled run can slip or be dropped under load: the state lives in the issue, so
-    # the next run catches up.
-    - cron: "23 7 * * *"
+    # Daily, in the evening in Europe/Rome (17:23 UTC is 18:23 or 19:23 there). A scheduled run
+    # can slip or be dropped under load: the state lives in the issue, so the next run catches up.
+    - cron: "23 17 * * *"
   workflow_dispatch:
 
 permissions:
