@@ -18,6 +18,8 @@ allaboard runs Claude Code on the owner's machine on behalf of one Slack user. I
   message content written to a log;
 - two instances served by one Slack app, which the daemon refuses at startup;
 - an approval request that shows the owner something other than what Approve lets run;
+- a reply that notifies anyone: a mention sequence (`<!here>`, `<!channel>`, `<@…>`) in Claude's
+  words that reaches Slack as a mention;
 - a session started in a folder the owner has not trusted in Claude Code;
 - the daemon's own git (the footer, `!status`, `!open`) run in a repository the owner has not
   trusted in Claude Code.

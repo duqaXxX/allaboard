@@ -432,6 +432,55 @@ test("changes inside one debounce go in one append", async () => {
   ]);
 });
 
+/** Every markdown text the stream was given, in order, joined. */
+function streamedText(slack: FakeSlack): string {
+  return [...slack.callsTo("chat.startStream"), ...slack.callsTo("chat.appendStream")]
+    .flatMap((call) => list(call.chunks))
+    .flatMap((chunk) => {
+      const { type, text } = chunk as { type: string; text?: string };
+      return type === "markdown_text" && text !== undefined ? [text] : [];
+    })
+    .join("");
+}
+
+const ZWSP = String.fromCodePoint(0x200b);
+
+test("a mention sequence in Claude's words never reaches Slack as one, even cut in two", async () => {
+  // #28: stored as a broadcast and notifying the channel, as typed (measured 2026-10-21).
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("Ping <");
+  await settled();
+  await sink.text("!here> and <@U000ALICE>, even in `<!channel>`");
+  await settled();
+  await sink.finish([]);
+  await sink.closeOut();
+  const quiet = `Ping <${ZWSP}!here> and <${ZWSP}@U000ALICE>, even in \`<${ZWSP}!channel>\``;
+  assert.equal(streamedText(slack), quiet);
+  assert.deepEqual(slack.messageTexts(), [quiet]);
+});
+
+test("words added after a reply ended cannot finish a mention its end began", async () => {
+  // A report turn renders into the reply after its `finish`.
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("a <");
+  await sink.finish([]);
+  await sink.text("!here> b");
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.deepEqual(slack.messageTexts(), [`a <${ZWSP}!here> b`]);
+});
+
+test("a line of the daemon's own is quieted too: some carry Claude's words", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("Agent launched: tell <!channel>", { notice: true });
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.deepEqual(slack.messageTexts(), [`Agent launched: tell <${ZWSP}!channel>`]);
+});
+
 test("the end stops the stream in one push, and the footer follows by a silent edit", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
@@ -2372,6 +2421,14 @@ for (const fence of ["```", "````", "``````", "```x```"]) {
     assert.equal(block.text.split("```").length - 1, 2);
   });
 }
+
+test("a file's preview notifies nobody either", () => {
+  const block = only(previewBlocks("<p>\n<!-- note -->\nping <!here> and <@U000ALICE>"));
+  assert.equal(
+    block.text,
+    `\`\`\`\n<p>\n<!-- note -->\nping <${ZWSP}!here> and <${ZWSP}@U000ALICE>\n\`\`\``,
+  );
+});
 
 test("update limiter never exceeds the budget in any window", async () => {
   // On a clock that moves by what the limiter sleeps: the times are exact.

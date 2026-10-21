@@ -102,7 +102,7 @@ import {
   tooManyBlocks,
   unknownOutcome,
 } from "./errors.ts";
-import { mrkdwnEscape } from "./escape.ts";
+import { mrkdwnEscape, quietMentions } from "./escape.ts";
 import type { Limiter } from "./limiter.ts";
 import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
 import { positionOf, ThreadPlaces } from "./places.ts";
@@ -149,6 +149,7 @@ function pieceKey(index: number, piece: number): string {
 }
 
 class Text {
+  /** What the message shows: the words with their mention sequences quieted. */
   text: string;
   /** A line of the daemon's own: never the banner while Claude has words. */
   notice: boolean;
@@ -159,12 +160,39 @@ class Text {
   /** Bumped when it changes: a message whose parts kept theirs is not rendered again. */
   rev: number;
 
+  // The words as they arrived since `settled`, the text shown when the part was last closed.
+  private raw = "";
+  private settled = "";
+
   constructor(text: string, notice: boolean, ending: boolean, aside: boolean, rev: number) {
-    this.text = text;
+    this.text = "";
     this.notice = notice;
     this.ending = ending;
     this.aside = aside;
     this.rev = rev;
+    this.add(text);
+  }
+
+  /**
+   * More words, quieted (`quietMentions`), the daemon's lines too, since some carry Claude's (an
+   * agent's description): an end that may still become a mention waits for the words after it,
+   * so the shown text only ever grows.
+   */
+  add(more: string): void {
+    this.raw += more;
+    this.text = this.settled + quietMentions(this.raw, false);
+  }
+
+  /**
+   * Nothing more is coming for now: what waited is shown as it reads, and words added later
+   * follow it. True when the shown text changed.
+   */
+  close(): boolean {
+    const before = this.text;
+    this.text = this.settled + quietMentions(this.raw, true);
+    this.settled = this.text;
+    this.raw = "";
+    return this.text !== before;
   }
 }
 
@@ -692,12 +720,19 @@ export class ReplySink implements Sink {
       last.ending === ending &&
       last.aside === aside
     ) {
-      last.text += markdown;
+      last.add(markdown);
       last.rev = this.nextRev();
     } else {
+      this.closeText();
       this.parts.push(new Text(markdown, notice, ending, aside, this.nextRev()));
     }
     this.changed();
+  }
+
+  /** The last part, when it is text, has all its words for now: none of them waits. */
+  private closeText(): void {
+    const last = this.parts.at(-1);
+    if (last instanceof Text && last.close()) last.rev = this.nextRev();
   }
 
   /**
@@ -712,6 +747,7 @@ export class ReplySink implements Sink {
       if (tool === undefined) {
         tool = new Tool(card, now);
         this.tools.set(card.id, tool);
+        this.closeText();
         this.parts.push(tool);
       } else {
         tool.set(card, now);
@@ -882,6 +918,7 @@ export class ReplySink implements Sink {
    */
   async finish(closing: readonly TaskUpdate[], signal?: AbortSignal): Promise<void> {
     for (const update of closing) await this.task(update);
+    this.closeText();
     this.finished = true;
     // Before the pending write is cancelled: the flush below carries the change it schedules.
     this.places.place();
