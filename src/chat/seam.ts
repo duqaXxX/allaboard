@@ -186,6 +186,12 @@ export type MessageId = string;
 /** What the root of a thread shows of its session. */
 export type SessionStatus = "working" | "waiting" | "done" | "error";
 
+/**
+ * What the root shows: the session's status, or `restarting` in place of `working` while a stop
+ * waits for the thread. Shown only, never stored: a close replaces it with how the session ended.
+ */
+export type RootStatus = SessionStatus | "restarting";
+
 /** What still runs in a thread: a title and one line per task. */
 export interface RunningList {
   readonly title: string;
@@ -258,7 +264,7 @@ export interface ThreadChat {
    * a `signal`, rejects with its reason when it aborts, and the change may be left half made.
    * False when the chat did not make the change and the root does not show `status`.
    */
-  showStatus(status: SessionStatus, signal?: AbortSignal): Promise<boolean>;
+  showStatus(status: RootStatus, signal?: AbortSignal): Promise<boolean>;
   /** Leaves the root with no status of this session. */
   clearStatus(): Promise<void>;
   /** Brings the root to the status asked for last: for whoever aborted a change on its way. */

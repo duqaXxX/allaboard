@@ -3392,6 +3392,34 @@ test("a stop held by a background task says so and bang stop ends it", async (t)
   await drainEnds(h, drain);
 });
 
+test("a stop shows the root of a thread it waits for as restarting, until the close", async (t) => {
+  // In the channel's own view, not only in the thread (#23): a reaction on the owner's root,
+  // which notifies nobody, in place of ⏳.
+  const [first] = splitBackground();
+  const h = harnessFor(t)({ turns: [first] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  assert.equal(h.reactions().at(-1), Status.WORKING); // the task still runs
+  const drain = startDrain(h);
+  await polled(h);
+  await h.until(() => h.reactions().at(-1) === Status.RESTARTING);
+  assert.deepEqual(h.slack.callsTo("chat.postMessage"), []);
+  assert.equal(thread(h).status, "working"); // shown only: the state keeps the session's own
+  assert.ok(await session.stop());
+  await drainEnds(h, drain);
+  // The close replaces it with how the session ended: nothing is left behind.
+  assert.equal(h.reactions().at(-1), Status.DONE);
+});
+
+test("a stop leaves the root of a thread it does not wait for as it was", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
+  await (await h.session().submit("hello")).done.wait();
+  await h.until(() => h.reactions().at(-1) === Status.DONE);
+  const drain = startDrain(h);
+  await drainEnds(h, drain);
+  assert.ok(!h.reactions().includes(Status.RESTARTING));
+});
+
 test("a stop whose interrupt is refused still stops the background tasks", async (t) => {
   // The SDK rejects a control request on a query it has cleaned up ("Query closed before
   // response received", read in sdk.mjs 0.3.296) and one the CLI refuses with its own error.

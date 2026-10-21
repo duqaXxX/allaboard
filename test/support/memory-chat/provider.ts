@@ -26,8 +26,8 @@ import {
   type OwnerRequest,
   type Presence,
   type Reply,
+  type RootStatus,
   type RunningList,
-  type SessionStatus,
   type TaskUpdate,
   type ThreadChat,
   type ThreadRef,
@@ -290,7 +290,7 @@ class MemoryThread implements ThreadChat {
     this.#room.showRunning(this.#ref, list);
   }
 
-  async showStatus(status: SessionStatus): Promise<boolean> {
+  async showStatus(status: RootStatus): Promise<boolean> {
     this.#room.stray(`showStatus ${status}`);
     return true;
   }

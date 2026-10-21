@@ -169,7 +169,7 @@ Terms used throughout:
 | reply | What the daemon writes in the thread for a turn |
 | report turn | A turn the agent starts by itself to report a finished background task |
 | bypass | The permission mode that skips permission requests (`bypassPermissions` in Claude Code), kept per thread and set with `!bypass` |
-| root reaction | With Slack, the reaction on the thread's root message that shows the session's state: ⏳ working, ✋ waiting for the owner, ✅ ended, ❌ error |
+| root reaction | With Slack, the reaction on the thread's root message that shows the session's state: ⏳ working, ✋ waiting for the owner, ✅ ended, ❌ error, 🔄 a restart waits for it |
 | drain | The wait at shutdown for the turns already sent to finish |
 | record | One object of the SDK's stream, as Claude Code wrote it |
 | event | A `SessionEvent` of the agent seam, which the back end makes from records and hook inputs |
@@ -1466,7 +1466,11 @@ closed when the start returns (`ThreadSession.connect`).
   second prompt queued behind the first keeps it `⏳` until everything has ended. `❌` error: a turn
   fails, a restart's drain drops a queued or taken turn, `SessionGone`, or a shutdown's drain cuts
   short a busy session. A session whose only unfinished work at the shutdown is a task the drain
-  left out (`ThreadSession.mayHaveOrderedRestart`) gets `✅` instead. A `❌` stands until new work
+  left out (`ThreadSession.mayHaveOrderedRestart`) gets `✅` instead. `🔄` restarting: while a
+  stop waits for the thread, the root shows it in place of `⏳` (`ThreadSession.rootStatus`, the
+  chat seam's `RootStatus`), so the channel's own view says why the session has not ended; it is
+  never written to `state.json`, and the close that ends the wait replaces it with `✅` or `❌`. A
+  `❌` stands until new work
   starts (a submit or a report turn, both of which clear `ThreadSession.errorStanding`), never
   flipped back to `✅` by some unrelated task's own idle sweep in between
   (`ThreadSession.reactDoneIfIdle` reads that flag, not `StatusReaction.current`, which only updates

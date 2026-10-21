@@ -37,6 +37,7 @@ import {
   type OwnerRequest,
   type Presence,
   type Reply,
+  type RootStatus,
   type RunningList,
   type SessionIndex,
   type SessionStatus,
@@ -556,7 +557,7 @@ export class SlackThread implements ThreadChat {
     this.places?.showRunning(list);
   }
 
-  showStatus(status: SessionStatus, signal?: AbortSignal): Promise<boolean> {
+  showStatus(status: RootStatus, signal?: AbortSignal): Promise<boolean> {
     return this.reaction.show(REACTIONS[status], signal);
   }
 

@@ -489,7 +489,8 @@ whether it is pinned (`pinned_to`). A row is dated by the last reply, or
 by the root while it has none, and the rows are ordered by that date. The status is a reaction
 name: the one `reply.status.REACTIONS` draws for the word in `ThreadState.ended` when it is set,
 for the word in `ThreadState.status` otherwise, and the reaction read from the root for a thread
-that has neither (one that ended before the daemon kept it). `ended`
+that has neither (one that ended before the daemon kept it). A root that shows 🔄 while a stop
+waits for its thread is listed as working, since that word is the one stored. `ended`
 and `status` are both set only for an answer that never reached Slack, where the root shows ❌ and
 `status` stays for crash repair. A root is read again only for a thread a state write touched since
 the last read, which every turn does at its start and at its end (`StateStore.onSessionsChange`

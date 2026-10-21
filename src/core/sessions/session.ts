@@ -62,6 +62,7 @@ import type {
   FooterFields,
   MessageId,
   Reply,
+  RootStatus,
   RunningAgent,
   RunningList,
   SessionStatus,
@@ -409,6 +410,9 @@ export class ThreadSession {
   // Whether this stop has said, in a message, which background tasks it waits for: only where
   // the thread's activity line cannot (`showRestartWait`).
   private toldWaiting = false;
+  // The status asked of the chat last (`noteStatus`): a stop that begins while it is `working`
+  // shows the root as restarting (`rootStatus`).
+  private lastStatus: SessionStatus | null = null;
   // Set when a stop begins while this session has a turn running. The signal names no sender,
   // and the session that sent it has its turn running then; a background task it starts from
   // that point is often its own wait for the new process, which cannot end before this one
@@ -731,6 +735,7 @@ export class ThreadSession {
       this.recordStatus(() =>
         this.deps.state.setStatusPending(this.channelId, this.threadId, null),
       );
+      this.lastStatus = null;
       if (this.reacts) await this.thread.clearStatus();
       return;
     }
@@ -1214,6 +1219,11 @@ export class ThreadSession {
    */
   async showRestartWait(): Promise<void> {
     this.showThreadStatus();
+    // No call when the root already shows it. A ❌ shown with ⏳ kept in the state (a reply that
+    // never landed) stands.
+    if (this.reacts && this.lastStatus === "working" && !this.errorStanding) {
+      this.thread.showStatus(this.rootStatus("working")).catch(() => {});
+    }
     if (!this.deps.chat.capabilities.activityLine) return;
     if (!this.thread.activityRefused || this.toldWaiting || this.busy) return;
     const held = this.runningKindsOf({ awaitedOnly: true });
@@ -1683,8 +1693,11 @@ export class ThreadSession {
       } else if (this.reacts) {
         // a session reads idle as soon as its turn ends, while its reader may
         // still be between the two calls that move ⏳ to ✅, and `cancelTasks` above stops it
-        // there. No call when the root already reads as asked.
-        await this.thread.settleStatus();
+        // there. No call when the root already reads as asked. A 🔄 asked last goes back to ⏳:
+        // the stop that waited is over, and the root must not say it after the restart.
+        if (this.lastStatus === "working" && !this.errorStanding) {
+          await this.thread.showStatus("working");
+        } else await this.thread.settleStatus();
       }
       // Crash repair: a graceful close is not what repair is for, whatever is
       // still live in the chat when it ends, so this thread's fields end up empty either way.
@@ -2631,7 +2644,18 @@ export class ThreadSession {
     this.errorStanding = state === "error";
     this.noteStatus(state);
     this.showThreadStatus();
-    if (this.reacts) this.thread.showStatus(state).catch(() => {});
+    if (this.reacts) this.thread.showStatus(this.rootStatus(state)).catch(() => {});
+  }
+
+  /**
+   * What the root shows for `state`: `restarting` in place of `working` while a stop waits for
+   * this thread (`SessionManager.drain` reads the same two flags), so the channel's own view says
+   * why it has not ended. An edit of the root, which notifies nobody; the close that ends the
+   * wait replaces it with how the session ended.
+   */
+  private rootStatus(state: SessionStatus): RootStatus {
+    const held = this.draining && !(this.restartReady && !this.reporting);
+    return state === "working" && held ? "restarting" : state;
   }
 
   /**
@@ -2641,6 +2665,7 @@ export class ThreadSession {
    * (`close`'s ❌, `reactDoneIfIdle`'s ✅).
    */
   private noteStatus(state: SessionStatus): void {
+    this.lastStatus = state;
     const pending = state === "working" || state === "waiting";
     this.recordStatus(() =>
       this.deps.state.setStatusPending(
