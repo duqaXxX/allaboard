@@ -8,6 +8,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      time: "19:00"
+      timezone: Europe/Rome
     assignees:
       - duqaXxX
     groups:
@@ -19,6 +21,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      time: "19:00"
+      timezone: Europe/Rome
     assignees:
       - duqaXxX
     # The SDK gets a pull request of its own: its bump changes the bundled CLI and so the message
