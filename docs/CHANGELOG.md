@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.7.0] - 2026-10-21
+
 ### Added
 
 - A `!word` typed in a session's thread that is no command of allaboard's or of the session is no
