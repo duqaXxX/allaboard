@@ -17,6 +17,9 @@ All notable changes to this project are documented here. The format follows
   no longer notifies like a typed mention: a zero-width space follows its `<`, in text and in code
   alike, and the reply reads the same. A page Claude read can no longer make a reply notify the
   channel or a member of the workspace.
+- A code block inside a list item in a reply shows as code: Slack showed it as the item's plain
+  text, its lines run together. The block now starts at the beginning of the line and the list
+  goes on after it.
 
 ## [0.7.0] - 2026-10-21
 

@@ -216,3 +216,91 @@ export function plainWords(text: string): string {
   const words = stripMarkdown(labelsOnly(text)).match(WORDS) ?? [];
   return words.join(" ").toLowerCase();
 }
+
+// A list item's first line; its length is where the item's own lines start.
+const LIST_ITEM = /^ {0,3}(?:\d{1,9}[.)]|[-*+]) {1,4}(?=\S)/;
+// A line that starts an item, read before the words after its marker have arrived.
+const ITEM_START = /^(?:\d{1,9}[.)]|[-*+])(?: |$)/;
+const ITEM_SO_FAR = /^(?:\d{1,9}[.)]?|[-*+])$/;
+const FENCE_OPEN = /^(`{3,}|~{3,})/;
+const FENCE_SO_FAR = /^(?:`{1,2}|~{1,2})$/;
+const FENCE_CLOSE = /^(`{3,}|~{3,})[ \t]*$/;
+
+/** How many spaces `line` starts with. */
+function leading(line: string): number {
+  let count = 0;
+  while (line[count] === " ") count += 1;
+  return count;
+}
+
+/**
+ * Claude's markdown with every fenced code block that sits in a list item moved to the start of
+ * the line, the item's lines after it with it, and a blank line before the item that follows.
+ * Slack stores a fence indented under its item as the item's plain text, its lines run together;
+ * moved, it is stored as code and the list goes on from the next number (measured 2026-10-22).
+ * Any other text is left as written.
+ *
+ * For text still arriving (`whole` false), a line waits while it may still turn into a fence or
+ * an item, so every later call starts with what this one returns.
+ */
+export function codeOutOfLists(text: string, whole: boolean): string {
+  let out = "";
+  // Where the open item's own lines start; whether one of its fences was moved; the fence open,
+  // and whether it is one being moved (a fence outside any item keeps every line as written).
+  let item: number | null = null;
+  let moved = false;
+  let fence: { indent: number; marks: string; moving: boolean } | null = null;
+  let afterBlank = false;
+  let start = 0;
+  while (start < text.length) {
+    const newline = text.indexOf("\n", start);
+    const complete = newline !== -1 || whole;
+    const end = newline === -1 ? text.length : newline;
+    const line = text.slice(start, end);
+    const lead = leading(line);
+    const rest = line.slice(lead);
+    let shown: string | null = line;
+    if (fence !== null) {
+      if (fence.moving) shown = line.slice(Math.min(fence.indent, lead));
+    } else if (item !== null) {
+      if (!complete && rest === "") shown = null;
+      else if (lead >= item && lead - item <= 3 && FENCE_OPEN.test(rest)) shown = rest;
+      else if (!complete && lead >= item && lead - item <= 3 && FENCE_SO_FAR.test(rest)) {
+        shown = null;
+      } else if (moved && lead <= 3 && ITEM_START.test(rest) && (complete || rest.includes(" "))) {
+        shown = (out.endsWith("\n\n") ? "" : "\n") + line;
+      } else if (moved && !complete && lead <= 3 && ITEM_SO_FAR.test(rest)) shown = null;
+      else if (moved && lead > 0) shown = line.slice(Math.min(item, lead));
+    }
+    if (shown === null) break;
+    out += shown;
+    if (newline === -1) break;
+    out += "\n";
+    // What this line opens or ends, read once it is whole.
+    if (fence !== null) {
+      const close = FENCE_CLOSE.exec(line.slice(Math.min(fence.indent + 3, lead)));
+      const marks = close?.[1] ?? "";
+      if (marks[0] === fence.marks[0] && marks.length >= fence.marks.length) fence = null;
+    } else if (item !== null && lead >= item && lead - item <= 3 && FENCE_OPEN.test(rest)) {
+      fence = { indent: lead, marks: FENCE_OPEN.exec(rest)?.[1] ?? "", moving: true };
+      moved = true;
+    } else if (lead <= 3 && FENCE_OPEN.test(rest)) {
+      // A fence of its own, outside any item: the list, if one was open, ends there.
+      fence = { indent: lead, marks: FENCE_OPEN.exec(rest)?.[1] ?? "", moving: false };
+      item = null;
+      moved = false;
+    } else {
+      const opened = LIST_ITEM.exec(line);
+      if (opened !== null) {
+        item = opened[0].length;
+        moved = false;
+      } else if (afterBlank && lead === 0 && rest !== "") {
+        item = null;
+        moved = false;
+      }
+    }
+    afterBlank = fence === null && rest === "";
+    start = newline + 1;
+  }
+  return out;
+}
