@@ -1,0 +1,719 @@
+/**
+ * The agent seam: what the core asks of an agent back end and what a back end tells the core.
+ * No type of an agent SDK appears here. One back end exists, `agent/claude`, and it is the only
+ * module that imports the SDK.
+ *
+ * The values declared here are errors the core has to tell from every other, and it may import
+ * nothing of a back end: `ResumeRefused`, the failure of a start, and `AgentConfigError`, a
+ * setting of the owner's the agent cannot use.
+ */
+import type { Clock } from "../clock.ts";
+import type { ModuleSetup } from "../module-setup.ts";
+
+/**
+ * The agent refused to resume the session a start named (its transcript is gone): the thread
+ * that held it cannot go on. Any other failure of a start rejects with the failure itself, and
+ * the thread's next message tries again.
+ */
+export class ResumeRefused extends Error {
+  constructor(options?: ErrorOptions) {
+    super("the agent could not resume the session", options);
+    this.name = "ResumeRefused";
+  }
+}
+
+/**
+ * A setting the owner gave the agent in the daemon's file cannot be used; the message names the
+ * variable and says what to fix. The daemon logs it as it does its own configuration errors.
+ */
+export class AgentConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentConfigError";
+  }
+}
+
+/** A permission mode, by the name the back end gives it. */
+export type PermissionMode = string;
+
+/** The modes a back end knows, by role. A role it lacks is null. */
+export interface PermissionModes {
+  readonly default: PermissionMode;
+  readonly auto: PermissionMode | null;
+  /** The mode that skips permission requests. */
+  readonly bypass: PermissionMode | null;
+}
+
+/** What an agent says it is doing (`state_changed`), for one that declares `declaredState`. */
+export type AgentState = "working" | "waiting" | "idle";
+
+/**
+ * What differs between back ends and the core adapts to. A capability is here because the core
+ * reads it: without one the feature it names is not offered (`!help` and `!guide` leave it
+ * out), and the core never calls what serves it. What every back end does alike needs none.
+ */
+export interface Capabilities {
+  /**
+   * The levels `StartOptions.effort` and `setEffort` take. A stored level outside them is never
+   * sent: the core drops it, with a line in the log.
+   */
+  readonly effortLevels: readonly string[];
+  /**
+   * The word the agent uses for "the model's own default effort", which an `effort_changed` or
+   * `effort_observed` level may carry though it is no level `setEffort` takes. The core stores
+   * it as no override. Null when the agent has no such word.
+   */
+  readonly effortDefault: string | null;
+  /** `setEffort` changes the live session; without it the core restarts the session. */
+  readonly liveEffort: boolean;
+  readonly permissionModes: PermissionModes;
+  /** Calls run under a call of their own (`parentCallId`), and a task can be a subagent's. */
+  readonly subagents: boolean;
+  /** A task outlives the turn that started it, and the agent starts a turn to report it. */
+  readonly backgroundTasks: boolean;
+  /**
+   * The agent says when it takes a task's notification into the turn that is running
+   * (`notification_folded`). Without it, a task that ends inside a turn counts as reported by
+   * that turn. Meaningful with `backgroundTasks`.
+   */
+  readonly foldedNotifications: boolean;
+  /** The agent compacts a conversation (`compaction_started`, `compacted`). */
+  readonly compaction: boolean;
+  /**
+   * The agent says whether it works, rests or waits for the owner (`state_changed`). Without it
+   * the core knows a turn of the agent's own only from that turn's first event.
+   */
+  readonly declaredState: boolean;
+  /**
+   * The agent asks the owner questions (`RequestHandler.question`). The core offers nothing of
+   * its own for a question, so the only thing that reads this is `!guide`, which names the
+   * answer form when it is declared.
+   */
+  readonly questions: boolean;
+  /** `AgentBackend.usageLimits`. */
+  readonly usageLimits: boolean;
+  /** `AgentInfo.models` lists what `setModel` takes. */
+  readonly models: boolean;
+  /** `AgentInfo.commands` lists commands of the agent's own, which a prompt can run. */
+  readonly commands: boolean;
+  /** A prompt sent while a turn runs is taken into that turn (`prompt_taken`). */
+  readonly promptDuringTurn: boolean;
+  /** `listSessions`, `datedSessions` and `aliveSessions`. */
+  readonly sessionListing: boolean;
+  /**
+   * `folderTrusted`, `trustedRepository` and `untrustedRepository` read a record of trust the
+   * owner keeps in the agent.
+   */
+  readonly folderTrust: boolean;
+  /** `AgentBackend.tagSession`. */
+  readonly sessionTags: boolean;
+  /** `AgentBackend.sessionTitle`. */
+  readonly sessionTitles: boolean;
+  /**
+   * `goal_changed`: the agent says what becomes of a goal the owner set with its command. The
+   * command's own text says when a goal is set or cleared; the event adds what it does not.
+   */
+  readonly goals: boolean;
+}
+
+/** The agent's own words, which the daemon's texts are filled with. */
+export interface AgentWords {
+  /** Who writes the replies, where a text names them and not the product. */
+  readonly author: string;
+  /** The command that opens the agent in a terminal on the host. */
+  readonly command: string;
+  /** Two of its commands as the owner types them in the chat, for the guide. */
+  readonly examples: string;
+  /**
+   * The agent's command names, without the slash, that start a new session; empty when it has
+   * none. One thread is one session, so the daemon refuses each of them inside a thread.
+   */
+  readonly newSession: readonly string[];
+  /**
+   * The name of the agent's own command that logs in on the host, without the slash; null when
+   * it has none. The daemon answers it with where it is done and never sends it.
+   */
+  readonly login: string | null;
+  /** The same for the command that logs out. */
+  readonly logout: string | null;
+  /**
+   * The shell line that continues a session in a terminal; `{directory}` and `{session}` are
+   * filled in, each quoted for a shell.
+   */
+  readonly terminal: string;
+  /**
+   * The shell line that opens the agent in `{directory}` (quoted for a shell), where it asks
+   * whether to trust that folder; null for an agent that keeps no record of trust.
+   */
+  readonly trust: string | null;
+  /**
+   * The agent's terminal commands, without the slash, that a session started from the chat does
+   * not offer, each with what the owner can do instead or null; empty when it has none. The
+   * daemon answers `!name` for one of them itself and sends the agent nothing, unless the
+   * session's own list offers that name.
+   */
+  readonly notOffered: Readonly<Record<string, string | null>>;
+  /**
+   * The agent's command, without the slash and with its argument, that drops the session's
+   * goal (`goals`); null when it has none. The daemon names it under a stop that leaves a goal
+   * set.
+   */
+  readonly goalClear: string | null;
+}
+
+export type SettingsSource = "user" | "project" | "local";
+
+export interface StartOptions {
+  readonly folder: string;
+  /** The session to resume, or null for a new one. */
+  readonly resume: string | null;
+  readonly settingsSources: readonly SettingsSource[];
+  readonly model: string | null;
+  readonly effort: string | null;
+}
+
+export interface TextPart {
+  readonly type: "text";
+  readonly text: string;
+}
+
+export interface ImagePart {
+  readonly type: "image";
+  readonly mediaType: string;
+  /** Base64. */
+  readonly data: string;
+}
+
+/** The owner's text, or the parts of one message when it carries images. */
+export type PromptContent = string | readonly (TextPart | ImagePart)[];
+
+export interface Prompt {
+  /** The prompt's own id, a UUID the core makes, which `prompt_taken` names. */
+  readonly id: string;
+  readonly content: PromptContent;
+}
+
+/** What the agent says of its context window; a value it does not report is null. */
+export interface ContextUsage {
+  readonly model: string | null;
+  /** The share of the context window in use, 0 to 100. */
+  readonly percentage: number | null;
+}
+
+export interface ModelInfo {
+  readonly value: string;
+  /** The full id the value stands for, which a message or a result names the model by; null when the agent gives none. */
+  readonly resolvedModel: string | null;
+  /** The agent's name for the model, or its value when it gives none. */
+  readonly displayName: string;
+  readonly description: string | null;
+  readonly supportsEffort: boolean;
+  readonly supportedEffortLevels: readonly string[];
+}
+
+export interface CommandInfo {
+  readonly name: string;
+  readonly description: string;
+  readonly argumentHint: string;
+  readonly aliases: readonly string[];
+}
+
+export interface AgentInfo {
+  readonly models: readonly ModelInfo[];
+  readonly commands: readonly CommandInfo[];
+  /** The mode the session started in, or null when the agent does not say. */
+  readonly permissionMode: PermissionMode | null;
+}
+
+export interface ListedSession {
+  readonly id: string;
+  /** What the agent's own picker shows for the session. */
+  readonly title: string;
+  /** The title the owner gave it or the agent generated, which `!resume <title>` matches. */
+  readonly customTitle: string | null;
+  readonly branch: string | null;
+  /** Bytes of the transcript. */
+  readonly size: number | null;
+  /** Milliseconds since the epoch. */
+  readonly lastModified: number;
+}
+
+export interface DiffHunk {
+  /** The number of the hunk's first line in the file as it was, and as it is now. */
+  readonly oldStart: number;
+  readonly newStart: number;
+  /**
+   * Each line with its sign as the first character: `-` removed, `+` added, a space for a
+   * line that did not change, a backslash for a note about the line above.
+   */
+  readonly lines: readonly string[];
+}
+
+/** What a call did to a file, when the agent reports it. */
+export interface FileChange {
+  /** As the agent names it, absolute in the Claude back end. */
+  readonly path: string;
+  /** `edited` always has a hunk; `created` has the file's content. */
+  readonly kind: "created" | "edited";
+  readonly hunks: readonly DiffHunk[];
+  /** A created file's content. */
+  readonly content: string | null;
+}
+
+export type TaskKind = "subagent" | "command" | "other";
+export type TurnEnding = "done" | "interrupted" | "error";
+
+export interface ModelTokens {
+  readonly input: number;
+  readonly output: number;
+  readonly cacheRead: number;
+  readonly cacheCreation: number;
+}
+
+/**
+ * What became of the session's goal (`goal_changed`), whose condition is the owner's words. An
+ * achieved goal carries what it took, each count null when the agent does not say: how many
+ * turns, how long, and how many tokens.
+ */
+export type GoalChange =
+  | { readonly state: "set" | "not_met" | "cleared"; readonly condition: string }
+  | {
+      readonly state: "achieved";
+      readonly condition: string;
+      readonly turns: number | null;
+      readonly durationMs: number | null;
+      readonly tokens: number | null;
+    };
+
+/**
+ * What a back end tells the core. An event can arrive while no turn of the owner's runs:
+ * `turn_ended` is an event like the others, not the answer to `send`.
+ *
+ * `parentCallId` names the call a subagent's event runs under, and is null at the top level. A
+ * subagent's text is never an event: the three text events carry no `parentCallId`.
+ * The events of one message arrive in the order the agent produced them.
+ */
+export type SessionEvent =
+  /**
+   * The agent names its session. It can come again, and the id can change (a cleared conversation).
+   * An id is announced only once a `start` that resumes it would succeed: the core stores it as
+   * the event arrives, and the setup's Start may start a fresh client that resumes it before any
+   * prompt was sent. An agent that keeps no record until its first prompt names the session with
+   * that prompt.
+   */
+  | {
+      readonly type: "session_started";
+      readonly sessionId: string | null;
+      readonly agentVersion: string | null;
+    }
+  /** The agent starts writing a message; its texts follow as `text_started` and `text_delta`. */
+  | {
+      readonly type: "message_started";
+      readonly parentCallId: string | null;
+    }
+  | {
+      readonly type: "message_ended";
+      readonly parentCallId: string | null;
+    }
+  /** A text of the message being written starts; a message can hold several. */
+  | { readonly type: "text_started" }
+  /** The next piece of the text being written, never empty. */
+  | { readonly type: "text_delta"; readonly text: string }
+  /**
+   * The whole text of a message that was not written piece by piece (a command's own output),
+   * trimmed and never empty. A text reaches the core once: as deltas or whole, never both.
+   */
+  | { readonly type: "text"; readonly text: string }
+  | {
+      readonly type: "call_started";
+      readonly callId: string;
+      readonly toolName: string;
+      /** The input as the agent sent it. */
+      readonly input: Readonly<Record<string, unknown>>;
+      readonly parentCallId: string | null;
+    }
+  | {
+      readonly type: "call_ended";
+      readonly callId: string;
+      readonly isError: boolean;
+      /** The result's text, as the agent wrote it; null when the result holds none. */
+      readonly output: string | null;
+      readonly fileChange: FileChange | null;
+      /**
+       * The model the call's agent ran on, when it is not the one that made the call; null when
+       * it is the same, and when the agent does not say. Only a call that starts an agent has
+       * one.
+       */
+      readonly model: string | null;
+      readonly parentCallId: string | null;
+    }
+  /** A task starts: the work of a call (`callId`), or of nothing the core saw (null). */
+  | {
+      readonly type: "task_started";
+      readonly taskId: string;
+      readonly kind: TaskKind;
+      /**
+       * The agent's own word for the kind, as written; null when it gives none. It names the
+       * task's line in the reply; the core counts and words a task by `kind`.
+       */
+      readonly taskType: string | null;
+      readonly description: string;
+      readonly callId: string | null;
+      /**
+       * The type of agent a subagent is, as the agent names it (`mechanical`); null for any
+       * other task and when the agent gives none.
+       */
+      readonly agentType: string | null;
+      /**
+       * Whether the task started in the background, the call that started it not waiting for
+       * it; null when the agent does not say.
+       */
+      readonly background: boolean | null;
+      /**
+       * The subagent task whose agent started this one; null when the conversation started it
+       * and when the agent does not say. A continued subagent's tasks still name it.
+       */
+      readonly parentTaskId: string | null;
+    }
+  | {
+      readonly type: "task_progress";
+      readonly taskId: string;
+      readonly description: string;
+      readonly callId: string | null;
+    }
+  /**
+   * A task's state changed. `terminal` says the task is over; the agent's report of the end
+   * (`task_ended`) may follow, come first, or never come.
+   */
+  | {
+      readonly type: "task_updated";
+      readonly taskId: string;
+      readonly status: string | null;
+      readonly terminal: boolean;
+    }
+  /** The agent reports a task's end to the conversation. */
+  | {
+      readonly type: "task_ended";
+      readonly taskId: string;
+      /**
+       * `completed`, `failed`, `killed` or `stopped` in the Claude back end. Any other word
+       * reads as an end with no failure and is shown as written.
+       */
+      readonly status: string;
+      readonly summary: string;
+      readonly durationMs: number | null;
+      readonly callId: string | null;
+      /**
+       * Whether the agent will name this task in `notification_folded` should a running turn
+       * take its notification. False when it cannot tell for this task (the SDK gave the run no
+       * id), or when no notification of the task's own follows its end (a stopped task): the core
+       * then counts the task as reported by the turn it ended in.
+       */
+      readonly foldNamed: boolean;
+    }
+  /**
+   * What the agent says it is doing, in its own judgement: `working` from before a turn's first
+   * event to after its last, and through whatever it waits for by itself between two turns;
+   * `waiting` while a request sits with the owner; `idle` once nothing of its own is left.
+   */
+  | { readonly type: "state_changed"; readonly state: AgentState }
+  /** The agent is compacting the conversation. Not repeated while it lasts. */
+  | { readonly type: "compaction_started" }
+  /** It no longer is. */
+  | { readonly type: "compaction_ended" }
+  /** The conversation continues from its summary. A count the agent does not give is null. */
+  | {
+      readonly type: "compacted";
+      readonly tokensBefore: number | null;
+      readonly tokensAfter: number | null;
+    }
+  | { readonly type: "mode_changed"; readonly mode: PermissionMode }
+  /** The effort the agent runs at; null is its default. */
+  | { readonly type: "effort_observed"; readonly level: string | null }
+  /**
+   * A command of the owner's changed the effort, or the model, which takes its own. `level` is
+   * the effort the command says the agent now runs at; null when it says none (the new model
+   * has its default). Said before the end of the turn that ran the command.
+   */
+  | { readonly type: "effort_changed"; readonly level: string | null }
+  /**
+   * The agent runs another model from now on, however the switch came (a command, the daemon's
+   * own `setModel`, a fallback, a resume): the id its `ContextUsage` will name once a request
+   * has gone to it. Said before the end of the turn that ran a command, ahead of the usage,
+   * which after a command still names the model before it.
+   */
+  | { readonly type: "model_changed"; readonly model: string }
+  | { readonly type: "folder_changed"; readonly folder: string }
+  /** The cached usage limits are stale. */
+  | { readonly type: "limits_changed" }
+  /**
+   * The goal of the session: set, checked and not met yet (the agent goes on working for it),
+   * achieved, or cleared by the owner. A set goal outlives a stopped turn and a restart; the
+   * agent may say nothing of it again until its next check.
+   */
+  | { readonly type: "goal_changed"; readonly goal: GoalChange }
+  /** The agent took a prompt the core sent: into the running turn, or as the next turn's. */
+  | { readonly type: "prompt_taken"; readonly promptId: string }
+  /**
+   * The turn the agent is about to start by itself answers what the background task `taskId`
+   * told it (a subagent handing its report back). It comes before that turn's first event,
+   * whether or not the task's own end was told yet.
+   */
+  | { readonly type: "report_started"; readonly taskId: string }
+  /**
+   * The agent took the notification of the ended background task `taskId` into the turn that
+   * is running, so that turn reports it and no turn of its own follows. Said after the task's
+   * end and before the running turn's end. A task that ended inside a turn and is never named
+   * so before that turn ends is owed a turn of its own.
+   */
+  | { readonly type: "notification_folded"; readonly taskId: string }
+  | {
+      readonly type: "turn_ended";
+      readonly sessionId: string | null;
+      readonly startedBy: "owner" | "agent";
+      readonly finalText: string | null;
+      readonly ending: TurnEnding;
+      /**
+       * How many times the agent went to its model in the turn, null when it does not say. 0
+       * is a turn that did nothing: no message, no call, no text.
+       */
+      readonly steps: number | null;
+      /** By model. Empty when the turn used none (a command the agent ran itself). */
+      readonly tokens: Readonly<Record<string, ModelTokens>>;
+    }
+  /**
+   * The agent wrote a message about a failed request of its own, in place of an answer.
+   * `category` is its word for the failure, as written; `text` is what the message says, which
+   * can be empty.
+   */
+  | {
+      readonly type: "agent_error";
+      readonly kind: "authentication" | "other";
+      readonly category: string;
+      readonly text: string;
+      readonly parentCallId: string | null;
+    }
+  /**
+   * The agent's process is gone and the core did not close it. The last event of the session:
+   * `events` ends after it. `reason` is shown to the owner as the error's name: the back end's
+   * own words for a process that exited, or the name of the failure that ended the stream,
+   * never its message. A session the core closed ends its events with no `process_lost`.
+   */
+  | { readonly type: "process_lost"; readonly reason: string };
+
+export type SessionEventType = SessionEvent["type"];
+
+export interface PermissionRequest {
+  readonly type: "permission";
+  readonly callId: string | null;
+  readonly toolName: string;
+  readonly input: Readonly<Record<string, unknown>>;
+  /** The agent's own sentence for the request, when it writes one. */
+  readonly title: string | null;
+  readonly description: string | null;
+}
+
+export type PermissionAnswer =
+  | { readonly allow: true }
+  | { readonly allow: false; readonly message: string };
+
+export interface QuestionOption {
+  readonly label: string;
+  readonly description: string | null;
+  /** What picking the option would look like, in lines of the agent's own. */
+  readonly preview: string | null;
+}
+
+export interface Question {
+  /** A short title, empty when the agent gives none. */
+  readonly header: string;
+  /** The question, which also names it in the answer. */
+  readonly text: string;
+  readonly multiSelect: boolean;
+  readonly options: readonly QuestionOption[];
+}
+
+export interface QuestionRequest {
+  readonly type: "question";
+  readonly callId: string | null;
+  /** The tool that asks, which names the request in one line when the agent writes no title. */
+  readonly toolName: string;
+  /** The agent's own sentence for the request, when it writes one. */
+  readonly title: string | null;
+  readonly questions: readonly Question[];
+}
+
+/**
+ * The answer to each question by its text: one answer, or the several of a multi-select; and the
+ * notes the owner added to the option picked in a question, only the non-empty ones, each for a
+ * question that has a key in `answers`. Or skipped, with what the agent is told.
+ */
+export type QuestionAnswer =
+  | {
+      readonly answered: true;
+      readonly answers: Readonly<Record<string, string | readonly string[]>>;
+      readonly notes: Readonly<Record<string, string>>;
+    }
+  | { readonly answered: false; readonly message: string };
+
+/**
+ * Asked by a back end while a call waits; each resolves once, for as long as it takes. A request
+ * still waiting when the core closes the session resolves as refused (a denial, a skip).
+ *
+ * `signal` is the agent's: it aborts it when it no longer waits for the answer. The core then
+ * takes the request back from the owner and the promise resolves as refused, like a request
+ * still waiting when the session closes. A signal already aborted when the request arrives
+ * shows the owner nothing.
+ */
+export interface RequestHandler {
+  permission(request: PermissionRequest, signal: AbortSignal): Promise<PermissionAnswer>;
+  question(request: QuestionRequest, signal: AbortSignal): Promise<QuestionAnswer>;
+}
+
+/** One live session of an agent. */
+export interface AgentSession {
+  /** Every event of the session, in order, until the session closes or its process is lost. */
+  readonly events: AsyncIterable<SessionEvent>;
+  /**
+   * Hands the prompt to the agent and resolves: the turn's end is the event `turn_ended`. On a
+   * session that has ended it rejects, and the owner is shown the error's name.
+   */
+  send(prompt: Prompt): Promise<void>;
+  /**
+   * Stops the running turn. An interrupt while `setModel` runs makes `setModel` reject and leaves
+   * the session closed (the agent ends it, as `close` does): a model change is no turn to resume.
+   */
+  interrupt(): Promise<void>;
+  stopTask(taskId: string): Promise<void>;
+  setPermissionMode(mode: PermissionMode): Promise<void>;
+  /**
+   * Sets the model of the next turns and resolves once it is in force: the session is idle, and
+   * whatever the agent does to change it (Claude Code: its own `/model`, a turn of its own) is no
+   * event. Null is the agent's default. Rejects a model `AgentInfo.models` does not list, and
+   * when `interrupt` is called while it runs: the session is closed then and the core drops it.
+   */
+  setModel(model: string | null): Promise<void>;
+  /**
+   * Drops the session's goal, if it has one, and resolves once it is gone: the session is idle,
+   * and whatever the agent does to drop it is no event. Present with `goals`; the core calls it
+   * only on an idle session. Rejects as `setModel` does when `interrupt` is called while it runs.
+   */
+  clearGoal?(): Promise<void>;
+  setEffort(level: string | null): Promise<void>;
+  contextUsage(): Promise<ContextUsage>;
+  info(): Promise<AgentInfo>;
+  /**
+   * Resolves once the agent's process has gone, so a session started right after may resume
+   * the same id. Safe to call again, and on a session whose process was lost.
+   */
+  close(): Promise<void>;
+}
+
+/** A folder's git repository, as the filesystem shows it. */
+export interface Repository {
+  /** The folder that holds the `.git` entry. */
+  readonly root: string;
+  /** The path whose trust covers it: the main checkout for a registered worktree. */
+  readonly key: string;
+  /** Null when the `.git` entry names none. */
+  readonly gitDir: string | null;
+  /** The folder is in the root's own `.git` directory, and has no work tree. */
+  readonly insideGitDir: boolean;
+}
+
+/** The limits of the owner's account; one the account does not have, or the agent hid, is null. */
+export interface UsageLimits {
+  readonly session: UsageLimit | null;
+  readonly week: UsageLimit | null;
+}
+
+export interface UsageLimit {
+  readonly percent: number;
+  /** Milliseconds since the epoch. */
+  readonly resetsAt: number | null;
+}
+
+export interface AgentBackend {
+  /** The agent's name as the daemon's texts say it. */
+  readonly name: string;
+  readonly words: AgentWords;
+  readonly capabilities: Capabilities;
+  /**
+   * Starts a session and resolves once the agent answered. Rejects with `ResumeRefused` when
+   * the agent refuses `options.resume`, and with the failure itself for any other reason; no
+   * process is left running either way. Whether the owner trusted the folder is the caller's
+   * to check first (`folderTrusted`). What the owner set in the agent for every session it
+   * starts (the Chrome integration in Claude Code) is read by the back end at each start.
+   */
+  start(options: StartOptions, requests: RequestHandler): Promise<AgentSession>;
+  /** The sessions of `folder` alone, newest first by the time their record last changed. */
+  listSessions(folder: string): Promise<readonly ListedSession[]>;
+  /**
+   * `sessions` of `folder` by their last message, newest first, as the agent's own picker
+   * shows them; `lastModified` is then that message's time on each session that was dated.
+   * Dating reads files, so a caller that shows only some of a folder's sessions passes those
+   * alone.
+   */
+  datedSessions(folder: string, sessions: readonly ListedSession[]): Promise<ListedSession[]>;
+  /** The ids of the sessions the agent still holds for `folder`; null when it cannot tell. */
+  aliveSessions(folder: string): Promise<ReadonlySet<string> | null>;
+  /** Whether the owner trusted `folder` in the agent, as the agent itself would decide. */
+  folderTrusted(folder: string): Promise<boolean>;
+  /**
+   * The repository holding `folder` when the daemon's own git may run in it: one the owner
+   * trusted in the agent, by itself. Null anywhere else.
+   */
+  trustedRepository(folder: string): Promise<Repository | null>;
+  /**
+   * The repository holding `folder` when only the owner's trust of it in the agent is missing
+   * for `trustedRepository` to give it: null when there is none, when it is trusted, and when
+   * the agent cannot tell which trust would cover it, which no trust given would change.
+   */
+  untrustedRepository(folder: string): Promise<Repository | null>;
+  /**
+   * The account's limits as the agent reports them now; it can take a while, and rejects when
+   * the agent gave none. Present with `usageLimits`.
+   */
+  usageLimits?(): Promise<UsageLimits>;
+  /**
+   * Sets the tag of the session `session` of `folder`, or clears it when `tag` is null; the
+   * agent keeps it with the session, and rejects when it cannot write it. Present with
+   * `sessionTags`.
+   */
+  tagSession?(folder: string, session: string, tag: string | null): Promise<void>;
+  /**
+   * The title the agent shows for the session `session` of `folder`, generated by the agent or
+   * set by the owner; null while it has none. Read at the end of every turn and at a status, so it
+   * must be cheap.
+   * Rejects when the agent cannot read it. Present with `sessionTitles`.
+   */
+  sessionTitle?(folder: string, session: string): Promise<string | null>;
+  /** Ends what the back end keeps running besides its sessions. Safe to call again. */
+  close(): Promise<void>;
+}
+
+/** What a back end is built with. */
+export interface AgentContext {
+  /** The module's own variables as the owner's file gives them; one not set is absent. */
+  readonly variables: Readonly<Record<string, string>>;
+  /** Every wait of the back end. */
+  readonly clock: Clock;
+}
+
+/** One agent the daemon can drive, as the registry holds it. */
+export interface AgentEntry {
+  /** The variables the module reads; the daemon does not start without the `required` ones. */
+  readonly required: readonly string[];
+  readonly optional: readonly string[];
+  /**
+   * The agent's own command, as the owner's terminal runs it. The service's `PATH` holds its
+   * folder, so a session's commands find it as the terminal's do. Absent, nothing is added.
+   */
+  readonly executable?: string;
+  build(context: AgentContext): AgentBackend;
+  /**
+   * What `allaboard setup` asks the owner to write the module's variables into `.env`. Absent, the
+   * module asks nothing and the owner adds its variables by hand; no substitute is invented.
+   */
+  setup?(): ModuleSetup;
+}

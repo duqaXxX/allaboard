@@ -1,0 +1,664 @@
+import assert from "node:assert/strict";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, beforeEach, test } from "node:test";
+import { aliveSessions } from "../../src/agent/claude/listing.ts";
+import type { Presence, ThreadRef } from "../../src/chat/seam.ts";
+import {
+  type ChannelLookup,
+  Cleanups,
+  clean,
+  forgetGoneChannels,
+  forgetGoneThreads,
+  type ThreadLookup,
+} from "../../src/core/cleanup.ts";
+import { StateStore } from "../../src/core/state.ts";
+import type { Logger } from "../../src/log.ts";
+import { AsyncEvent } from "../support/fake-clock.ts";
+
+const CHANNEL = "C000CHAN";
+const GONE_CHANNEL = "C000GONE";
+const OTHER_GONE = "C000GON2";
+const THREAD = "1789000000.000100";
+const GONE_THREAD = "1789000500.000100";
+const SESSION = "68da9311-0000-4000-8000-00000000000a";
+const NOBODY: readonly ThreadRef[] = [];
+const NEEDS_PERMISSIONS = { skip: process.platform === "win32" || process.getuid?.() === 0 };
+
+/** A thread's name read as its opening time in epoch seconds, as a chat whose names are times does. */
+const opened = (ref: ThreadRef): number | null => Number(ref.thread);
+
+function nothingLive(): readonly ThreadRef[] {
+  return NOBODY;
+}
+
+const made: string[] = [];
+
+after(() => {
+  for (const directory of made) rmSync(directory, { recursive: true, force: true });
+});
+
+/** The lines a pass logs, by level. */
+interface Logged extends Pick<Logger, "info" | "warning"> {
+  readonly lines: string[];
+}
+
+function logged(): Logged {
+  const lines: string[] = [];
+  return {
+    lines,
+    info: (message) => lines.push(`INFO ${message}`),
+    warning: (message) => lines.push(`WARNING ${message}`),
+  };
+}
+
+let directory: string;
+let state: StateStore;
+let log: Logged;
+
+beforeEach(() => {
+  directory = mkdtempSync(join(tmpdir(), "awd-cleanup-"));
+  made.push(directory);
+  state = new StateStore(join(directory, "state.json"), { warn: () => undefined });
+  state.bind(CHANNEL, join(directory, "project"));
+  state.bind(GONE_CHANNEL, join(directory, "old"));
+  state.openThread(CHANNEL, THREAD, SESSION);
+  state.openThread(GONE_CHANNEL, GONE_THREAD, SESSION);
+  log = logged();
+});
+
+/** What `conversations.info` can answer: the recorded channel, or an error code or exception. */
+type Reply = "channel" | string | Error;
+
+/**
+ * The lookup the Slack provider supplies, over a fake `conversations.info`: it answers per channel
+ * id with the recorded channel when the id is not named, else the failure given. Slack's
+ * `channel_not_found` is `gone`, a channel read is `there`, and every other error code or
+ * exception is `no answer`, which is what the provider will make of them.
+ */
+function channelsInSlack(
+  replies: Record<string, Reply>,
+  otherwise: Reply = "channel",
+): ChannelLookup {
+  return async (channelId) => {
+    const reply = replies[channelId] ?? otherwise;
+    if (reply === "channel") return "there";
+    if (reply instanceof Error) return "no answer";
+    return reply === "channel_not_found" ? "gone" : "no answer";
+  };
+}
+
+/**
+ * The lookup the Slack provider supplies for a thread, over a fake `conversations.replies`:
+ * `thread_not_found` is `gone`, a root read is `there`, every other error code is `no answer`,
+ * and an exception is thrown as the provider does. Keyed by thread id; `asked` collects the
+ * threads it was asked about.
+ */
+function threadsInSlack(
+  replies: Record<string, "root" | string | Error>,
+  asked: ThreadRef[] = [],
+): ThreadLookup {
+  return async (ref) => {
+    asked.push(ref);
+    const reply = replies[ref.thread] ?? "root";
+    if (reply instanceof Error) throw reply;
+    if (reply === "root") return "there";
+    return reply === "thread_not_found" ? "gone" : "no answer";
+  };
+}
+
+const found = [CHANNEL];
+const GONE_ROOT = "1789000900.000100";
+const SECOND_SESSION = "68da9311-0000-4000-8000-00000000000b";
+
+test("a channel slack no longer has is forgotten with its threads", async () => {
+  // conversations.info reference, read 2026-10-01: `channel_not_found`, also what a private
+  // channel the bot is not in answers (measured the same day on deleted channels).
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
+  assert.deepEqual((await forgetGoneChannels(lookup, state, nothingLive, "Slack", log)).forgotten, [
+    GONE_CHANNEL,
+  ]);
+  assert.deepEqual(state.channels(), [CHANNEL]);
+  assert.equal(state.thread(GONE_CHANNEL, GONE_THREAD), null);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
+  const text = log.lines.join("\n");
+  assert.ok(text.includes(GONE_CHANNEL) && text.includes("1 thread"));
+});
+
+// The lookup maps every answer but `channel_not_found` to `no answer`, so one row stands for all.
+test("anything but not found forgets nothing", async () => {
+  // Not an answer about the channel: it cannot be told gone.
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: "internal_error" });
+  assert.deepEqual(
+    (await forgetGoneChannels(lookup, state, nothingLive, "Slack", log)).forgotten,
+    [],
+  );
+  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
+});
+
+test("no channel slack can see forgets nothing and says so", async () => {
+  // Every bound channel not found: the token of another workspace, or the app removed from
+  // them all. Wiping every binding on that would be the wrong repair.
+  const lookup = channelsInSlack({}, "channel_not_found");
+  assert.deepEqual(
+    (await forgetGoneChannels(lookup, state, nothingLive, "Slack", log)).forgotten,
+    [],
+  );
+  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
+  assert.ok(log.lines.join("\n").includes("none of the 2 bound channels"));
+});
+
+test("a pass in which slack found no channel forgets nothing", async () => {
+  // The token of another workspace, and one call that failed for a reason of its own: a
+  // channel Slack did not answer about is not a channel it found.
+  state.bind(OTHER_GONE, "/srv/elsewhere");
+  const gone = "channel_not_found";
+  const lookup = channelsInSlack({
+    [CHANNEL]: new Error("network down"),
+    [GONE_CHANNEL]: gone,
+    [OTHER_GONE]: gone,
+  });
+  assert.deepEqual(
+    (await forgetGoneChannels(lookup, state, nothingLive, "Slack", log)).forgotten,
+    [],
+  );
+  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL, OTHER_GONE]);
+  assert.ok(log.lines.join("\n").includes("none of the 3 bound channels"));
+});
+
+test("a channel with a live session is left for the next pass", async () => {
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
+  const live: ThreadRef[] = [{ channel: GONE_CHANNEL, thread: GONE_THREAD }];
+  assert.deepEqual(
+    (await forgetGoneChannels(lookup, state, () => live, "Slack", log)).forgotten,
+    [],
+  );
+  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
+});
+
+test("several gone channels go in one pass", async () => {
+  state.bind(OTHER_GONE, "/srv/elsewhere");
+  const gone = "channel_not_found";
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: gone, [OTHER_GONE]: gone });
+  assert.deepEqual((await forgetGoneChannels(lookup, state, nothingLive, "Slack", log)).forgotten, [
+    GONE_CHANNEL,
+    OTHER_GONE,
+  ]);
+  assert.deepEqual(state.channels(), [CHANNEL]);
+});
+
+test("clean forgets gone channels then prunes what is left", async () => {
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
+  const asked: string[] = [];
+
+  function alive(folder: string): Set<string> {
+    asked.push(folder);
+    return new Set(); // the session is gone from the folder
+  }
+
+  await clean(lookup, state, {
+    threadLookup: threadsInSlack({}),
+    alive,
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
+  assert.deepEqual(state.channels(), [CHANNEL]);
+  assert.equal(state.thread(CHANNEL, THREAD), null); // pruned: its session no longer exists
+  // the forgotten channel's folder is not read
+  assert.deepEqual(asked, [state.channel(CHANNEL)?.directory]);
+  assert.ok(log.lines.join("\n").includes("pruned 1 stale thread"));
+});
+
+test("clean keeps a thread with a live session", async () => {
+  const live: ThreadRef[] = [{ channel: CHANNEL, thread: THREAD }];
+  await clean(channelsInSlack({}), state, {
+    threadLookup: threadsInSlack({}),
+    alive: () => new Set(),
+    live: () => live,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
+});
+
+test("a thread opened while the folders are read is kept", async () => {
+  // The sessions are listed off the event loop: what is opened meanwhile, in a folder the
+  // listing did not cover, cannot be told gone.
+  const late = "1789000900.000100";
+
+  async function alive(): Promise<Set<string>> {
+    state.bind("C000LATE", join(directory, "late"));
+    state.openThread("C000LATE", late, "a-session-no-listing-saw");
+    await Promise.resolve();
+    return new Set([SESSION]);
+  }
+
+  await clean(channelsInSlack({}), state, {
+    threadLookup: threadsInSlack({}),
+    alive,
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
+  assert.notEqual(state.thread("C000LATE", late), null);
+});
+
+test("clean goes on to prune when the channel check itself fails", async () => {
+  // The check fails the way it can: `live`, read once the channel is found gone, raises on that
+  // first read.
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
+  let reads = 0;
+
+  function live(): readonly ThreadRef[] {
+    reads += 1;
+    if (reads === 1) throw new Error("unexpected");
+    return NOBODY;
+  }
+
+  await clean(lookup, state, {
+    threadLookup: threadsInSlack({}),
+    alive: () => new Set(),
+    live,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
+  assert.ok(log.lines.join("\n").includes("could not check the bound channels"));
+  assert.equal(state.thread(CHANNEL, THREAD), null); // the prune still ran
+});
+
+test("clean survives a folder that cannot be read and a slack that fails", async () => {
+  const lookup = channelsInSlack({}, new Error("network down"));
+
+  function broken(): never {
+    throw Object.assign(new Error("transcripts unreadable"), { code: "EACCES" });
+  }
+
+  await clean(lookup, state, {
+    threadLookup: threadsInSlack({}),
+    alive: broken,
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  }); // never throws
+  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
+  assert.ok(log.lines.join("\n").includes("could not prune stale threads"));
+});
+
+test("a lookup that throws is no answer", async () => {
+  const answers: Record<string, Presence> = { [CHANNEL]: "there", [GONE_CHANNEL]: "gone" };
+  const lookup: ChannelLookup = async (channelId) => {
+    if (channelId === OTHER_GONE) throw new Error("boom");
+    return answers[channelId] ?? "no answer";
+  };
+  state.bind(OTHER_GONE, "/srv/elsewhere");
+  assert.deepEqual((await forgetGoneChannels(lookup, state, nothingLive, "Slack", log)).forgotten, [
+    GONE_CHANNEL,
+  ]);
+  assert.deepEqual(state.channels(), [CHANNEL, OTHER_GONE]);
+  assert.ok(log.lines.join("\n").includes(`could not read channel ${OTHER_GONE}`));
+});
+
+test("a thread with no session is dropped for its age only when the chat dates it", async () => {
+  // The chat's names mean nothing to the core: a thread it cannot date is never dropped for age.
+  const undated = "not-a-time";
+  state.openThread(CHANNEL, undated);
+  state.openThread(CHANNEL, GONE_THREAD);
+  const later = Number(GONE_THREAD) + 2 * 24 * 60 * 60;
+  const dated = (ref: ThreadRef): number | null => (ref.thread === undated ? null : opened(ref));
+
+  await clean(channelsInSlack({}), state, {
+    threadLookup: threadsInSlack({}),
+    alive: () => new Set([SESSION]),
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: dated,
+    now: () => later,
+    logger: log,
+  });
+  assert.equal(state.thread(CHANNEL, GONE_THREAD), null); // dated and older than a day
+  assert.notEqual(state.thread(CHANNEL, undated), null);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null); // its session is alive
+  assert.ok(log.lines.join("\n").includes("pruned 1 stale thread"));
+});
+
+test(
+  "a pass over transcripts that cannot be searched prunes nothing",
+  NEEDS_PERMISSIONS,
+  async (t) => {
+    // The real `aliveSessions` over a config folder of the test: with the projects folder closed
+    // (EACCES) its listing is empty, and the thread's session is on disk all the same.
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "awd-cleanup-")));
+    made.push(root);
+    const config = join(root, "config");
+    const project = join(root, "project");
+    mkdirSync(project);
+    const transcripts = join(config, "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+    mkdirSync(transcripts, { recursive: true });
+    writeFileSync(join(transcripts, `${SESSION}.jsonl`), "");
+    const previous = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = config;
+    t.after(() => {
+      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = previous;
+      chmodSync(join(config, "projects"), 0o755);
+    });
+    const closed = new StateStore(join(root, "state.json"), { warn: () => undefined });
+    closed.bind(CHANNEL, project);
+    closed.openThread(CHANNEL, THREAD, SESSION);
+
+    chmodSync(join(config, "projects"), 0o000);
+    await clean(channelsInSlack({}), closed, {
+      threadLookup: threadsInSlack({}),
+      alive: (folder) => aliveSessions(folder),
+      live: nothingLive,
+      chat: "Slack",
+      openedAt: opened,
+      logger: log,
+    });
+    assert.notEqual(closed.thread(CHANNEL, THREAD), null);
+    assert.deepEqual(log.lines, []);
+  },
+);
+
+test("forgetGoneChannels returns the channels it found as well as those it forgot", async () => {
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
+  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), {
+    forgotten: [GONE_CHANNEL],
+    found: [CHANNEL],
+  });
+  const none = channelsInSlack({ [GONE_CHANNEL]: "internal_error" });
+  assert.deepEqual((await forgetGoneChannels(none, state, nothingLive, "Slack", log)).found, [
+    CHANNEL,
+  ]);
+});
+
+test("a thread whose first message slack no longer has is forgotten", async () => {
+  // conversations.replies with the root's ts and limit=1 answers `thread_not_found` for a deleted
+  // root (measured 2026-10-01).
+  state.openThread(CHANNEL, GONE_ROOT, SECOND_SESSION);
+  const lookup = threadsInSlack({ [GONE_ROOT]: "thread_not_found" });
+  const forgotten = await forgetGoneThreads(lookup, state, found, nothingLive, "Slack", log);
+  assert.deepEqual(forgotten, [{ channel: CHANNEL, thread: GONE_ROOT }]);
+  assert.equal(state.thread(CHANNEL, GONE_ROOT), null);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
+  const text = log.lines.join("\n");
+  assert.ok(text.includes(GONE_ROOT) && text.includes(CHANNEL));
+  // Its session is listed again by !resume: no thread holds it any more.
+  assert.equal(state.holder(SECOND_SESSION), null);
+  assert.notEqual(state.holder(SESSION), null);
+});
+
+test("a thread slack gave no answer about is kept, and the log names the error", async () => {
+  state.openThread(CHANNEL, GONE_ROOT, SECOND_SESSION);
+  const failing = new Error("boom");
+  failing.name = "ratelimited";
+  for (const reply of ["internal_error", failing]) {
+    const lookup = threadsInSlack({ [GONE_ROOT]: reply });
+    assert.deepEqual(await forgetGoneThreads(lookup, state, found, nothingLive, "Slack", log), []);
+    assert.notEqual(state.thread(CHANNEL, GONE_ROOT), null);
+  }
+  const text = log.lines.join("\n");
+  assert.ok(text.includes(`could not read thread ${GONE_ROOT} of ${CHANNEL}: ratelimited`));
+  assert.ok(text.includes(`could not read thread ${GONE_ROOT} of ${CHANNEL}: no answer`));
+});
+
+test("after a thread the chat gave no answer about, its channel is asked no more", async () => {
+  // What stops one answer (a rate limit, a history the bot may not read) stops the others.
+  state.openThread(CHANNEL, GONE_ROOT, SECOND_SESSION);
+  const asked: ThreadRef[] = [];
+  const lookup = threadsInSlack(
+    { [THREAD]: "internal_error", [GONE_ROOT]: "internal_error" },
+    asked,
+  );
+  await forgetGoneThreads(lookup, state, found, nothingLive, "Slack", log);
+  assert.equal(asked.length, 1);
+  assert.equal(log.lines.filter((line) => line.includes("could not read thread")).length, 1);
+});
+
+test("a stop that has begun asks about no further thread", async () => {
+  state.openThread(CHANNEL, GONE_ROOT, SECOND_SESSION);
+  const asked: ThreadRef[] = [];
+  const lookup = threadsInSlack(
+    { [THREAD]: "thread_not_found", [GONE_ROOT]: "thread_not_found" },
+    asked,
+  );
+  const stopping = (): boolean => asked.length >= 1;
+  await forgetGoneThreads(lookup, state, found, nothingLive, "Slack", log, stopping);
+  assert.equal(asked.length, 1);
+});
+
+test("only the threads of the channels found are asked about", async () => {
+  const asked: ThreadRef[] = [];
+  const lookup = threadsInSlack({}, asked);
+  await forgetGoneThreads(lookup, state, found, nothingLive, "Slack", log);
+  assert.deepEqual(asked, [{ channel: CHANNEL, thread: THREAD }]);
+});
+
+test("a thread with a live session is left for the next pass", async () => {
+  const lookup = threadsInSlack({ [THREAD]: "thread_not_found" });
+  const live: ThreadRef[] = [{ channel: CHANNEL, thread: THREAD }];
+  assert.deepEqual(await forgetGoneThreads(lookup, state, found, () => live, "Slack", log), []);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
+});
+
+test("a session that went live while the chat was asked keeps its thread", async () => {
+  const live: ThreadRef[] = [];
+  const lookup: ThreadLookup = async () => {
+    live.push({ channel: CHANNEL, thread: THREAD });
+    return "gone";
+  };
+  assert.deepEqual(await forgetGoneThreads(lookup, state, found, () => live, "Slack", log), []);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
+});
+
+test("clean asks about no thread of a channel that gave no answer or was forgotten", async () => {
+  const asked: ThreadRef[] = [];
+  state.bind(OTHER_GONE, "/srv/elsewhere");
+  state.openThread(OTHER_GONE, GONE_ROOT, SECOND_SESSION);
+  const channels = channelsInSlack({
+    [GONE_CHANNEL]: "channel_not_found",
+    [OTHER_GONE]: "internal_error",
+  });
+  await clean(channels, state, {
+    threadLookup: threadsInSlack({ [THREAD]: "thread_not_found" }, asked),
+    alive: () => new Set([SESSION, SECOND_SESSION]),
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: () => null,
+    logger: log,
+  });
+  assert.deepEqual(asked, [{ channel: CHANNEL, thread: THREAD }]);
+  assert.equal(state.thread(CHANNEL, THREAD), null);
+  assert.notEqual(state.thread(OTHER_GONE, GONE_ROOT), null);
+  assert.equal(state.thread(GONE_CHANNEL, GONE_THREAD), null);
+});
+
+test("clean asks about no thread when no channel was found", async () => {
+  const asked: ThreadRef[] = [];
+  await clean(channelsInSlack({}, "channel_not_found"), state, {
+    threadLookup: threadsInSlack({}, asked),
+    alive: () => new Set([SESSION]),
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: () => null,
+    logger: log,
+  });
+  assert.deepEqual(asked, []);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
+});
+
+/** A pass a test holds open: each call waits for the next `release`. */
+function heldPasses(): { run: () => Promise<void>; started: () => number; release: () => void } {
+  let started = 0;
+  let gate = new AsyncEvent();
+  return {
+    run: async () => {
+      started += 1;
+      await gate.wait();
+    },
+    started: () => started,
+    release: () => {
+      const open = gate;
+      gate = new AsyncEvent();
+      open.set();
+    },
+  };
+}
+
+/** Lets the promise callbacks queued so far run. */
+const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+test("Cleanups runs a pass for a request and answers when it ended", async () => {
+  let passes = 0;
+  const cleanups = new Cleanups(
+    async () => {
+      passes += 1;
+    },
+    () => false,
+  );
+  await cleanups.request();
+  assert.equal(passes, 1);
+  await cleanups.request();
+  assert.equal(passes, 2);
+});
+
+test("Cleanups never runs two passes at once, and requests during one share one more", async () => {
+  const held = heldPasses();
+  const cleanups = new Cleanups(held.run, () => false);
+  const first = cleanups.request();
+  await settle();
+  assert.equal(held.started(), 1);
+  // Three more requests while the first runs: one pass follows, not three.
+  const later = [cleanups.request(), cleanups.request(), cleanups.request()];
+  await settle();
+  assert.equal(held.started(), 1, "the second pass waits for the first");
+  held.release();
+  await first;
+  await settle();
+  assert.equal(held.started(), 2);
+  held.release();
+  await Promise.all(later);
+  assert.equal(held.started(), 2);
+  // The queue is empty again: the next request is a pass of its own.
+  const next = cleanups.request();
+  await settle();
+  assert.equal(held.started(), 3);
+  held.release();
+  await next;
+});
+
+test("Cleanups runs no pass once a stop has begun, and not the one queued behind a pass", async () => {
+  const held = heldPasses();
+  let stopping = false;
+  const cleanups = new Cleanups(held.run, () => stopping);
+  const first = cleanups.request();
+  const queued = cleanups.request();
+  await settle();
+  stopping = true;
+  held.release();
+  await Promise.all([first, queued]);
+  assert.equal(held.started(), 1);
+  await cleanups.request();
+  assert.equal(held.started(), 1);
+});
+
+test("Cleanups survives a pass that throws", async () => {
+  let passes = 0;
+  const cleanups = new Cleanups(
+    async () => {
+      passes += 1;
+      throw new Error("boom");
+    },
+    () => false,
+    log,
+  );
+  await cleanups.request();
+  await cleanups.request();
+  assert.equal(passes, 2);
+});
+
+test("Cleanups never overlaps two passes, even when a caller asks again as its pass ends", async () => {
+  let running = 0;
+  let most = 0;
+  const gates: Array<() => void> = [];
+  const cleanups = new Cleanups(
+    async () => {
+      running += 1;
+      most = Math.max(most, running);
+      await new Promise<void>((resolve) => gates.push(resolve));
+      running -= 1;
+    },
+    () => false,
+  );
+  const first = cleanups.request();
+  // The first caller asks again from the continuation of its own pass; another joins the queue.
+  const chained = first.then(() => cleanups.request());
+  const queued = cleanups.request();
+  await settle();
+  gates.shift()?.();
+  await settle();
+  await settle();
+  const overlapped = most;
+  while (gates.length > 0) {
+    gates.shift()?.();
+    await settle();
+  }
+  await Promise.all([chained, queued]);
+  assert.equal(overlapped, 1);
+  assert.equal(most, 1);
+});
+
+test("Cleanups.settled waits for the running pass and the one queued behind it", async () => {
+  const held = heldPasses();
+  const cleanups = new Cleanups(held.run, () => false);
+  await cleanups.settled(); // nothing runs: at once
+  void cleanups.request();
+  void cleanups.request();
+  await settle();
+  let done = false;
+  void cleanups.settled().then(() => {
+    done = true;
+  });
+  held.release();
+  await settle();
+  assert.equal(done, false, "the queued pass has not ended");
+  held.release();
+  await settle();
+  await settle();
+  assert.equal(done, true);
+  assert.equal(held.started(), 2);
+});
+
+test("a pass caught by a stop asks about no further channel, forgets none and prunes nothing", async () => {
+  state.bind("C000MORE", join(directory, "more"));
+  const asked: string[] = [];
+  let stopping = false;
+  const lookup: ChannelLookup = async (channelId) => {
+    asked.push(channelId);
+    stopping = true; // the stop begins during the first answer
+    return channelId === GONE_CHANNEL ? "gone" : "there";
+  };
+  const pruned = (): number => state.threads().length;
+  const threads = pruned();
+  await clean(lookup, state, {
+    threadLookup: threadsInSlack({}, []),
+    // A folder that lists no session would prune every thread that holds one.
+    alive: () => new Set<string>(),
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: () => null,
+    stopping: () => stopping,
+    logger: log,
+  });
+  assert.equal(asked.length, 1);
+  assert.notEqual(state.channel(GONE_CHANNEL), null);
+  assert.equal(pruned(), threads);
+});

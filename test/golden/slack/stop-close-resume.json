@@ -1,0 +1,151 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "output": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "Stopped",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "task-a1b2c3d4e5f60718",
+     "title": "Background agent \"Run timed sleep and write done marker\" didn't finish before t…",
+     "type": "task_card"
+    },
+    {
+     "text": "OK",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   [
+    {
+     "id": "task-a1b2c3d4e5f60718",
+     "output": "Stopped",
+     "status": "complete",
+     "title": "Background agent \"Run timed sleep and write done marker\" didn't finish before t…"
+    }
+   ]
+  ],
+  "message_texts": [
+   "OK"
+  ],
+  "pushes": 1
+ },
+ "recording": "stop-close-resume",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "task-a1b2c3d4e5f60718",
+      "output": "Stopped",
+      "status": "complete",
+      "title": "Background agent \"Run timed sleep and write done marker\" didn't finish before t…",
+      "type": "task_update"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "OK",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "blocks": [
+     {
+      "output": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "Stopped",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "task-a1b2c3d4e5f60718",
+      "title": "Background agent \"Run timed sleep and write done marker\" didn't finish before t…",
+      "type": "task_card"
+     },
+     {
+      "text": "OK",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "OK",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

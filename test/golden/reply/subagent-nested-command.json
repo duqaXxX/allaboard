@@ -1,0 +1,282 @@
+{
+ "recording": "subagent-nested-command",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nstarted",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "a99ac728588823f5a"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c 'import time; time.sleep(12)'",
+      "folded": null,
+      "id": "toolu_01VuYf3xvrqBf6xe5UN5uDWh",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep for 12 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01VuYf3xvrqBf6xe5UN5uDWh",
+      "name": "Bash",
+      "output": "Sleep for 12 seconds",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 12 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01VuYf3xvrqBf6xe5UN5uDWh",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 12 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c 'import time; time.sleep(12)'",
+      "folded": null,
+      "id": "toolu_01UHhHBJqasUoU6SUJjct3zq",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep for 12 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01UHhHBJqasUoU6SUJjct3zq",
+      "name": "Bash",
+      "output": "Sleep for 12 seconds",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 12 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01UHhHBJqasUoU6SUJjct3zq",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 12 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a99ac728588823f5a",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a99ac728588823f5a"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a99ac728588823f5a",
+      "name": "task",
+      "output": "finished",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a99ac728588823f5a"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The agent ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "finished r",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "unning bot",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "h sleep co",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "mmands and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " reported ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "finished.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nstarted",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe agent ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "finished r",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "unning bot",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "h sleep co",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "mmands and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " reported ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "finished.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

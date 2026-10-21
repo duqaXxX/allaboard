@@ -1,0 +1,384 @@
+/**
+ * `ClaudeBackend` over a fake `query()`: what it passes to the session at a start, and the
+ * questions it forwards to the trust code and to the listing. Those two are tested in
+ * `trust.test.ts` and `listing.test.ts`; here only that the backend asks them of the right
+ * folder and home.
+ */
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, realpath, rm, utimes, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, test } from "node:test";
+import { getSessionInfo } from "@anthropic-ai/claude-agent-sdk";
+import { ClaudeBackend } from "../../../src/agent/claude/backend.ts";
+import { CAPABILITIES } from "../../../src/agent/claude/capabilities.ts";
+import { claudeAgent } from "../../../src/agent/claude/module.ts";
+import type { RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
+import { ResumeRefused } from "../../../src/agent/seam.ts";
+import { systemClock } from "../../../src/clock.ts";
+import { fill } from "../../../src/core/texts.ts";
+import { shellQuote } from "../../../src/text.ts";
+import { FakeSdk, fail } from "../../support/fake-query.ts";
+import { type JsonObject, sdkRecords } from "../../support/fixtures.ts";
+import { gitInit, trust } from "../../support/git-layouts.ts";
+
+const LIMIT = { timeout: 10_000 };
+const START: StartOptions = {
+  folder: "/srv/alice/app",
+  resume: null,
+  settingsSources: ["user", "project", "local"],
+  model: null,
+  effort: null,
+};
+const NO_REQUESTS: RequestHandler = {
+  permission: async () => ({ allow: true }),
+  question: async () => ({ answered: false, message: "" }),
+};
+
+let tmp = "";
+let home = "";
+
+beforeEach(async () => {
+  tmp = await realpath(await mkdtemp(join(tmpdir(), "allaboard-backend-")));
+  home = join(tmp, "home");
+  await mkdir(home);
+  await claudeRecord({});
+});
+
+afterEach(async () => {
+  await rm(tmp, { recursive: true, force: true });
+});
+
+async function claudeRecord(content: unknown): Promise<void> {
+  await writeFile(join(home, ".claude.json"), JSON.stringify(content));
+}
+
+test("the capabilities are the Claude back end's", () => {
+  assert.equal(new ClaudeBackend().capabilities, CAPABILITIES);
+});
+
+test("a start returns a session once Claude Code answered", LIMIT, async () => {
+  const sdk = new FakeSdk();
+  const session = await new ClaudeBackend({ query: sdk.query, home }).start(START, NO_REQUESTS);
+  assert.equal(sdk.queries.length, 1);
+  assert.equal(sdk.only.options.cwd, START.folder);
+  assert.equal((await session.info()).permissionMode, "bypassPermissions");
+  await session.close();
+  assert.equal(sdk.only.closed, true);
+});
+
+test("a start carries the Chrome flag when the owner enabled it by default", LIMIT, async () => {
+  await claudeRecord({ claudeInChromeDefaultEnabled: true });
+  const sdk = new FakeSdk();
+  const backend = new ClaudeBackend({ query: sdk.query, home });
+  await (await backend.start(START, NO_REQUESTS)).close();
+  assert.deepEqual(sdk.only.options.extraArgs, { "replay-user-messages": null, chrome: null });
+});
+
+test("the Chrome setting is read at every start", LIMIT, async () => {
+  const sdk = new FakeSdk();
+  const backend = new ClaudeBackend({ query: sdk.query, home });
+  await (await backend.start(START, NO_REQUESTS)).close();
+  await claudeRecord({ claudeInChromeDefaultEnabled: true });
+  await (await backend.start(START, NO_REQUESTS)).close();
+  const flags = sdk.queries.map((query) => Object.keys(query.options.extraArgs ?? {}));
+  assert.deepEqual(flags, [["replay-user-messages"], ["replay-user-messages", "chrome"]]);
+});
+
+// The daemon hands a module its variables readable by lookup and shown by nothing
+// (`hiddenVariables` in `src/core/config.ts`): a spread of that object copies none of them.
+test("a variable the daemon hands over by lookup alone reaches the session", LIMIT, async () => {
+  const hidden: Record<string, string> = Object.create(null);
+  Object.defineProperty(hidden, "BASH_DEFAULT_TIMEOUT_MS", {
+    value: "21600000",
+    enumerable: false,
+  });
+  const sdk = new FakeSdk();
+  const entry = claudeAgent({ query: sdk.query, home });
+  assert.deepEqual(entry.optional, ["BASH_DEFAULT_TIMEOUT_MS", "CLAUDE_CONFIG_DIR"]);
+  const backend = entry.build({ variables: hidden, clock: systemClock });
+  const session = await backend.start(START, NO_REQUESTS);
+  assert.equal(sdk.only.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
+  await session.close();
+  await backend.close();
+});
+
+const DEFAULT_TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
+
+test("the terminal line is today's for a back end with no config dir of its own", () => {
+  const saved = process.env.CLAUDE_CONFIG_DIR;
+  delete process.env.CLAUDE_CONFIG_DIR;
+  try {
+    assert.equal(new ClaudeBackend({ home }).words.terminal, DEFAULT_TERMINAL);
+  } finally {
+    if (saved !== undefined) process.env.CLAUDE_CONFIG_DIR = saved;
+  }
+});
+
+test("the terminal line of a login of its own names its config dir", () => {
+  const configDir = join(tmp, "login-two");
+  assert.equal(
+    new ClaudeBackend({ home, configDir }).words.terminal,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(configDir)} claude --resume {session} --fork-session`,
+  );
+});
+
+test("the line that opens Claude Code to trust a folder names the login's config dir", () => {
+  // the trust dialog records the folder for the login it runs under.
+  const configDir = join(tmp, "login-two");
+  assert.equal(
+    new ClaudeBackend({ home, configDir }).words.trust,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(configDir)} claude`,
+  );
+  const saved = process.env.CLAUDE_CONFIG_DIR;
+  delete process.env.CLAUDE_CONFIG_DIR;
+  try {
+    assert.equal(new ClaudeBackend({ home }).words.trust, "cd {directory} && claude");
+  } finally {
+    if (saved !== undefined) process.env.CLAUDE_CONFIG_DIR = saved;
+  }
+});
+
+test("the config dir is quoted as the folder is, and a brace in it fills as written", () => {
+  const configDir = join(tmp, "my login {x}");
+  const { terminal } = new ClaudeBackend({ home, configDir }).words;
+  const line = fill(terminal, { directory: "/srv/alice/app", session: "0000-id" });
+  // A shell reads the quoted word back as the folder.
+  const word = /CLAUDE_CONFIG_DIR=(.*) claude/.exec(line)?.[1] ?? "";
+  assert.equal(execFileSync("sh", ["-c", `printf %s ${word}`], { encoding: "utf8" }), configDir);
+});
+
+test(
+  "the owner's variables go to a thread's session and not to the daemon's own",
+  LIMIT,
+  async () => {
+    const sdk = new FakeSdk();
+    const backend = new ClaudeBackend({
+      query: sdk.query,
+      home,
+      variables: { BASH_DEFAULT_TIMEOUT_MS: "21600000" },
+    });
+    const thread = await backend.start(START, NO_REQUESTS);
+    const own = await backend.startBare(START.folder, NO_REQUESTS);
+    const [first, second] = sdk.queries;
+    assert.equal(first?.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
+    assert.equal("env" in (second?.options ?? {}), false);
+    await thread.close();
+    await own.close();
+  },
+);
+
+test("a start where Claude Code refuses the resume rejects with ResumeRefused", LIMIT, async () => {
+  const failure = new Error("Claude Code returned an error result: No conversation found");
+  const refusal = { ...(sdkRecords("interrupt").at(-1) as JsonObject), is_error: true };
+  const sdk = new FakeSdk({ initError: failure, start: [refusal, fail(failure)] });
+  const backend = new ClaudeBackend({ query: sdk.query, home });
+  await assert.rejects(
+    backend.start({ ...START, resume: "68da9311-0000-4000-8000-0000000000aa" }, NO_REQUESTS),
+    ResumeRefused,
+  );
+  assert.equal(sdk.only.closed, true);
+});
+
+test("a folder is trusted as Claude Code's record says", LIMIT, async () => {
+  const trusted = join(tmp, "trusted");
+  const other = join(tmp, "other");
+  await mkdir(trusted);
+  await mkdir(other);
+  await claudeRecord({ projects: { [trusted]: { hasTrustDialogAccepted: true } } });
+  const backend = new ClaudeBackend({ home });
+  assert.equal(await backend.folderTrusted(trusted), true);
+  assert.equal(await backend.folderTrusted(other), false);
+});
+
+test("only a repository the owner trusted may run the daemon's git", async () => {
+  const folder = join(tmp, "session");
+  const repository = join(folder, "app");
+  await mkdir(folder);
+  gitInit(repository);
+  trust(home, [folder]);
+  const backend = new ClaudeBackend({ home });
+  // The folder's trust does not stand for the repository inside it.
+  assert.equal(await backend.trustedRepository(repository), null);
+  trust(home, [folder, repository]);
+  assert.deepEqual(await backend.trustedRepository(repository), {
+    root: repository,
+    key: repository,
+    gitDir: join(repository, ".git"),
+    insideGitDir: false,
+  });
+});
+
+test(
+  "the sessions of a folder are listed through the SDK, the ids alive through the files",
+  LIMIT,
+  async (t) => {
+    const previous = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = join(tmp, "config");
+    t.after(() => {
+      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = previous;
+    });
+    const project = join(tmp, "project");
+    const folder = join(tmp, "config", "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+    await mkdir(folder, { recursive: true });
+    const sid = "68da9311-0000-4000-8000-0000000000c1";
+    const bare = "68da9311-0000-4000-8000-0000000000c2";
+    const line = {
+      type: "user",
+      timestamp: "2026-09-21T10:00:00.000Z",
+      sessionId: sid,
+      uuid: "u1",
+      parentUuid: null,
+      gitBranch: "main",
+      message: { role: "user", content: "A question" },
+    };
+    await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify(line)}\n`);
+    await writeFile(join(folder, `${bare}.jsonl`), `${JSON.stringify({ type: "ledger" })}\n`);
+    await utimes(join(folder, `${sid}.jsonl`), 1_790_000_000, 1_790_000_000);
+    const backend = new ClaudeBackend({ home });
+    const listed = await backend.listSessions(project);
+    assert.equal(listed.length, 1);
+    assert.deepEqual(
+      { id: listed[0]?.id, title: listed[0]?.title, branch: listed[0]?.branch },
+      { id: sid, title: "A question", branch: "main" },
+    );
+    assert.equal(listed[0]?.lastModified, 1_790_000_000_000);
+    assert.deepEqual(await backend.aliveSessions(project), new Set([sid, bare]));
+    const dated = await backend.datedSessions(project, listed);
+    assert.equal(dated[0]?.lastModified, Date.UTC(2026, 8, 21, 10, 0, 0, 0));
+  },
+);
+
+test(
+  "a session's title is the generated one or the owner's, and null while there is none",
+  LIMIT,
+  async (t) => {
+    const previous = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = join(tmp, "config");
+    t.after(() => {
+      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = previous;
+    });
+    const project = join(tmp, "project");
+    const folder = join(tmp, "config", "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+    await mkdir(folder, { recursive: true });
+    const backend = new ClaudeBackend({ home });
+    // The record shapes are those Claude Code writes (read back by the SDK 0.3.302 on 2026-10-20):
+    // `ai-title` for the generated title, `custom-title` for `/rename`.
+    let count = 0;
+    const session = async (...entries: object[]): Promise<string> => {
+      count += 1;
+      const sid = `68da9311-0000-4000-8000-0000000000a${count}`;
+      const user = {
+        type: "user",
+        timestamp: "2026-09-21T10:00:01.000Z",
+        sessionId: sid,
+        uuid: "u1",
+        parentUuid: null,
+        message: { role: "user", content: "A first prompt" },
+      };
+      const lines = [user, ...entries.map((entry) => ({ ...entry, sessionId: sid }))];
+      await writeFile(
+        join(folder, `${sid}.jsonl`),
+        `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`,
+      );
+      return sid;
+    };
+    // `summary` would answer the first prompt here: only a title counts.
+    assert.equal(await backend.sessionTitle(project, await session()), null);
+    const generated = await session({ type: "ai-title", aiTitle: "  Fix the footer " });
+    assert.equal(await backend.sessionTitle(project, generated), "Fix the footer");
+    const renamed = await session(
+      { type: "ai-title", aiTitle: "Fix the footer" },
+      { type: "custom-title", customTitle: "Footer work" },
+    );
+    assert.equal(await backend.sessionTitle(project, renamed), "Footer work");
+    assert.equal(await backend.sessionTitle(project, "68da9311-0000-4000-8000-0000000000ff"), null);
+  },
+);
+
+test(
+  "a session's tag is set, changed and cleared in its transcript through the SDK",
+  LIMIT,
+  async (t) => {
+    const previous = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = join(tmp, "config");
+    t.after(() => {
+      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = previous;
+    });
+    const project = join(tmp, "project");
+    const folder = join(tmp, "config", "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+    await mkdir(folder, { recursive: true });
+    const sid = "68da9311-0000-4000-8000-0000000000e1";
+    const line = {
+      type: "user",
+      timestamp: "2026-09-21T10:00:00.000Z",
+      sessionId: sid,
+      uuid: "u1",
+      parentUuid: null,
+      message: { role: "user", content: "A question" },
+    };
+    await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify(line)}\n`);
+    const backend = new ClaudeBackend({ home });
+    assert.equal(typeof backend.tagSession, "function");
+    const tagOf = async () => (await getSessionInfo(sid, { dir: project }))?.tag;
+    assert.equal(await tagOf(), undefined);
+    await backend.tagSession(project, sid, "devops");
+    assert.equal(await tagOf(), "devops");
+    await backend.tagSession(project, sid, "ops-2");
+    assert.equal(await tagOf(), "ops-2");
+    await backend.tagSession(project, sid, null);
+    assert.equal(await tagOf(), undefined);
+  },
+);
+
+// An instance with its own Claude Code login. The module writes the same folder into the
+// daemon's environment for the SDK's listing, so a test that gives the backend a folder sets both.
+test("the records and the transcripts are the config folder's", LIMIT, async (t) => {
+  const config = join(tmp, "second-login");
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = config;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  const project = join(tmp, "project");
+  await mkdir(project);
+  const folder = join(config, "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+  await mkdir(folder, { recursive: true });
+  const sid = "68da9311-0000-4000-8000-0000000000d1";
+  await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify({ type: "ledger" })}\n`);
+  await writeFile(
+    join(config, ".claude.json"),
+    JSON.stringify({
+      claudeInChromeDefaultEnabled: true,
+      projects: { [project]: { hasTrustDialogAccepted: true } },
+    }),
+  );
+  // The home's record trusts nothing and has no Chrome: it is another login's.
+  const sdk = new FakeSdk();
+  const backend = new ClaudeBackend({ query: sdk.query, home, configDir: config });
+  assert.equal(await backend.folderTrusted(project), true);
+  assert.deepEqual(await backend.aliveSessions(project), new Set([sid]));
+  const session = await backend.start({ ...START, folder: project }, NO_REQUESTS);
+  assert.deepEqual(sdk.only.options.extraArgs, { "replay-user-messages": null, chrome: null });
+  await session.close();
+  await backend.close();
+});
+
+test("a backend with no config folder reads the home's records", LIMIT, async (t) => {
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  delete process.env.CLAUDE_CONFIG_DIR;
+  t.after(() => {
+    if (previous !== undefined) process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  const project = join(tmp, "project");
+  await mkdir(project);
+  await claudeRecord({ projects: { [project]: { hasTrustDialogAccepted: true } } });
+  const backend = new ClaudeBackend({ home });
+  assert.equal(await backend.folderTrusted(project), true);
+  await backend.close();
+});

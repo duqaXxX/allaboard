@@ -1,0 +1,530 @@
+{
+ "recording": "subagent",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Run ls and report contents)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nI've laun",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ched the ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "general-p",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "urpose ag",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ent to ru",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "n `ls` an",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "d report ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "the direc",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "tory cont",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ents. The",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " agent is",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " working ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "in the ba",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ckground ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "now. I'll",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " notify y",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ou when i",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t complet",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "es with t",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "he result",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "s.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "a42694cd437f15ed1"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ ls -la",
+      "folded": null,
+      "id": "toolu_01NJC7PqCRjvqpuDbQxHDXTp",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "List files and directories in current working directory"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ ls -la",
+      "folded": null,
+      "id": "toolu_01NJC7PqCRjvqpuDbQxHDXTp",
+      "name": "Bash",
+      "output": "total 8",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "List files and directories in current working directory"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a42694cd437f15ed1",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a42694cd437f15ed1"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a42694cd437f15ed1",
+      "name": "task",
+      "output": "The current working directory is empty except for a single file: **Files and directories present:** - `notes.txt` (6 bytes, regular file) That's the only item in `/home/dev/project`.",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a42694cd437f15ed1"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The agent has co",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "mpleted running ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "`ls`. Here's wha",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t it found:\n\n**F",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "iles and directo",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ries in the curr",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ent working dire",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ctory:**\n- `note",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "s.txt` (6 bytes,",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " regular file)\n\n",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The directory co",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ntains only this",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " single file.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Run ls and report contents)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nI've laun",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ched the ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "general-p",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "urpose ag",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ent to ru",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "n `ls` an",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "d report ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "the direc",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "tory cont",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ents. The",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " agent is",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " working ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "in the ba",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ckground ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "now. I'll",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " notify y",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ou when i",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t complet",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "es with t",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "he result",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "s.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe agent has co",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "mpleted running ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "`ls`. Here's wha",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t it found:\n\n**F",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "iles and directo",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ries in the curr",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ent working dire",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ctory:**\n- `note",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "s.txt` (6 bytes,",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " regular file)\n\n",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "The directory co",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ntains only this",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " single file.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

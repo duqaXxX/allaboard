@@ -1,0 +1,114 @@
+# allaboard pins @anthropic-ai/claude-agent-sdk and runs the Claude Code CLI it bundles, whose
+# message shapes the tests' fixtures record. This asks, every day, whether the suite still passes on
+# the SDK release npm serves now, and keeps one issue with the answer and the checks left to do by
+# hand.
+# Dependabot's weekly pull request still moves the pin; this is the checklist beside it.
+#
+# Two jobs, because the release under test is code nobody here has reviewed: `test` installs and
+# runs it with a token that only reads, and `report`, the one job that can write an issue, starts
+# on a runner of its own where that release was never installed.
+name: SDK release watch
+
+on:
+  schedule:
+    # Daily. A scheduled run can slip or be dropped under load: the state lives in the issue, so
+    # the next run catches up.
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release-watch
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      pinned: ${{ steps.versions.outputs.pinned }}
+      latest: ${{ steps.versions.outputs.latest }}
+      fixture_cli: ${{ steps.versions.outputs.fixture_cli }}
+      cli: ${{ steps.tests.outputs.cli }}
+      outcome: ${{ steps.tests.outputs.outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No npm cache here: this job installs a release nobody has reviewed, and a cache it saved
+      # would be one the CI workflow restores.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # `npm view <package> version` prints the release the registry tags `latest`
+      # (docs.npmjs.com/cli/commands/npm-view).
+      - name: Read the pinned and the latest versions
+        id: versions
+        run: |
+          set -euo pipefail
+          latest="$(npm view @anthropic-ai/claude-agent-sdk version)"
+          pinned="$(jq -r '.dependencies["@anthropic-ai/claude-agent-sdk"]' package.json)"
+          fixture_cli="$(grep -rhoE '"claude_code_version": "[0-9.]+"' test/fixtures/sdk \
+            | grep -oE '[0-9]+(\.[0-9]+)+' | sort -u | tail -1)"
+          for v in "$latest" "$pinned" "$fixture_cli"; do
+            [[ "$v" =~ ^[0-9]+(\.[0-9]+)+$ ]] || { echo "not a version: '$v'" >&2; exit 1; }
+          done
+          { echo "latest=$latest"; echo "pinned=$pinned"; echo "fixture_cli=$fixture_cli"; } \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Run the suite on the latest SDK
+        id: tests
+        env:
+          LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          set -uo pipefail
+          if ! npm ci --silent ||
+            ! npm install --silent --save-exact "@anthropic-ai/claude-agent-sdk@$LATEST"; then
+            echo "outcome=install failed" >> "$GITHUB_OUTPUT"; echo "cli=0.0.0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The SDK's package.json names the Claude Code CLI it bundles.
+          cli="$(jq -r .claudeCodeVersion node_modules/@anthropic-ai/claude-agent-sdk/package.json)"
+          echo "cli=$cli" >> "$GITHUB_OUTPUT"
+          if npm test; then
+            echo "outcome=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "outcome=fail" >> "$GITHUB_OUTPUT"
+          fi
+
+  report:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # A clean checkout, and neither npm nor the project's node_modules: with the token in reach,
+      # nothing runs that the `test` job could have written. That job's outputs are text it could
+      # have written, so they arrive through the environment and sdk-release-report.mjs refuses
+      # any that is not a version or a known outcome.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Open the issue, or bring it up to date
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PINNED: ${{ needs.test.outputs.pinned }}
+          LATEST: ${{ needs.test.outputs.latest }}
+          LATEST_CLI: ${{ needs.test.outputs.cli }}
+          FIXTURE_CLI: ${{ needs.test.outputs.fixture_cli }}
+          OUTCOME: ${{ needs.test.outputs.outcome }}
+        run: bash .github/scripts/watch-sdk-release.sh
+
+      - name: Fail the run when the suite failed
+        if: needs.test.outputs.outcome != 'pass'
+        env:
+          LATEST: ${{ needs.test.outputs.latest }}
+          OUTCOME: ${{ needs.test.outputs.outcome }}
+        run: |
+          echo "@anthropic-ai/claude-agent-sdk $LATEST: $OUTCOME" >&2
+          exit 1

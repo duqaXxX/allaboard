@@ -1,0 +1,728 @@
+/**
+ * Invariant 1, listener by listener: every inbound path checks the owner and the workspace on
+ * its own. Each case is a payload that acts when the owner sends it (the first test of the pair
+ * proves it does), sent again by another user and by the owner's id from another workspace: the
+ * daemon then calls Slack for nothing, not even to read the channel, and changes nothing.
+ *
+ * The refusals are kept in one table, apart from the section of each feature, so a listener added
+ * to `buildApp` without its check has one place to fail.
+ */
+import assert from "node:assert/strict";
+import { join } from "node:path";
+import { test } from "node:test";
+import {
+  DELETE_THREAD_CANCEL,
+  DELETE_THREAD_CONFIRM,
+} from "../../../../src/chat/slack/delete-thread.ts";
+import { HOLD_CANCEL, HOLD_CONTINUE } from "../../../../src/chat/slack/hold.ts";
+import {
+  CHANNEL_ACTION,
+  CLEAN_ACTION,
+  DATE_ACTION,
+  DELETE_ACTION,
+  EDIT_ACTION,
+  EDIT_ON,
+  FILTERS_BLOCK,
+  HOME_UPDATE_ACTION,
+  homeFilter,
+  NEW_THREAD_ACTION,
+  REFRESH_ACTION,
+  SEARCH_ACTION,
+  SHOW_ALL_ACTION,
+  STATUS_ACTION,
+  TAG_ACTION,
+  TODAY,
+} from "../../../../src/chat/slack/home.ts";
+import { QUESTION_EDIT } from "../../../../src/chat/slack/requests.ts";
+import {
+  SETUP_BYPASS,
+  SETUP_EFFORT,
+  SETUP_MODEL,
+  SETUP_START,
+} from "../../../../src/chat/slack/setup.ts";
+import {
+  fieldBlockId,
+  SUGGEST_EDIT,
+  SUGGEST_MENU,
+  SUGGEST_PICK,
+  SUGGEST_SEND,
+} from "../../../../src/chat/slack/suggest.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
+import { UPDATE_ACTION } from "../../../../src/chat/slack/update.ts";
+import { fill, named } from "../../../../src/core/texts.ts";
+import { BOT, CHANNEL, OTHER_TEAM, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
+import { NAMES } from "../../../support/names.ts";
+import {
+  answerClick,
+  type Body,
+  CLICK_THREAD,
+  chooseClick,
+  chosenOption,
+  click,
+  clickIn,
+  clipInfo,
+  clipMessage,
+  ephemeralClick,
+  ephemeralPick,
+  FORM_THREAD,
+  fieldEnter,
+  fieldSend,
+  formAction,
+  HOME_THREAD,
+  homeAction,
+  listed,
+  ModalSlack,
+  message,
+  openedForm,
+  picked,
+  put,
+  QUESTIONS,
+  recorded,
+  respondedTo,
+  resumeClick,
+  SESSION_A,
+  setupState,
+  submitOn,
+  submitted,
+  typing,
+  updatingWorld,
+  type World,
+  worldOf,
+} from "../../../support/slack-app.ts";
+import type { FakeUpdatesHost } from "../../../support/updates.ts";
+
+/** Who sends a payload: the owner, another user, or the owner's id from another workspace. */
+type Sender = "owner" | "stranger" | "other workspace";
+
+/** What a click's `user` says of `sender`: the user's id, or the user's own workspace. */
+function userOf(sender: Sender): Body {
+  if (sender === "stranger") return { id: STRANGER };
+  return sender === "other workspace" ? { team_id: OTHER_TEAM } : {};
+}
+
+/** A click or a form by `sender`. */
+function sentBy(body: Body, sender: Sender): Body {
+  Object.assign(body.user, userOf(sender));
+  return body;
+}
+
+/** A Home control used by `sender`: such a payload names the workspace in `team.id`. */
+function homeBy(action: Body, sender: Sender, values: Body = {}): Body {
+  const body = homeAction(action, sender === "stranger" ? STRANGER : OWNER, values);
+  if (sender === "other workspace") body.team.id = OTHER_TEAM;
+  return body;
+}
+
+interface Case {
+  /** The listener, by what `buildApp` registers it for. */
+  readonly listener: string;
+  /**
+   * Arrange the world, and answer the payload `sender` sends and whether it acted. `responses`
+   * holds what Bolt's `respond` posted, for a case that `responds`.
+   */
+  readonly arrange: (
+    world: World,
+    sender: Sender,
+    responses: readonly Body[],
+  ) => Promise<{ body: Body; acted: () => boolean }>;
+  /** The listener answers through the click's `response_url`: `respondedTo` catches it. */
+  readonly responds?: true;
+  /** The world is one whose daemon can update itself (`updatingWorld`). */
+  readonly updating?: true;
+}
+
+const VERSION = "0.3.1";
+
+/** How many installs the update's host was asked for. */
+function installs(world: World): number {
+  assert.ok(world.updates, "the world can update itself");
+  return (world.updates.host as FakeUpdatesHost).installs.length;
+}
+
+const CASES: readonly Case[] = [
+  ...["approval_allow", "approval_deny", "question_skip"].map(
+    (actionId): Case => ({
+      listener: `action ${actionId}`,
+      arrange: async (world, sender) => {
+        const [approvalId, pending] = world.approvals.open(CHANNEL, CLICK_THREAD, "Bash: ls");
+        return {
+          body: sentBy(click(actionId, approvalId), sender),
+          acted: () => pending.decided,
+        };
+      },
+    }),
+  ),
+  {
+    listener: "action question_open",
+    arrange: async (world, sender) => {
+      const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Colour", QUESTIONS);
+      const body = sentBy(click("question_open", approvalId), sender);
+      body.trigger_id = "0000000000.0000000000.fake";
+      return { body, acted: () => world.slack.callsTo("views.open").length > 0 };
+    },
+  },
+  ...(["answer", "other"] as const).map(
+    (actionId): Case => ({
+      listener: `action ${actionId}`,
+      arrange: async (world, sender) => {
+        const question = QUESTIONS[0] as (typeof QUESTIONS)[number];
+        const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
+        const modal = new ModalSlack(world.slack);
+        await world.dispatch(answerClick(approvalId)); // the form on screen
+        // Other chosen and a text typed: a choice redraws the form, typing reaches the draft.
+        const values = {
+          ...picked(0, "other"),
+          o0: { other: { type: "plain_text_input", value: "mauve" } },
+        };
+        world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
+        const body = formAction(
+          modal.view,
+          values,
+          {
+            id: actionId,
+            block: actionId === "answer" ? "q0" : "o0",
+            type: actionId === "answer" ? "radio_buttons" : "plain_text_input",
+          },
+          { hash: modal.hash },
+        );
+        return {
+          body: sentBy(body, sender),
+          acted:
+            actionId === "answer"
+              ? () => world.slack.callsTo("views.update").length > 0
+              : () => world.built.drafts.get(approvalId)?.typed.size === 1,
+        };
+      },
+    }),
+  ),
+  {
+    listener: `action ${QUESTION_EDIT}`,
+    arrange: async (world, sender) => {
+      const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+      const modal = new ModalSlack(world.slack);
+      await world.dispatch(answerClick(approvalId));
+      const next = await world.dispatch(submitOn(modal.view, picked(0, "0")));
+      const second = (next.body as Body).view as Body; // the form on page two
+      const last = await world.dispatch(
+        submitOn(second, {
+          q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
+        }),
+      );
+      const review = (last.body as Body).view as Body; // the review page
+      world.slack.apiCalls = [];
+      const body = formAction(
+        review,
+        {},
+        { id: "question_edit_0", type: "button" },
+        { hash: modal.hash },
+      );
+      return {
+        body: sentBy(body, sender),
+        acted: () => world.slack.callsTo("views.update").length > 0,
+      };
+    },
+  },
+  {
+    listener: "action notes",
+    arrange: async (world, sender) => {
+      const question = QUESTIONS[0] as (typeof QUESTIONS)[number];
+      const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
+      const modal = new ModalSlack(world.slack);
+      await world.dispatch(answerClick(approvalId));
+      world.slack.apiCalls = [];
+      const values = { ...picked(0, "0"), n0: { notes: { type: "plain_text_input", value: "x" } } };
+      const body = formAction(modal.view, values, {
+        id: "notes",
+        block: "n0",
+        type: "plain_text_input",
+      });
+      return {
+        body: sentBy(body, sender),
+        acted: () => world.built.drafts.get(approvalId)?.notes.size === 1,
+      };
+    },
+  },
+  {
+    listener: "view question_form",
+    arrange: async (world, sender) => {
+      const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [
+        QUESTIONS[0] as (typeof QUESTIONS)[number],
+      ]);
+      const form = await openedForm(world, approvalId);
+      world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
+      return {
+        body: sentBy(submitOn(form, picked(0, "0")), sender),
+        acted: () => pending.decided,
+      };
+    },
+  },
+  {
+    listener: `action ${DELETE_THREAD_CONFIRM}`,
+    responds: true,
+    arrange: async (world, sender) => ({
+      body: sentBy(ephemeralClick(DELETE_THREAD_CONFIRM, CLICK_THREAD), sender),
+      acted: () => world.threadDeletes.length > 0,
+    }),
+  },
+  {
+    listener: `action ${DELETE_THREAD_CANCEL}`,
+    responds: true,
+    arrange: async (_world, sender, responses) => ({
+      body: sentBy(ephemeralClick(DELETE_THREAD_CANCEL, CLICK_THREAD), sender),
+      acted: () => responses.length > 0,
+    }),
+  },
+  {
+    // Enter hands the text to the core as a typed message: a command of the session runs.
+    listener: `action ${SUGGEST_EDIT}`,
+    responds: true,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, CLICK_THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          fieldEnter(
+            SUGGEST_EDIT,
+            fieldBlockId("1790192011.000009", 1),
+            "!model opus",
+            CLICK_THREAD,
+          ),
+          sender,
+        ),
+        acted: () => world.queries().length > 0,
+      };
+    },
+  },
+  {
+    // Send hands the field's text, carried in `state`, to the core as a typed message.
+    listener: `action ${SUGGEST_SEND}`,
+    responds: true,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, CLICK_THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          fieldSend(
+            SUGGEST_SEND,
+            fieldBlockId("1790192011.000009", 1),
+            SUGGEST_EDIT,
+            "!model opus",
+            CLICK_THREAD,
+          ),
+          sender,
+        ),
+        acted: () => world.queries().length > 0,
+      };
+    },
+  },
+  ...[SUGGEST_PICK, SUGGEST_MENU].map(
+    (actionId): Case => ({
+      listener: `action ${actionId}`,
+      responds: true,
+      arrange: async (_world, sender, responses) => ({
+        body: sentBy(ephemeralPick(actionId, "forgotten:0", CLICK_THREAD), sender),
+        acted: () => responses.length > 0,
+      }),
+    }),
+  ),
+  ...[HOLD_CONTINUE, HOLD_CANCEL].map(
+    (actionId): Case => ({
+      listener: `action ${actionId}`,
+      arrange: async (world, sender) => {
+        const [holdId, pending] = world.holds.open(CHANNEL, CLICK_THREAD);
+        return { body: sentBy(click(actionId, holdId), sender), acted: () => pending.decided };
+      },
+    }),
+  ),
+  {
+    listener: `action ${SETUP_START}`,
+    arrange: async (world, sender) => {
+      const [setupId, pending] = world.holds.open(CHANNEL, CLICK_THREAD, []);
+      const body = sentBy(click(SETUP_START, setupId), sender);
+      body.state = { values: setupState(undefined, undefined, true) };
+      return { body, acted: () => pending.decided };
+    },
+  },
+  {
+    listener: `action ${SETUP_MODEL}`,
+    arrange: async (world, sender) => {
+      const [setupId] = world.holds.open(CHANNEL, CLICK_THREAD, []);
+      // Posted through the provider, which keeps what the setup said to draw for a redraw.
+      const shownAt = await world.chat.thread({ channel: CHANNEL, thread: CLICK_THREAD }).ask(
+        setupId,
+        {
+          type: "setup",
+          requestId: setupId,
+          models: [],
+          efforts: [],
+          bypassOffered: true,
+          selection: { model: "default", effort: "default", bypass: false },
+        },
+        "Set up this session",
+      );
+      const body = sentBy(click(SETUP_MODEL, "opus"), sender);
+      world.slack.apiCalls = []; // the post is the arrangement, not what the payload did
+      body.message.ts = shownAt;
+      world.holds.posted(setupId, shownAt);
+      body.state = { values: setupState("opus") };
+      return { body, acted: () => world.slack.callsTo("chat.update").length > 0 };
+    },
+  },
+  {
+    listener: "action open_choose",
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      return {
+        body: chooseClick("", userOf(sender)),
+        acted: () => world.slack.callsTo("views.open").length > 0,
+      };
+    },
+  },
+  {
+    listener: "action open_query",
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      new ModalSlack(world.slack);
+      const body = typing("notes", 1790000100, {
+        ...(sender === "stranger" && { user: STRANGER }),
+        ...(sender === "other workspace" && { team: OTHER_TEAM }),
+      });
+      return { body, acted: () => world.slack.callsTo("views.update").length > 0 };
+    },
+  },
+  {
+    listener: "view open_form",
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      put(join(world.root, "app"), "notes.txt", "hello\n");
+      const body = submitted("notes.txt", {
+        ...(sender === "stranger" && { user: STRANGER }),
+        ...(sender === "other workspace" && { team: OTHER_TEAM }),
+      });
+      return {
+        body,
+        acted: () => world.slack.callsTo("files.completeUploadExternal").length > 0,
+      };
+    },
+  },
+  {
+    listener: "action folder_bind",
+    arrange: async (world, sender) => {
+      world.state.removeChannel(CHANNEL);
+      return {
+        body: sentBy(click("folder_bind", "app"), sender),
+        acted: () => world.state.channel(CHANNEL) !== null,
+      };
+    },
+  },
+  {
+    listener: "action session_resume",
+    arrange: async (world, sender) => {
+      world.storedSessions = [listed(SESSION_A, "footer", 0, 1)];
+      return {
+        body: sentBy(resumeClick(SESSION_A, THREAD), sender),
+        acted: () => world.state.thread(CHANNEL, THREAD) !== null,
+      };
+    },
+  },
+  {
+    listener: `action ${UPDATE_ACTION}`,
+    updating: true,
+    arrange: async (world, sender) => {
+      await world.updates?.check();
+      return {
+        body: sentBy(
+          clickIn(UPDATE_ACTION, VERSION, CHANNEL, THREAD, { messageTs: THREAD }),
+          sender,
+        ),
+        acted: () => installs(world) > 0,
+      };
+    },
+  },
+  // The four filters share one listener, each is registered on its own `action_id`.
+  ...(
+    [
+      [
+        CHANNEL_ACTION,
+        chosenOption(CHANNEL),
+        (world: World) => world.home.chosen.channel === CHANNEL,
+      ],
+      [
+        STATUS_ACTION,
+        chosenOption("raised_hand"),
+        (world: World) => world.home.chosen.status === "raised_hand",
+      ],
+      [DATE_ACTION, chosenOption(TODAY), (world: World) => world.home.chosen.date === TODAY],
+      // The page drops a tag no root carries, so what shows the click was taken is the page it
+      // publishes at once.
+      [
+        TAG_ACTION,
+        chosenOption("devops"),
+        (world: World) => world.slack.callsTo("views.publish").length > 0,
+      ],
+      [
+        SEARCH_ACTION,
+        { type: "plain_text_input", value: "footer" },
+        (world: World) => world.home.chosen.search === "footer",
+      ],
+    ] as const
+  ).map(
+    ([actionId, control, chosen]): Case => ({
+      listener: `action ${actionId}`,
+      arrange: async (world, sender) => {
+        const values = { [FILTERS_BLOCK]: { [actionId]: control } };
+        const action = { action_id: actionId, ...control };
+        return { body: homeBy(action, sender, values), acted: () => chosen(world) };
+      },
+    }),
+  ),
+  {
+    listener: `action ${SHOW_ALL_ACTION}`,
+    arrange: async (world, sender) => ({
+      body: homeBy({ type: "button", action_id: SHOW_ALL_ACTION, value: CHANNEL }, sender),
+      acted: () => world.home.chosen.channel === CHANNEL,
+    }),
+  },
+  {
+    listener: `action ${EDIT_ACTION}`,
+    arrange: async (world, sender) => ({
+      body: homeBy({ type: "button", action_id: EDIT_ACTION, value: EDIT_ON }, sender),
+      acted: () => world.slack.callsTo("views.publish").length > 0,
+    }),
+  },
+  {
+    listener: `action ${REFRESH_ACTION}`,
+    arrange: async (world, sender) => ({
+      body: homeBy({ type: "button", action_id: REFRESH_ACTION, value: "refresh" }, sender),
+      acted: () => world.cleanups > 0,
+    }),
+  },
+  {
+    listener: `action ${DELETE_ACTION}`,
+    arrange: async (world, sender) => {
+      await world.home.edit(true);
+      world.slack.apiCalls.length = 0;
+      const value = `${CHANNEL}:${HOME_THREAD}`;
+      return {
+        body: homeBy({ type: "button", action_id: DELETE_ACTION, value }, sender),
+        acted: () => world.deleted.length > 0,
+      };
+    },
+  },
+  {
+    listener: `action ${CLEAN_ACTION}`,
+    arrange: async (world, sender) => {
+      await world.home.edit(true);
+      world.slack.apiCalls.length = 0;
+      return {
+        body: homeBy({ type: "button", action_id: CLEAN_ACTION, value: CHANNEL }, sender),
+        acted: () => world.cleaned.length > 0,
+      };
+    },
+  },
+  {
+    listener: `action ${HOME_UPDATE_ACTION}`,
+    updating: true,
+    arrange: async (world, sender) => {
+      await world.updates?.check();
+      return {
+        body: homeBy({ type: "button", action_id: HOME_UPDATE_ACTION, value: VERSION }, sender),
+        acted: () => installs(world) > 0,
+      };
+    },
+  },
+];
+
+for (const { listener, arrange, updating, responds } of CASES) {
+  const madeWorld = (t: Parameters<typeof worldOf>[0]): [World, readonly Body[]] => {
+    // Bolt reads the global `fetch` when the app is built: it is mocked first.
+    const responses = responds ? respondedTo(t) : [];
+    return [updating ? updatingWorld(t).world : worldOf(t), responses];
+  };
+  test(`${listener}: the owner's payload acts`, async (t) => {
+    const [world, responses] = madeWorld(t);
+    const { body, acted } = await arrange(world, "owner", responses);
+    const response = await world.dispatch(body);
+    await world.settle();
+    assert.equal(response.status, 200);
+    assert.ok(acted());
+  });
+
+  for (const sender of ["stranger", "other workspace"] as const) {
+    test(`${listener}: the same payload from ${sender === "stranger" ? "another user" : "another workspace"} does nothing`, async (t) => {
+      const [world, responses] = madeWorld(t);
+      const { body, acted } = await arrange(world, sender, responses);
+      const response = await world.dispatch(body);
+      await world.settle();
+      // Acknowledged, as Slack requires of every payload, and nothing else.
+      assert.equal(response.status, 200);
+      assert.equal(response.body, null);
+      assert.ok(!acted());
+      assert.deepEqual(world.slack.apiCalls, []); // not even the channel is read
+      assert.deepEqual(world.clients, []);
+      assert.deepEqual(world.home.chosen, homeFilter());
+    });
+  }
+}
+
+// The listeners that only acknowledge: they read nothing and do nothing, whoever sends the
+// payload. Each is registered (`BuiltApp.registered` says so), so that one that starts to do
+// something must be moved to the table above, with the checks it then needs.
+
+const ACKNOWLEDGE_ONLY: ReadonlyArray<
+  readonly [listener: string, payload: (sender: Sender) => Body]
+> = [
+  [`action ${SETUP_EFFORT}`, (sender) => sentBy(click(SETUP_EFFORT, "high"), sender)],
+  [`action ${SETUP_BYPASS}`, (sender) => sentBy(click(SETUP_BYPASS, "bypass"), sender)],
+  [
+    `action ${NEW_THREAD_ACTION}`,
+    (sender) => homeBy({ type: "button", action_id: NEW_THREAD_ACTION, value: "x" }, sender),
+  ],
+];
+
+for (const [listener, payload] of ACKNOWLEDGE_ONLY) {
+  for (const sender of ["owner", "stranger", "other workspace"] as const) {
+    test(`${listener}: only acknowledges, from ${sender}`, async (t) => {
+      const world = worldOf(t);
+      const response = await world.dispatch(payload(sender));
+      await world.settle();
+      assert.equal(response.status, 200);
+      assert.equal(response.body, null);
+      assert.deepEqual(world.slack.apiCalls, []);
+      assert.deepEqual(world.clients, []);
+      assert.deepEqual(world.home.chosen, homeFilter());
+    });
+  }
+}
+
+// The two events: tested by hand below.
+const EVENTS = ["event message", "event message deleted", "event file_change"];
+
+test("every listener the app registers has a row in the table, and every row a listener", (t) => {
+  const world = worldOf(t);
+  const rows = new Set([
+    ...CASES.map((row) => row.listener),
+    ...ACKNOWLEDGE_ONLY.map(([listener]) => listener),
+    ...EVENTS,
+  ]);
+  const registered = world.built.registered.map((entry) => `${entry.kind} ${entry.id}`);
+  assert.deepEqual(
+    registered.filter((listener) => !rows.has(listener)),
+    [],
+    "a listener `buildApp` registers has no row in the table of owner checks",
+  );
+  assert.deepEqual(
+    [...rows].filter((row) => !registered.includes(row)),
+    [],
+    "a row of the table names a listener `buildApp` no longer registers",
+  );
+  // The flag says what the table believes: a listener marked so is in the acknowledge-only rows.
+  const acknowledging = new Set(ACKNOWLEDGE_ONLY.map(([listener]) => listener));
+  for (const entry of world.built.registered) {
+    assert.equal(
+      acknowledging.has(`${entry.kind} ${entry.id}`),
+      entry.acknowledgeOnly,
+      `${entry.kind} ${entry.id}: acknowledgeOnly disagrees with the table`,
+    );
+  }
+});
+
+// Three checks that the table above did not need, and a removal of any of them passed every
+// test of the handlers. A stranger's Next on a form of two questions, the form of a channel the
+// guard now refuses, and a clip whose channel the guard now refuses.
+
+test("view question_form: a stranger's Next on a two-question form is answered with nothing", async (t) => {
+  const world = worldOf(t);
+  const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+  const form = await openedForm(world, approvalId);
+  world.slack.apiCalls = [];
+  // The first question answered: for the owner this is a Next, answered with the next question.
+  const owner = await world.dispatch(submitOn(form, picked(0, "0")));
+  assert.equal(owner.body?.response_action, "update");
+  const stranger = await world.dispatch(sentBy(submitOn(form, picked(0, "0")), "stranger"));
+  assert.equal(stranger.status, 200);
+  assert.equal(stranger.body, null); // no view, no error: nothing that says the form exists
+  assert.equal(pending.decided, false);
+  assert.deepEqual(world.slack.apiCalls, []);
+});
+
+test("view question_form: the form of a channel the guard refuses resolves nothing", async (t) => {
+  const world = worldOf(t);
+  const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [
+    QUESTIONS[0] as (typeof QUESTIONS)[number],
+  ]);
+  const form = await openedForm(world, approvalId);
+  // The channel gained a member while the form was open.
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  const response = await world.dispatch(submitOn(form, picked(0, "0")));
+  await world.settle();
+  assert.equal(response.status, 200);
+  assert.equal(pending.decided, false);
+  assert.equal(
+    world.ephemerals().at(-1),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
+  );
+});
+
+test("event file_change: a clip whose channel the guard now refuses is never sent", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  clipInfo(world);
+  // The channel gained a member while the clip waited for its transcript.
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  await world.dispatch(recorded("event_callback-file_change"));
+  await world.settle();
+  assert.deepEqual(world.queries(), []);
+  assert.deepEqual(world.clients, []);
+  assert.equal(
+    world.ephemerals().at(-1),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
+  );
+});
+
+// The one path with no user in its payload: Slack changed a file. It acts only on a clip the
+// owner's own message left waiting, and checks the owner again on the file Slack now describes.
+
+test("event file_change: the owner's clip is sent once its transcript is there", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  clipInfo(world);
+  await world.dispatch(recorded("event_callback-file_change"));
+  await world.settle();
+  assert.equal(world.queries().length, 1);
+});
+
+for (const [who, fields] of [
+  ["another user", { user: STRANGER }],
+  ["another workspace", { user_team: OTHER_TEAM }],
+] as const) {
+  test(`event file_change: a file that became ${who}'s is never sent`, async (t) => {
+    const world = worldOf(t);
+    await world.dispatch(clipMessage(false));
+    clipInfo(world, fields);
+    await world.dispatch(recorded("event_callback-file_change"));
+    await world.settle();
+    assert.deepEqual(world.queries(), []);
+    assert.deepEqual(world.clients, []);
+    assert.equal(world.ephemerals().at(-1), named(slackTexts.CLIP_NOT_YOURS, NAMES));
+  });
+}
+
+test("event file_change: a file nobody waits for is not even read", async (t) => {
+  const world = worldOf(t);
+  clipInfo(world);
+  await world.dispatch(recorded("event_callback-file_change"));
+  assert.deepEqual(world.slack.apiCalls, []);
+});
+
+for (const [who, event] of [
+  ["another user", { user: STRANGER }],
+  ["another workspace", { team: OTHER_TEAM }],
+] as const) {
+  test(`event message: a message from ${who} does nothing`, async (t) => {
+    const world = worldOf(t);
+    await world.dispatch(message("!bypass on", event));
+    await world.dispatch(message("rm -rf /", { ...event, ts: THREAD }));
+    assert.deepEqual(world.slack.apiCalls, []);
+    assert.deepEqual(world.clients, []);
+    assert.equal(world.state.thread(CHANNEL, THREAD), null);
+  });
+}

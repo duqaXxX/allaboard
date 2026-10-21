@@ -1,0 +1,51 @@
+{
+  "display_information": {
+    "name": "allaboard",
+    "description": "Drive the coding-agent sessions on your own computer from private Slack channels.",
+    "background_color": "#1f2328"
+  },
+  "features": {
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": true
+    },
+    "bot_user": {
+      "display_name": "allaboard",
+      "always_online": true
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "groups:history",
+        "groups:read",
+        "chat:write",
+        "files:read",
+        "files:write",
+        "reactions:write"
+      ],
+      "user": [
+        "chat:write",
+        "pins:write"
+      ]
+    },
+    "pkce_enabled": false
+  },
+  "settings": {
+    "event_subscriptions": {
+      "bot_events": [
+        "message.groups",
+        "file_change"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false,
+    "app_level_token_rotation_enabled": false,
+    "is_mcp_enabled": false
+  }
+}

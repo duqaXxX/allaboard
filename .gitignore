@@ -1,0 +1,18 @@
+# What `npm run build` writes, and the package `npm run build:npm` assembles from it.
+/dist/
+/build/
+
+# Secrets. allaboard reads its configuration from ~/.config/allaboard/, never from
+# the repository; these lines only catch a copy made here by mistake.
+.env
+.env.*
+
+# Files a machine or an agent creates while working in the checkout.
+.DS_Store
+/.claude/settings.local.json
+/.superpowers/
+
+/node_modules/
+
+# The tarball `npm pack` builds for the install.
+/allaboard-*.tgz

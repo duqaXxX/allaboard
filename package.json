@@ -1,0 +1,59 @@
+{
+  "name": "allaboard",
+  "version": "0.6.0",
+  "description": "Your Claude Code workspace in Slack: one channel per project, one thread per session, running on your own Mac.",
+  "keywords": [
+    "slack",
+    "coding-agent",
+    "claude-code",
+    "agent-sdk",
+    "remote",
+    "daemon"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/duqaXxX/allaboard.git"
+  },
+  "type": "module",
+  "bin": {
+    "allaboard": "dist/main.js"
+  },
+  "files": [
+    "dist",
+    "slack-app-manifest.json",
+    "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "LICENSE",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:npm": "npm run prepack && node .github/scripts/npm-package.mjs",
+    "prepack": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && npm run build",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "golden": "node test/support/write-golden.ts",
+    "test": "node --test --test-timeout=300000 \"test/**/*.test.ts\"",
+    "test:linux": "bash .github/scripts/test-linux.sh",
+    "check": "npm run lint && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.304",
+    "@inquirer/input": "5.1.7",
+    "@inquirer/password": "5.2.3",
+    "@inquirer/select": "5.2.6",
+    "@slack/bolt": "5.1.0",
+    "@slack/web-api": "8.2.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2"
+  }
+}

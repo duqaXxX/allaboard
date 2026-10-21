@@ -1,0 +1,570 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "elements": [
+      {
+       "text": "ToolSearch, Monitor, ran 3 shell commands",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
+     "type": "markdown"
+    },
+    {
+     "text": "Foreground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.\n\nnoted.\n\nnoted.",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   []
+  ],
+  "message_texts": [
+   "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds\n\nForeground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.\n\nnoted.\n\nnoted."
+  ],
+  "pushes": 1
+ },
+ "recording": "monitor-ended-in-turn",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "in_progress",
+      "title": "ToolSearch: select:Monitor,Bash",
+      "type": "task_update"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "complete",
+      "title": "ToolSearch",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "in_progress",
+      "title": "Monitor: tick watch",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "complete",
+      "title": "ToolSearch, Monitor",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ sleep 50",
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "in_progress",
+      "title": "Background sleep 50 seconds",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 5,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "complete",
+      "title": "ToolSearch, Monitor, ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ sleep 55",
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "in_progress",
+      "title": "Background sleep 55 seconds",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 7,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "complete",
+      "title": "ToolSearch, Monitor, ran 2 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 8,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ python3 -c 'import time; time.sleep(30)'",
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "in_progress",
+      "title": "Sleep 30 seconds in Python",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 9,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 10,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "status": "complete",
+      "title": "ToolSearch, Monitor, ran 3 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 12,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nFore",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 13,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ground Python sleep",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 14,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " completed successfully",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 15,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " after",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 16,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " 30 seconds while",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 17,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " the",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 18,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " monitor",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 19,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " em",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 20,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "itted",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 21,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " two",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 22,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " tick events and",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 23,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " two",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 24,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " background",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 25,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " sle",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 26,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "eps continue",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 27,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " running",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 28,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ".",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 29,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nnoted.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 30,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nnoted.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 32,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 32,
+   "args": {
+    "blocks": [
+     {
+      "elements": [
+       {
+        "text": "ToolSearch, Monitor, ran 3 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
+      "type": "markdown"
+     },
+     {
+      "text": "Foreground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.\n\nnoted.\n\nnoted.",
+      "type": "markdown"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "Foreground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  },
+  {
+   "after_sink_call": 32,
+   "args": {
+    "blocks": [
+     {
+      "elements": [
+       {
+        "text": "ToolSearch, Monitor, ran 3 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
+      "type": "markdown"
+     },
+     {
+      "text": "Foreground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.\n\nnoted.\n\nnoted.",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "Foreground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

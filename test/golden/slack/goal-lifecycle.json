@@ -1,0 +1,2069 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nGoal set: create `a1.txt` through `a20.txt` in the current folder, one per Bash call, each containing its own number. Starting with `a1.txt`.",
+     "type": "markdown"
+    },
+    {
+     "elements": [
+      {
+       "text": "Ran 2 shell commands",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.",
+     "type": "markdown"
+    },
+    {
+     "elements": [
+      {
+       "text": "Ran 1 shell command",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "Hello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.",
+     "type": "markdown"
+    },
+    {
+     "elements": [
+      {
+       "text": "Ran 17 shell commands",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "All 20 files are written. Checking the folder once to confirm each file holds its own number.",
+     "type": "markdown"
+    },
+    {
+     "elements": [
+      {
+       "text": "Ran 1 shell command",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "The goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.",
+     "type": "markdown"
+    },
+    {
+     "elements": [
+      {
+       "text": "Ran 3 shell commands",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   []
+  ],
+  "message_texts": [
+   "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nGoal set: create `a1.txt` through `a20.txt` in the current folder, one per Bash call, each containing its own number. Starting with `a1.txt`.\n\n`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.\n\nHello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.\n\nAll 20 files are written. Checking the folder once to confirm each file holds its own number.\n\nThe goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.\n\nGoal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number"
+  ],
+  "pushes": 1
+ },
+ "recording": "goal-lifecycle",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number",
+      "type": "markdown_text"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nGoal set: cre",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ate `a1.txt` ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "through `a20.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "txt` in the c",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 5,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "urrent folder",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ", one per Bas",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 7,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "h call, each ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 8,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "containing it",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 9,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "s own number.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 10,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " Starting wit",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "h `a1.txt`.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 12,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ echo 1 > a1.txt && cat a1.txt",
+      "id": "fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "status": "in_progress",
+      "title": "Create a1.txt containing 1",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 13,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 14,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 2 > a2.txt && cat a2.txt",
+      "id": "fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "status": "in_progress",
+      "title": "Create a2.txt containing 2",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 15,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "status": "complete",
+      "title": "Ran 2 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 16,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "`a1.txt` an",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 17,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "d `a2.txt` ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 18,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "are done. C",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 19,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ontinuing w",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 20,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ith `a3.txt",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 21,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "` through `",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 22,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "a6.txt`.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 23,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ echo 3 > a3.txt && cat a3.txt",
+      "id": "fold:toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+      "status": "in_progress",
+      "title": "Create a3.txt containing 3",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 24,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 25,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "Hello.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 26,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nThe goal ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 27,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "is still ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 28,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "open: `a1",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 29,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ".txt` to ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 30,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "`a3.txt` ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 31,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "exist, an",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 32,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "d `a4.txt",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 33,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "` to `a20",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 34,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ".txt` do ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 35,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "not. Crea",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 36,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ting `a4.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 37,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "txt` now.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 38,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ echo 4 > a4.txt && cat a4.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a4.txt containing 4",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 39,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 40,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 5 > a5.txt && cat a5.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a5.txt containing 5",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 41,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 2 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 42,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 6 > a6.txt && cat a6.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a6.txt containing 6",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 43,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 3 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 44,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 7 > a7.txt && cat a7.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a7.txt containing 7",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 45,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 4 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 46,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 8 > a8.txt && cat a8.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a8.txt containing 8",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 47,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 5 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 48,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 9 > a9.txt && cat a9.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a9.txt containing 9",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 49,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 6 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 50,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 10 > a10.txt && cat a10.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a10.txt containing 10",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 51,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 7 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 52,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 11 > a11.txt && cat a11.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a11.txt containing 11",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 53,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 8 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 54,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 12 > a12.txt && cat a12.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a12.txt containing 12",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 55,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 9 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 56,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 13 > a13.txt && cat a13.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a13.txt containing 13",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 57,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 10 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 58,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 14 > a14.txt && cat a14.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a14.txt containing 14",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 59,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 11 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 60,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 15 > a15.txt && cat a15.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a15.txt containing 15",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 61,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 12 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 62,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 16 > a16.txt && cat a16.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a16.txt containing 16",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 63,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 13 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 64,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 17 > a17.txt && cat a17.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a17.txt containing 17",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 65,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 14 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 66,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 18 > a18.txt && cat a18.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a18.txt containing 18",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 67,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 15 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 68,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 19 > a19.txt && cat a19.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a19.txt containing 19",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 69,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 16 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 70,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 20 > a20.txt && cat a20.txt",
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "in_progress",
+      "title": "Create a20.txt containing 20",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 71,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "status": "complete",
+      "title": "Ran 17 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 72,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "All 20 files a",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 73,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "re written. Ch",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 74,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ecking the fol",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 75,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "der once to co",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 76,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "nfirm each fil",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 77,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "e holds its ow",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 78,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "n number.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 79,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+      "id": "fold:toolu_01XAexZvMygkUXzSNFPijXpm",
+      "status": "in_progress",
+      "title": "Verify a1.txt to a20.txt contents",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 80,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01XAexZvMygkUXzSNFPijXpm",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 81,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "The goal i",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 82,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "s met. `a1",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 83,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ".txt` thro",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 84,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ugh `a20.t",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 85,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "xt` now ex",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 86,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ist in `/h",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 87,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ome/dev/pr",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 88,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "oject`, ea",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 89,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ch created",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 90,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " by its ow",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 91,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "n Bash cal",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 92,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "l and each",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 93,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " containin",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 94,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "g its own ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 95,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "number. A ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 96,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "final chec",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 97,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "k printed ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 98,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "every file",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 99,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "'s content",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 100,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "s, and eac",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 101,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "h matches ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 102,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "its name.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 103,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 104,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nNew goal: `b1.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 105,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "txt` through `",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 106,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "b20.txt`, one ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 107,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "per Bash call,",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 108,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " each holding ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 109,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "its own number",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 110,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ". Starting wit",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 111,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "h `b1.txt`.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 112,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ echo 1 > b1.txt && cat b1.txt",
+      "id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "status": "in_progress",
+      "title": "Create b1.txt containing 1",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 113,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 114,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 2 > b2.txt && cat b2.txt",
+      "id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "status": "in_progress",
+      "title": "Create b2.txt containing 2",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 115,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "status": "complete",
+      "title": "Ran 2 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 116,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\n$ echo 3 > b3.txt && cat b3.txt",
+      "id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "status": "in_progress",
+      "title": "Create b3.txt containing 3",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 117,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "status": "complete",
+      "title": "Ran 3 shell commands",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 118,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 120,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 120,
+   "args": {
+    "blocks": [
+     {
+      "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nGoal set: create `a1.txt` through `a20.txt` in the current folder, one per Bash call, each containing its own number. Starting with `a1.txt`.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 2 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 1 shell command",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "Hello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 17 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "All 20 files are written. Checking the folder once to confirm each file holds its own number.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 1 shell command",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "The goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 3 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+      "type": "markdown"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  },
+  {
+   "after_sink_call": 120,
+   "args": {
+    "blocks": [
+     {
+      "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nGoal set: create `a1.txt` through `a20.txt` in the current folder, one per Bash call, each containing its own number. Starting with `a1.txt`.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 2 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 1 shell command",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "Hello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 17 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "All 20 files are written. Checking the folder once to confirm each file holds its own number.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 1 shell command",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "The goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Ran 3 shell commands",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

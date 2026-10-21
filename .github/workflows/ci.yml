@@ -1,0 +1,85 @@
+# Runs on every push to main and every pull request. Two jobs, kept separate: a leak is not a
+# reason to stop reporting a broken test, nor the reverse, so a red check names what broke.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Sensitive-data scan
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: the scan diffs against a base commit, which a shallow clone does not have.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The refs arrive through the environment, never interpolated into the script: a branch name
+      # on a pull request from a fork is attacker-controlled text.
+      - name: Scan the pushed changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags origin "$BASE_REF"
+            git diff "origin/$BASE_REF...HEAD"
+          elif [ -n "${BEFORE:-}" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            git diff "$BEFORE..$SHA"
+          else
+            git show "$SHA"
+          fi | bash .github/scripts/scan-sensitive-diff.sh
+
+  check:
+    name: Tests, types, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Node 22 is the oldest release line the package accepts (`engines` in package.json).
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Reports rather than rewrites: CI never edits the code under review.
+      - run: npm run lint
+      # The tests run from the sources with the types stripped, so a type error survives a green
+      # suite.
+      - run: npm run typecheck
+      - run: npm test
+
+  # The unit tests on the other systems the daemon is meant to run on: the job above
+  # runs them on Linux. They start no Claude Code process and open no connection.
+  systems:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test

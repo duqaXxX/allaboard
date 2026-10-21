@@ -1,0 +1,247 @@
+/**
+ * The app after the daemon stopped (`BuiltApp.close`, which the shutdown calls once the Socket
+ * Mode connection is closed): a listener still in flight when the stop ends goes on at its next
+ * await, and must do nothing the owner can see, call nothing in Slack and write nothing, since
+ * the sessions are closed and the lock is released.
+ *
+ * The listeners are held on the channel check (`conversations.members`), which every inbound
+ * path runs after the owner check.
+ */
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
+import { DELETE_ACTION } from "../../../../src/chat/slack/home.ts";
+import { AsyncEvent, BOT, CHANNEL, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
+import {
+  type Body,
+  CLICK_THREAD,
+  click,
+  clickIn,
+  FORM_THREAD,
+  homeAction,
+  listed,
+  ModalSlack,
+  message,
+  QUESTIONS,
+  reply,
+  resumeClick,
+  SESSION_A,
+  sharedFile,
+  type World,
+  worldOf,
+} from "../../../support/slack-app.ts";
+
+/**
+ * Counts what the provider hands the core: the core ends a flow of its own once it is stopped,
+ * so only this count shows that the provider itself stopped at the channel check.
+ */
+function crossings(t: Parameters<typeof worldOf>[0], world: World): () => number {
+  const spies = (["message", "answer", "picked"] as const).map((name) =>
+    t.mock.method(world.inbound, name),
+  );
+  return () => spies.reduce((total, spy) => total + spy.mock.callCount(), 0);
+}
+
+/** A world with `THREAD` stored and the channel check held, a body dispatched and waiting on it. */
+async function held(
+  t: Parameters<typeof worldOf>[0],
+  body: Body,
+  arrange?: (world: World) => void,
+) {
+  const world = worldOf(t);
+  world.state.openThread(CHANNEL, THREAD, SESSION_A);
+  arrange?.(world);
+  const gate = new AsyncEvent();
+  world.slack.gate = gate;
+  world.slack.gateMethod = "conversations.members";
+  const crossed = crossings(t, world);
+  await world.dispatch(body);
+  assert.ok(world.slack.gated.isSet(), "the listener never reached the channel check");
+  return { world, gate, crossed };
+}
+
+/** The daemon's stop: the connection closed, the app told, the sessions closed. */
+async function stop(world: World): Promise<void> {
+  world.built.close();
+  await world.sessions.closeAll();
+}
+
+/** What changed since the stop, once the held listener went on. */
+async function release(world: World, gate: AsyncEvent, crossed: () => number): Promise<string[]> {
+  const stateFile = join(world.tmpPath, "state.json");
+  const before = readFileSync(stateFile, "utf8");
+  const calls = world.slack.apiCalls.length;
+  gate.set();
+  await world.idle();
+  assert.equal(readFileSync(stateFile, "utf8"), before, "state.json was written after the stop");
+  assert.deepEqual(world.clients, [], "an agent session was started after the stop");
+  assert.equal(crossed(), 0, "the core was handed an input after the stop");
+  // The held `conversations.members` is recorded once it is let go; nothing follows it.
+  return world.slack.apiCalls.slice(calls).map((call) => call.method);
+}
+
+test("a message in a thread whose channel check ends after the stop does nothing", async (t) => {
+  const { world, gate, crossed } = await held(t, reply("hello", THREAD));
+  await stop(world);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
+});
+
+test("a message still waiting for its place in the thread when the daemon stops calls nothing", async (t) => {
+  const { world, gate, crossed } = await held(t, reply("first", THREAD));
+  // Two more replies of the thread: each waits for the place of the one before it.
+  await world.dispatch(reply("second", THREAD));
+  await world.dispatch(reply("third", THREAD));
+  await stop(world);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
+});
+
+test("a top-level message whose channel check ends after the stop does nothing", async (t) => {
+  const { world, gate, crossed } = await held(t, message("hello", { ts: "1790000000.000044" }));
+  await stop(world);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
+  assert.equal(world.state.thread(CHANNEL, "1790000000.000044"), null);
+});
+
+test("a channel the guard refuses is not told about once the daemon stopped", async (t) => {
+  const { world, gate, crossed } = await held(t, reply("hello", THREAD));
+  world.slack.responses["conversations.members"] = {
+    ok: true,
+    members: [OWNER, "U000BOB"],
+  };
+  await stop(world);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
+});
+
+test("a message that arrives after the stop is not even checked", async (t) => {
+  const world = worldOf(t);
+  await stop(world);
+  await world.dispatch(message("hello", { ts: "1790000000.000045" }));
+  assert.deepEqual(world.slack.apiCalls, []);
+  assert.deepEqual(world.clients, []);
+});
+
+test("a file download that ends after the stop sends nothing and says nothing", async (t) => {
+  const world = worldOf(t);
+  world.state.openThread(CHANNEL, THREAD, SESSION_A);
+  const body = sharedFile("snippet");
+  Object.assign(body.event, { thread_ts: THREAD, ts: "1790000000.000046" });
+  world.downloads.set(body.event.files[0].url_private_download, new TextEncoder().encode("hi"));
+  world.slowDownloads = 5;
+  await world.dispatch(body);
+  const calls = world.slack.apiCalls.length;
+  await stop(world);
+  await world.appClock.advance(5);
+  await world.idle();
+  assert.deepEqual(
+    world.slack.apiCalls.slice(calls).map((call) => call.method),
+    [],
+  );
+  assert.deepEqual(world.clients, []);
+});
+
+const CLICKS: ReadonlyArray<readonly [string, (world: World) => Body, (world: World) => boolean]> =
+  [
+    [
+      "approval_allow",
+      (world) => {
+        const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Bash: ls");
+        return click("approval_allow", approvalId);
+      },
+      (world) => world.slack.callsTo("chat.delete").length > 0,
+    ],
+    [
+      "question_open",
+      (world) => {
+        const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Colour", QUESTIONS);
+        // The form opens before the channel check; a refused channel would replace it.
+        new ModalSlack(world.slack);
+        world.slack.responses["conversations.members"] = {
+          ok: true,
+          members: [OWNER, BOT, STRANGER],
+        };
+        const body = click("question_open", approvalId);
+        body.trigger_id = "0000000000.0000000000.fake";
+        return body;
+      },
+      (world) => world.slack.callsTo("views.update").length > 0,
+    ],
+    [
+      "folder_bind",
+      (world) => {
+        world.state.removeChannel(CHANNEL);
+        return click("folder_bind", "app");
+      },
+      (world) => world.state.channel(CHANNEL) !== null,
+    ],
+    [
+      "session_resume",
+      (world) => {
+        world.storedSessions = [listed(SESSION_A, "footer", 0, 1)];
+        return resumeClick(SESSION_A, FORM_THREAD);
+      },
+      (world) => world.state.thread(CHANNEL, FORM_THREAD) !== null,
+    ],
+  ];
+
+for (const [name, arrange, acted] of CLICKS) {
+  test(`a click on ${name} whose channel check ends after the stop does nothing`, async (t) => {
+    const world = worldOf(t);
+    const body = arrange(world);
+    const gate = new AsyncEvent();
+    world.slack.gate = gate;
+    world.slack.gateMethod = "conversations.members";
+    const crossed = crossings(t, world);
+    await world.dispatch(body);
+    assert.ok(world.slack.gated.isSet(), "the listener never reached the channel check");
+    await stop(world);
+    const stateFile = join(world.tmpPath, "state.json");
+    const before = readFileSync(stateFile, "utf8");
+    const calls = world.slack.apiCalls.length;
+    gate.set();
+    await world.idle();
+    assert.equal(readFileSync(stateFile, "utf8"), before);
+    assert.equal(acted(world), false);
+    assert.equal(crossed(), 0, "the core was handed an input after the stop");
+    assert.deepEqual(
+      world.slack.apiCalls.slice(calls).map((call) => call.method),
+      ["conversations.members"],
+    );
+  });
+}
+
+test("a Home control used after the stop does nothing", async (t) => {
+  const world = worldOf(t);
+  await world.home.edit(true);
+  await stop(world);
+  world.slack.apiCalls.length = 0;
+  const value = `${CHANNEL}:${FORM_THREAD}`;
+  await world.dispatch(homeAction({ type: "button", action_id: DELETE_ACTION, value }));
+  assert.deepEqual(world.deleted, []);
+  assert.deepEqual(world.slack.apiCalls, []);
+});
+
+test("a question form whose opening ends after the stop calls nothing more", async (t) => {
+  // The form opens before the channel check: it is held on views.open instead.
+  const world = worldOf(t);
+  const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Colour", QUESTIONS);
+  new ModalSlack(world.slack);
+  const gate = new AsyncEvent();
+  world.slack.gate = gate;
+  world.slack.gateMethod = "views.open";
+  const crossed = crossings(t, world);
+  const body = click("question_open", approvalId);
+  body.trigger_id = "0000000000.0000000000.fake";
+  await world.dispatch(body);
+  assert.ok(world.slack.gated.isSet(), "the listener never reached views.open");
+  await stop(world);
+  assert.deepEqual(await release(world, gate, crossed), ["views.open"]);
+});
+
+test("closing the app twice is harmless", async (t) => {
+  const world = worldOf(t);
+  world.built.close();
+  world.built.close();
+  await world.dispatch(clickIn("approval_allow", "none", CHANNEL, THREAD));
+  assert.deepEqual(world.slack.apiCalls, []);
+});

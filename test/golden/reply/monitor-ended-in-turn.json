@@ -1,0 +1,735 @@
+{
+ "recording": "monitor-ended-in-turn",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "ToolSearch: select:Monitor,Bash"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "ToolSearch: select:Monitor,Bash"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_017shEK34RSKqh2oQoxkuzMN",
+      "name": "Monitor",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Monitor: tick watch"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_017shEK34RSKqh2oQoxkuzMN",
+      "name": "Monitor",
+      "output": "Monitor started (task b7rugr2a7, expires in 2m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do …",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "Monitor: tick watch"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 50",
+      "folded": null,
+      "id": "toolu_012Yf74j8TrjBkGVzbviyDaR",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Background sleep 50 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 50",
+      "folded": null,
+      "id": "toolu_012Yf74j8TrjBkGVzbviyDaR",
+      "name": "Bash",
+      "output": "Command running in background with ID: bjx79rq2x. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bjx79rq2x.output. You will be notified when it completes. To check interim outpu…",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Background sleep 50 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 55",
+      "folded": null,
+      "id": "toolu_018N8Er6oPQ2FU8H3EDYPS4j",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Background sleep 55 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 55",
+      "folded": null,
+      "id": "toolu_018N8Er6oPQ2FU8H3EDYPS4j",
+      "name": "Bash",
+      "output": "Command running in background with ID: bxfy5efvn. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bxfy5efvn.output. You will be notified when it completes. To check interim outpu…",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Background sleep 55 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c 'import time; time.sleep(30)'",
+      "folded": null,
+      "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep 30 seconds in Python"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
+     "notice": true
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
+      "name": "Bash",
+      "output": "Sleep 30 seconds in Python",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep 30 seconds in Python"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep 30 seconds in Python"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nFore",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ground Python sleep",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " completed successfully",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " after",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " 30 seconds while",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " monitor",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " em",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "itted",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " two",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " tick events and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " two",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " background",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " sle",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "eps continue",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " running",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "bjx79rq2x",
+    "bxfy5efvn"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bjx79rq2x",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "bjx79rq2x"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bjx79rq2x",
+      "name": "task",
+      "output": "Background command \"Background sleep 50 seconds\" completed (exit code 0)",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "bjx79rq2x"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "noted.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bxfy5efvn",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "bxfy5efvn"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bxfy5efvn",
+      "name": "task",
+      "output": "Background command \"Background sleep 55 seconds\" completed (exit code 0)",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "bxfy5efvn"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "noted.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "ToolSearch: select:Monitor,Bash"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "complete",
+     "task": false,
+     "title": "ToolSearch: select:Monitor,Bash"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_017shEK34RSKqh2oQoxkuzMN",
+     "name": "Monitor",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "Monitor: tick watch"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_017shEK34RSKqh2oQoxkuzMN",
+     "name": "Monitor",
+     "output": "Monitor started (task b7rugr2a7, expires in 2m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do …",
+     "preview": null,
+     "startedAt": null,
+     "status": "complete",
+     "task": false,
+     "title": "Monitor: tick watch"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ sleep 50",
+     "folded": null,
+     "id": "toolu_012Yf74j8TrjBkGVzbviyDaR",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Background sleep 50 seconds"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ sleep 50",
+     "folded": null,
+     "id": "toolu_012Yf74j8TrjBkGVzbviyDaR",
+     "name": "Bash",
+     "output": "Command running in background with ID: bjx79rq2x. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bjx79rq2x.output. You will be notified when it completes. To check interim outpu…",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Background sleep 50 seconds"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ sleep 55",
+     "folded": null,
+     "id": "toolu_018N8Er6oPQ2FU8H3EDYPS4j",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Background sleep 55 seconds"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ sleep 55",
+     "folded": null,
+     "id": "toolu_018N8Er6oPQ2FU8H3EDYPS4j",
+     "name": "Bash",
+     "output": "Command running in background with ID: bxfy5efvn. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bxfy5efvn.output. You will be notified when it completes. To check interim outpu…",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Background sleep 55 seconds"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ python3 -c 'import time; time.sleep(30)'",
+     "folded": null,
+     "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Sleep 30 seconds in Python"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
+    "notice": true
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
+     "name": "Bash",
+     "output": "Sleep 30 seconds in Python",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Sleep 30 seconds in Python"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
+     "name": "Bash",
+     "output": "(Bash completed with no output)",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Sleep 30 seconds in Python"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nFore",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ground Python sleep",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " completed successfully",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " after",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " 30 seconds while",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " monitor",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " em",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "itted",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " two",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " tick events and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " two",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " background",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " sle",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "eps continue",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " running",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nnoted.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nnoted.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

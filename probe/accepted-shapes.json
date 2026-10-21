@@ -1,0 +1,50 @@
+{
+  "kinds": {},
+  "paths": {
+    "assistant": {
+      "aborted:boolean": "2.1.304",
+      "api_error_status:number": "2.1.304",
+      "local_command_outcome.kind:string": "2.1.304",
+      "local_command_outcome:object": "2.1.304"
+    },
+    "result/error_during_execution": {
+      "safety_stops:number": "2.1.304",
+      "stop_reason:null": "2.1.304",
+      "user_message_uuid:string": "2.1.304",
+      "user_message_uuids:array": "2.1.304"
+    },
+    "stream_event/message_delta": {
+      "event.context_management:null": "2.1.304",
+      "event.delta.stop_reason:null": "2.1.304",
+      "event.usage.fallback_credit:null": "2.1.304",
+      "event.usage.server_tool_use.web_fetch_requests:number": "2.1.304",
+      "event.usage.server_tool_use.web_search_requests:number": "2.1.304",
+      "event.usage.server_tool_use:object": "2.1.304"
+    },
+    "system/init": {
+      "additional_directories:array": "2.1.304",
+      "original_cwd:string": "2.1.304",
+      "user_message_uuids:array": "2.1.304"
+    },
+    "user": {
+      "message.content[].content[].source.data:string": "2.1.304",
+      "message.content[].content[].source.media_type:string": "2.1.304",
+      "message.content[].content[].source.type:string": "2.1.304",
+      "message.content[].content[].source:object": "2.1.304",
+      "message.content[].source.data:string": "2.1.304",
+      "message.content[].source.media_type:string": "2.1.304",
+      "message.content[].source.type:string": "2.1.304",
+      "message.content[].source:object": "2.1.304",
+      "tool_use_result.file.base64:string": "2.1.304",
+      "tool_use_result.file.dimensions.displayHeight:number": "2.1.304",
+      "tool_use_result.file.dimensions.displayWidth:number": "2.1.304",
+      "tool_use_result.file.dimensions.originalHeight:number": "2.1.304",
+      "tool_use_result.file.dimensions.originalWidth:number": "2.1.304",
+      "tool_use_result.file.dimensions:object": "2.1.304",
+      "tool_use_result.file.originalSize:number": "2.1.304",
+      "tool_use_result.file.type:string": "2.1.304",
+      "tool_use_result.revivedAgentId:string": "2.1.304"
+    }
+  },
+  "tools": {}
+}

@@ -1,0 +1,2458 @@
+{
+ "recording": "goal-lifecycle",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nGoal set: cre",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ate `a1.txt` ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "through `a20.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "txt` in the c",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "urrent folder",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", one per Bas",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "h call, each ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "containing it",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "s own number.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Starting wit",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "h `a1.txt`.",
+     "notice": false
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 1 > a1.txt && cat a1.txt",
+      "folded": null,
+      "id": "toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a1.txt containing 1"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 1 > a1.txt && cat a1.txt",
+      "folded": null,
+      "id": "toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "name": "Bash",
+      "output": "1",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a1.txt containing 1"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 2 > a2.txt && cat a2.txt",
+      "folded": null,
+      "id": "toolu_01EnQknY6M8F66p9trFqhmWD",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a2.txt containing 2"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 2 > a2.txt && cat a2.txt",
+      "folded": null,
+      "id": "toolu_01EnQknY6M8F66p9trFqhmWD",
+      "name": "Bash",
+      "output": "2",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a2.txt containing 2"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "`a1.txt` an",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "d `a2.txt` ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "are done. C",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ontinuing w",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ith `a3.txt",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "` through `",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "a6.txt`.",
+     "notice": false
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 3 > a3.txt && cat a3.txt",
+      "folded": null,
+      "id": "toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a3.txt containing 3"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 3 > a3.txt && cat a3.txt",
+      "folded": null,
+      "id": "toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+      "name": "Bash",
+      "output": "3",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a3.txt containing 3"
+     }
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "Hello.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nThe goal ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "is still ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "open: `a1",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".txt` to ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "`a3.txt` ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "exist, an",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "d `a4.txt",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "` to `a20",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".txt` do ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "not. Crea",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ting `a4.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "txt` now.",
+     "notice": false
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 4 > a4.txt && cat a4.txt",
+      "folded": null,
+      "id": "toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a4.txt containing 4"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 4 > a4.txt && cat a4.txt",
+      "folded": null,
+      "id": "toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "name": "Bash",
+      "output": "4",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a4.txt containing 4"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 5 > a5.txt && cat a5.txt",
+      "folded": null,
+      "id": "toolu_0168hJjFDkq61w3rDkKwwaG9",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a5.txt containing 5"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 5 > a5.txt && cat a5.txt",
+      "folded": null,
+      "id": "toolu_0168hJjFDkq61w3rDkKwwaG9",
+      "name": "Bash",
+      "output": "5",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a5.txt containing 5"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 6 > a6.txt && cat a6.txt",
+      "folded": null,
+      "id": "toolu_01PdWf1mZH2mM2j5GZc74DEA",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a6.txt containing 6"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 6 > a6.txt && cat a6.txt",
+      "folded": null,
+      "id": "toolu_01PdWf1mZH2mM2j5GZc74DEA",
+      "name": "Bash",
+      "output": "6",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a6.txt containing 6"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 7 > a7.txt && cat a7.txt",
+      "folded": null,
+      "id": "toolu_017KzLZ6iPWzrT8NttfDAxvQ",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a7.txt containing 7"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 7 > a7.txt && cat a7.txt",
+      "folded": null,
+      "id": "toolu_017KzLZ6iPWzrT8NttfDAxvQ",
+      "name": "Bash",
+      "output": "7",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a7.txt containing 7"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 8 > a8.txt && cat a8.txt",
+      "folded": null,
+      "id": "toolu_01WF46TypepAdq9vnbDSaw5U",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a8.txt containing 8"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 8 > a8.txt && cat a8.txt",
+      "folded": null,
+      "id": "toolu_01WF46TypepAdq9vnbDSaw5U",
+      "name": "Bash",
+      "output": "8",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a8.txt containing 8"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 9 > a9.txt && cat a9.txt",
+      "folded": null,
+      "id": "toolu_018UVDxoCKJccgq87ADPDAMk",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a9.txt containing 9"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 9 > a9.txt && cat a9.txt",
+      "folded": null,
+      "id": "toolu_018UVDxoCKJccgq87ADPDAMk",
+      "name": "Bash",
+      "output": "9",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a9.txt containing 9"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 10 > a10.txt && cat a10.txt",
+      "folded": null,
+      "id": "toolu_01484QPZZgRs6AZVqjMC7YXr",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a10.txt containing 10"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 10 > a10.txt && cat a10.txt",
+      "folded": null,
+      "id": "toolu_01484QPZZgRs6AZVqjMC7YXr",
+      "name": "Bash",
+      "output": "10",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a10.txt containing 10"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 11 > a11.txt && cat a11.txt",
+      "folded": null,
+      "id": "toolu_01BFTnLcPNNXmgQybqSaUZiP",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a11.txt containing 11"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 11 > a11.txt && cat a11.txt",
+      "folded": null,
+      "id": "toolu_01BFTnLcPNNXmgQybqSaUZiP",
+      "name": "Bash",
+      "output": "11",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a11.txt containing 11"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 12 > a12.txt && cat a12.txt",
+      "folded": null,
+      "id": "toolu_01UvsX2ckCrVFCb7hAPAWKWE",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a12.txt containing 12"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 12 > a12.txt && cat a12.txt",
+      "folded": null,
+      "id": "toolu_01UvsX2ckCrVFCb7hAPAWKWE",
+      "name": "Bash",
+      "output": "12",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a12.txt containing 12"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 13 > a13.txt && cat a13.txt",
+      "folded": null,
+      "id": "toolu_018m8CCkvVxp2YnY1MX1qZM4",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a13.txt containing 13"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 13 > a13.txt && cat a13.txt",
+      "folded": null,
+      "id": "toolu_018m8CCkvVxp2YnY1MX1qZM4",
+      "name": "Bash",
+      "output": "13",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a13.txt containing 13"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 14 > a14.txt && cat a14.txt",
+      "folded": null,
+      "id": "toolu_01GGvBe5AVLYWLUxXLc3okZK",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a14.txt containing 14"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 14 > a14.txt && cat a14.txt",
+      "folded": null,
+      "id": "toolu_01GGvBe5AVLYWLUxXLc3okZK",
+      "name": "Bash",
+      "output": "14",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a14.txt containing 14"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 15 > a15.txt && cat a15.txt",
+      "folded": null,
+      "id": "toolu_01KCaNCtnC5pSsuPkRLjtnov",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a15.txt containing 15"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 15 > a15.txt && cat a15.txt",
+      "folded": null,
+      "id": "toolu_01KCaNCtnC5pSsuPkRLjtnov",
+      "name": "Bash",
+      "output": "15",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a15.txt containing 15"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 16 > a16.txt && cat a16.txt",
+      "folded": null,
+      "id": "toolu_01KYkfvDMhmCioQZ9AzH5QUZ",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a16.txt containing 16"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 16 > a16.txt && cat a16.txt",
+      "folded": null,
+      "id": "toolu_01KYkfvDMhmCioQZ9AzH5QUZ",
+      "name": "Bash",
+      "output": "16",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a16.txt containing 16"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 17 > a17.txt && cat a17.txt",
+      "folded": null,
+      "id": "toolu_01FA9gU8UVM11xKvwamhw5PT",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a17.txt containing 17"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 17 > a17.txt && cat a17.txt",
+      "folded": null,
+      "id": "toolu_01FA9gU8UVM11xKvwamhw5PT",
+      "name": "Bash",
+      "output": "17",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a17.txt containing 17"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 18 > a18.txt && cat a18.txt",
+      "folded": null,
+      "id": "toolu_01WsFA9zzEd9i3SzHAh6dYV5",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a18.txt containing 18"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 18 > a18.txt && cat a18.txt",
+      "folded": null,
+      "id": "toolu_01WsFA9zzEd9i3SzHAh6dYV5",
+      "name": "Bash",
+      "output": "18",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a18.txt containing 18"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 19 > a19.txt && cat a19.txt",
+      "folded": null,
+      "id": "toolu_01Va1XCnUcgMCaCkej95oUao",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a19.txt containing 19"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 19 > a19.txt && cat a19.txt",
+      "folded": null,
+      "id": "toolu_01Va1XCnUcgMCaCkej95oUao",
+      "name": "Bash",
+      "output": "19",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a19.txt containing 19"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 20 > a20.txt && cat a20.txt",
+      "folded": null,
+      "id": "toolu_013tm1BySohhousLvu11Tc9j",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create a20.txt containing 20"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 20 > a20.txt && cat a20.txt",
+      "folded": null,
+      "id": "toolu_013tm1BySohhousLvu11Tc9j",
+      "name": "Bash",
+      "output": "20",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create a20.txt containing 20"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "All 20 files a",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "re written. Ch",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ecking the fol",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "der once to co",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nfirm each fil",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "e holds its ow",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "n number.",
+     "notice": false
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+      "folded": null,
+      "id": "toolu_01XAexZvMygkUXzSNFPijXpm",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Verify a1.txt to a20.txt contents"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+      "folded": null,
+      "id": "toolu_01XAexZvMygkUXzSNFPijXpm",
+      "name": "Bash",
+      "output": "a1.txt=1",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Verify a1.txt to a20.txt contents"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The goal i",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "s met. `a1",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".txt` thro",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ugh `a20.t",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "xt` now ex",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ist in `/h",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ome/dev/pr",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "oject`, ea",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ch created",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " by its ow",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "n Bash cal",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "l and each",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " containin",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "g its own ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "number. A ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "final chec",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "k printed ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "every file",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "'s content",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "s, and eac",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "h matches ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "its name.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "Goal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nNew goal: `b1.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "txt` through `",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "b20.txt`, one ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "per Bash call,",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " each holding ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "its own number",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". Starting wit",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "h `b1.txt`.",
+     "notice": false
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 1 > b1.txt && cat b1.txt",
+      "folded": null,
+      "id": "toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create b1.txt containing 1"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 1 > b1.txt && cat b1.txt",
+      "folded": null,
+      "id": "toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "name": "Bash",
+      "output": "1",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create b1.txt containing 1"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 2 > b2.txt && cat b2.txt",
+      "folded": null,
+      "id": "toolu_01NEvTKStEYnR53swKyDgKig",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create b2.txt containing 2"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 2 > b2.txt && cat b2.txt",
+      "folded": null,
+      "id": "toolu_01NEvTKStEYnR53swKyDgKig",
+      "name": "Bash",
+      "output": "2",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create b2.txt containing 2"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 3 > b3.txt && cat b3.txt",
+      "folded": null,
+      "id": "toolu_01QNrwQd4rVT41QBe8Q5gfZi",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Create b3.txt containing 3"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ echo 3 > b3.txt && cat b3.txt",
+      "folded": null,
+      "id": "toolu_01QNrwQd4rVT41QBe8Q5gfZi",
+      "name": "Bash",
+      "output": "3",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Create b3.txt containing 3"
+     }
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nGoal set: cre",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ate `a1.txt` ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "through `a20.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "txt` in the c",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "urrent folder",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", one per Bas",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "h call, each ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "containing it",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "s own number.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Starting wit",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "h `a1.txt`.",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 1 > a1.txt && cat a1.txt",
+     "folded": null,
+     "id": "toolu_01XhBFtCRFzS2AzFWp47mgYp",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a1.txt containing 1"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 1 > a1.txt && cat a1.txt",
+     "folded": null,
+     "id": "toolu_01XhBFtCRFzS2AzFWp47mgYp",
+     "name": "Bash",
+     "output": "1",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a1.txt containing 1"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 2 > a2.txt && cat a2.txt",
+     "folded": null,
+     "id": "toolu_01EnQknY6M8F66p9trFqhmWD",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a2.txt containing 2"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 2 > a2.txt && cat a2.txt",
+     "folded": null,
+     "id": "toolu_01EnQknY6M8F66p9trFqhmWD",
+     "name": "Bash",
+     "output": "2",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a2.txt containing 2"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "`a1.txt` an",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "d `a2.txt` ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "are done. C",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ontinuing w",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ith `a3.txt",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "` through `",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "a6.txt`.",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 3 > a3.txt && cat a3.txt",
+     "folded": null,
+     "id": "toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a3.txt containing 3"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 3 > a3.txt && cat a3.txt",
+     "folded": null,
+     "id": "toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+     "name": "Bash",
+     "output": "3",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a3.txt containing 3"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "Hello.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe goal ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "is still ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "open: `a1",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".txt` to ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "`a3.txt` ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "exist, an",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "d `a4.txt",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "` to `a20",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".txt` do ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "not. Crea",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ting `a4.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "txt` now.",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 4 > a4.txt && cat a4.txt",
+     "folded": null,
+     "id": "toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a4.txt containing 4"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 4 > a4.txt && cat a4.txt",
+     "folded": null,
+     "id": "toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+     "name": "Bash",
+     "output": "4",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a4.txt containing 4"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 5 > a5.txt && cat a5.txt",
+     "folded": null,
+     "id": "toolu_0168hJjFDkq61w3rDkKwwaG9",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a5.txt containing 5"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 5 > a5.txt && cat a5.txt",
+     "folded": null,
+     "id": "toolu_0168hJjFDkq61w3rDkKwwaG9",
+     "name": "Bash",
+     "output": "5",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a5.txt containing 5"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 6 > a6.txt && cat a6.txt",
+     "folded": null,
+     "id": "toolu_01PdWf1mZH2mM2j5GZc74DEA",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a6.txt containing 6"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 6 > a6.txt && cat a6.txt",
+     "folded": null,
+     "id": "toolu_01PdWf1mZH2mM2j5GZc74DEA",
+     "name": "Bash",
+     "output": "6",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a6.txt containing 6"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 7 > a7.txt && cat a7.txt",
+     "folded": null,
+     "id": "toolu_017KzLZ6iPWzrT8NttfDAxvQ",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a7.txt containing 7"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 7 > a7.txt && cat a7.txt",
+     "folded": null,
+     "id": "toolu_017KzLZ6iPWzrT8NttfDAxvQ",
+     "name": "Bash",
+     "output": "7",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a7.txt containing 7"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 8 > a8.txt && cat a8.txt",
+     "folded": null,
+     "id": "toolu_01WF46TypepAdq9vnbDSaw5U",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a8.txt containing 8"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 8 > a8.txt && cat a8.txt",
+     "folded": null,
+     "id": "toolu_01WF46TypepAdq9vnbDSaw5U",
+     "name": "Bash",
+     "output": "8",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a8.txt containing 8"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 9 > a9.txt && cat a9.txt",
+     "folded": null,
+     "id": "toolu_018UVDxoCKJccgq87ADPDAMk",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a9.txt containing 9"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 9 > a9.txt && cat a9.txt",
+     "folded": null,
+     "id": "toolu_018UVDxoCKJccgq87ADPDAMk",
+     "name": "Bash",
+     "output": "9",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a9.txt containing 9"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 10 > a10.txt && cat a10.txt",
+     "folded": null,
+     "id": "toolu_01484QPZZgRs6AZVqjMC7YXr",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a10.txt containing 10"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 10 > a10.txt && cat a10.txt",
+     "folded": null,
+     "id": "toolu_01484QPZZgRs6AZVqjMC7YXr",
+     "name": "Bash",
+     "output": "10",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a10.txt containing 10"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 11 > a11.txt && cat a11.txt",
+     "folded": null,
+     "id": "toolu_01BFTnLcPNNXmgQybqSaUZiP",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a11.txt containing 11"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 11 > a11.txt && cat a11.txt",
+     "folded": null,
+     "id": "toolu_01BFTnLcPNNXmgQybqSaUZiP",
+     "name": "Bash",
+     "output": "11",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a11.txt containing 11"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 12 > a12.txt && cat a12.txt",
+     "folded": null,
+     "id": "toolu_01UvsX2ckCrVFCb7hAPAWKWE",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a12.txt containing 12"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 12 > a12.txt && cat a12.txt",
+     "folded": null,
+     "id": "toolu_01UvsX2ckCrVFCb7hAPAWKWE",
+     "name": "Bash",
+     "output": "12",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a12.txt containing 12"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 13 > a13.txt && cat a13.txt",
+     "folded": null,
+     "id": "toolu_018m8CCkvVxp2YnY1MX1qZM4",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a13.txt containing 13"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 13 > a13.txt && cat a13.txt",
+     "folded": null,
+     "id": "toolu_018m8CCkvVxp2YnY1MX1qZM4",
+     "name": "Bash",
+     "output": "13",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a13.txt containing 13"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 14 > a14.txt && cat a14.txt",
+     "folded": null,
+     "id": "toolu_01GGvBe5AVLYWLUxXLc3okZK",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a14.txt containing 14"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 14 > a14.txt && cat a14.txt",
+     "folded": null,
+     "id": "toolu_01GGvBe5AVLYWLUxXLc3okZK",
+     "name": "Bash",
+     "output": "14",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a14.txt containing 14"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 15 > a15.txt && cat a15.txt",
+     "folded": null,
+     "id": "toolu_01KCaNCtnC5pSsuPkRLjtnov",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a15.txt containing 15"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 15 > a15.txt && cat a15.txt",
+     "folded": null,
+     "id": "toolu_01KCaNCtnC5pSsuPkRLjtnov",
+     "name": "Bash",
+     "output": "15",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a15.txt containing 15"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 16 > a16.txt && cat a16.txt",
+     "folded": null,
+     "id": "toolu_01KYkfvDMhmCioQZ9AzH5QUZ",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a16.txt containing 16"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 16 > a16.txt && cat a16.txt",
+     "folded": null,
+     "id": "toolu_01KYkfvDMhmCioQZ9AzH5QUZ",
+     "name": "Bash",
+     "output": "16",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a16.txt containing 16"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 17 > a17.txt && cat a17.txt",
+     "folded": null,
+     "id": "toolu_01FA9gU8UVM11xKvwamhw5PT",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a17.txt containing 17"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 17 > a17.txt && cat a17.txt",
+     "folded": null,
+     "id": "toolu_01FA9gU8UVM11xKvwamhw5PT",
+     "name": "Bash",
+     "output": "17",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a17.txt containing 17"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 18 > a18.txt && cat a18.txt",
+     "folded": null,
+     "id": "toolu_01WsFA9zzEd9i3SzHAh6dYV5",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a18.txt containing 18"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 18 > a18.txt && cat a18.txt",
+     "folded": null,
+     "id": "toolu_01WsFA9zzEd9i3SzHAh6dYV5",
+     "name": "Bash",
+     "output": "18",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a18.txt containing 18"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 19 > a19.txt && cat a19.txt",
+     "folded": null,
+     "id": "toolu_01Va1XCnUcgMCaCkej95oUao",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a19.txt containing 19"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 19 > a19.txt && cat a19.txt",
+     "folded": null,
+     "id": "toolu_01Va1XCnUcgMCaCkej95oUao",
+     "name": "Bash",
+     "output": "19",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a19.txt containing 19"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 20 > a20.txt && cat a20.txt",
+     "folded": null,
+     "id": "toolu_013tm1BySohhousLvu11Tc9j",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create a20.txt containing 20"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 20 > a20.txt && cat a20.txt",
+     "folded": null,
+     "id": "toolu_013tm1BySohhousLvu11Tc9j",
+     "name": "Bash",
+     "output": "20",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create a20.txt containing 20"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "All 20 files a",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "re written. Ch",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ecking the fol",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "der once to co",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nfirm each fil",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "e holds its ow",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "n number.",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+     "folded": null,
+     "id": "toolu_01XAexZvMygkUXzSNFPijXpm",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Verify a1.txt to a20.txt contents"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+     "folded": null,
+     "id": "toolu_01XAexZvMygkUXzSNFPijXpm",
+     "name": "Bash",
+     "output": "a1.txt=1",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Verify a1.txt to a20.txt contents"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "The goal i",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "s met. `a1",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".txt` thro",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ugh `a20.t",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "xt` now ex",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ist in `/h",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ome/dev/pr",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "oject`, ea",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ch created",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " by its ow",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "n Bash cal",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "l and each",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " containin",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "g its own ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "number. A ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "final chec",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "k printed ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "every file",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "'s content",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "s, and eac",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "h matches ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "its name.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nNew goal: `b1.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "txt` through `",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "b20.txt`, one ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "per Bash call,",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " each holding ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "its own number",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". Starting wit",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "h `b1.txt`.",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 1 > b1.txt && cat b1.txt",
+     "folded": null,
+     "id": "toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create b1.txt containing 1"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 1 > b1.txt && cat b1.txt",
+     "folded": null,
+     "id": "toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+     "name": "Bash",
+     "output": "1",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create b1.txt containing 1"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 2 > b2.txt && cat b2.txt",
+     "folded": null,
+     "id": "toolu_01NEvTKStEYnR53swKyDgKig",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create b2.txt containing 2"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 2 > b2.txt && cat b2.txt",
+     "folded": null,
+     "id": "toolu_01NEvTKStEYnR53swKyDgKig",
+     "name": "Bash",
+     "output": "2",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create b2.txt containing 2"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 3 > b3.txt && cat b3.txt",
+     "folded": null,
+     "id": "toolu_01QNrwQd4rVT41QBe8Q5gfZi",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Create b3.txt containing 3"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ echo 3 > b3.txt && cat b3.txt",
+     "folded": null,
+     "id": "toolu_01QNrwQd4rVT41QBe8Q5gfZi",
+     "name": "Bash",
+     "output": "3",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Create b3.txt containing 3"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

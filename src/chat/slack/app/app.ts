@@ -1,0 +1,460 @@
+/**
+ * The Slack side: every inbound path, each checked on its own before it reaches a session. This
+ * builds the Bolt app, with one listener per inbound path (a message, the `file_change` of a
+ * clip, a button, a select, a modal, a Home control). The app registers no slash command.
+ *
+ * What was read in `@slack/bolt` 5.1.0 (`node_modules/@slack/bolt/dist/`), and what follows:
+ *
+ * - `App.js`, the constructor. With `authorize` and no `token`, `app.client` is built with no
+ *   token, and `processEvent` makes a client of its own only for a context that carries a
+ *   `botToken` or a `userToken` (`selectToken`). `authorize` below returns the workspace and the
+ *   bot user `auth.test` gave at startup and no token: no request costs an API call, and Bolt
+ *   never builds a client that could call Slack. Every listener calls Slack through the client
+ *   `buildApp` was given.
+ * - `App.js`, `initReceiver`. `socketMode: true` with an `appToken` builds a
+ *   `SocketModeReceiver` inside the constructor; a `receiver` passed in is used as it is. The
+ *   receiver is passed in: the daemon gives `socketReceiver()`, a test one that opens no socket
+ *   and feeds `App.processEvent({ body, ack })`, the entry point `SocketModeReceiver.js` itself
+ *   calls for each `slack_event`.
+ * - `App.js`, `processEvent`. `body` is the envelope as it came, so `team_id` and
+ *   `is_ext_shared_channel` of an event's envelope reach the listener; `payload` is the event,
+ *   the first action or the view. An event is acknowledged by Bolt before any listener runs
+ *   (`await ack()`); an action or a view submission is acknowledged by its listener, and what a
+ *   view submission answers (`response_action`) is the argument of `ack`. Every listener whose
+ *   constraints match runs, and one that throws reaches `handleError`, the handler set with
+ *   `app.error`: an `UnknownError` holding the thrown value in `original`, unless it has a
+ *   `code` of its own.
+ * - `middleware/builtin.js`. `ignoreSelf` (on by default) drops a `bot_message` of this app and
+ *   any event whose `user` is the bot. It is switched off, which differs from `slack_bolt`'s
+ *   default (it ignores its own events). That is harmless: the listeners drop what a bot wrote
+ *   themselves (`guards.isPromptMessage` refuses any event with a `bot_id`, and the owner check
+ *   refuses a user who is not the owner), so the middleware would add nothing. `app.event("message")`
+ *   filters nothing else (`onlyEvents`, `matchEventType`): a `message_changed` reaches the
+ *   listener, which drops it. `app.action` matches on `action_id` alone, `app.view` on
+ *   `callback_id` and the `view_submission` type.
+ * - `conversation-store.js`. The default store adds a lookup per event for a state this app
+ *   never keeps: switched off (`convoStore: false`).
+ */
+import { App, LogLevel, type Receiver, SocketModeReceiver } from "@slack/bolt";
+import type { WebClient, WebClientOptions } from "@slack/web-api";
+import { type Clock, monotonicClock } from "../../../clock.ts";
+import type {
+  ApprovalsPort,
+  HoldsPort,
+  Names,
+  SessionsPort,
+  StatePort,
+} from "../../../core/port.ts";
+import { Listings } from "../../../core/port.ts";
+import type { ChatInbound, CommandSuggestion } from "../../seam.ts";
+import { download } from "../attachments.ts";
+import { BIND_ACTION } from "../bind.ts";
+import type { ThreadDeletion } from "../delete.ts";
+import { DELETE_THREAD_CANCEL, DELETE_THREAD_CONFIRM } from "../delete-thread.ts";
+import { HOLD_CANCEL, HOLD_CONTINUE } from "../hold.ts";
+import {
+  CLEAN_ACTION,
+  DELETE_ACTION,
+  EDIT_ACTION,
+  FILTER_ACTIONS,
+  HOME_UPDATE_ACTION,
+  type Home,
+  NEW_THREAD_ACTION,
+  REFRESH_ACTION,
+  SHOW_ALL_ACTION,
+} from "../home.ts";
+import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.ts";
+import { levelLogger } from "../quiet-logger.ts";
+import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
+import { describe } from "../reply/errors.ts";
+import {
+  APPROVAL_ALLOW,
+  APPROVAL_DENY,
+  type Draft,
+  QUESTION_EDIT,
+  QUESTION_FORM,
+  QUESTION_OPEN,
+  QUESTION_SKIP,
+} from "../requests.ts";
+import { RESUME_ACTION } from "../resume.ts";
+import { SETUP_BYPASS, SETUP_EFFORT, SETUP_MODEL, SETUP_START } from "../setup.ts";
+import { SUGGEST_EDIT, SUGGEST_MENU, SUGGEST_PICK, SUGGEST_SEND } from "../suggest.ts";
+import type { SlackChat } from "../thread.ts";
+import { UPDATE_ACTION } from "../update.ts";
+import * as voice from "../voice.ts";
+import { Answers, type AppConfig, type AppParts, type Fetch, logger } from "./answers.ts";
+import { Clips } from "./clip.ts";
+import { DeleteThread } from "./delete-thread.ts";
+import {
+  type ChannelGuard,
+  deletedAuthor,
+  deletedTs,
+  type Identity,
+  isPromptMessage,
+  isTombstoneRemoval,
+  isWrittenMessage,
+  messageActor,
+} from "./guards.ts";
+import { HomeControls } from "./home-controls.ts";
+import { filesOf, inboundMessage } from "./messages.ts";
+import { Open } from "./open.ts";
+import { ThreadOrder, threadKey } from "./order.ts";
+import { Requests } from "./requests.ts";
+import { ResumeBind } from "./resume-bind.ts";
+import { Suggestions } from "./suggest.ts";
+import { type Ack, type Payload, type Respond, str, text } from "./wire.ts";
+
+export const DECISION_ACTIONS = [APPROVAL_ALLOW, APPROVAL_DENY, QUESTION_SKIP] as const;
+
+/** What `buildApp` is given: every client, store and clock comes from outside. */
+export interface BuildAppOptions {
+  /** The shared client every handler calls Slack with. */
+  readonly slack: WebClient;
+  /**
+   * The provider the handlers answer through: its `chat.update` budget every reply draws from
+   * and the stop signal every listener checks.
+   */
+  readonly chat: SlackChat;
+  readonly config: AppConfig;
+  readonly identity: Identity;
+  readonly sessions: SessionsPort;
+  readonly approvals: ApprovalsPort;
+  readonly holds: HoldsPort;
+  readonly guard: ChannelGuard;
+  readonly state: StatePort;
+  /** The agent's and the chat's names, which the texts that name them take. */
+  readonly names: Names;
+  /** What the listeners tell the core of what the owner did. */
+  readonly inbound: ChatInbound;
+  /** The folder a message's files that are no image are saved in (`ChatContext.scratchDir`). */
+  readonly uploads: string;
+  readonly home: Home;
+  /** Absent without the owner's user token. */
+  readonly deletion?: ThreadDeletion;
+  /** Where Slack's payloads come from: `socketReceiver(config.appToken)` in the daemon. */
+  readonly receiver: Receiver;
+  /** How a file is downloaded; `attachments.download` with the bot token when absent. */
+  readonly fetch?: Fetch;
+  /** Every wait of a handler; monotonic seconds when absent. */
+  readonly clock?: Clock;
+  /** Wall-clock seconds; `Date.now` when absent. */
+  readonly now?: () => number;
+  /** `!open`'s listings; made over `sessions.repository` when absent. */
+  readonly listings?: Listings;
+}
+
+/** One thing the app registered a listener for. */
+export interface Registration {
+  readonly kind: "event" | "action" | "view";
+  /** The event type, the `action_id` (a pattern as written, `/.../`) or the `callback_id`. */
+  readonly id: string;
+  /** The listener only acknowledges: it reads nothing and does nothing, whoever sent the payload. */
+  readonly acknowledgeOnly: boolean;
+}
+
+/** The Bolt app with its listeners, and what a stop must end besides the connection. */
+export interface BuiltApp {
+  readonly app: App;
+  /**
+   * Every listener `buildApp` registered, as it registered them: what a test compares with its
+   * table of owner checks, so that a listener added without a row fails there.
+   */
+  readonly registered: readonly Registration[];
+  /**
+   * Tells every listener the daemon is stopping (`SlackChat.halt`), and gives up the clips
+   * still waiting for a transcript, whose timers would keep the process alive. A listener still
+   * in flight does nothing from its next step on: it posts, opens a modal, submits and writes
+   * nothing.
+   */
+  close(): void;
+  /**
+   * What the owner filled in each open question form, by request id (`Requests.drafts`): read by
+   * a test.
+   */
+  readonly drafts: ReadonlyMap<string, Draft>;
+  /** `!open` typed in a session's thread, for the folder the session works in. */
+  openFile(channel: string, threadTs: string, folder: string, words: string): Promise<void>;
+  /** `!delete-thread` typed in a session's thread: the question, for the owner alone. */
+  askDelete(channel: string, threadTs: string): Promise<void>;
+  /** A `!word` that is no command, typed in a thread: the suggestion, for the owner alone. */
+  suggest(channel: string, threadTs: string, suggestion: CommandSuggestion): Promise<void>;
+}
+
+// The longest wait between two tries to get the connection back.
+export const RECONNECT_WAIT_SECONDS = 60;
+
+// The web client `@slack/socket-mode` 3.1.0 asks Slack for a WebSocket URL with. Left to itself
+// the library gives it 100 retries, each wait 1.3 times the one before with no upper limit: with
+// the network gone for two hours it tried 30 times, the last wait 26 minutes, and was still
+// waiting 10 minutes after the network was back (run on mocked timers, 2026-10-10). The waits
+// start as the library's and stop growing at the limit, and the client never gives up, so the
+// connection is back within the limit of the network's return. A try that gets no answer ends
+// at the timeout of the daemon's other clients.
+const RECONNECT: WebClientOptions = {
+  timeout: REQUEST_TIMEOUT_MS,
+  retryConfig: {
+    forever: true,
+    retries: 100,
+    factor: 1.3,
+    maxTimeout: RECONNECT_WAIT_SECONDS * 1000,
+  },
+};
+
+/** What `socketReceiver` can be given besides the token: the network and the pace of a test. */
+export interface SocketOptions {
+  /** The options of the client that asks Slack for the WebSocket URL (`fetch`, in a test). */
+  readonly clientOptions?: WebClientOptions;
+  /** Milliseconds the client waits for a ping, and before a reconnect (5000 by default). */
+  readonly clientPingTimeout?: number;
+}
+
+/**
+ * The Socket Mode connection the daemon's app listens on; `app.start()` opens it, `app.stop()`
+ * closes it. The libraries' own text is never logged (`levelLogger`): the connection's states
+ * are, by the names the client gives them.
+ */
+export function socketReceiver(appToken: string, options: SocketOptions = {}): SocketModeReceiver {
+  const receiver = new SocketModeReceiver({
+    appToken,
+    logger: levelLogger("socket mode"),
+    logLevel: LogLevel.WARN,
+    ...(options.clientPingTimeout !== undefined && {
+      clientPingTimeout: options.clientPingTimeout,
+    }),
+    installerOptions: { clientOptions: { ...RECONNECT, ...options.clientOptions } },
+  });
+  receiver.client.on("connected", () => logger.info("socket mode: connected"));
+  receiver.client.on("reconnecting", () => logger.warning("socket mode: reconnecting"));
+  receiver.client.on("disconnected", () => logger.info("socket mode: disconnected"));
+  return receiver;
+}
+
+/** The error a listener threw, under Bolt's wrapping of one that has no `code`. */
+function thrown(error: unknown): unknown {
+  return typeof error === "object" && error !== null && "original" in error
+    ? error.original
+    : error;
+}
+
+/** The Bolt app, with one listener per inbound path. */
+export function buildApp(options: BuildAppOptions): BuiltApp {
+  const { chat, config, identity, sessions } = options;
+  const parts: AppParts = {
+    slack: options.slack,
+    chat,
+    config,
+    identity,
+    sessions,
+    approvals: options.approvals,
+    holds: options.holds,
+    guard: options.guard,
+    state: options.state,
+    names: options.names,
+    inbound: options.inbound,
+    uploads: options.uploads,
+    home: options.home,
+    ...(options.deletion !== undefined && { deletion: options.deletion }),
+    limiter: chat.limiter,
+    fetch:
+      options.fetch ??
+      (({ url, mimetype, limit }) => download(url, config.botToken, mimetype, limit)),
+    clock: options.clock ?? monotonicClock,
+    stopped: chat.stopped,
+    now: options.now ?? (() => Date.now() / 1000),
+    listings: options.listings ?? new Listings((directory) => sessions.repository(directory)),
+  };
+  const answers = new Answers(parts);
+  const requests = new Requests(parts, answers);
+  const open = new Open(parts, answers);
+  const resumeBind = new ResumeBind(parts, answers);
+  const clips = new Clips(parts, answers);
+  const home = new HomeControls(parts);
+  const deleteThread = new DeleteThread(parts, answers);
+
+  const app = new App({
+    receiver: options.receiver,
+    // auth.test already ran at startup; who may act is decided by the guards of each listener.
+    authorize: async () => ({ teamId: identity.teamId, botUserId: identity.botUserId }),
+    ignoreSelf: false,
+    convoStore: false,
+    logger: levelLogger("bolt"),
+    logLevel: LogLevel.WARN,
+  });
+
+  const registered: Registration[] = [];
+  const order = new ThreadOrder();
+  const suggestions = new Suggestions(parts, answers, order);
+
+  app.event("message", async ({ event, body }) => {
+    const message = event as unknown as Payload;
+    const envelope = body as unknown as Payload;
+    if (!isWrittenMessage(message)) return;
+    const [user, team] = messageActor(message, envelope);
+    const channel = text(message.channel);
+    const ts = str(message.ts);
+    const threadTs = str(message.thread_ts || ts);
+    // The owner and the workspace first, with nothing awaited: anyone else takes no place.
+    if (!answers.fromOwner(user, team, channel) || channel === null) return;
+    // (sync) Where the owner's message sits among the replies, whatever becomes of it next:
+    // also a message the filter below drops.
+    parts.chat.ownerPosted(channel, threadTs, ts);
+    if (!isPromptMessage(message)) return;
+    // (sync) The place among the thread's messages is taken in the order the listeners were
+    // called, before the first await: the channel check below takes longer for one message than
+    // for the next, and a message that passed it first would be handed over first. The place is
+    // left once the message is handed over (`arrival` in `core/flows/messages.ts` orders it from
+    // there), never held through the turn, a download or a setup the owner has not answered.
+    // The exception is a clip whose transcript is in the file's `vtt`: `Clips.takeClip` hands it
+    // over after the download of that file, so a typed reply sent after it can be handed over
+    // first.
+    const place = order.enter(threadKey(channel, threadTs));
+    let handed: Promise<void>;
+    try {
+      await place.turn;
+      // The daemon can have stopped while this message waited for the ones before it: calling
+      // Slack then would break the contract of a listener in flight after the stop.
+      if (answers.stopped) return;
+      if (!(await answers.channelAllowed(channel, threadTs, ts))) return;
+      // (sync) From the check to the call that hands the message over, nothing is awaited.
+      const spoken = voice.clip(filesOf(message));
+      // A failure of the prompt itself (or of the session it starts) lands in that session's
+      // thread: it is the turn's one push. A word answers where it was typed instead. The core
+      // tells the owner of a failure of its own.
+      handed =
+        spoken !== null
+          ? answers.replyOnFailure(channel, threadTs, () =>
+              clips.takeClip(channel, threadTs, ts, message, spoken),
+            )
+          : parts.inbound.message(inboundMessage(parts, answers, channel, threadTs, ts, message));
+    } finally {
+      place.leave();
+    }
+    await handed;
+  });
+
+  // A first message the owner deleted by hand. Its own listener: the guard above stays closed to
+  // every subtype but a person's message. Three checks, on this path's own: the envelope names the
+  // owner's workspace, its ts is a thread the daemon keeps, and the deleted message was the owner's
+  // (`previous_message.user`). No field of either event names who DELETED the message, so the last
+  // check proves whose message went, not who removed it. This may be revisited.
+  app.event("message", async ({ event, body }) => {
+    const message = event as unknown as Payload;
+    const deleted = deletedTs(message);
+    if (deleted === null) return;
+    const channel = text(message.channel);
+    if (answers.stopped || channel === null) return;
+    if (text((body as unknown as Payload).team_id) !== identity.teamId) {
+      logger.info("ignored a deleted message from another workspace");
+      return;
+    }
+    // The kept thread first: a deletion of the daemon's own message, or the removal of a tombstone,
+    // is no kept root and is dropped without a word.
+    if (parts.state.thread(channel, deleted) === null) return;
+    // Silently: the tombstone's own removal, which the earlier event already acted on.
+    if (isTombstoneRemoval(message)) return;
+    if (deletedAuthor(message) !== identity.ownerUserId) {
+      logger.info(
+        `ignored the deletion of the first message of ${channel}/${deleted}: not the owner's`,
+      );
+      return;
+    }
+    const ref = { channel, thread: deleted };
+    try {
+      await parts.inbound.rootGone(ref);
+    } catch (error) {
+      logger.warning(`could not forget ${channel}/${deleted}: ${describe(error)}`);
+    }
+    // Forgetting the entry already asked the index (`onSessionsChange`); one left stands for a
+    // turn that runs, or for a call that failed, and the index reads its row again.
+    if (parts.state.thread(channel, deleted) !== null) parts.chat.index?.refresh([ref]);
+  });
+
+  app.event("file_change", ({ event }) => clips.onFileChange(event as unknown as Payload));
+  registered.push(
+    { kind: "event", id: "message", acknowledgeOnly: false },
+    { kind: "event", id: "message deleted", acknowledgeOnly: false },
+    { kind: "event", id: "file_change", acknowledgeOnly: false },
+  );
+
+  /** A click or a select: the listener acknowledges, then checks, on its own. */
+  const action = (
+    actionId: string | RegExp,
+    listener: (ack: Ack, body: Payload, respond?: Respond) => Promise<void>,
+    options: { readonly acknowledgeOnly?: boolean } = {},
+  ): void => {
+    registered.push({
+      kind: "action",
+      id: String(actionId),
+      acknowledgeOnly: options.acknowledgeOnly ?? false,
+    });
+    app.action(actionId, ({ ack, body, respond }) =>
+      listener(() => ack(), body as unknown as Payload, respond),
+    );
+  };
+
+  /** A modal's submit: what the listener answers is what the modal does next. */
+  const view = (callbackId: string, listener: (ack: Ack, body: Payload) => Promise<void>): void => {
+    registered.push({ kind: "view", id: callbackId, acknowledgeOnly: false });
+    app.view(callbackId, ({ ack, body }) =>
+      // The answer is built to the view submission reference by the listener itself.
+      listener((answer) => ack(answer as never), body as unknown as Payload),
+    );
+  };
+
+  action(SETUP_START, requests.onSetupStart);
+  action(SETUP_MODEL, requests.onSetupModel);
+  // The controls' own state rides on Start's click: a change of either needs nothing here.
+  action(SETUP_EFFORT, requests.onSetupEdit, { acknowledgeOnly: true });
+  action(SETUP_BYPASS, requests.onSetupEdit, { acknowledgeOnly: true });
+  for (const actionId of [HOLD_CONTINUE, HOLD_CANCEL]) action(actionId, requests.onHoldDecision);
+  for (const actionId of DECISION_ACTIONS) action(actionId, requests.onDecision);
+  action("answer", requests.onQuestionChoice);
+  action("other", requests.onQuestionTyping);
+  action("notes", requests.onQuestionTyping);
+  action(QUESTION_EDIT, requests.onQuestionEdit);
+  action(QUESTION_OPEN, requests.onQuestionOpen);
+  view(QUESTION_FORM, requests.onQuestionSubmit);
+
+  action(OPEN_BUTTON_ACTION, open.onOpenChoose);
+  action(QUERY_ACTION, open.onOpenQuery);
+  view(OPEN_FORM, open.onOpenSubmit);
+
+  action(DELETE_THREAD_CONFIRM, deleteThread.onConfirm);
+  action(DELETE_THREAD_CANCEL, deleteThread.onCancel);
+
+  action(SUGGEST_EDIT, suggestions.onEdit);
+  action(SUGGEST_SEND, suggestions.onSend);
+  action(SUGGEST_PICK, suggestions.onPick);
+  action(SUGGEST_MENU, suggestions.onPick);
+
+  action(BIND_ACTION, resumeBind.onBind);
+  action(RESUME_ACTION, resumeBind.onResume);
+  action(UPDATE_ACTION, resumeBind.onUpdate);
+
+  action(NEW_THREAD_ACTION, home.onHomeLink, { acknowledgeOnly: true });
+  for (const actionId of FILTER_ACTIONS) action(actionId, home.onHomeFilter);
+  action(SHOW_ALL_ACTION, home.onHomeShowAll);
+  action(EDIT_ACTION, home.onHomeEdit);
+  action(REFRESH_ACTION, home.onHomeRefresh);
+  action(DELETE_ACTION, home.onHomeDelete);
+  action(CLEAN_ACTION, home.onHomeClean);
+  action(HOME_UPDATE_ACTION, home.onHomeUpdate);
+
+  app.error(async (error) => {
+    logger.error(`handler failed: ${describe(thrown(error))}`);
+  });
+
+  return {
+    app,
+    registered,
+    drafts: requests.drafts,
+    close: () => {
+      requests.close();
+      chat.halt();
+      clips.close();
+    },
+    openFile: (channel, threadTs, folder, words) => open.openWord(channel, threadTs, folder, words),
+    askDelete: (channel, threadTs) => deleteThread.ask(channel, threadTs),
+    suggest: (channel, threadTs, suggestion) => suggestions.show(channel, threadTs, suggestion),
+  };
+}

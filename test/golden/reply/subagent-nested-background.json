@@ -1,0 +1,331 @@
+{
+ "recording": "subagent-nested-background",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Launch background sleep command)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nstarted",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "a291e2504de323f06"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 20; echo done",
+      "folded": null,
+      "id": "toolu_01JjA7q6WDz1WJ3ezrrPTEkg",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep for 20 seconds then echo done"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Bash**(Sleep for 20 seconds then echo done)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 20; echo done",
+      "folded": null,
+      "id": "toolu_01JjA7q6WDz1WJ3ezrrPTEkg",
+      "name": "Bash",
+      "output": "Command running in background with ID: bcyg8i1tv. Output is being written to: /private/tmp/claude-502/-home-dev-project/29225642-a816-42d9-a471-018555d81084/tasks/bcyg8i1tv.output. You will be notifi…",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 20 seconds then echo done"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a291e2504de323f06",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a291e2504de323f06"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a291e2504de323f06",
+      "name": "task",
+      "output": "Launched.",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a291e2504de323f06"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The backgro",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "und sleep c",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ommand was ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "launched.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "bcyg8i1tv"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bcyg8i1tv",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "bcyg8i1tv"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bcyg8i1tv",
+      "name": "task",
+      "output": "Background command \"Sleep for 20 seconds then echo done\" completed (exit code 0)",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "bcyg8i1tv"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The sleep",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " command ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "finished ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "after 20 ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "seconds a",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nd exited",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " successf",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ully.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Launch background sleep command)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nstarted",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe backgro",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "und sleep c",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ommand was ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "launched.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe sleep",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " command ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "finished ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "after 20 ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "seconds a",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nd exited",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " successf",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ully.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

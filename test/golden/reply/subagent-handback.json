@@ -1,0 +1,887 @@
+{
+ "recording": "subagent-handback",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 15",
+      "folded": null,
+      "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Wait 15 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 15",
+      "folded": null,
+      "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+      "name": "Bash",
+      "output": "Command running in background with ID: btmuz8js3. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/btmuz8js3.output. You will be notified when it completes. To check interim outpu…",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Wait 15 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nBoth ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "tasks",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " are ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "start",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ed in",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "backg",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "round",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ": the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " suba",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "gent ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "that ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "runs ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "`echo",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " suba",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "gent-",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ok` a",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nd th",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "e com",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "mand ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "`slee",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "p 15`",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". Nei",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ther ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "has f",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "inish",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ed ye",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "a2212140c7c7bb15e",
+    "btmuz8js3"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01UBD5wbvijjsTd3xiAriYk1",
+      "name": "SubagentHandback",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "SubagentHandback: subagent-ok"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01UBD5wbvijjsTd3xiAriYk1",
+      "name": "SubagentHandback",
+      "output": "{\"success\":true,\"message\":\"Report delivered to your caller.\"}",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "SubagentHandback: subagent-ok"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a2212140c7c7bb15e",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a2212140c7c7bb15e"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a2212140c7c7bb15e",
+      "name": "task",
+      "output": "This agent's report was delivered to you as a message from \"a2212140c7c7bb15e\" (its SubagentHandback call). Read it there; it is not repeated here.",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a2212140c7c7bb15e"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The sub",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "agent f",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "inished",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ": `echo",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " subage",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nt-ok` ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "printed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " `subag",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ent-ok`",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". The c",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ommand ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "`sleep ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "15` is ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "still r",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "unning.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-btmuz8js3",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "btmuz8js3"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-btmuz8js3",
+      "name": "task",
+      "output": "Background command \"Wait 15 seconds\" completed (exit code 0)",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "btmuz8js3"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The comm",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "and `sle",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ep 15` e",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nded wit",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "h exit c",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ode 0, s",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "o both t",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "asks are",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " done.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ sleep 15",
+     "folded": null,
+     "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Wait 15 seconds"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ sleep 15",
+     "folded": null,
+     "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+     "name": "Bash",
+     "output": "Command running in background with ID: btmuz8js3. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/btmuz8js3.output. You will be notified when it completes. To check interim outpu…",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Wait 15 seconds"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nBoth ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "tasks",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " are ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "start",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ed in",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "backg",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "round",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ": the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " suba",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "gent ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "that ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "runs ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "`echo",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " suba",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "gent-",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ok` a",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nd th",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "e com",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "mand ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "`slee",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "p 15`",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". Nei",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ther ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "has f",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "inish",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ed ye",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe sub",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "agent f",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "inished",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ": `echo",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " subage",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nt-ok` ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "printed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " `subag",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ent-ok`",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". The c",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ommand ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "`sleep ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "15` is ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "still r",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "unning.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe comm",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "and `sle",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ep 15` e",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nded wit",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "h exit c",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ode 0, s",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "o both t",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "asks are",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " done.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

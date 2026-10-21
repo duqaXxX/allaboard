@@ -1,0 +1,487 @@
+{
+ "recording": "report-turn-agent-resume",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Test background agent)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nSTARTED",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "a0d6caecc437a1298"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a0d6caecc437a1298",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a0d6caecc437a1298"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a0d6caecc437a1298",
+      "name": "task",
+      "output": "READY",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a0d6caecc437a1298"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "NOTED",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01EN71a4pBQzXL4JEZkr5vEN",
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01EN71a4pBQzXL4JEZkr5vEN",
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
+      "name": "SendMessage",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "SendMessage: a0d6caecc437a1298"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
+      "name": "SendMessage",
+      "output": "{\"success\":true,\"message\":\"Resuming agent a0d6cae\",\"resumedAgentId\":\"a0d6caecc437a1298\",\"pin\":{\"id\":\"a0d6caecc437a1298\",\"name\":\"a0d6caecc437a1298\",\"ref\":\"ecd3c5\"}}",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "SendMessage: a0d6caecc437a1298"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**SendMessage**(Test background agent)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nSENT",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "a0d6caecc437a1298"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 20",
+      "folded": null,
+      "id": "toolu_017gf5kSZb4JxhViLJgtScNc",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Bash: sleep 20"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_017gf5kSZb4JxhViLJgtScNc",
+      "name": "Bash",
+      "output": "sleep 20",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Bash: sleep 20"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_017gf5kSZb4JxhViLJgtScNc",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Bash: sleep 20"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a0d6caecc437a1298",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a0d6caecc437a1298"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a0d6caecc437a1298",
+      "name": "task",
+      "output": "AGAIN",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "a0d6caecc437a1298"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ sleep 15",
+      "folded": null,
+      "id": "toolu_01H5wwXkRKqXrGbowxTuLKMV",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Bash: sleep 15"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01H5wwXkRKqXrGbowxTuLKMV",
+      "name": "Bash",
+      "output": "sleep 15",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Bash: sleep 15"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01H5wwXkRKqXrGbowxTuLKMV",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Bash: sleep 15"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "REPORTED\n",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "PINEAPPLE",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "KIWI",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Test background agent)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nSTARTED",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nNOTED",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01EN71a4pBQzXL4JEZkr5vEN",
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "ToolSearch: select:SendMessage"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01EN71a4pBQzXL4JEZkr5vEN",
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "complete",
+     "task": false,
+     "title": "ToolSearch: select:SendMessage"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n⎿ Resuming agent a0d6cae",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nSENT",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ sleep 15",
+     "folded": null,
+     "id": "toolu_01H5wwXkRKqXrGbowxTuLKMV",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Bash: sleep 15"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01H5wwXkRKqXrGbowxTuLKMV",
+     "name": "Bash",
+     "output": "sleep 15",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Bash: sleep 15"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01H5wwXkRKqXrGbowxTuLKMV",
+     "name": "Bash",
+     "output": "(Bash completed with no output)",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Bash: sleep 15"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "REPORTED\n",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "PINEAPPLE",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nKIWI",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

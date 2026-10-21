@@ -1,0 +1,536 @@
+{
+ "recording": "subagent-nested-background-mid-turn",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "I'll launc",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "h the Agen",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t to run t",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "he backgro",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "und comman",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "d now.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nLaunc",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "hed.\n",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\nNow ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "runni",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ng th",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "e 40-",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "secon",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "d Pyt",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "hon s",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "leep ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "comma",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nd:",
+     "notice": false
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c \"import time; time.sleep(40)\"",
+      "folded": null,
+      "id": "toolu_01QpTjiHn9CtQiYmXdMKovV8",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Run 40-second sleep in Python"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01QpTjiHn9CtQiYmXdMKovV8",
+      "name": "Bash",
+      "output": "Run 40-second sleep in Python",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Run 40-second sleep in Python"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01QpTjiHn9CtQiYmXdMKovV8",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Run 40-second sleep in Python"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The 40-s",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "econd Py",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "thon sle",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ep comma",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nd finis",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "hed.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The 15-sec",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ond backgr",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ound sleep",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " command t",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "hat the Ag",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ent ran fi",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nished suc",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "cessfully.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "I'll launc",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "h the Agen",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t to run t",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "he backgro",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "und comman",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "d now.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nLaunc",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "hed.\n",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\nNow ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "runni",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ng th",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "e 40-",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "secon",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "d Pyt",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "hon s",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "leep ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "comma",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nd:",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ python3 -c \"import time; time.sleep(40)\"",
+     "folded": null,
+     "id": "toolu_01QpTjiHn9CtQiYmXdMKovV8",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Run 40-second sleep in Python"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01QpTjiHn9CtQiYmXdMKovV8",
+     "name": "Bash",
+     "output": "Run 40-second sleep in Python",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Run 40-second sleep in Python"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01QpTjiHn9CtQiYmXdMKovV8",
+     "name": "Bash",
+     "output": "(Bash completed with no output)",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Run 40-second sleep in Python"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "The 40-s",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "econd Py",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "thon sle",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ep comma",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nd finis",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "hed.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe 15-sec",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ond backgr",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ound sleep",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " command t",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "hat the Ag",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ent ran fi",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nished suc",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "cessfully.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}
