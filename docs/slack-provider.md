@@ -22,6 +22,18 @@ and then freezing until it resets. A write that waited `limiter.UPDATE_WAIT_LOGG
 for its turn is logged with the time it waited, which is what tells whether the budget ever held
 back what the owner sees.
 
+Text reaches Slack as markdown, where `<!here>`, `<!channel>`, `<!everyone>`, `<!subteam^…>` and
+`<@…>` are stored as mentions and notify as typed ones do; a backslash before them stops none. The
+sink writes a zero-width space after the `<` of each (`escape.quietMentions`), in every text part,
+the daemon's lines included since some carry Claude's words, and inside code too: Slack pairs
+backticks where CommonMark would not, and a reply split across messages can start one inside a
+fence, so the sink does not try to tell code apart. The text reads the same; a sequence copied out
+of a code block carries the invisible space. `<#C…>` is a channel link, which notifies nobody, and
+is left as written. Words still arriving that may become a sequence (`<`, `<!he`) wait for what
+follows; when the part closes they get the space all the same. A new file's preview
+(`blocks.previewBlocks`) and a session's title in a link (`escape.markdownEscape`) get the space
+too.
+
 ### Retries and writes in flight
 
 The retries of a Slack call are the daemon's own policy, in `clients`. Both clients are built with

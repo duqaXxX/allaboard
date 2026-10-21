@@ -9,7 +9,7 @@ import { formatDuration, NESTED, STOPPED, shownPreview } from "../../../core/por
 import type { RunningLine, RunningList, TaskStatus, TaskUpdate } from "../../seam.ts";
 import { RECORD_MARK } from "../texts.ts";
 import { at, lastNewline, len, take } from "./chars.ts";
-import { shownAsWritten } from "./escape.ts";
+import { quietMentions, shownAsWritten } from "./escape.ts";
 import { markdownBlocks } from "./markdown.ts";
 
 // A message holds at most 12,000 characters and 50 blocks or task cards (measured 2026-09-28),
@@ -206,10 +206,13 @@ export const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b);
 /**
  * A new file's first lines as code blocks, split where a block would pass its limit. A fence
  * inside the file must not close the block early: every run of three or more backticks is
- * broken up, as `shownAsWritten` breaks every one.
+ * broken up, as `shownAsWritten` breaks every one. Its mention sequences are quieted as a
+ * reply's are (`quietMentions`).
  */
 export function previewBlocks(body: string): MarkdownBlock[] {
-  const broken = body.replace(/`{3,}/g, (run) => run.split("").join(ZERO_WIDTH_SPACE));
+  const broken = quietMentions(body, true).replace(/`{3,}/g, (run) =>
+    run.split("").join(ZERO_WIDTH_SPACE),
+  );
   return split(broken)
     .filter((chunk) => chunk !== "")
     .map((chunk) => ({ type: "markdown", text: `\`\`\`\n${chunk}\n\`\`\`` }));

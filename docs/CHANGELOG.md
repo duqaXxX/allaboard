@@ -11,6 +11,13 @@ All notable changes to this project are documented here. The format follows
   channel's own view says the daemon is restarting, not only the thread. A reaction on the owner's
   message notifies nobody; once the session closes, the root shows ✅ or ❌ as before.
 
+### Fixed
+
+- A mention sequence in a reply (`<!here>`, `<!channel>`, `<!everyone>`, `<!subteam^…>`, `<@…>`)
+  no longer notifies like a typed mention: a zero-width space follows its `<`, in text and in code
+  alike, and the reply reads the same. A page Claude read can no longer make a reply notify the
+  channel or a member of the workspace.
+
 ## [0.7.0] - 2026-10-21
 
 ### Added
