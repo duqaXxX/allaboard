@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- While a restart waits for a session's thread, the thread's root shows 🔄 in place of ⏳, so the
+  channel's own view says the daemon is restarting, not only the thread. A reaction on the owner's
+  message notifies nobody; once the session closes, the root shows ✅ or ❌ as before.
+
 ## [0.7.0] - 2026-10-21
 
 ### Added

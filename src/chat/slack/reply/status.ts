@@ -1,6 +1,6 @@
 /**
  * One reaction on a session's root message: working, waiting for the owner,
- * everything ended, error, or stopped/restarted. Adding or removing a reaction on the owner's own
+ * everything ended, error, or waiting for a restart. Adding or removing a reaction on the owner's own
  * message notifies nobody and only shows in the channel list on iOS (measured 2026-09-28, Slack
  * free plan). Arguments and error codes read from docs.slack.dev/reference/methods/reactions.add
  * and .../reactions.remove, 2026-09-28.
@@ -28,7 +28,7 @@ import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
 import { Mutex, texts } from "../../../core/port.ts";
 import { getLogger, type Logger } from "../../../log.ts";
-import type { SessionStatus } from "../../seam.ts";
+import type { RootStatus } from "../../seam.ts";
 import { describe, gone } from "./errors.ts";
 
 export const logger = getLogger("allaboard.chat.slack.reply.status");
@@ -50,15 +50,17 @@ export const Status = {
   WAITING: "raised_hand",
   DONE: "white_check_mark",
   ERROR: "x",
+  RESTARTING: "arrows_counterclockwise",
 } as const;
 export type Status = (typeof Status)[keyof typeof Status];
 
 /** The reaction that shows each status of a session on its root message. */
-export const REACTIONS: Readonly<Record<SessionStatus, Status>> = {
+export const REACTIONS: Readonly<Record<RootStatus, Status>> = {
   working: Status.WORKING,
   waiting: Status.WAITING,
   done: Status.DONE,
   error: Status.ERROR,
+  restarting: Status.RESTARTING,
 };
 
 // Process-wide, once true: no instance calls Slack for reactions again this run.
@@ -84,7 +86,7 @@ export interface StatusReactionOptions {
  * root is never bare between them, and only once the add succeeded (or was already there):
  * a failed add leaves `current` as it was, so the next `show` retries rather than stripping
  * the root's own reaction for nothing. A fresh instance (a new session's reaction, next to
- * whatever an earlier one already left on the same root) also strips the other three names on
+ * whatever an earlier one already left on the same root) also strips the other names on
  * its own first successful add, so the root never carries more than one. Calls are serialized
  * per instance (a lock): two quick changes end on the last one. A change is two calls,
  * so a caller aborted between them leaves both reactions on the root: the instance then

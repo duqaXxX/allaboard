@@ -212,14 +212,17 @@ test("settle makes no call when the last change landed", async () => {
 });
 
 test("a fresh instance strips a leftover reaction from a previous session", async () => {
-  // An earlier session on the same root left ❌ standing (a restart); this one's own first
-  // `show` must remove it too, not just the one name it happens to know about, so the root
-  // never carries two.
+  // An earlier session on the same root left ❌ standing (a restart), or 🔄 (a daemon killed
+  // while its stop waited); this one's own first `show` must remove it too, not just the one
+  // name it happens to know about, so the root never carries two.
   const slack = new FakeSlack();
   const sr = reaction(slack);
   await sr.show(Status.WORKING);
   const removed = names(slack, "reactions.remove");
-  assert.deepEqual(removed.sort(), ["raised_hand", "white_check_mark", "x"].sort());
+  assert.deepEqual(
+    removed.sort(),
+    ["arrows_counterclockwise", "raised_hand", "white_check_mark", "x"].sort(),
+  );
 });
 
 test("a failed add leaves current unchanged so the next show retries", async () => {
