@@ -115,3 +115,8 @@ test("text cut anywhere moves code to a prefix of what the whole text gives", ()
     }
   }
 });
+
+test("the items nested under a moved code block follow it out, and the list goes on", () => {
+  const text = "1. a\n   ```\n   x\n   ```\n   - sub\n   - sub2\n2. b";
+  assert.equal(codeOutOfLists(text, true), "1. a\n```\nx\n```\n- sub\n- sub2\n\n2. b");
+});

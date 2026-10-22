@@ -160,9 +160,13 @@ class Text {
   /** Bumped when it changes: a message whose parts kept theirs is not rendered again. */
   rev: number;
 
-  // The words as they arrived since `settled`, the text shown when the part was last closed.
+  // Every word of the part, those since it was last closed, and what it showed then. After a
+  // close the part is read whole again when that still starts with what it showed (`joined`): a
+  // list or a fence that goes on past a turn's end is then read as one.
+  private all = "";
   private raw = "";
   private settled = "";
+  private joined = true;
 
   constructor(text: string, notice: boolean, ending: boolean, aside: boolean, rev: number) {
     this.text = "";
@@ -180,8 +184,14 @@ class Text {
    * ever grows.
    */
   add(more: string): void {
+    if (this.raw === "" && this.settled !== "") {
+      this.joined = Text.shown(this.all + more, false).startsWith(this.settled);
+    }
+    this.all += more;
     this.raw += more;
-    this.text = this.settled + Text.shown(this.raw, false);
+    this.text = this.joined
+      ? Text.shown(this.all, false)
+      : this.settled + Text.shown(this.raw, false);
   }
 
   private static shown(raw: string, whole: boolean): string {
@@ -194,7 +204,11 @@ class Text {
    */
   close(): boolean {
     const before = this.text;
-    this.text = this.settled + Text.shown(this.raw, true);
+    const whole = this.joined
+      ? Text.shown(this.all, true)
+      : this.settled + Text.shown(this.raw, true);
+    // Never less than was shown: a whole read that disagrees keeps what was sent.
+    this.text = whole.startsWith(this.text) ? whole : this.settled + Text.shown(this.raw, true);
     this.settled = this.text;
     this.raw = "";
     return this.text !== before;
