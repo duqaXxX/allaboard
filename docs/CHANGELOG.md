@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.8.0] - 2026-10-22
+
 ### Added
 
 - Once a session's work is done and ended well, its channel shows as unread in the Slack sidebar: the bot posts
