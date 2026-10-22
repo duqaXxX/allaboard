@@ -146,6 +146,11 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `BaseHookInput` | `effort` | field | hooks.ts: stopHookEvents | reference | none |
 | `BaseHookInput.effort` | `level` | field | hooks.ts: stopHookEvents | package | none |
 | `PostModelSwitchHookInput` | `to_model` | field | hooks.ts: postModelSwitchHookEvents | reference | P26 |
+| `SessionCronSummary` | `id` | field | hooks.ts: scheduledJob | package | none |
+| `SessionCronSummary` | `prompt` | field | hooks.ts: scheduledJob | package | none |
+| `SessionCronSummary` | `recurring` | field | hooks.ts: scheduledJob | package | none |
+| `SessionCronSummary` | `schedule` | field | hooks.ts: scheduledJob | package | none |
+| `StopHookInput` | `session_crons` | field | hooks.ts: scheduledJobs | package | none |
 | `CanUseTool` | `description` | field | requests.ts: toRequest, CallContext | package | none |
 | `CanUseTool` | `signal` | field | session.ts: ClaudeSession.#options | package | none |
 | `CanUseTool` | `title` | field | requests.ts: toRequest, CallContext | package | none |

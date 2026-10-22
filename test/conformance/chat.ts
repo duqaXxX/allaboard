@@ -460,6 +460,7 @@ export function chatConformance(
           "activityLine",
           "commandSuggestions",
           "fileUpload",
+          "loopCard",
           "nativeStreaming",
           "reactions",
           "threadDelete",
@@ -1053,6 +1054,60 @@ export function chatConformance(
         assert.equal(typeof thread.activityRefused, "boolean");
         thread.showActivity("Reading the module", "is reading the module");
         thread.showActivity("", "");
+      });
+    });
+
+    describe("the loop card", () => {
+      gated("is one message that each run rewrites", "loopCard", async ({ rig, provider, ref }) => {
+        const thread = provider.thread(ref);
+        const before = rig.read(ref).length;
+        await thread.showLoop({
+          label: "Scheduled run · every minute · run 1",
+          text: "build green",
+        });
+        await rig.settle();
+        const first = rig.read(ref).slice(before);
+        assert.equal(first.length, 1, "the first run posts one message");
+        assert.ok(first[0]?.text.includes("run 1") && first[0].text.includes("build green"));
+        await thread.showLoop({ label: "Scheduled run · every minute · run 2", text: "build red" });
+        await rig.settle();
+        const second = rig.read(ref).slice(before);
+        assert.equal(second.length, 1, "the next run edits it");
+        assert.equal(second[0]?.id, first[0]?.id);
+        assert.ok(second[0]?.text.includes("run 2") && second[0].text.includes("build red"));
+        assert.ok(!second[0]?.text.includes("build green"));
+      });
+
+      gated("an empty run still shows its label", "loopCard", async ({ rig, provider, ref }) => {
+        await provider.thread(ref).showLoop({ label: "Scheduled run · run 1", text: "" });
+        await rig.settle();
+        assert.ok(rig.read(ref).some((m) => m.text.includes("Scheduled run · run 1")));
+      });
+
+      gated(
+        "the end is a new message and lets the card go",
+        "loopCard",
+        async ({ rig, provider, ref }) => {
+          const thread = provider.thread(ref);
+          const before = rig.read(ref).length;
+          await thread.showLoop({ label: "Scheduled run · run 1", text: "one" });
+          await thread.endLoop("Scheduled loop ended · 1 run");
+          await rig.settle();
+          const shown = rig.read(ref).slice(before);
+          assert.equal(shown.length, 2);
+          assert.ok(shown[0]?.text.includes("run 1") && !shown[0].text.includes("ended"));
+          assert.ok(shown[1]?.text.includes("Scheduled loop ended · 1 run"));
+          await thread.showLoop({ label: "Scheduled run · run 1", text: "again" });
+          await rig.settle();
+          assert.equal(rig.read(ref).slice(before).length, 3, "a later run posts a card anew");
+        },
+      );
+
+      gated("never rejects when the chat refuses", "loopCard", async ({ rig, provider, ref }) => {
+        const thread = provider.thread(ref);
+        rig.refuseWrites();
+        await thread.showLoop({ label: "Scheduled run · run 1", text: "x" });
+        await thread.endLoop("Scheduled loop ended · 1 run");
       });
     });
 

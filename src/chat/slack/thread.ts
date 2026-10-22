@@ -31,6 +31,7 @@ import {
   type ChatInbound,
   type ChatProvider,
   type CommandSuggestion,
+  type LoopCard,
   type Markup,
   type MessageId,
   type OpenMessageChange,
@@ -58,7 +59,7 @@ import { crossing, deliver, deliverNotice } from "./notice.ts";
 import { endReply } from "./repair.ts";
 import { contextBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
-import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
+import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
@@ -165,6 +166,9 @@ const STATUS_MARKS: Readonly<Record<SessionStatus, string>> = {
   error: "❌",
 };
 
+// The most of a run's words the loop card shows; a markdown block holds 12,000 characters in all.
+const LOOP_TEXT_LIMIT = 3000;
+
 /** What Slack draws of the chat seam whatever the configuration. */
 const CAPABILITIES = {
   nativeStreaming: true,
@@ -172,6 +176,7 @@ const CAPABILITIES = {
   activityLine: true,
   fileUpload: true,
   commandSuggestions: true,
+  loopCard: true,
 } as const satisfies Omit<ChatCapabilities, "threadTags" | "threadTitles" | "threadDelete">;
 
 /** The Slack provider: one `SlackThread` per thread, one `SlackChannel` per channel. */
@@ -495,6 +500,10 @@ export class SlackThread implements ThreadChat {
   private readonly onWritten: () => void;
   /** The replies this object opened, with the places each is registered in. */
   private readonly opened: Array<[ThreadPlaces, ReplySink]> = [];
+  /** The loop card's message, once posted, until the loop ends. */
+  private loopTs: string | null = null;
+  /** The loop card's writes, one after the other. */
+  private loopWrites: Promise<void> = Promise.resolve();
 
   /**
    * `written` stands for this object's own status line where something else holds it: the
@@ -623,6 +632,79 @@ export class SlackThread implements ThreadChat {
     } catch (error) {
       logger.error(`could not post in ${this.channel}/${this.threadTs}: ${describe(error)}`);
     }
+  }
+
+  showLoop(card: LoopCard): Promise<void> {
+    this.loopWrites = this.loopWrites.then(() => this.writeLoop(card));
+    return this.loopWrites;
+  }
+
+  /** Posts the card, or rewrites it; a card Slack lost is posted again by the next run. */
+  private async writeLoop(card: LoopCard): Promise<void> {
+    const label = `_${mrkdwnEscape(card.label)}_`;
+    const blocks: KnownBlock[] = [contextBlock(noticeText(label))];
+    // A markdown block's text may not be empty, and holds 12,000 characters in all.
+    const words = quietMentions(card.text.trim(), true);
+    if (words !== "") {
+      // The end of a long run is what it concluded: that is the part kept.
+      const shown =
+        words.length > LOOP_TEXT_LIMIT
+          ? `…${words.slice(words.length - LOOP_TEXT_LIMIT + 1)}`
+          : words;
+      blocks.push({ type: "markdown", text: shown } as unknown as KnownBlock);
+    }
+    try {
+      if (this.loopTs === null) {
+        const posted = await this.slack.chat.postMessage({
+          channel: this.channel,
+          thread_ts: this.threadTs,
+          text: label,
+          blocks,
+          unfurl_links: false,
+          unfurl_media: false,
+        });
+        if (typeof posted.ts === "string" && posted.ts !== "") this.loopTs = posted.ts;
+        this.postedOwn(posted.ts);
+        this.line.wrote();
+      } else {
+        await this.options.limiter.acquire();
+        await this.slack.chat.update({
+          channel: this.channel,
+          ts: this.loopTs,
+          text: label,
+          blocks,
+        });
+      }
+    } catch (error) {
+      logger.error(
+        `could not write the loop card in ${this.channel}/${this.threadTs}: ${describe(error)}`,
+      );
+      // A card that cannot be edited (deleted by hand) is not tried again: the next run posts one.
+      this.loopTs = null;
+    }
+  }
+
+  endLoop(line: string): Promise<void> {
+    // After the card's last write, so the end is the newest message and the card is not reposted.
+    this.loopWrites = this.loopWrites.then(async () => {
+      this.loopTs = null;
+      const shown = `_${mrkdwnEscape(line)}_`;
+      try {
+        const posted = await this.slack.chat.postMessage({
+          channel: this.channel,
+          thread_ts: this.threadTs,
+          text: shown,
+          blocks: [contextBlock(noticeText(shown))],
+          unfurl_links: false,
+          unfurl_media: false,
+        });
+        this.postedOwn(posted.ts);
+        this.line.wrote();
+      } catch (error) {
+        logger.error(`could not post in ${this.channel}/${this.threadTs}: ${describe(error)}`);
+      }
+    });
+    return this.loopWrites;
   }
 
   async ask(requestId: string, request: OwnerRequest, title: string): Promise<MessageId> {
