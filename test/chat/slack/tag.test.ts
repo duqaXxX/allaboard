@@ -261,7 +261,7 @@ test("a pin that is already there, and one that is already gone, are not failure
   }
 });
 
-async function failure(promise: Promise<void>): Promise<ChatError> {
+async function failure(promise: Promise<unknown>): Promise<ChatError> {
   try {
     await promise;
   } catch (error) {
@@ -366,10 +366,17 @@ test("a title rewrites the root, the owner's words included, and keeps its tag",
 
 test("a title already on the root, or a new one, sends an edit only when it changes", async () => {
   const same = made(root([rich(TAG, SPACE, TITLE)], "`[devops]` *Fix the footer*"));
-  await same.tagger.title(CHANNEL, THREAD, "Fix the footer");
+  // Either way the root's text as it now reads comes back, for the channel's line.
+  assert.equal(
+    await same.tagger.title(CHANNEL, THREAD, "Fix the footer"),
+    "`[devops]` *Fix the footer*",
+  );
   assert.deepEqual(same.owner.apiCalls, []);
   const other = made(root([rich(TAG, SPACE, TITLE)], "`[devops]` *Fix the footer*"));
-  await other.tagger.title(CHANNEL, THREAD, "Fix the header");
+  assert.equal(
+    await other.tagger.title(CHANNEL, THREAD, "Fix the header"),
+    "`[devops]` *Fix the header*",
+  );
   assert.equal(other.owner.apiCalls[0]?.args.text, "`[devops]` *Fix the header*");
 });
 

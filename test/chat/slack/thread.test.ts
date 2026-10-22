@@ -22,6 +22,7 @@ import {
   approvalBlocks,
   questionBlocks,
 } from "../../../src/chat/slack/requests.ts";
+import type { RootEditor } from "../../../src/chat/slack/tag.ts";
 import { logger, SlackChat, type SlackThread } from "../../../src/chat/slack/thread.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { named } from "../../../src/core/texts.ts";
@@ -177,12 +178,68 @@ test("a write of a reply sets the thread status again", async () => {
   assert.equal(slack.callsTo("assistant.threads.setStatus").at(-1)?.status, "");
 });
 
-/** A line that records which threads it was asked to name. */
-function recordingLine(): { line: ChannelLine; shown: [string, string][] } {
+/** A line that records which threads it was asked to name, and by which root texts. */
+function recordingLine(): {
+  line: ChannelLine;
+  shown: [string, string][];
+  retitled: [string, string, string][];
+} {
   const shown: [string, string][] = [];
-  const line = { show: async (channel: string, root: string) => void shown.push([channel, root]) };
-  return { line: line as unknown as ChannelLine, shown };
+  const retitled: [string, string, string][] = [];
+  const line = {
+    show: async (channel: string, root: string) => void shown.push([channel, root]),
+    retitle: async (channel: string, root: string, text: string) =>
+      void retitled.push([channel, root, text]),
+  };
+  return { line: line as unknown as ChannelLine, shown, retitled };
 }
+
+/** A provider with a root editor whose title edit `edit` stands for. */
+function titling(line: ChannelLine, edit: (chat: SlackChat) => Promise<string>): SlackChat {
+  const slack = new FakeSlack();
+  const chat: SlackChat = new SlackChat({
+    slack,
+    replies: slack,
+    identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    agent: () => AGENT,
+    limiter: new CountingLimiter(slack),
+    clock: new FakeClock(),
+    roots: { title: () => edit(chat) } as unknown as RootEditor,
+    line,
+  });
+  return chat;
+}
+
+// #43: the channel's line names a thread as its root shows it, so a title the root got after
+// the line was posted reaches the line too.
+test("a title written on the root is passed to the channel's line", async () => {
+  const { line, retitled } = recordingLine();
+  const chat = titling(line, async () => "`[web]` *Footer fix*");
+  await chat.titleThread?.({ channel: CHANNEL, thread: THREAD }, "Footer fix");
+  // The root's text as the edit left it, so the line names the thread as the root reads.
+  assert.deepEqual(retitled, [[CHANNEL, THREAD, "`[web]` *Footer fix*"]]);
+});
+
+test("a title written once the daemon is stopping never reaches the channel's line", async () => {
+  const { line, retitled } = recordingLine();
+  const chat = titling(line, async (chat) => {
+    chat.halt();
+    return "*Footer fix*";
+  });
+  await chat.titleThread?.({ channel: CHANNEL, thread: THREAD }, "Footer fix");
+  assert.deepEqual(retitled, []);
+});
+
+test("a title the root refused never reaches the channel's line", async () => {
+  const { line, retitled } = recordingLine();
+  const chat = titling(line, async () => {
+    throw new ChatError("thread_not_found", { permanent: true });
+  });
+  await assert.rejects(
+    chat.titleThread?.({ channel: CHANNEL, thread: THREAD }, "Footer fix") ?? Promise.resolve(),
+  );
+  assert.deepEqual(retitled, []);
+});
 
 for (const [status, named] of [
   ["done", true],

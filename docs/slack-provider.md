@@ -421,13 +421,20 @@ edit and the owner's own messages all leave it as read (measured on a dev app on
 Once a session's work is done and ended well (its reply's first footer is written,
 `ReplySink.showFooterFormatted`, while its root's status is ✅; a footer drawn on a stop, an
 error or a shutdown moves nothing), `channel-line.ChannelLine` posts one line at the top level,
-`✅ Done:` and a link to the thread named by its first line (`channel-line.lineLabel`), and then
+`✅ Done:` and a link to the thread named by its root's first line (`channel-line.lineLabel`): the
+session's title once the root shows one, else the owner's first words. It then
 deletes the line it posted before, so the channel holds one such line at most, shows bold and
 opens at the bottom. The line is found again by its message metadata (`channel-line.LINE_EVENT`):
 the one this run posted is remembered per channel, and after a start the channel's latest
 `channel-line.HISTORY_LIMIT` messages are read for any an earlier run left. The changes of one
 channel run one at a time, an old line a delete failed for is deleted at the next change, and a
-failure is logged and changes nothing else.
+failure is logged and changes nothing else. The root may get its title after the line read it
+(the line and the title are both asked at a turn's end, and the agent may write the title a
+moment later), and `!rename` changes it: the text each title edit leaves on a root
+(`tag.RootEditor.title`) reaches `channel-line.ChannelLine.retitle`, which names the thread from
+it through `channel-line.lineLabel` and edits the line this run posted when it names that thread.
+A line an earlier run posted keeps its words until the next one replaces it. An edit leaves the
+channel as read and rings nothing.
 ## Opening a file
 
 `!open` shares a file of a session's folder into its thread, where Slack shows it in its own file
