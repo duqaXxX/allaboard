@@ -14,21 +14,60 @@ import {
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 
 const STOP = sdkJson("stop-hook") as JsonObject;
+// Written to the shape of `StopHookInput.session_crons` in `sdk.d.ts` 0.3.304: one `/loop 1m` job.
+const STOP_WITH_JOB = sdkJson("stop-hook-session-crons") as JsonObject;
 const POST_TOOL_USE = sdkJson("post-tool-use-hook") as JsonObject;
 const MODEL_SWITCH = sdkJson("post-model-switch-hook") as JsonObject;
 const PROJECT = "/home/dev/project";
 
-test("a Stop hook gives the effort the session runs at, then the folder it works in", () => {
+test("a Stop hook gives the effort the session runs at, its scheduled jobs, then its folder", () => {
   assert.deepEqual(stopHookEvents(STOP), [
     { type: "effort_observed", level: "medium" },
+    { type: "scheduled_jobs", jobs: [] },
     { type: "folder_changed", folder: PROJECT },
   ]);
+});
+
+test("a Stop hook lists the jobs the session has scheduled, whole", () => {
+  assert.deepEqual(stopHookEvents(STOP_WITH_JOB)[1], {
+    type: "scheduled_jobs",
+    jobs: [{ id: "a1b2c3d4", schedule: "*/1 * * * *", recurring: true, prompt: "check the build" }],
+  });
+});
+
+test("a Stop hook that lists no jobs, or a job it cannot read, keeps what the session knew", () => {
+  const { session_crons: _, ...without } = STOP_WITH_JOB;
+  for (const session_crons of [undefined, null, "none", { id: "a" }]) {
+    assert.deepEqual(
+      stopHookEvents({ ...STOP_WITH_JOB, session_crons }).map((event) => event.type),
+      ["effort_observed", "folder_changed"],
+    );
+  }
+  assert.deepEqual(
+    stopHookEvents(without).map((event) => event.type),
+    ["effort_observed", "folder_changed"],
+  );
+  // One job that is no job is left out; the others stand.
+  const listed = stopHookEvents({
+    ...STOP_WITH_JOB,
+    session_crons: [
+      { id: "a", schedule: "0 9 * * *", recurring: false, prompt: "once" },
+      { id: "", schedule: "0 9 * * *", recurring: true, prompt: "no id" },
+      { id: "b", schedule: 7, recurring: true, prompt: "no schedule" },
+      "x",
+    ],
+  });
+  assert.deepEqual(listed[1], {
+    type: "scheduled_jobs",
+    jobs: [{ id: "a", schedule: "0 9 * * *", recurring: false, prompt: "once" }],
+  });
 });
 
 test("a Stop hook with no effort is a model that takes none", () => {
   const { effort: _, ...without } = STOP;
   assert.deepEqual(stopHookEvents(without), [
     { type: "effort_observed", level: null },
+    { type: "scheduled_jobs", jobs: [] },
     { type: "folder_changed", folder: PROJECT },
   ]);
   for (const effort of ["medium", null, [], { level: 7 }, {}]) {
@@ -57,6 +96,7 @@ test("a hook input that names no folder moves none", () => {
   for (const cwd of ["", null, 7, undefined]) {
     assert.deepEqual(stopHookEvents({ ...STOP, cwd }), [
       { type: "effort_observed", level: "medium" },
+      { type: "scheduled_jobs", jobs: [] },
     ]);
     assert.deepEqual(postToolUseHookEvents({ ...POST_TOOL_USE, cwd }), []);
   }

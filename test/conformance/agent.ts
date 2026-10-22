@@ -331,6 +331,7 @@ function assertDeclared(events: readonly SessionEvent[], caps: Capabilities): vo
     if (!caps.models) assert.notEqual(event.type, "model_changed");
     if (!caps.declaredState) assert.notEqual(event.type, "state_changed");
     if (!caps.goals) assert.notEqual(event.type, "goal_changed");
+    if (!caps.scheduledJobs) assert.notEqual(event.type, "scheduled_jobs");
     if (
       (event.type === "effort_observed" || event.type === "effort_changed") &&
       event.level !== null

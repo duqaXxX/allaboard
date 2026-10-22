@@ -9,7 +9,7 @@
  */
 
 import { isRecord } from "../../values.ts";
-import type { SessionEvent } from "../seam.ts";
+import type { ScheduledJob, SessionEvent } from "../seam.ts";
 import { string, words } from "./wire.ts";
 
 function folderChanged(input: unknown): SessionEvent[] {
@@ -17,14 +17,42 @@ function folderChanged(input: unknown): SessionEvent[] {
   return folder === null ? [] : [{ type: "folder_changed", folder }];
 }
 
+/** One entry of `session_crons`, or null when it is not a job (`SessionCronSummary`). */
+function scheduledJob(entry: unknown): ScheduledJob | null {
+  if (!isRecord(entry)) return null;
+  const id = words(entry.id);
+  const schedule = words(entry.schedule);
+  const prompt = string(entry.prompt);
+  if (id === null || schedule === null || prompt === null || typeof entry.recurring !== "boolean") {
+    return null;
+  }
+  return { id, schedule, recurring: entry.recurring, prompt };
+}
+
 /**
- * A Stop hook's input: the effort the session runs at, then its folder. The effort is always
- * said: `effort` is in the CLI's Stop input since Claude Code 2.1.280 and absent when the model
- * takes no effort parameter, which reads as null.
+ * The Stop input's `session_crons` as one event, `[]` included. No event when the input holds no
+ * list: a CLI that does not report them says nothing of them, which is not "none".
+ */
+function scheduledJobs(input: unknown): SessionEvent[] {
+  if (!isRecord(input) || !Array.isArray(input.session_crons)) return [];
+  const jobs = input.session_crons.map(scheduledJob).filter((job) => job !== null);
+  return [{ type: "scheduled_jobs", jobs }];
+}
+
+/**
+ * A Stop hook's input: the effort the session runs at, the jobs it has scheduled, then its
+ * folder. The effort is always said: `effort` is in the CLI's Stop input since Claude Code
+ * 2.1.280 and absent when the model takes no effort parameter, which reads as null. The jobs are
+ * said whenever the input lists them (measured 2026-10-19, CLI 2.1.302: after the turn that set
+ * a loop up and after every run).
  */
 export function stopHookEvents(input: unknown): SessionEvent[] {
   const effort = isRecord(input) && isRecord(input.effort) ? input.effort : {};
-  return [{ type: "effort_observed", level: string(effort.level) }, ...folderChanged(input)];
+  return [
+    { type: "effort_observed", level: string(effort.level) },
+    ...scheduledJobs(input),
+    ...folderChanged(input),
+  ];
 }
 
 /** A PostToolUse hook's input: the folder the session works in after the tool. */
