@@ -87,6 +87,8 @@ export interface TaskUpdate {
 /** The footer as fields. A provider formats them in its own markup. */
 export interface FooterFields {
   readonly bypass: boolean;
+  /** The session is in plan mode: shown in place of bypass, the mode actually in force. */
+  readonly planning: boolean;
   readonly model: string | null;
   /** A fixed level, or the agent's word for its default. */
   readonly effort: string | null;

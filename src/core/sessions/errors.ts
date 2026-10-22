@@ -76,6 +76,16 @@ export class BypassUnavailable extends Error {
 }
 
 /**
+ * `!plan` was asked of an agent with no plan mode: nothing was switched.
+ */
+export class PlanUnavailable extends Error {
+  constructor() {
+    super("the agent has no plan mode");
+    this.name = "PlanUnavailable";
+  }
+}
+
+/**
  * An install is replacing allaboard's own copy: no agent process starts until it ends,
  * since a new one would run the new copy's agent under the old code, or a half-written copy. A
  * session already connected is not touched.

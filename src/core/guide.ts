@@ -12,6 +12,8 @@ export interface GuideOffer {
   readonly efforts: boolean;
   /** The agent has a bypass mode (`permissionModes.bypass` is not null). */
   readonly bypass: boolean;
+  /** The agent has a plan mode (`permissionModes.plan` is not null). */
+  readonly plan: boolean;
   /** The agent has commands of its own (`commands`). */
   readonly commands: boolean;
   /** The agent asks questions (`questions`). */
@@ -80,6 +82,7 @@ export function guideText(names: Names, offered: GuideOffer): string {
     sessions,
     ...(offered.fileUpload ? [say(texts.GUIDE_FILES)] : []),
     ...(offered.bypass ? [say(texts.GUIDE_BYPASS)] : []),
+    ...(offered.plan ? [say(texts.GUIDE_PLAN)] : []),
     ...(offered.threadTags ? [say(texts.GUIDE_TAGS)] : []),
     ...(offered.threadDelete ? [say(texts.GUIDE_DELETE)] : []),
     ...(offered.updates ? [texts.GUIDE_UPDATES] : []),

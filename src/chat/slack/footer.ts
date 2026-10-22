@@ -59,7 +59,8 @@ function workPart(work: NonNullable<FooterFields["work"]>): string {
 export function formatFooter(data: FooterFields, now: number): string {
   const fields = footerFields(data, now);
   const parts = data.work === null ? [] : [workPart(data.work)];
-  if (data.bypass) parts.push("⚡ bypass");
+  if (data.planning) parts.push("⏸ plan");
+  else if (data.bypass) parts.push("⚡ bypass");
   parts.push(...fields.filter((f) => SESSION.includes(f.key)).map((f) => short(f)));
   // Its name alone, the project's: the whole path is on `!status`'s Directory line.
   const name = data.folder === null ? "" : basename(data.folder);

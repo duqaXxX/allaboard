@@ -6,6 +6,7 @@ export const EVERYTHING_OFFERED: GuideOffer = {
   models: true,
   efforts: true,
   bypass: true,
+  plan: true,
   commands: true,
   questions: true,
   backgroundTasks: true,

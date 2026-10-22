@@ -17,6 +17,7 @@ import {
   PLAIN_NAMES,
   WithBypass,
   WithGoals,
+  WithPlan,
   WithSessionTags,
 } from "./messages-world.ts";
 
@@ -26,7 +27,7 @@ const identity = (text: string): string => text;
 
 // The plain agent has no bypass mode and the memory chat no file upload: `!bypass` and `!open`
 // are refused when typed, and the help does not list them.
-const UNSERVED = new Set(["bypass", "open", "tag", "untag", "delete-thread", "allaboard"]);
+const UNSERVED = new Set(["bypass", "plan", "open", "tag", "untag", "delete-thread", "allaboard"]);
 // It keeps no record of trust either, so its `!bind` line speaks of none.
 const NO_TRUST = false;
 
@@ -81,6 +82,7 @@ const PLAIN_OFFER: GuideOffer = {
   models: false,
   efforts: true,
   bypass: false,
+  plan: false,
   commands: true,
   questions: true,
   backgroundTasks: false,
@@ -106,6 +108,82 @@ test("!guide offers what the agent and the chat declare", async (t) => {
   assert.equal(
     world.inChannel().at(-1),
     guideText(PLAIN_NAMES, { ...PLAIN_OFFER, bypass: true, fileUpload: true }),
+  );
+});
+
+// --- !plan
+
+test("!plan belongs to a session", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new WithPlan() });
+  await world.says("!plan");
+  assert.equal(world.inChannel().at(-1), texts.PLAN_TOP_LEVEL);
+});
+
+test("!plan switches a started session to plan mode and !plan off returns to its mode", async (t) => {
+  const agent = new WithPlan();
+  const world = await MessagesWorld.make(t, { agent });
+  const ref = await world.opened();
+  const before = JSON.stringify(world.state.thread(ref.channel, ref.thread));
+  await world.says("!plan", ref.thread);
+  assert.equal(world.shown(ref).at(-1), named(texts.PLAN_ON_THREAD, PLAIN_NAMES));
+  await world.says("!status", ref.thread);
+  assert.ok(world.shown(ref).at(-1)?.includes("Mode: `planning`"));
+  await world.says("!plan off", ref.thread);
+  assert.equal(world.shown(ref).at(-1), texts.PLAN_OFF_THREAD);
+  assert.deepEqual(agent.modes, ["planning", "standard"]);
+  // Session only: nothing is stored about plan mode.
+  assert.equal(JSON.stringify(world.state.thread(ref.channel, ref.thread)), before);
+});
+
+test("!plan off with bypass on returns to bypass, and !status shows plan meanwhile", async (t) => {
+  const agent = new WithPlan();
+  const world = await MessagesWorld.make(t, { agent });
+  const ref = await world.opened();
+  await world.says("!bypass on", ref.thread);
+  await world.says("!plan", ref.thread);
+  await world.says("!status", ref.thread);
+  assert.ok(world.shown(ref).at(-1)?.includes("Mode: `planning`"));
+  await world.says("!plan off", ref.thread);
+  assert.deepEqual(agent.modes, ["unrestricted", "planning", "unrestricted"]);
+  await world.says("!status", ref.thread);
+  assert.ok(world.shown(ref).at(-1)?.includes("Mode: `unrestricted`"));
+});
+
+test("!bypass on during plan mode ends plan mode", async (t) => {
+  const agent = new WithPlan();
+  const world = await MessagesWorld.make(t, { agent });
+  const ref = await world.opened();
+  await world.says("!plan", ref.thread);
+  await world.says("!bypass on", ref.thread);
+  await world.says("!status", ref.thread);
+  assert.ok(world.shown(ref).at(-1)?.includes("Mode: `unrestricted`"));
+});
+
+test("!plan before the setup is started changes nothing", async (t) => {
+  const agent = new WithPlan();
+  const world = await MessagesWorld.make(t, { agent });
+  const ref = world.chat.openThread(world.channel);
+  world.sessions.open(ref.channel, ref.thread);
+  await world.says("!plan", ref.thread);
+  assert.equal(world.shown(ref).at(-1), texts.PLAN_BEFORE_START);
+  assert.deepEqual(agent.modes, []);
+});
+
+test("!plan for an agent with no plan mode says so and changes nothing", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened();
+  await world.says("!plan", ref.thread);
+  assert.equal(world.shown(ref).at(-1), named(texts.PLAN_UNAVAILABLE, PLAIN_NAMES));
+  await world.says("!plan off", ref.thread);
+  assert.equal(world.shown(ref).at(-1), named(texts.PLAN_UNAVAILABLE, PLAIN_NAMES));
+});
+
+test("!guide and !help offer plan only to an agent with a plan mode", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new WithPlan() });
+  await world.says("!guide");
+  assert.equal(
+    world.inChannel().at(-1),
+    guideText(PLAIN_NAMES, { ...PLAIN_OFFER, bypass: true, plan: true }),
   );
 });
 

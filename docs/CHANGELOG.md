@@ -5,6 +5,24 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `!plan` switches a session to the agent's plan mode and `!plan off` returns to the mode the
+  thread would otherwise have, bypass included. It is the second permission word the owner can
+  set, session only: nothing is stored, so a restart of allaboard or an idle close reopens the
+  session in its normal mode, and `!bypass on` or `off` sent during plan mode ends it. An agent
+  declares it in `PermissionModes.plan` (null for none, and the word is refused). `!status` shows
+  the mode while it is plan.
+- The approval of Claude Code's `ExitPlanMode` shows the plan's text alone, without the file path,
+  as text in the code blocks every request uses for its input, so a link, a mention or a fence in
+  the plan draws nothing and notifies nobody. A plan too long for one message shows its start and
+  its end with a line that says how much is not shown. An input with any other key is shown
+  whole, as before.
+- While a session plans, its footer and the channel's session list show `⏸ plan` in place of
+  `⚡ bypass`. `!plan off` returns to the default mode when the owner's settings start the folder
+  in plan. A session put in plan and resumed after a restart came back in the settings' mode
+  (measured 2026-10-22, SDK 0.3.304). An input with any other key is shown whole, as before.
+
 ### Fixed
 
 - The channel's `✅ Done:` line names a thread by its title once the root shows one. It read the

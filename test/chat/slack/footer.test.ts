@@ -14,6 +14,7 @@ const DAY = 24 * HOUR;
 function fields(known: Partial<FooterFields> = {}): FooterFields {
   return {
     bypass: false,
+    planning: false,
     model: null,
     effort: null,
     effortObserved: null,
@@ -140,4 +141,9 @@ test("the work opens the line, its end time in Slack's own date format", () => {
 
 test("a footer that knows only the work still says it", () => {
   assert.match(formatFooter(fields({ work: { durationMs: 0, doneAt: NOW } }), NOW), /^0s · done /);
+});
+
+test("while planning the footer says plan in place of bypass", () => {
+  const data = fields({ bypass: true, planning: true, model: "claude-opus-5-5" });
+  assert.equal(formatFooter(data, NOW), "⏸ plan · claude-opus-5-5");
 });

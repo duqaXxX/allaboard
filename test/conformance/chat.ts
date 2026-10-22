@@ -239,6 +239,7 @@ const REQUESTS: ReadonlyArray<{
 
 const FOOTER: FooterFields = {
   bypass: false,
+  planning: false,
   model: "model-a",
   effort: null,
   effortObserved: null,

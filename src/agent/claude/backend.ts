@@ -46,12 +46,11 @@ function trustWith(environment: string): string {
 // The commands `docs/limits.md` lists as not offered, which a session of the SDK refuses with
 // `/<name> isn't available in this environment.` (measured on Claude Code 2.1.292 on 2026-10-09
 // and 2.1.303 on 2026-10-20; claim P23 sends each to every release). `test/docs.test.ts` holds
-// the two lists to the same names. What follows a name is what the page says to do instead.
+// the two lists to the same names (`/plan` is not among them: `!plan` is a word of the daemon's own). What follows a name is what the page says to do instead.
 const SETTINGS_APPLY = "The settings you made in the terminal apply: change them there.";
 const BOUND_FOLDER = "A thread works in the folder its channel was bound to.";
 const NOT_OFFERED: Readonly<Record<string, string | null>> = Object.freeze({
   rewind: null,
-  plan: null,
   branch: null,
   fork: null,
   subtask: null,

@@ -376,6 +376,36 @@ test("a restart rebuilds a stored thread with its bypass", async (t) => {
   await restarted.close();
 });
 
+test("plan mode is session only: a reconnect does not reapply it, and a bypass word ends it", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] }, {});
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait(); // the setup's Start is behind it
+  assert.equal(await session.switchPlan(true), true);
+  assert.deepEqual(h.clients[0]?.modes, ["plan"]);
+  assert.ok(session.planning);
+  assert.ok((await session.status()).includes("Mode: `plan`"));
+  // Nothing is stored about it.
+  assert.equal(thread(h).bypass, null);
+  // A bypass word sets a mode of its own, which replaces plan.
+  await session.setBypass(true);
+  assert.ok(!session.planning);
+  assert.deepEqual(h.clients[0]?.modes, ["plan", "bypassPermissions"]);
+  // Bypass on: leaving plan mode returns to bypass.
+  assert.equal(await session.switchPlan(true), true);
+  assert.equal(await session.switchPlan(false), true);
+  assert.deepEqual(h.clients[0]?.modes.slice(-2), ["plan", "bypassPermissions"]);
+  // A new client (a restart, an idle close) starts as the thread would without plan.
+  const path = join(h.tmpPath, "state.json");
+  const restarted = new SessionManager({ ...h.deps, state: new StateStore(path) }).get(
+    CHANNEL,
+    THREAD,
+  );
+  await restarted?.ensureConnected();
+  assert.deepEqual(h.clients[1]?.modes, ["bypassPermissions"]);
+  assert.ok(!restarted?.planning);
+  await restarted?.close();
+});
+
 test("queue waits while approval pending", async (t) => {
   const ask = canUseToolCall("Bash", { command: "ls" });
   const h = harnessFor(t)({ turns: [[ask, ...sdkMessages("tools")], sdkMessages("tools")] });
@@ -2338,6 +2368,36 @@ test("bypass from the folder s own settings shows and turns off", async (t) => {
   await (await session.submit("again")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
   assert.ok(!statuses(h).at(-1)?.startsWith("⚡ bypass"));
+});
+
+test("!plan off in a folder whose settings start in plan returns to the default mode", async (t) => {
+  const info = infoOf({ commands: [], current_permission_mode: "plan" });
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], info });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  assert.ok(session.planning);
+  assert.equal(await session.switchPlan(false), true);
+  assert.deepEqual(h.clients[0]?.modes, ["default"]);
+  assert.ok(!session.planning);
+  assert.ok((await session.status()).includes("Mode: `default`"));
+});
+
+test("the footer shows plan in place of bypass while planning, and bypass again after", async (t) => {
+  const h = harnessFor(t)({
+    turns: [sdkMessages("tools"), sdkMessages("tools"), sdkMessages("tools")],
+  });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await session.setBypass(true);
+  await session.switchPlan(true);
+  await (await session.submit("again")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("⏸ plan"), statuses(h).at(-1));
+  assert.ok(!statuses(h).at(-1)?.includes("⚡"));
+  await session.switchPlan(false);
+  await (await session.submit("third")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("⚡ bypass"), statuses(h).at(-1));
 });
 
 test("a stored bypass off is sent when the agent reports no mode, with one line in the log", async (t) => {

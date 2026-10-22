@@ -4606,6 +4606,7 @@ test("the footer's limit counts down from the clock's time in milliseconds", asy
   await settled();
   const fields = {
     bypass: false,
+    planning: false,
     model: null,
     effort: null,
     effortObserved: null,
@@ -4632,6 +4633,7 @@ test("the footer's fields are formatted into the line drawn under the reply", as
   await settled();
   const fields = {
     bypass: true,
+    planning: false,
     model: "opus",
     effort: null,
     effortObserved: null,

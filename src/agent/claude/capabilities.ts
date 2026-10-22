@@ -14,6 +14,7 @@ export const CAPABILITIES: Capabilities = Object.freeze({
     default: "default",
     auto: "auto",
     bypass: "bypassPermissions",
+    plan: "plan",
   }),
   subagents: true,
   backgroundTasks: true,

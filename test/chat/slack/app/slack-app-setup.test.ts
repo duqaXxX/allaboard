@@ -285,7 +285,7 @@ test("an agent with no bypass mode: the setup has no Bypass checkbox, before and
   const manual = manualWorld(t);
   manual.backend.capabilities = {
     ...manual.backend.capabilities,
-    permissionModes: { default: "default", auto: null, bypass: null },
+    permissionModes: { default: "default", auto: null, bypass: null, plan: null },
   };
   await manual.dispatch(message("hello", { ts: THREAD }));
   const posted = setupControls(postedBlocks(manual));
