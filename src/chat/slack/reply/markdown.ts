@@ -267,9 +267,14 @@ export function codeOutOfLists(text: string, whole: boolean): string {
       else if (lead >= item && lead - item <= 3 && FENCE_OPEN.test(rest)) shown = rest;
       else if (!complete && lead >= item && lead - item <= 3 && FENCE_SO_FAR.test(rest)) {
         shown = null;
-      } else if (moved && lead <= 3 && ITEM_START.test(rest) && (complete || rest.includes(" "))) {
+      } else if (
+        moved &&
+        lead < item &&
+        ITEM_START.test(rest) &&
+        (complete || rest.includes(" "))
+      ) {
         shown = (out.endsWith("\n\n") ? "" : "\n") + line;
-      } else if (moved && !complete && lead <= 3 && ITEM_SO_FAR.test(rest)) shown = null;
+      } else if (moved && !complete && lead < item && ITEM_SO_FAR.test(rest)) shown = null;
       else if (moved && lead > 0) shown = line.slice(Math.min(item, lead));
     }
     if (shown === null) break;
@@ -289,6 +294,8 @@ export function codeOutOfLists(text: string, whole: boolean): string {
       fence = { indent: lead, marks: FENCE_OPEN.exec(rest)?.[1] ?? "", moving: false };
       item = null;
       moved = false;
+    } else if (moved && item !== null && lead >= item) {
+      // A line of the item whose fence was moved, a nested item included: it follows it out.
     } else {
       const opened = LIST_ITEM.exec(line);
       if (opened !== null) {

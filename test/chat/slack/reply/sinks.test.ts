@@ -487,6 +487,18 @@ test("a code block in a list item reaches Slack at the start of the line, stream
   assert.deepEqual(slack.messageTexts(), [moved]);
 });
 
+test("a list that goes on in a report after the turn's end is read as one", async () => {
+  // A report renders into the reply after its `finish`, in the same text part.
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("1. run\n   ```\n   x\n");
+  await sink.finish([]);
+  await sink.text("   y\n   ```\n2. next");
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.deepEqual(slack.messageTexts(), ["1. run\n```\nx\ny\n```\n\n2. next"]);
+});
+
 test("a line of the daemon's own is quieted too: some carry Claude's words", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
