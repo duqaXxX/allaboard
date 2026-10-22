@@ -610,16 +610,17 @@ test("a question whose input cannot be read is a deny", LIMIT, async (t) => {
 // Hooks.
 
 test(
-  "the Stop hook gives the effort and the folder, where it ran in the stream",
+  "the Stop hook gives the effort, the scheduled jobs and the folder, where it ran in the stream",
   LIMIT,
   async (t) => {
     const batch: Batch = [...TOOLS.slice(0, -1), hook("Stop", STOP), TOOLS.at(-1) as JsonObject];
     const { session, events } = await started(t, { turns: [batch] });
     await session.send(PROMPT);
     const seen = await until(events, "turn_ended");
-    const tail = seen.slice(-3);
+    const tail = seen.slice(-4);
     assert.deepEqual(tail, [
       { type: "effort_observed", level: "medium" },
+      { type: "scheduled_jobs", jobs: [] },
       { type: "folder_changed", folder: "/home/dev/project" },
       seen.at(-1),
     ]);

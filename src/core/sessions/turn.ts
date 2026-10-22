@@ -43,6 +43,8 @@ export interface ActiveTurn {
    * report's and did not release it. A normal end sends it back to wait for a turn of its own.
    */
   unanswered: Turn | null;
+  /** A scheduled run: its words go to the loop card and it touches neither status nor footer. */
+  readonly run: boolean;
 }
 
 /** The owner's question on one line, as a note about a message that was not sent quotes it. */

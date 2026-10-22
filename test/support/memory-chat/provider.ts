@@ -19,6 +19,7 @@ import {
   type ChatProvider,
   type CommandSuggestion,
   type FooterFields,
+  type LoopCard,
   type Markup,
   type MessageId,
   type OpenMessageChange,
@@ -44,6 +45,7 @@ const CAPABILITIES: ChatCapabilities = {
   threadTitles: false,
   threadDelete: false,
   commandSuggestions: false,
+  loopCard: true,
 };
 
 /** The footer as one line of words. */
@@ -271,6 +273,9 @@ function answered(
     .join("\n");
 }
 
+// The loop card of each thread, by room: a thread object is made afresh for every lookup.
+const loopCards = new WeakMap<Room, Map<string, StoredMessage>>();
+
 class MemoryThread implements ThreadChat {
   readonly #room: Room;
   readonly #ref: ThreadRef;
@@ -363,6 +368,31 @@ class MemoryThread implements ThreadChat {
       return false;
     }
     return true;
+  }
+
+  async showLoop(card: LoopCard): Promise<void> {
+    const text = card.text === "" ? card.label : `${card.label}\n${card.text}`;
+    const cards = loopCards.get(this.#room) ?? new Map<string, StoredMessage>();
+    loopCards.set(this.#room, cards);
+    const key = `${this.#ref.channel}/${this.#ref.thread}`;
+    try {
+      const held = cards.get(key);
+      if (held !== undefined && this.#room.message(held.id) !== null) {
+        this.#room.edit(held, text);
+      } else {
+        cards.set(
+          key,
+          this.#room.write(this.#ref.channel, this.#ref.thread, DAEMON, text, "notice"),
+        );
+      }
+    } catch (error) {
+      if (!(error instanceof ChatError)) throw error;
+    }
+  }
+
+  async endLoop(line: string): Promise<void> {
+    loopCards.get(this.#room)?.delete(`${this.#ref.channel}/${this.#ref.thread}`);
+    await this.#post(line, "notice").catch(() => {});
   }
 
   async close(): Promise<void> {}

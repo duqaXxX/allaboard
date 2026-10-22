@@ -54,6 +54,7 @@ import type {
   Question,
   QuestionAnswer,
   QuestionRequest,
+  ScheduledJob,
   SessionEvent,
   TaskKind,
 } from "../../agent/seam.ts";
@@ -69,7 +70,7 @@ import type {
   ThreadChat,
 } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
-import { strip } from "../../text.ts";
+import { blank, strip } from "../../text.ts";
 import { errorName } from "../../values.ts";
 import {
   footerFields,
@@ -80,6 +81,7 @@ import {
 } from "../footer.ts";
 import { modelName } from "../models.ts";
 import { resolvePath } from "../paths.ts";
+import { LoopReply } from "../reply/loop-card.ts";
 import { described } from "../reply/previews.ts";
 import {
   endedLine,
@@ -98,6 +100,7 @@ import {
   HOLD_MARKER,
   IDLE_CLOSE_SECONDS,
   INJECTED_TURN_WAIT,
+  LOOPS_BELIEVED_SECONDS,
   PROCESS_EXITED,
   STOP_TAIL_WAIT,
   SUMMARY_IS_END_LINE,
@@ -123,6 +126,7 @@ import {
   SessionGone,
   StartsBlocked,
 } from "./errors.ts";
+import { cadenceOf, promptOf } from "./loops.ts";
 import { quoted } from "./quote.ts";
 import { Cancelled, cancellable, Event, Mutex, Queue, Task } from "./tasks.ts";
 import { ThreadTitle } from "./title.ts";
@@ -389,6 +393,19 @@ export class ThreadSession {
   // (`SessionManager.session`): a goal set before a restart is not known until its next check,
   // since a resumed agent says nothing of it before then (measured 2026-10-20).
   goal: string | null = null;
+  // The jobs the agent last listed (`scheduled_jobs`) and when, on the clock of `deps.clock`.
+  // Memory only (invariant 3): a resumed agent lists them again at its first turn's end.
+  private jobs: readonly ScheduledJob[] = [];
+  private jobsListedAt = 0;
+  // The runs the loop card has shown since it was posted; zero when it has not been. Memory
+  // only: after a restart the card and the count start fresh.
+  private loopRuns = 0;
+  // A prompt was replayed while no turn ran, since the last turn started: the turn that comes
+  // is an owner's, whatever the list of jobs says (`opensRun`).
+  private promptReplayed = false;
+  // A report turn was given up on since the last turn started: a turn that comes may be that
+  // report arriving late, and is not taken for a run.
+  private reportGivenUp = false;
   // The model the agent last said it switched to (`model_changed`), kept until the context
   // usage names it too: after a command the usage still names the model before it. Null when
   // none is awaited.
@@ -610,6 +627,15 @@ export class ThreadSession {
    */
   get runningKinds(): string {
     return this.runningKindsOf();
+  }
+
+  /**
+   * The jobs the agent has scheduled and the session still believes in: its last list, unless
+   * it is older than the agent keeps a job (`LOOPS_BELIEVED_SECONDS`).
+   */
+  get scheduledJobs(): readonly ScheduledJob[] {
+    const stale = this.deps.clock.time() - this.jobsListedAt >= LOOPS_BELIEVED_SECONDS;
+    return stale ? [] : this.jobs;
   }
 
   /**
@@ -1400,6 +1426,7 @@ export class ThreadSession {
       );
       this.interrupting = true;
       await this.dropClientLocked();
+      await this.leaveLoop().catch(() => {});
       // An approval a background agent waits on goes with the process, as in a stopped turn.
       for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
         await this.deleteRequest(pending.messageTs);
@@ -1554,6 +1581,14 @@ export class ThreadSession {
     }
     const running = this.runningKindsOf();
     if (running) fields.push(texts.fill(texts.STATUS_BACKGROUND, { counts: running }));
+    for (const job of this.scheduledJobs) {
+      fields.push(
+        texts.fill(texts.STATUS_LOOP, {
+          cadence: cadenceOf(job),
+          prompt: this.deps.chat.escape(promptOf(job), "reference"),
+        }),
+      );
+    }
     const activity = this.busy
       ? texts.fill(texts.ACTIVITY_BUSY, { queued: this.queue.size })
       : texts.ACTIVITY_IDLE;
@@ -1717,6 +1752,8 @@ export class ThreadSession {
         this.predecessor = null;
       }
       // Only now, with every task cancelled: a round trip to the chat must not hold those up.
+      // A loop with runs shown is over with its session, however it closed.
+      await this.leaveLoop().catch(() => {});
       await this.thread.close();
       // The last chance a change still only debounced gets, and the last chance of a reply
       // whose end failed and whose retry is still waiting: each reply once.
@@ -1969,13 +2006,19 @@ export class ThreadSession {
         await this.settleRequests(requests);
       } finally {
         // Whatever the chat did meanwhile, the turn is released.
-        await this.abandon(
-          texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: reason }),
-          {
-            error: true,
-            because: texts.named(texts.BECAUSE_STOPPED, this.names),
-          },
-        );
+        try {
+          await this.abandon(
+            texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: reason }),
+            {
+              error: true,
+              because: texts.named(texts.BECAUSE_STOPPED, this.names),
+            },
+          );
+        } finally {
+          // After the run the process lost was in, whose card `abandon` closes: the loop's end
+          // is the last message, and no card is posted below it.
+          await this.leaveLoop().catch(() => {});
+        }
       }
     } finally {
       await client.close().catch(() => {});
@@ -2030,6 +2073,8 @@ export class ThreadSession {
         return declared.models ? null : "models";
       case "goal_changed":
         return declared.goals ? null : "goals";
+      case "scheduled_jobs":
+        return declared.scheduledJobs ? null : "scheduledJobs";
       case "task_started": {
         const needs = event.kind === "subagent" ? "subagents" : "backgroundTasks";
         if (declared[needs]) return null;
@@ -2060,6 +2105,9 @@ export class ThreadSession {
         this.usage?.invalidate();
         return;
       case "prompt_taken":
+        // Known or not (a prompt a guess already settled is no longer sent): the turn it
+        // starts is the owner's.
+        if (this.active === null) this.promptReplayed = true;
         this.acknowledge(event.promptId);
         return;
       case "state_changed":
@@ -2106,6 +2154,13 @@ export class ThreadSession {
         return;
       case "folder_changed":
         this.workingDirectory = event.folder;
+        return;
+      case "scheduled_jobs":
+        this.jobs = event.jobs;
+        this.jobsListedAt = this.deps.clock.time();
+        // The last job going is what lets the idle close run again.
+        this.idleTimerCheck();
+        await this.endLoopIfOver();
         return;
       case "goal_changed": {
         const { state, condition } = event.goal;
@@ -2322,7 +2377,7 @@ export class ThreadSession {
           return;
         }
       }
-      await this.startTurn(worded);
+      await this.startTurn(worded, worded && task === null && this.opensRun());
       // A report turn has no prompt behind it: only now does `threadLine` read it.
       this.showThreadStatus();
     }
@@ -2371,8 +2426,14 @@ export class ThreadSession {
         }
         // Checked only now, with the turn no longer active: `finish` alone still reads busy.
         // `!stop` already reacted ✅ itself; the stop's end is the session's end all the same.
-        if (!turnStopped) await this.reactDoneIfIdle(signal);
-        else await this.showFooterIfEnded(signal);
+        // A run that took no prompt in changed no status of its own and owes no footer; one that
+        // asked for an approval left the root at work, which its end settles.
+        const ownerTurn = !active.run || active.taken.length > 0;
+        const moved = this.lastStatus === "working" || this.lastStatus === "waiting";
+        if (turnStopped) await this.showFooterIfEnded(signal);
+        else if (ownerTurn || moved) await this.reactDoneIfIdle(signal);
+        // The loop may have ended with this turn, the owner's or a run's.
+        await this.endLoopIfOver();
       } finally {
         this.turnEnding = false;
         this.showThreadStatus();
@@ -2625,6 +2686,7 @@ export class ThreadSession {
    */
   private async reportNotComing(signal?: AbortSignal): Promise<void> {
     this.injectedExpected = false;
+    this.reportGivenUp = true;
     const held = this.held;
     this.held = [];
     // An end line waits to be said: of a task with no card (a command or an agent in the
@@ -2975,10 +3037,14 @@ export class ThreadSession {
    * nothing is running, sent or queued for `close()` to end with a line.
    */
   private async closeWhenIdle(signal: AbortSignal): Promise<void> {
-    await this.deps.clock.sleep(IDLE_CLOSE_SECONDS, signal);
-    if (this.closedFlag || this.draining || this.waitingForOwner || !this.idle) {
-      return; // something started again before the hour was up
-    }
+    // A session with a scheduled job is idle by the hour and not for closing: the agent wakes
+    // it by itself. The wait goes on for as long as the list is believed.
+    do {
+      await this.deps.clock.sleep(IDLE_CLOSE_SECONDS, signal);
+      if (this.closedFlag || this.draining || this.waitingForOwner || !this.idle) {
+        return; // something started again before the hour was up
+      }
+    } while (this.scheduledJobs.length > 0);
     logger.info(`closing an idle session in ${this.where}`);
     // Cleared first: `close()` cancels its tasks through `cancelTasks`, and a task cannot
     // await itself.
@@ -3026,19 +3092,96 @@ export class ThreadSession {
     return first;
   }
 
-  private async startTurn(worded: boolean): Promise<ActiveTurn> {
+  /**
+   * Whether the turn that starts now is a scheduled run: the agent opens it with no owner prompt
+   * behind it and no task end to report, while a scheduled job is believed. The agent marks a run
+   * nowhere (no `origin`, measured 2026-10-19), so this is all there is to tell it by; a run that
+   * comes while an owner prompt is queued is that prompt's turn. A prompt replayed since the last
+   * turn, a task still running and a report given up on all say the turn may be another's (an
+   * owner's, a Monitor's event, a report that came late): it is then an ordinary reply, which
+   * is the safe way to be wrong. Only where the chat has the loop card.
+   */
+  private opensRun(): boolean {
+    return (
+      this.deps.chat.capabilities.loopCard &&
+      this.scheduledJobs.length > 0 &&
+      !this.promptOwed() &&
+      !this.promptReplayed &&
+      !this.reportGivenUp &&
+      this.runningKindsOf() === "" &&
+      !this.injectedExpected &&
+      this.announced === null &&
+      this.reportOf === null &&
+      this.ended.length === 0 &&
+      this.opening === null &&
+      this.held.length === 0 &&
+      this.endedAhead.length === 0 &&
+      this.notice === null
+    );
+  }
+
+  /** The loop card's label for the run that starts: its cadence when one job could have fired. */
+  private runLabel(): string {
+    const [only, ...others] = this.scheduledJobs;
+    const run = this.loopRuns;
+    return only !== undefined && others.length === 0
+      ? texts.fill(texts.LOOP_RUN, { cadence: cadenceOf(only), run })
+      : texts.fill(texts.LOOP_RUN_MANY, { run });
+  }
+
+  /**
+   * The loop is over once its list is empty and no run still writes: the one message that says
+   * so, with the runs counted. Called wherever either could have changed.
+   */
+  private async endLoopIfOver(): Promise<void> {
+    // A turn of the owner's that deleted the loop says so when it ends, as a run does.
+    if (this.scheduledJobs.length > 0 || this.active !== null) return;
+    await this.leaveLoop();
+  }
+
+  /**
+   * The session's view of the loop ends: the one message that says so, and the jobs and the
+   * count forgotten, so that `!status` and the idle close stop treating the loop as live. Three
+   * messages: paused when a believed job is recurring (Claude Code restores it on resume),
+   * stopped-with-a-maybe when the believed jobs are all one-shot, and ended when none is
+   * believed (deleted, or expired). Nothing when no job was believed and no run shown, and
+   * where the chat has no loop card.
+   */
+  private async leaveLoop(): Promise<void> {
+    if (!this.deps.chat.capabilities.loopCard) return;
+    // On resume Claude Code restores a recurring task, and a one-shot one whose time has not
+    // passed, but not a self-paced loop's pending wakeup (scheduled tasks documentation, read
+    // 2026-10-23). The two one-shot kinds cannot be told apart, so a believed list with no
+    // recurring job is said to be stopped, with a maybe.
+    const believed = this.scheduledJobs;
+    const runs = this.loopRuns;
+    if (believed.length === 0 && runs === 0) return;
+    this.jobs = [];
+    this.loopRuns = 0;
+    const count = runs === 0 ? "" : ` · ${runs === 1 ? "1 run" : `${runs} runs`}`;
+    let line: string;
+    if (believed.length === 0) line = texts.fill(texts.LOOP_ENDED, { runs: count });
+    else if (believed.some((job) => job.recurring)) {
+      line = texts.fill(texts.LOOP_PAUSED, { runs: count });
+    } else line = texts.named(texts.LOOP_STOPPED, this.names);
+    await this.thread.endLoop(line);
+  }
+
+  private async startTurn(worded: boolean, run = false): Promise<ActiveTurn> {
     // Skipped while `stop()` is still winding an interrupt down (`finish` clears the flag once
     // that very turn's own end says so): this can be that turn's own trailing events, not a
     // new one, and `stop()`'s own ✅ must stand. `read` raises it too, while it settles a lost
     // process's requests, for the same reason.
-    if (!this.interrupting) {
+    if (!this.interrupting && !run) {
       this.errorStanding = false; // a turn is sent, or a report turn starts: new work
       // A background task's own report turn can start while a hold waits on this very
       // session; ✋ must stand through it, not be overwritten by ⏳ (`waitingForOwner` covers a
       // hold the same way it covers an open approval or question).
       this.react(this.waitingForOwner ? "waiting" : "working");
     }
-    const turn = this.whoseTurn(worded);
+    this.promptReplayed = false;
+    this.reportGivenUp = false;
+    const turn = run ? null : this.whoseTurn(worded);
     // An agent that takes no prompt into a running turn is sent the next one once this turn has
     // ended: `work` waits on `settled`, as it does for a report turn that was expected.
     if (turn === null && !this.deps.agent.capabilities.promptDuringTurn) this.settled.clear();
@@ -3047,7 +3190,10 @@ export class ThreadSession {
     let renderer: TurnRenderer;
     let opening: string | null = null;
     let openingAside = false;
-    if (turn === null) {
+    if (run) {
+      this.loopRuns += 1;
+      renderer = this.newRenderer(new LoopReply(this.thread, this.runLabel()));
+    } else if (turn === null) {
       this.notificationWaits = false;
       // A report turn renders into the reply that started a task it reports, so no new message
       // follows for it, but only a reply that is still tracked, not ended and the last thing in
@@ -3078,10 +3224,14 @@ export class ThreadSession {
       released: [],
       takenNoted: false,
       unanswered: null,
+      run,
     };
     this.active = active;
-    this.workStartedAt ??= this.now();
-    this.footerOwedTo = this.reply(renderer);
+    // A run is no work of the owner's: it is timed and footed by no one.
+    if (!run) {
+      this.workStartedAt ??= this.now();
+      this.footerOwedTo = this.reply(renderer);
+    }
     if (opening !== null) await renderer.feedOpening(opening, openingAside);
     const ahead = this.endedAhead;
     this.endedAhead = [];
@@ -3432,8 +3582,10 @@ export class ThreadSession {
     let stopped = false;
     let takenNoted = false;
     const injected = result.startedBy === "agent";
-    // The agent ends a turn it took prompts into with one result of its own for all of them.
-    const released = injected ? active.taken : [];
+    // The agent ends a turn it took prompts into with one result of its own for all of them. A
+    // run it took a prompt into is that prompt's turn from then on.
+    const released = injected || active.run ? active.taken : [];
+    const handedOver = active.run && released.length > 0;
     try {
       if (result.sessionId) {
         this.deps.state.setSession(this.channelId, this.threadId, result.sessionId);
@@ -3452,9 +3604,16 @@ export class ThreadSession {
       }
       // What a restart dropped meanwhile is said where the running turn ends.
       await this.feedEndNotes(active.renderer);
+      const card = this.reply(active.renderer);
+      let handed: string | null = null;
+      if (card instanceof LoopReply) {
+        card.setFinal(result.finalText);
+        if (handedOver) handed = card.takeOver();
+      }
       // `!stop` cut this turn short, the owner's own or a report's: its reply ends like any
       // other, and never waits on a task it may still owe (`force`: `!stop` never does).
       await this.closeReply(active.renderer, { force: stopped, signal });
+      if (handed !== null) await this.answerTakenRun(handed, signal);
     } catch (error) {
       active.cut = this.cutBeforeClose(active, error);
       if (active.cut) {
@@ -3469,7 +3628,10 @@ export class ThreadSession {
       // Not settled when the cancel came before the reply closed: the turn stays active and
       // `abandon` ends the reply and releases the turn, as for a close while the turn runs.
       if (!active.cut) {
-        this.settle(active.turn, result, released);
+        // A run has no prompt of its own: it releases the ones it took in, and the owner prompt
+        // that waits behind it is not its.
+        if (active.run) this.releaseTaken(released);
+        else this.settle(active.turn, result, released);
         this.expectUnfoldedReports();
         // A report turn's own reply is `closeReply`'s concern above; this catches every other
         // reply a joint one left stranded.
@@ -3503,6 +3665,31 @@ export class ThreadSession {
    */
   private cutBeforeClose(active: ActiveTurn, error: unknown): boolean {
     return error instanceof Cancelled && this.closedFlag && !active.renderer.closedOut;
+  }
+
+  /** The prompts a run took into itself are answered: nobody waits on them any more. */
+  private releaseTaken(taken: readonly Turn[]): void {
+    for (const turn of taken) {
+      const at = this.sent.indexOf(turn);
+      if (at !== -1) this.sent.splice(at, 1);
+      turn.done.set();
+    }
+    this.settled.set();
+  }
+
+  /**
+   * A run that took an owner's prompt into itself wrote nothing to the card: its words are the
+   * answer to that prompt, in a reply of their own that the owner is told of. The run does not
+   * count among the runs the card showed.
+   */
+  private async answerTakenRun(words: string, signal?: AbortSignal): Promise<void> {
+    this.loopRuns = Math.max(0, this.loopRuns - 1);
+    const reply = this.newReply();
+    if (!blank(words)) await reply.text(words);
+    await reply.finish([], signal);
+    this.workStartedAt ??= this.now();
+    this.footerOwedTo = reply;
+    this.trackLanding(await reply.closeOut(signal), reply);
   }
 
   /**

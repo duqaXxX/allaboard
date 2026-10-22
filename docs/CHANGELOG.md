@@ -21,7 +21,23 @@ All notable changes to this project are documented here. The format follows
 - While a session plans, its footer and the channel's session list show `⏸ plan` in place of
   `⚡ bypass`. `!plan off` returns to the default mode when the owner's settings start the folder
   in plan. A session put in plan and resumed after a restart came back in the settings' mode
-  (measured 2026-10-22, SDK 0.3.304). An input with any other key is shown whole, as before.
+  (measured 2026-10-22, SDK 0.3.304).
+- `!status` in a thread lists the jobs the agent has scheduled (a `/loop`), one `Loop` line each
+  with the cadence in plain words (`every minute`, `every 2 hours`, else the cron as written) and
+  the start of the prompt. The agent seam gains a `scheduled_jobs` event and a `scheduledJobs`
+  capability; the Claude back end reads them from the Stop hook's `session_crons`. A session
+  that holds a scheduled job is no longer closed after an hour idle: the list is believed for 7
+  days after the agent last reported it, the time Claude Code keeps a job.
+- A scheduled run (a turn the agent opens by itself while a job is believed) no longer opens a
+  reply of its own. The thread gets one card, `Scheduled run · every minute · run 14`, that each
+  run rewrites with its final words, so a run notifies nobody; the card shows no tool calls. When
+  the last job is deleted or the 7 days pass, one message says `Scheduled loop ended · 14 runs`.
+  The chat seam gains `ThreadChat.showLoop` and `endLoop` and the capability `loopCard`. When the
+  process goes away (a restart, `!stop`, a lost process) with a recurring job still believed, the
+  one message is `Scheduled loop paused · 14 runs: it resumes with your next message in this
+  thread`; with believed jobs that are all one-shot it is `Scheduled task stopped with the
+  session: Claude Code may restore it with your next message`. The paused and ended messages
+  leave out the count when no run was shown. `!status` lists no loop until the agent reports one again.
 
 ### Fixed
 

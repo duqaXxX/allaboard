@@ -116,6 +116,11 @@ export interface Capabilities {
    * command's own text says when a goal is set or cleared; the event adds what it does not.
    */
   readonly goals: boolean;
+  /**
+   * `scheduled_jobs`: the agent says which jobs it has scheduled to wake the session by itself
+   * (a loop). Without it the daemon knows of none and offers nothing about them.
+   */
+  readonly scheduledJobs: boolean;
 }
 
 /** The agent's own words, which the daemon's texts are filled with. */
@@ -288,6 +293,19 @@ export type GoalChange =
     };
 
 /**
+ * A job the agent scheduled to start a turn of its own later (`scheduled_jobs`): a loop the
+ * owner asked for, a reminder. `prompt` is what the agent runs when it fires, possibly clipped.
+ */
+export interface ScheduledJob {
+  readonly id: string;
+  /** A cron expression (minute hour day month weekday): when the job fires. */
+  readonly schedule: string;
+  /** False for a job that fires once. */
+  readonly recurring: boolean;
+  readonly prompt: string;
+}
+
+/**
  * What a back end tells the core. An event can arrive while no turn of the owner's runs:
  * `turn_ended` is an event like the others, not the answer to `send`.
  *
@@ -454,6 +472,12 @@ export type SessionEvent =
    * agent may say nothing of it again until its next check.
    */
   | { readonly type: "goal_changed"; readonly goal: GoalChange }
+  /**
+   * The jobs the agent has scheduled as of now, whole: the list replaces the one before, and an
+   * empty one says the last job is gone (deleted, fired once, expired). Said when the agent
+   * reports its list, not at the moment a job changes.
+   */
+  | { readonly type: "scheduled_jobs"; readonly jobs: readonly ScheduledJob[] }
   /** The agent took a prompt the core sent: into the running turn, or as the next turn's. */
   | { readonly type: "prompt_taken"; readonly promptId: string }
   /**

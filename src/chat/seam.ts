@@ -165,6 +165,8 @@ export interface ChatCapabilities {
   readonly threadDelete: boolean;
   /** `ChatProvider.suggestCommands`. */
   readonly commandSuggestions: boolean;
+  /** `ThreadChat.showLoop` and `endLoop`: without it a scheduled run is an ordinary reply. */
+  readonly loopCard: boolean;
 }
 
 /**
@@ -215,6 +217,14 @@ export interface RunningAgent {
   readonly calls: number;
   /** The call it is at, or made last, in the words the thread uses for a call. */
   readonly step: string;
+}
+
+/** What the loop card of a thread shows: the latest scheduled run. */
+export interface LoopCard {
+  /** One plain line that says which run this is (`Scheduled run · every minute · run 3`). */
+  readonly label: string;
+  /** The run's final words, Markdown; empty when the run said nothing. */
+  readonly text: string;
 }
 
 /**
@@ -339,6 +349,17 @@ export interface ThreadChat {
    * the chat did not write the line and the reply is still there without it.
    */
   endReply(reply: MessageId, note: string): Promise<boolean>;
+  /**
+   * Shows `card` as the thread's loop card: the first call posts a message, every later one
+   * rewrites that same message, which notifies nobody. Needs `ChatCapabilities.loopCard`. Calls
+   * take effect in the order made. Never rejects.
+   */
+  showLoop(card: LoopCard): Promise<void>;
+  /**
+   * The loop is over: `line` is posted as a new message of the thread, the one push of the loop,
+   * and the card is let go, so a later `showLoop` posts a card anew. Never rejects.
+   */
+  endLoop(line: string): Promise<void>;
   /** The session closed: the activity line is cleared, and nothing is left running. */
   close(): Promise<void>;
 }

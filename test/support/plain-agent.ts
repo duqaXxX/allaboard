@@ -45,6 +45,7 @@ import type {
   QuestionRequest,
   Repository,
   RequestHandler,
+  ScheduledJob,
   SessionEvent,
   StartOptions,
 } from "../../src/agent/seam.ts";
@@ -93,6 +94,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   sessionTags: false,
   sessionTitles: false,
   goals: false,
+  scheduledJobs: false,
 });
 
 /** The two commands of the agent, run by a prompt `/echo text` and `/count text`. */
@@ -129,6 +131,7 @@ export type PlainStep =
   | { readonly effort: string | null }
   | { readonly model: string }
   | { readonly goal: GoalChange }
+  | { readonly jobs: readonly ScheduledJob[] }
   | { readonly hold: true }
   | { readonly die: true };
 
@@ -196,6 +199,14 @@ export function modelSwitched(id: string): PlainStep {
  */
 export function goalChanged(goal: GoalChange): PlainStep {
   return { goal };
+}
+
+/**
+ * The jobs the agent says it has scheduled, as an agent that declares `scheduledJobs` says them:
+ * the plain agent itself declares none, so only a test's variant that does may play it.
+ */
+export function scheduledJobs(jobs: readonly ScheduledJob[]): PlainStep {
+  return { jobs };
 }
 
 /** The turn waits here until `interrupt()` (it ends as `interrupted`) or `release()`. */
@@ -545,6 +556,8 @@ export class PlainSession implements AgentSession {
         this.#push({ type: "model_changed", model: step.model });
       } else if ("goal" in step) {
         this.#push({ type: "goal_changed", goal: step.goal });
+      } else if ("jobs" in step) {
+        this.#push({ type: "scheduled_jobs", jobs: step.jobs });
       } else if ("hold" in step) {
         await orAborted(
           new Promise<void>((resolve) => {

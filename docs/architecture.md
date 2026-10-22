@@ -70,7 +70,7 @@ What crosses the chat seam, in both directions:
 | Crossing | Direction | What |
 |---|---|---|
 | a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `rest`, `last`, `overtaken` and `showFooter`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
-| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the list of what still runs (`showRunning`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
+| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the list of what still runs (`showRunning`), the loop card of scheduled runs (`showLoop`, `endLoop`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice` (which resolves with the id of the message posted, null when the chat cannot say), `say`, `tell`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
 | the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `threadState`, `index`, `openFile`, `tagThread`, `titleThread` and `statusMark` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders, of sessions or the update of allaboard |
@@ -1674,6 +1674,58 @@ messages not sent, whether or not Claude Code had taken it in; its replay is not
   always re-armed synchronously before a lookup is handed to a caller (`SessionManager.get` calls
   `ThreadSession.touch`), so it cannot fire in the gap between a lookup and the caller's own next
   `await` (a download, a slow Slack call).
+- A thread whose agent lists a scheduled job (`ThreadSession.scheduledJobs`, from the
+  `scheduled_jobs` event of an agent that declares `scheduledJobs`) is not closed by the idle
+  close: the agent starts its turns by itself, and a closed process would stop them. The wait goes
+  on hour by hour while the list is believed, that is for `constants.LOOPS_BELIEVED_SECONDS` (7
+  days, the time Claude Code keeps a job) after the agent last listed it, since the list is
+  reported only when a turn ends and a job that expired says nothing. The list is kept in memory
+  only, and `!status` shows it.
+
+### Scheduled runs and the loop card
+
+- A turn the agent opens with no owner prompt behind it and no task end to report, while a
+  scheduled job is believed (`ThreadSession.opensRun`), is a scheduled run. The agent marks it
+  nowhere (`origin` is absent, measured 2026-10-19), so nothing else tells it from an owner's
+  turn. It runs through the same start and end of a turn as any other, with a `LoopReply`
+  (`core/reply/loop-card.ts`) as its reply: the renderer feeds it, it keeps the words and drops
+  the calls, and it writes them with `ThreadChat.showLoop` when the turn's body ends. A run moves
+  no status reaction, owes no footer and starts no timing of work, and its end releases no prompt
+  (`ActiveTurn.run`). An approval or a question a run asks goes the normal way.
+- A turn is not taken for a run when a prompt of the owner's was replayed since the last turn
+  started (`promptReplayed`: Claude Code runs it in a turn of its own after a cron took the turn
+  that was guessed to be its), when a background task runs, or when a report was given up on
+  since the last turn (`reportGivenUp`: it may arrive late): it is an ordinary reply, the safe
+  way to be wrong.
+- A prompt Claude Code folds into a running run makes the turn the owner's: the prompt is released
+  at the run's end, its answer is written to a reply of the owner's own with the footer owed
+  to it, the card is not written for that run, and the run is not counted.
+- A run that left the root at work (it asked for an approval) settles the status at its end as a
+  turn does.
+- One card per session, whatever the jobs. The first run posts it and each later run rewrites the
+  same message (`chat.update` in the Slack provider, which notifies nobody). Its label is
+  `Scheduled run · <cadence> · run N` when exactly one job is believed and `Scheduled run · run N`
+  with several, since a run names no job. `ThreadSession.loopRuns` counts the runs.
+- The card shows the run's final words (the result's text, else what was written), the end of
+  them when they are too long. Its body is written once, when the turn's body ends.
+- The loop ends when the believed list is empty and no turn is active, a run or an owner's
+  (`ThreadSession.endLoopIfOver`, called at every turn's end and when the list arrives):
+  `ThreadChat.endLoop` posts one new message, `Scheduled loop ended · N runs`, the only push of the
+  loop, and lets the card go. The same message ends it when the session closes after the believed
+  list expired. When the process goes away while a job is still believed (a close, a restart, a
+  stop that ends the process, a lost process) and one of them is recurring, which Claude Code
+  restores on resume (scheduled tasks documentation, read 2026-10-23), the message is `Scheduled
+  loop paused · N runs: it resumes with your next message in this thread` instead. When the
+  believed jobs are all one-shot it is `Scheduled task stopped with the session: Claude Code may
+  restore it with your next message`: the documentation restores a one-shot task whose time has
+  not passed and not a self-paced loop's wakeup, and the daemon cannot tell the two apart. The
+  jobs and the count are forgotten in each case (`ThreadSession.leaveLoop`). The paused and ended
+  messages leave out ` · N runs` when no run was shown. After a lost process the message is said
+  once the lost run's card is closed, even if closing it failed, so it is the thread's last
+  message. Neither the card nor the count is stored: after a restart
+  the next run posts a card and counts from 1.
+- A chat that declares no `loopCard` shows a run as an ordinary reply. A run that arrives while
+  an owner prompt is queued is taken for that prompt's turn.
 - A level set with `/effort` does not survive Claude Code's own `--resume` by itself, unlike the
   model (`/model`), so the daemon stores it per thread and passes it back as the effort of
   `StartOptions` at every start (`ThreadSession.connect`). It is read from `state.json` before each

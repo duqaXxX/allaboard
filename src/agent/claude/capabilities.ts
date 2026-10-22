@@ -37,4 +37,6 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   sessionTitles: true,
   // The `goal_status` entries a session store receives (`goals.ts`).
   goals: true,
+  // `session_crons` of the Stop hook's input (`hooks.ts`).
+  scheduledJobs: true,
 });
