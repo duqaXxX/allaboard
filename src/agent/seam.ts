@@ -494,6 +494,21 @@ export type SessionEvent =
       readonly parentCallId: string | null;
     }
   /**
+   * The model refused a request. `fallbackModel` is the model that answers instead, or null
+   * when none did. `text` is the agent's own sentence about it, which can be empty. `retracted`:
+   * the agent withdrew what the refused attempt had written, and the reply still holds it.
+   * Said when the agent decides, so a switch of the session's model (`model_changed`) follows
+   * it. A refusal says which attempt it concerns by position only: it carries no call.
+   */
+  | {
+      readonly type: "model_refused";
+      readonly text: string;
+      readonly originalModel: string;
+      readonly fallbackModel: string | null;
+      readonly category: string | null;
+      readonly retracted: boolean;
+    }
+  /**
    * The agent's process is gone and the core did not close it. The last event of the session:
    * `events` ends after it. `reason` is shown to the owner as the error's name: the back end's
    * own words for a process that exited, or the name of the failure that ended the stream,

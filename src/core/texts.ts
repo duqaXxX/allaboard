@@ -335,6 +335,12 @@ export const TASKS_LAUNCHED = "**{n} background tasks launched**";
 export const TASKS_LAUNCHED_BRANCH = "├ {description}";
 export const TASKS_LAUNCHED_LAST = "└ {description}";
 export const PROMPT_IMAGE = "an image";
+// A refusal in the reply: the agent's own words behind the mark, or the sentence built from
+// what it said when it gave none; and the mark of what the refused attempt left in the reply.
+export const REFUSED_MARK = "⚠️ ";
+export const REFUSED_NO_FALLBACK =
+  "{model} refused this request{category}; no other model answered.";
+export const REFUSED_RETRACTED = "↩ Retracted: the {model} attempt above.";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";
 // A goal's lines in its reply, in the terminal's words (captured 2026-10-20, Claude Code 2.1.303).

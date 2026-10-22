@@ -5,6 +5,19 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- The reply shows when a model refuses a request. When Claude Code retries on another model, the
+  reply carries Claude Code's own sentence as a quoted warning (`> ⚠️ Opus 5.5's safeguards
+  flagged this session. …`), and the footer and `!status` name the model that answers from then
+  on. When no model answers, the line reads `<model> refused this request (<category>); no other
+  model answered.` unless Claude Code wrote words of its own. What the refused attempt had
+  already written stays in the reply, followed by `↩ Retracted: the <model> attempt above.`: the
+  terminal removes it, a reply cannot (`docs/limits.md`). The new agent seam event is
+  `model_refused`; `model_refusal_fallback` and `model_refusal_no_fallback` were declared by the
+  SDK and not read before. Their recordings, `model-refusal-fallback.jsonl` and
+  `model-refusal-no-fallback.jsonl`, are written by hand to the `sdk.d.ts` 0.3.304 shape.
+
 ### Fixed
 
 - The channel's `✅ Done:` line names a thread by its title once the root shows one. It read the

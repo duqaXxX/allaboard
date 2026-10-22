@@ -13,6 +13,7 @@ export const TURN_EVENTS: ReadonlySet<SessionEventType> = new Set([
   "call_started",
   "call_ended",
   "agent_error",
+  "model_refused",
   "turn_ended",
 ]);
 export const TASK_EVENTS: ReadonlySet<SessionEventType> = new Set([

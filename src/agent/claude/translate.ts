@@ -295,6 +295,46 @@ function agentModel(memory: Memory, result: unknown): string | null {
   return ran === memory.mainModel ? null : ran;
 }
 
+// Refusals. A fallback of "local" scope (a subagent, a side question, a fork) leaves the
+// session's model alone; an absent scope is an older CLI's, and means the session's.
+// `direction` is not read: `sdk.d.ts` 0.3.304 says "revert" and "sticky" are no longer emitted,
+// so every fallback emitted is a "retry".
+function refusalFallback(_memory: Memory, record: WireRecord): SessionEvent[] {
+  const originalModel = words(record.original_model);
+  const fallbackModel = words(record.fallback_model);
+  if (originalModel === null || fallbackModel === null) return [];
+  const retracted = Array.isArray(record.retracted_message_uuids)
+    ? record.retracted_message_uuids.length > 0
+    : false;
+  const events: SessionEvent[] = [
+    {
+      type: "model_refused",
+      text: string(record.content) ?? "",
+      originalModel,
+      fallbackModel,
+      category: words(record.api_refusal_category),
+      retracted,
+    },
+  ];
+  if (record.scope !== "local") events.push({ type: "model_changed", model: fallbackModel });
+  return events;
+}
+
+function refusalNoFallback(_memory: Memory, record: WireRecord): SessionEvent[] {
+  const originalModel = words(record.original_model);
+  if (originalModel === null) return [];
+  return [
+    {
+      type: "model_refused",
+      text: string(record.content) ?? "",
+      originalModel,
+      fallbackModel: null,
+      category: words(record.api_refusal_category),
+      retracted: false,
+    },
+  ];
+}
+
 function user(memory: Memory, record: WireRecord): SessionEvent[] {
   const promptId = string(record.uuid);
   if (promptId !== null && memory.sent.has(promptId)) {
@@ -563,6 +603,8 @@ const HANDLERS = {
   "stream_event:message_stop": messageStop,
   "system:compact_boundary": compactBoundary,
   "system:init": init,
+  "system:model_refusal_fallback": refusalFallback,
+  "system:model_refusal_no_fallback": refusalNoFallback,
   "system:session_state_changed": sessionState,
   "system:status": status,
   "system:task_notification": taskNotification,
