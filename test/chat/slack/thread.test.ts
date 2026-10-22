@@ -8,7 +8,9 @@ import assert from "node:assert/strict";
 import { beforeEach, mock, test } from "node:test";
 import type { PermissionRequest, QuestionRequest } from "../../../src/agent/seam.ts";
 import { ChatError, type SessionStatus } from "../../../src/chat/seam.ts";
+import type { ChannelLine } from "../../../src/chat/slack/channel-line.ts";
 import type { Limiter } from "../../../src/chat/slack/reply/limiter.ts";
+import type { ReplySink } from "../../../src/chat/slack/reply/sinks.ts";
 import {
   resetStatusFlags,
   logger as statusLogger,
@@ -65,7 +67,7 @@ interface Made {
   readonly thread: SlackThread;
 }
 
-function made(options: { replies?: FakeSlack } = {}): Made {
+function made(options: { replies?: FakeSlack; line?: ChannelLine } = {}): Made {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const limiter = new CountingLimiter(slack);
@@ -77,6 +79,7 @@ function made(options: { replies?: FakeSlack } = {}): Made {
     agent: () => AGENT,
     limiter,
     clock,
+    ...(options.line !== undefined && { line: options.line }),
   });
   return { slack, clock, limiter, chat, thread: chat.thread({ channel: CHANNEL, thread: THREAD }) };
 }
@@ -173,6 +176,33 @@ test("a write of a reply sets the thread status again", async () => {
   await thread.close();
   assert.equal(slack.callsTo("assistant.threads.setStatus").at(-1)?.status, "");
 });
+
+/** A line that records which threads it was asked to name. */
+function recordingLine(): { line: ChannelLine; shown: [string, string][] } {
+  const shown: [string, string][] = [];
+  const line = { show: async (channel: string, root: string) => void shown.push([channel, root]) };
+  return { line: line as unknown as ChannelLine, shown };
+}
+
+for (const [status, named] of [
+  ["done", true],
+  ["error", false],
+] as const) {
+  test(`a reply's footer moves the channel's line only for work that ended well [${status}]`, async () => {
+    // #34: a footer is drawn on a stop, an error and a shutdown too; the line says Done.
+    const { line, shown } = recordingLine();
+    const { thread } = made({ line });
+    const reply = thread.openReply(() => {});
+    await reply.text("hello");
+    await reply.finish([]);
+    await reply.closeOut();
+    await thread.showStatus(status);
+    // The footer's own drawing has its tests in the sink's: here, only that one was written.
+    const sink = reply as unknown as ReplySink;
+    assert.equal(await sink.showFooterFormatted("main · ctx 6%"), true);
+    assert.deepEqual(shown, named ? [[CHANNEL, THREAD]] : []);
+  });
+}
 
 test("a message posted outside the session sets the thread status again", async () => {
   const { slack, clock, thread } = made();

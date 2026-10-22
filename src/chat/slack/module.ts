@@ -22,6 +22,7 @@ import type { Fetch } from "./app/answers.ts";
 import { socketReceiver } from "./app/app.ts";
 import { ChannelGuard, type Identity } from "./app/guards.ts";
 import { prepareUploads } from "./attachments.ts";
+import { ChannelLine } from "./channel-line.ts";
 import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
 import { type ProbeClient, slackSetup } from "./onboarding.ts";
@@ -288,6 +289,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     steady: context.steady,
     agent: () => context.core().agent,
     ...(roots !== null && { roots, canTag: canTag(owner) }),
+    line: new ChannelLine(slack, { botUserId: identity.botUserId }),
     app: {
       core: () => context.core(),
       config: { botToken, allowedRoot: context.allowedRoot },

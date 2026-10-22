@@ -155,6 +155,7 @@ interface ReplyOptions {
   steady?: FakeClock;
   onOpenReply?: (old: string | null, fresh: string | null) => void;
   onWrite?: () => void;
+  onFooter?: () => void;
   logger?: Logger;
   /** Zero unless a test is about the debounce itself. */
   debounceSeconds?: number;
@@ -179,6 +180,7 @@ function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
     ...(options.steady !== undefined && { steady: options.steady }),
     onOpenReply: options.onOpenReply,
     onWrite: options.onWrite,
+    ...(options.onFooter !== undefined && { onFooter: options.onFooter }),
     logger: options.logger ?? new Recorded(),
     debounceSeconds: options.debounceSeconds ?? 0,
     finalRetrySeconds: options.finalRetrySeconds,
@@ -526,6 +528,32 @@ test("the end stops the stream in one push, and the footer follows by a silent e
     { type: "context", elements: [{ type: "mrkdwn", text: "main · ctx 6%" }] },
   ]);
   assert.equal(slack.pushes(), 1);
+});
+
+test("the first footer written, and only it, tells the thread the work is done", async () => {
+  // #34: the channel's line moves to the bottom then, not while a turn or a request still goes on.
+  const slack = new FakeSlack();
+  let told = 0;
+  const sink = reply(slack, { onFooter: () => (told += 1) });
+  await sink.text("Done.");
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.equal(told, 0);
+  assert.equal(await sink.showFooterFormatted("main · ctx 6%"), true);
+  assert.equal(await sink.showFooterFormatted("main · ctx 6%"), true);
+  assert.equal(told, 1);
+});
+
+test("a footer that could not be written tells nothing", async () => {
+  const slack = new FakeSlack();
+  let told = 0;
+  const sink = reply(slack, { onFooter: () => (told += 1) });
+  await sink.text("Done.");
+  await sink.finish([]);
+  await sink.closeOut();
+  slack.responses["chat.update"] = rejected("ratelimited");
+  assert.equal(await sink.showFooterFormatted("main · ctx 6%"), false);
+  assert.equal(told, 0);
 });
 
 test("a reply that ends before its first write starts and stops its stream", async () => {
