@@ -462,6 +462,19 @@ export const UNTRUSTED_MORE = "…and {count} more.";
 export const ACTIVITY_IDLE = "idle";
 export const VERSION_PENDING = "started, version shown after the first turn";
 export const STATUS_BACKGROUND = "Background: `{counts}`";
+// The loop card's label for a run, and the one message that says the loop is over.
+export const LOOP_RUN = "Scheduled run · {cadence} · run {run}";
+export const LOOP_RUN_MANY = "Scheduled run · run {run}";
+// `{runs}` is ` · 1 run` or ` · 14 runs`, and nothing when no run was shown.
+export const LOOP_ENDED = "Scheduled loop ended{runs}";
+// Said when no job believed is recurring: a one-shot reminder is restored on resume and a
+// self-paced loop's pending wakeup is not, and the two cannot be told apart.
+export const LOOP_STOPPED = new Named(
+  "Scheduled task stopped with the session: {agent} may restore it with your next message",
+);
+export const LOOP_PAUSED =
+  "Scheduled loop paused{runs}: it resumes with your next message in this thread";
+export const STATUS_LOOP = "Loop `{cadence}`: {prompt}";
 export const STATUS_WORKING = "Working in: `{directory}`";
 // The count `!status` adds to a session's row.
 export const RUNNING = "⏳ {counts}";

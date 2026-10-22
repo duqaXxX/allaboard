@@ -54,6 +54,13 @@ export const DRAIN_POLL_SECONDS = 0.5;
 // A session's agent process closes after this long with nothing to do (idle, and no approval,
 // question or background report pending); the next message rebuilds it and resumes.
 export const IDLE_CLOSE_SECONDS = 3600.0;
+// How long a scheduled-jobs list the agent reported stays believed with no new report: the
+// agent drops a job after 7 days (Claude Code's scheduled tasks documentation), and the list
+// is reported only when a turn ends, so one that expired in silence would keep the session open
+// for good.
+export const LOOPS_BELIEVED_SECONDS = 7 * 24 * 3600.0;
+// How much of a job's prompt `!status` shows.
+export const LOOP_PROMPT_LIMIT = 60;
 // The one hold a thread can have open at once, in the session's waiting set alongside real
 // approval ids (`waitingForOwner` and the idle-close timer treat every entry the same).
 export const HOLD_MARKER = "d8-hold";

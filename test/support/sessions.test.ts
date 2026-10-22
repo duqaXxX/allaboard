@@ -124,6 +124,7 @@ test("a request waits for the cores answer before the stream goes on", async () 
   // The Stop hook's input, as the back end reads it, then the end of the stream.
   assert.deepEqual(events, [
     { type: "effort_observed", level: "medium" },
+    { type: "scheduled_jobs", jobs: [] },
     { type: "folder_changed", folder: "/home/dev/project" },
     { type: "process_lost", reason: "the Claude Code process exited" },
   ]);
