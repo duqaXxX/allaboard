@@ -49,6 +49,7 @@ import { type BuiltApp, buildApp } from "./app/app.ts";
 import type { ChannelGuard } from "./app/guards.ts";
 import { threadKey } from "./app/order.ts";
 import { SlackChannel } from "./channel.ts";
+import type { ChannelLine } from "./channel-line.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
 import type { ThreadDeletion } from "./delete.ts";
 import { holdBlocks } from "./hold.ts";
@@ -61,7 +62,7 @@ import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
-import { REACTIONS, StatusReaction, ThreadStatus } from "./reply/status.ts";
+import { REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 import type { RootEditor } from "./tag.ts";
@@ -149,6 +150,11 @@ export interface SlackChatOptions {
   readonly roots?: RootEditor;
   /** Whether the token can pin, which tags need and titles do not (`module.canTag`). */
   readonly canTag?: boolean;
+  /**
+   * Moves the channel's line to the bottom once a reply's footer is written (`channel-line`), so
+   * the channel shows as unread. Absent in a test of the threads alone.
+   */
+  readonly line?: ChannelLine;
 }
 
 /** The emoji of each root reaction (`REACTIONS`), as a character. */
@@ -534,6 +540,15 @@ export class SlackThread implements ThreadChat {
       ...(this.options.steady !== undefined && { steady: this.options.steady }),
       onOpenReply: onOpenMessage,
       onWrite: () => this.line.wrote(),
+      ...(this.options.line !== undefined && {
+        // Only for work that ended well: a footer is drawn on a stop, an error or a shutdown too,
+        // and the line says the work is done.
+        onFooter: () => {
+          if (this.reaction.wanted === Status.DONE) {
+            void this.options.line?.show(this.channel, this.threadTs);
+          }
+        },
+      }),
       places,
       ...(this.options.debounceSeconds !== undefined && {
         debounceSeconds: this.options.debounceSeconds,

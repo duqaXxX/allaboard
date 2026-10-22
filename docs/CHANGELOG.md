@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Once a session's work is done and ended well, its channel shows as unread in the Slack sidebar: the bot posts
+  one line at the bottom of the channel, `✅ Done:` with a link to the thread, and deletes the
+  line it posted before, so the channel holds one such line at most. A reply inside a thread left
+  the channel as read.
 - While a restart waits for a session's thread, the thread's root shows 🔄 in place of ⏳, so the
   channel's own view says the daemon is restarting, not only the thread. A reaction on the owner's
   message notifies nobody; once the session closes, the root shows ✅ or ❌ as before.

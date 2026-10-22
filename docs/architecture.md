@@ -376,7 +376,8 @@ reaches an agent or a chat.
 4. It builds the selected chat from the registry (for Slack, `module.slackChat`, whose `build`
    reads the core only once it is used): the two Slack clients (`module.makeClients`: `clients.sharedClient` for every call but a
    reply's, `clients.repliesClient` for replies), `auth.test` for the workspace id and the bot
-   user id, the `SlackChat` with the shared `UpdateLimiter`, the `ThreadDeleter` when the owner's
+   user id, the `SlackChat` with the shared `UpdateLimiter` and the channels' `ChannelLine` (see the Slack
+   provider's "Pushes and threads"), the `ThreadDeleter` when the owner's
    user token is configured (`module.deleter`, which calls `auth.test` with that token), the
    `Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
    "Attached files"). The provider's `ChatProvider.identities` (for Slack two keys: the workspace and the bot,

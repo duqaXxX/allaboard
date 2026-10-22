@@ -414,6 +414,20 @@ stop) is tried once more after
 (`ThreadSession.trackLanding`), shows ❌ if the retry fails too, and keeps the persisted status so
 the next start's repair still finds the reply.
 
+
+A reply in a thread leaves its channel as read in the sidebar: Slack marks a channel unread only
+for a top-level message of someone else's, and a reply, a mention or a reaction in a thread, an
+edit and the owner's own messages all leave it as read (measured on a dev app on 2026-10-22).
+Once a session's work is done and ended well (its reply's first footer is written,
+`ReplySink.showFooterFormatted`, while its root's status is ✅; a footer drawn on a stop, an
+error or a shutdown moves nothing), `channel-line.ChannelLine` posts one line at the top level,
+`✅ Done:` and a link to the thread named by its first line (`channel-line.lineLabel`), and then
+deletes the line it posted before, so the channel holds one such line at most, shows bold and
+opens at the bottom. The line is found again by its message metadata (`channel-line.LINE_EVENT`):
+the one this run posted is remembered per channel, and after a start the channel's latest
+`channel-line.HISTORY_LIMIT` messages are read for any an earlier run left. The changes of one
+channel run one at a time, an old line a delete failed for is deleted at the next change, and a
+failure is logged and changes nothing else.
 ## Opening a file
 
 `!open` shares a file of a session's folder into its thread, where Slack shows it in its own file
