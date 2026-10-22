@@ -1851,7 +1851,13 @@ test("a fallback shows the agent's words as a quoted warning, and keeps the refu
   assert.ok(refused !== -1, "the retracted text stays");
   assert.ok(refused < warning && warning < answer, "in the order it happened");
   assert.ok(reply.includes("\n>\n> Details: `[cyber]`"), "every line of the words is quoted");
-  assert.ok(reply.includes("https://support.claude.com/en/articles/8106465"), "verbatim");
+  const [refusal] = eventsOf(recordedEvents("model-refusal-fallback"), "model_refused");
+  assert.ok(refusal);
+  const quoted = refusal.text
+    .split("\n")
+    .map((line, i) => (i === 0 ? `> ⚠️ ${line}` : line ? `> ${line}` : ">"))
+    .join("\n");
+  assert.ok(reply.includes(quoted), "verbatim, link included");
 });
 
 test("a fallback that retracted something marks it, naming the model", async () => {
