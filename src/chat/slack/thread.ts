@@ -222,9 +222,9 @@ export class SlackChat implements ChatProvider {
     if (home !== undefined) this.index = { refresh: (changed) => home.request(changed) };
     const roots = options.roots;
     // The root may have changed even when a later step failed: the Home reads it again.
-    const rereading = async (ref: ThreadRef, edit: () => Promise<void>): Promise<void> => {
+    const rereading = async <T>(ref: ThreadRef, edit: () => Promise<T>): Promise<T> => {
       try {
-        await edit();
+        return await edit();
       } finally {
         this.index?.refresh([ref]);
       }
@@ -236,7 +236,9 @@ export class SlackChat implements ChatProvider {
       this.titleThread = async (ref, title, keep) => {
         // A title resolving after the stop began touches neither Slack nor the state.
         if (this.stopped.aborted) return;
-        await rereading(ref, () => roots.title(ref.channel, ref.thread, title, keep));
+        const text = await rereading(ref, () => roots.title(ref.channel, ref.thread, title, keep));
+        // The channel's line may have read the root before this title reached it.
+        if (!this.stopped.aborted) void options.line?.retitle(ref.channel, ref.thread, text);
       };
     }
     if (options.app?.deletion !== undefined) {

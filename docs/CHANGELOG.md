@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- The channel's `✅ Done:` line names a thread by its title once the root shows one. It read the
+  root at the turn's end, often before the title reached it, and kept the owner's first words; it
+  is now edited when the thread's title is written or changed with `!rename`.
+
 ## [0.8.0] - 2026-10-22
 
 ### Added

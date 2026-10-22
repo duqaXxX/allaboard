@@ -46,6 +46,90 @@ test("a done thread's line is posted at the bottom, linking the thread by its ti
   assert.deepEqual(posted?.metadata, { event_type: LINE_EVENT, event_payload: {} });
 });
 
+// #43: the line read the root before the session's title reached it, and kept the owner's words.
+test("a line posted before the thread's title names the thread by it once the root shows it", async () => {
+  const fake = slack();
+  fake.responses["conversations.replies"] = {
+    ok: true,
+    messages: [{ ts: ROOT, user: "U000ALICE", text: "the login page answers 500, fix it" }],
+  };
+  fake.responses["chat.update"] = { ok: true };
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  // Asked at once, as at a turn's end: the footer's line first, the title a moment later.
+  await Promise.all([
+    lines.show(CHANNEL, ROOT),
+    lines.retitle(CHANNEL, ROOT, "*Fix the login page*"),
+  ]);
+  assert.equal(
+    fake.callsTo("chat.postMessage")[0]?.text,
+    "Done: the login page answers 500, fix it",
+  );
+  const [updated, ...more] = fake.callsTo("chat.update");
+  assert.deepEqual(more, []);
+  assert.equal(updated?.channel, CHANNEL);
+  assert.equal(updated?.ts, fake.createdTs[0]);
+  assert.equal(updated?.text, "Done: Fix the login page");
+  assert.deepEqual(updated?.blocks, [
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `✅ Done: <${LINK}|Fix the login page>` }],
+    },
+  ]);
+});
+
+test("a title the line already shows, of another thread, or with no line, edits nothing", async () => {
+  const fake = slack();
+  fake.responses["conversations.replies"] = {
+    ok: true,
+    messages: [{ ts: ROOT, user: "U000ALICE", text: "`[web]` *Fix `parse_args` in cli.py*" }],
+  };
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  await lines.retitle(CHANNEL, ROOT, "*Fix `parse_args` in cli.py*");
+  await lines.show(CHANNEL, ROOT);
+  // The root's text names the thread as the line read it, its tag and marks aside.
+  await lines.retitle(CHANNEL, ROOT, "`[web]` *Fix `parse_args` in cli.py*");
+  await lines.retitle(CHANNEL, ROOT, "*Fix `parse_args` in cli.py*");
+  await lines.retitle(CHANNEL, "1792626999.000001", "*Another thread*");
+  await lines.retitle("C000OTHER", ROOT, "*Fix `parse_args` in cli.py*");
+  assert.deepEqual(fake.callsTo("chat.update"), []);
+});
+
+test("a renamed line is renamed again by a later title, and a refused edit is only logged", async () => {
+  const fake = slack();
+  fake.responses["chat.update"] = [{ ok: true }, rejected("ratelimited"), { ok: true }];
+  const said: string[] = [];
+  const lines = new ChannelLine(fake, {
+    botUserId: BOT,
+    logger: { warning: (text: string) => said.push(text) } as never,
+  });
+  await lines.show(CHANNEL, ROOT);
+  await lines.retitle(CHANNEL, ROOT, "*Login page fix*");
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  // Refused: the line still says what it said, and the same words asked again edit it.
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  assert.deepEqual(
+    fake.callsTo("chat.update").map((call) => call.text),
+    ["Done: Login page fix", "Done: Login fix", "Done: Login fix"],
+  );
+  assert.equal(said.length, 1);
+  assert.ok(said[0]?.includes("ratelimited"), said[0]);
+});
+
+test("a line deleted by hand is not edited again", async () => {
+  const fake = slack();
+  fake.responses["chat.update"] = rejected("message_not_found");
+  const said: string[] = [];
+  const lines = new ChannelLine(fake, {
+    botUserId: BOT,
+    logger: { warning: (text: string) => said.push(text) } as never,
+  });
+  await lines.show(CHANNEL, ROOT);
+  await lines.retitle(CHANNEL, ROOT, "*Login page fix*");
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  assert.equal(fake.callsTo("chat.update").length, 1);
+  assert.deepEqual(said, []);
+});
+
 test("the next line replaces the one before, which goes only once the new one is there", async () => {
   const fake = slack();
   const lines = new ChannelLine(fake, { botUserId: BOT });

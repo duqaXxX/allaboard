@@ -263,15 +263,16 @@ export class RootEditor {
    * own words leave the root. In one queued task it reads the root once, hands `keep` the words
    * the root held in the form the agent receives a message (`slackUnescape` of the root's `text`,
    * the tag left out) and waits for it, and only then edits; when `keep` throws nothing is edited.
-   * Nothing is sent when the root already reads as asked. Rejects with a `ChatError` carrying
-   * Slack's code when a call was refused, `permanent` when the refusal cannot change.
+   * Nothing is sent when the root already reads as asked. Resolves with the root's text as it now
+   * reads. Rejects with a `ChatError` carrying Slack's code when a call was refused, `permanent`
+   * when the refusal cannot change.
    */
   title(
     channel: string,
     thread: string,
     title: string,
     keep?: (text: string) => void | Promise<void>,
-  ): Promise<void> {
+  ): Promise<string> {
     // One line: a newline in the title would end the bold element's line early.
     const line = title.replace(/\s+/g, " ").trim();
     return this.#serially(channel, thread, async () => {
@@ -281,21 +282,23 @@ export class RootEditor {
         const text = typeof root.text === "string" ? root.text : "";
         await keep(slackUnescape(retaggedText(text, null)));
       }
+      const text = retitledText(line, tag);
       await permanently(() =>
         this.#edit(channel, thread, root, {
-          text: () => retitledText(line, tag),
+          text: () => text,
           blocks: (blocks) => retitledBlocks(blocks, line, tag),
         }),
       );
+      return text;
     });
   }
 
   /** Runs `work` after the edits of the same root asked before it, and wraps its failure. */
-  #serially(channel: string, thread: string, work: () => Promise<void>): Promise<void> {
+  #serially<T>(channel: string, thread: string, work: () => Promise<T>): Promise<T> {
     const key = `${channel}/${thread}`;
     const run = (this.#tails.get(key) ?? Promise.resolve()).then(async () => {
       try {
-        await work();
+        return await work();
       } catch (error) {
         if (error instanceof ChatError) throw error;
         throw new ChatError(describe(error), { cause: error });
