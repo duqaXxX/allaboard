@@ -237,6 +237,9 @@ const REQUESTS: ReadonlyArray<{
   },
 ];
 
+// A scheduled run's end: 22:18 UTC on a fixed day.
+const AT = Date.UTC(2026, 9, 23, 22, 18);
+
 const FOOTER: FooterFields = {
   bypass: false,
   planning: false,
@@ -1064,13 +1067,20 @@ export function chatConformance(
         const before = rig.read(ref).length;
         await thread.showLoop({
           label: "Scheduled run · every minute · run 1",
+          at: AT,
           text: "build green",
+          footer: null,
         });
         await rig.settle();
         const first = rig.read(ref).slice(before);
         assert.equal(first.length, 1, "the first run posts one message");
         assert.ok(first[0]?.text.includes("run 1") && first[0].text.includes("build green"));
-        await thread.showLoop({ label: "Scheduled run · every minute · run 2", text: "build red" });
+        await thread.showLoop({
+          label: "Scheduled run · every minute · run 2",
+          at: AT,
+          text: "build red",
+          footer: null,
+        });
         await rig.settle();
         const second = rig.read(ref).slice(before);
         assert.equal(second.length, 1, "the next run edits it");
@@ -1079,8 +1089,53 @@ export function chatConformance(
         assert.ok(!second[0]?.text.includes("build green"));
       });
 
+      gated(
+        "carries the footer of the latest run, rewritten with each run",
+        "loopCard",
+        async ({ rig, provider, ref }) => {
+          const thread = provider.thread(ref);
+          const before = rig.read(ref).length;
+          await thread.showLoop({
+            label: "Scheduled run · run 1",
+            at: AT,
+            text: "one",
+            footer: { ...FOOTER, model: "model-one", sessionTokens: 1500 },
+          });
+          await rig.settle();
+          const first = rig.read(ref).slice(before);
+          assert.equal(first.length, 1);
+          assert.ok(first[0]?.text.includes("one") && first[0].text.includes("model-one"));
+          await thread.showLoop({
+            label: "Scheduled run · run 2",
+            at: AT,
+            text: "two",
+            footer: { ...FOOTER, model: "model-two", sessionTokens: 4000 },
+          });
+          await rig.settle();
+          const second = rig.read(ref).slice(before);
+          assert.equal(second.length, 1, "the footer is rewritten with the card: no new message");
+          assert.equal(second[0]?.id, first[0]?.id);
+          assert.ok(second[0]?.text.includes("model-two"));
+          assert.ok(!second[0]?.text.includes("model-one"), "the earlier run's footer is gone");
+        },
+      );
+
+      gated(
+        "shows the time of the run beside the label",
+        "loopCard",
+        async ({ rig, provider, ref }) => {
+          await provider
+            .thread(ref)
+            .showLoop({ label: "Scheduled run · run 1", at: AT, text: "", footer: null });
+          await rig.settle();
+          assert.ok(rig.read(ref).some((m) => /Scheduled run · run 1 · \S/.test(m.text)));
+        },
+      );
+
       gated("an empty run still shows its label", "loopCard", async ({ rig, provider, ref }) => {
-        await provider.thread(ref).showLoop({ label: "Scheduled run · run 1", text: "" });
+        await provider
+          .thread(ref)
+          .showLoop({ label: "Scheduled run · run 1", at: AT, text: "", footer: null });
         await rig.settle();
         assert.ok(rig.read(ref).some((m) => m.text.includes("Scheduled run · run 1")));
       });
@@ -1091,14 +1146,24 @@ export function chatConformance(
         async ({ rig, provider, ref }) => {
           const thread = provider.thread(ref);
           const before = rig.read(ref).length;
-          await thread.showLoop({ label: "Scheduled run · run 1", text: "one" });
+          await thread.showLoop({
+            label: "Scheduled run · run 1",
+            at: AT,
+            text: "one",
+            footer: null,
+          });
           await thread.endLoop("Scheduled loop ended · 1 run");
           await rig.settle();
           const shown = rig.read(ref).slice(before);
           assert.equal(shown.length, 2);
           assert.ok(shown[0]?.text.includes("run 1") && !shown[0].text.includes("ended"));
           assert.ok(shown[1]?.text.includes("Scheduled loop ended · 1 run"));
-          await thread.showLoop({ label: "Scheduled run · run 1", text: "again" });
+          await thread.showLoop({
+            label: "Scheduled run · run 1",
+            at: AT,
+            text: "again",
+            footer: null,
+          });
           await rig.settle();
           assert.equal(rig.read(ref).slice(before).length, 3, "a later run posts a card anew");
         },
@@ -1107,7 +1172,7 @@ export function chatConformance(
       gated("never rejects when the chat refuses", "loopCard", async ({ rig, provider, ref }) => {
         const thread = provider.thread(ref);
         rig.refuseWrites();
-        await thread.showLoop({ label: "Scheduled run · run 1", text: "x" });
+        await thread.showLoop({ label: "Scheduled run · run 1", at: AT, text: "x", footer: null });
         await thread.endLoop("Scheduled loop ended · 1 run");
       });
     });

@@ -371,7 +371,10 @@ class MemoryThread implements ThreadChat {
   }
 
   async showLoop(card: LoopCard): Promise<void> {
-    const text = card.text === "" ? card.label : `${card.label}\n${card.text}`;
+    // The time as the memory chat draws any moment: fixed, in UTC, so that a test can read it.
+    const label = `${card.label} · ${new Date(card.at).toISOString().slice(11, 16)} UTC`;
+    const footer = card.footer === null ? "" : footerLine(card.footer);
+    const text = [label, card.text, footer].filter((part) => part !== "").join("\n");
     const cards = loopCards.get(this.#room) ?? new Map<string, StoredMessage>();
     loopCards.set(this.#room, cards);
     const key = `${this.#ref.channel}/${this.#ref.thread}`;

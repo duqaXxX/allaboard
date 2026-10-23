@@ -3197,7 +3197,7 @@ export class ThreadSession {
     let openingAside = false;
     if (run) {
       this.loopRuns += 1;
-      renderer = this.newRenderer(new LoopReply(this.thread, this.runLabel()));
+      renderer = this.newRenderer(new LoopReply(this.thread, this.runLabel(), this.now()));
     } else if (turn === null) {
       this.notificationWaits = false;
       // A report turn renders into the reply that started a task it reports, so no new message
@@ -3230,6 +3230,7 @@ export class ThreadSession {
       takenNoted: false,
       unanswered: null,
       run,
+      startedAt: this.now(),
     };
     this.active = active;
     // A run is no work of the owner's: it is timed and footed by no one.
@@ -3614,6 +3615,7 @@ export class ThreadSession {
       if (card instanceof LoopReply) {
         card.setFinal(result.finalText);
         if (handedOver) handed = card.takeOver();
+        else await this.dateRun(card, active, stopped, signal);
       }
       // `!stop` cut this turn short, the owner's own or a report's: its reply ends like any
       // other, and never waits on a task it may still owe (`force`: `!stop` never does).
@@ -3670,6 +3672,23 @@ export class ThreadSession {
    */
   private cutBeforeClose(active: ActiveTurn, error: unknown): boolean {
     return error instanceof Cancelled && this.closedFlag && !active.renderer.closedOut;
+  }
+
+  /**
+   * The footer of a run's end goes to its card, built as an ordinary reply's is, with the run's
+   * own duration: the card is rewritten on every run, so it is an edit and no push.
+   */
+  private async dateRun(
+    card: LoopReply,
+    active: ActiveTurn,
+    stopped: boolean,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const at = this.now();
+    const work = { durationMs: Math.max(0, at - active.startedAt), doneAt: at };
+    // A run cut short ends with a process on its way out, which a live read can lose to.
+    const live = !stopped && !this.closedFlag;
+    card.setEnd(await this.readFooter(signal, live, work), at);
   }
 
   /** The prompts a run took into itself are answered: nobody waits on them any more. */

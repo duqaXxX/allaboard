@@ -223,8 +223,12 @@ export interface RunningAgent {
 export interface LoopCard {
   /** One plain line that says which run this is (`Scheduled run · every minute · run 3`). */
   readonly label: string;
+  /** When the run ended, epoch milliseconds: the chat writes it after the label, in its own clock format. */
+  readonly at: number;
   /** The run's final words, Markdown; empty when the run said nothing. */
   readonly text: string;
+  /** The footer an ordinary reply shows, with the data of this run; null when it would say nothing. */
+  readonly footer: FooterFields | null;
 }
 
 /**

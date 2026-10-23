@@ -45,6 +45,8 @@ export interface ActiveTurn {
   unanswered: Turn | null;
   /** A scheduled run: its words go to the loop card and it touches neither status nor footer. */
   readonly run: boolean;
+  /** When the turn began, epoch milliseconds: a run is dated and timed from it. */
+  readonly startedAt: number;
 }
 
 /** The owner's question on one line, as a note about a message that was not sent quotes it. */

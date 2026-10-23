@@ -394,10 +394,14 @@ the margin `blocks.MESSAGE_LIMIT` leaves.
 
 A scheduled run is drawn on one message per thread, which `SlackThread.showLoop` posts the first
 time and rewrites with `chat.update` on every later run, so a run notifies nobody. The message is
-a context block with the label the core made (`Scheduled run · every minute · run 14`), then a
-markdown block with the run's final words, mentions quieted as in a reply. Past 3,000 characters
-the card keeps the end of the words, after a leading `…`: the end of a run is what it concluded.
-A run with no words keeps the label alone, since a markdown block's text may not be empty. The
+a context block with the label the core made and the time of the run (`Scheduled run · every
+minute · run 14 · 22:18`, the time drawn as the reply footer draws `done 22:18`, by Slack's own
+date formatting, `slackTime` in `src/chat/slack/footer.ts`), then a markdown block with the run's
+final words, mentions quieted as in a reply, then a divider and the reply footer (`formatFooter`)
+with the data of the run, in a context block. Past 3,000 characters the card keeps the end of the
+words, after a leading `…`: the end of a run is what it concluded. The footer is rewritten with
+the card on every run, so it is an edit and no push. A run with no words keeps the label alone,
+since a markdown block's text may not be empty; a footer that says nothing is left out. The
 writes of one thread's card run one after the other, and the rewrite takes the shared limiter. A
 write that fails (the card was deleted by hand) forgets the card, and the next run posts a new
 one.

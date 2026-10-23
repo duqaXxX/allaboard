@@ -2,13 +2,17 @@
  * The reply of a scheduled run: its words go to the thread's loop card (`ThreadChat.showLoop`)
  * instead of a message of their own. A `Reply` so that the turn runs through the renderer, the
  * session's start and end of a turn, and a request it asks, as any other; it shows the run's
- * final words and nothing of the calls, and draws no footer.
+ * final words and nothing of the calls, and the footer of the run's end (`setEnd`), which the
+ * card carries instead of the reply footer the session draws for an ordinary reply.
  */
-import type { LoopCard, Reply, ThreadChat } from "../../chat/seam.ts";
+import type { FooterFields, LoopCard, Reply, ThreadChat } from "../../chat/seam.ts";
 
 export class LoopReply implements Reply {
   readonly #thread: Pick<ThreadChat, "showLoop">;
   readonly #label: string;
+  /** When the run ended, or began until it has: epoch milliseconds. */
+  #at: number;
+  #footer: FooterFields | null = null;
   /** Everything Claude wrote in the run, message after message. */
   #words = "";
   /** The daemon's own lines (an error, a note), which follow the words. */
@@ -20,9 +24,10 @@ export class LoopReply implements Reply {
   #dirty = false;
   #handedOver = false;
 
-  constructor(thread: Pick<ThreadChat, "showLoop">, label: string) {
+  constructor(thread: Pick<ThreadChat, "showLoop">, label: string, startedAt: number) {
     this.#thread = thread;
     this.#label = label;
+    this.#at = startedAt;
   }
 
   // A report of an ended task never renders into the card: it belongs under a normal reply.
@@ -46,6 +51,13 @@ export class LoopReply implements Reply {
   /** The run's final words, from the result that ended it: they replace the running text. */
   setFinal(text: string | null): void {
     this.#final = text;
+    this.#dirty = true;
+  }
+
+  /** The run's end: the moment it is dated by and the footer of its result. */
+  setEnd(footer: FooterFields | null, at: number): void {
+    this.#footer = footer;
+    this.#at = at;
     this.#dirty = true;
   }
 
@@ -94,7 +106,12 @@ export class LoopReply implements Reply {
     if (this.#handedOver || (this.#written && !this.#dirty)) return;
     this.#written = true;
     this.#dirty = false;
-    const card: LoopCard = { label: this.#label, text: this.#body() };
+    const card: LoopCard = {
+      label: this.#label,
+      at: this.#at,
+      text: this.#body(),
+      footer: this.#footer,
+    };
     await this.#thread.showLoop(card);
   }
 }

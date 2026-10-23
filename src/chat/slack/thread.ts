@@ -53,6 +53,7 @@ import { SlackChannel } from "./channel.ts";
 import type { ChannelLine } from "./channel-line.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
 import type { ThreadDeletion } from "./delete.ts";
+import { formatFooter, slackTime } from "./footer.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
@@ -641,7 +642,8 @@ export class SlackThread implements ThreadChat {
 
   /** Posts the card, or rewrites it; a card Slack lost is posted again by the next run. */
   private async writeLoop(card: LoopCard): Promise<void> {
-    const label = `_${mrkdwnEscape(card.label)}_`;
+    // The time is Slack's control sequence, which must not be escaped.
+    const label = `_${mrkdwnEscape(card.label)} · ${slackTime(card.at)}_`;
     const blocks: KnownBlock[] = [contextBlock(noticeText(label))];
     // A markdown block's text may not be empty, and holds 12,000 characters in all.
     const words = quietMentions(card.text.trim(), true);
@@ -652,6 +654,11 @@ export class SlackThread implements ThreadChat {
           ? `…${words.slice(words.length - LOOP_TEXT_LIMIT + 1)}`
           : words;
       blocks.push({ type: "markdown", text: shown } as unknown as KnownBlock);
+    }
+    // The footer an ordinary reply shows, of the latest run: it is rewritten with the card.
+    if (card.footer !== null) {
+      const line = formatFooter(card.footer, this.clock.time() * 1000);
+      if (line !== "") blocks.push({ type: "divider" }, contextBlock(noticeText(line)));
     }
     try {
       if (this.loopTs === null) {

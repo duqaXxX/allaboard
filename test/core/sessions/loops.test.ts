@@ -25,6 +25,8 @@ import {
   harnessFor,
   hookRun,
   type Item,
+  isResult,
+  recordOf,
   sdkMessages,
 } from "../../support/sessions.ts";
 import { pending, send, splitBackground, withResult } from "./helpers.ts";
@@ -176,6 +178,47 @@ test("runs share one message that the latest run rewrites, and open no reply of 
   assert.equal(loopMessages(h).length, 1);
   assert.equal(h.reactions().length, reactions, "a run moves no status");
   assert.ok(session.scheduledJobs.length === 1);
+});
+
+/** The card's blocks as one JSON text, label and footer among them. */
+function card(h: Harness): string {
+  const [shown] = loopMessages(h);
+  assert.ok(shown !== undefined, "the card is posted");
+  return shown;
+}
+
+/** A run whose result reports `input` and `output` tokens, so one run's footer differs from the next. */
+function runWithTokens(input: number, output: number): Item[] {
+  const messages = sdkMessages("tools");
+  const result = recordOf(messages.at(-1));
+  assert.ok(result !== null && isResult(messages.at(-1)));
+  const model = Object.keys(result.modelUsage as JsonObject)[0] as string;
+  const trimmed = {
+    record: { ...result, modelUsage: { [model]: { inputTokens: input, outputTokens: output } } },
+  };
+  return withStopHook([...messages.slice(0, -1), trimmed], { ...WITH_JOB, session_crons: [JOB] });
+}
+
+test("the card's label carries the time of the latest run, as the reply footer writes its own", async (t) => {
+  const [h] = await withLoop(t);
+  h.clients[0]?.inject(run([JOB]));
+  await h.until(() => loopMessages(h).length === 1);
+  assert.match(card(h), /Scheduled run · every minute · run 1 · <!date\^\d+\^\{time\}\|[^>]+>/);
+});
+
+test("the card carries the footer of the latest run, rewritten with it", async (t) => {
+  const [h] = await withLoop(t);
+  h.clients[0]?.inject(runWithTokens(1000, 500));
+  await h.until(() => loopMessages(h).length === 1);
+  await h.until(() => card(h).includes("1.5k *tok*"));
+  assert.ok(card(h).includes('"type":"divider"'), "the footer stands under a divider");
+  assert.ok(card(h).indexOf("run 1") < card(h).indexOf("1.5k *tok*"), "below the label");
+  assert.match(card(h), /done <!date\^/, "with the run's own duration and end");
+  h.clients[0]?.inject(runWithTokens(4100, 1000));
+  await h.until(() => card(h).includes("run 2"));
+  await h.until(() => card(h).includes("5.1k *tok*"));
+  assert.ok(!card(h).includes("1.5k *tok*"), "the first run's footer is gone");
+  assert.equal(loopMessages(h).length, 1);
 });
 
 test("a run whose list is empty at its end ends the loop with one message that counts the runs", async (t) => {
@@ -451,6 +494,27 @@ test("the card shows the run's final words, and the end of them when they are to
   const card = loopMessages(h)[0] ?? "";
   assert.ok(card.includes("THE END"), "the end is kept");
   assert.ok(!card.includes("notes.txt"), "the final words, not the first message's");
+});
+
+test("a long run with its footer stays within what a message holds", async (t) => {
+  const [h] = await looping(t);
+  const words = `${"padding ".repeat(2000)}THE END`;
+  h.clients[0]?.inject(withResult(run([JOB]), words));
+  await h.until(() => (loopMessages(h)[0] ?? "").includes("*tok*"));
+  const blocks =
+    h.slack.messageBlocks().find((b) => JSON.stringify(b).includes("Scheduled ")) ?? [];
+  const kinds = blocks.map((b) => b.type);
+  assert.deepEqual(kinds, ["context", "markdown", "divider", "context"]);
+  const markdown = blocks.reduce(
+    (n, b) => n + (b.type === "markdown" ? String(b.text).length : 0),
+    0,
+  );
+  assert.ok(markdown <= 3000, `${markdown} characters of words`);
+  for (const b of blocks.filter((x) => x.type === "context")) {
+    const [element] = b.elements as JsonObject[];
+    assert.ok(String(element?.text).length <= 3000);
+  }
+  assert.ok(JSON.stringify(blocks).includes("THE END"), "the end of the words is kept");
 });
 
 test("the end of a loop is said after the turn that deleted it, not in the middle of it", async (t) => {
