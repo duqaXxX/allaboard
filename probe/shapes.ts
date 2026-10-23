@@ -31,7 +31,14 @@ export const ACCEPTED = join(import.meta.dirname, "accepted-shapes.json");
 
 // Objects whose keys are data, not names: a tool call's id, a model, a question's text, an agent
 // type. Their keys read as `*`, else every run would add paths.
-const MAPS = new Set(["wire_tool_inputs", "modelUsage", "answers", "tool_uses", "by_type"]);
+const MAPS = new Set([
+  "wire_tool_inputs",
+  "modelUsage",
+  "model_usage_since_last_result",
+  "answers",
+  "tool_uses",
+  "by_type",
+]);
 const ID = /^(toolu_|srvtoolu_)/;
 // A tool of an MCP server is the owner's or the folder's configuration, not the SDK's shape:
 // a claude.ai connector shows in one run and not in the next.

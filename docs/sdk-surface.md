@@ -7,8 +7,8 @@ from. A new SDK release is checked against this table before it is pinned.
 Read against `@anthropic-ai/claude-agent-sdk` 0.3.296 (bundled Claude Code 2.1.296), its
 declarations in `sdk.d.ts` and the
 [Agent SDK reference for TypeScript](https://code.claude.com/docs/en/agent-sdk/typescript) on
-2026-10-10. The release probe found every row in 0.3.304 (bundled Claude Code 2.1.304) on
-2026-10-20.
+2026-10-10. The release probe found every row in 0.3.309 (bundled Claude Code 2.1.309) on
+2026-10-24.
 
 ## How to read it
 

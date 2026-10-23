@@ -51,6 +51,16 @@ All notable changes to this project are documented here. The format follows
   session: Claude Code may restore it with your next message`. The paused and ended messages
   leave out the count when no run was shown. `!status` lists no loop until the agent reports one again.
 
+### Changed
+
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.309, which bundles Claude Code 2.1.309. The
+  release probe certified it on 2026-10-24: the SDK surface table holds and so do the 47 claims.
+  The `sdk.d.ts` of 0.3.309 only adds optional fields and options to 0.3.304's, none of which the
+  source reads. Every result now carries `model_usage_since_last_result`, keyed by model as
+  `modelUsage` is; the source does not read it, the probe's shape check reads its keys as data
+  and its paths are accepted on 2.1.309. The release offers `/plugin-authoring`, which the
+  recorded `server-info.json` does not list.
+
 ### Fixed
 
 - `!plan` sent with a request (`!plan` and a prompt in one message) answered with the whole
