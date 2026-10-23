@@ -132,7 +132,7 @@ Facts about a feature that neither `setup.md` nor `architecture.md` states, kept
 - With the field empty, the line above the rows reads `Changed in this session (N), newest first`; with text in it, `N files match`. More than 10 rows say so under them.
 - A listing that was cut short adds `The folder could not be listed in full, so some files may be missing here.` An `!open <words>` that finds no match in such a listing answers `No file matching ... was found, but the folder could not be listed in full.`
 - An empty file answers `... is empty: there is nothing to show.`
-- The modal waits for the listing at most 1 second after the click. Git runs in at most 4 repositories at once, and the repositories found in a folder are kept for 5 seconds.
+- How long the modal waits for the listing and how the listing is built and kept: [Opening a file](slack-provider.md#opening-a-file) and [Files offered by `!open`](architecture.md#files-offered-by-open).
 
 ### Background commands and subagents
 

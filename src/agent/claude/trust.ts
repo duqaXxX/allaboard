@@ -36,7 +36,17 @@
  *
  * Every check runs on `node:fs/promises`, so a slow disk never holds the event loop. The paths
  * are compared as directories on disk by device and inode (`stat` with `bigint`, since a 64-bit
- * inode does not fit a number), never by string.
+ * inode does not fit a number), never by string, so a path in another case or Unicode form is the
+ * same folder and a name one space longer is another. A folder git would take for a bare
+ * repository outside the root's own `.git` has no key and counts as untrusted, with everything
+ * below it; it is told by the names of its entries alone (a `HEAD`, with `objects` and `refs` or
+ * a `commondir`), so a folder that only looks like a git dir counts too.
+ *
+ * Trust is by path, as in Claude Code: a folder placed at a path the owner trusted, or at the path
+ * of a worktree deleted and not pruned, passes for it, and a repository placed at a trusted path
+ * covers the worktrees it registers. A path in the record that passes through a symlink trusts
+ * nothing. Not verified: the daemon on Windows; folder trust and the footer's git are exercised
+ * there by the tests in CI alone.
  */
 import { type BigIntStats, constants, type Stats } from "node:fs";
 import { lstat, open, readFile, readlink, stat } from "node:fs/promises";

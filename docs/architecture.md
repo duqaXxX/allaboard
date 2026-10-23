@@ -858,13 +858,12 @@ the click is checked like any other inbound path, and a value in any other shape
 reaches the core at once as an `InboundMessage` whose `content` downloads, checks and saves the
 files and makes the prompt; the message flow reads it when the message's turn among its thread's
 comes, so nothing of the files reaches Claude Code before that. Every file is checked first (`attachments.refusal`): its download URL must be
-`https://files.slack.com/...`, the only host that receives the bot token, and an image must be JPEG,
-PNG, GIF or WebP, at most 7.5 MB (10 MB once base64-encoded) and 8000x8000 px, the limits of
-Claude's vision API; any other image type is refused. A file that is not an image must be a `text/*`
-type (which covers source code) or one of `attachments.FILE_TYPES` (PDF, JSON, XML, YAML,
-JavaScript, shell, SQL, TOML, Jupyter notebook), at most 100 MB; any other type is refused. One
-message takes at most 5 images and 15 MB of images in all (`attachments.imagesRefusal`): images stay
-in the conversation and are sent again at every turn, and a request is capped at 32 MB. Then the
+`https://files.slack.com/...`, the only host that receives the bot token, and its type and size
+must be within the limits listed in [Files in a message](setup.md#files-in-a-message). The image
+limits are those of Claude's vision API; a non-image file must be a `text/*` type or one of
+`attachments.FILE_TYPES`. One message takes at most the images `attachments.imagesRefusal` allows,
+since images stay in the conversation and are sent again at every turn, and a request is capped at
+32 MB. Then the
 files are downloaded together, with the bot token and no redirect followed, each within
 `attachments.DOWNLOAD_TIMEOUT_MS`; `attachments.download` checks the host again before it sends the
 token. Slack answers 302 when the app lacks `files:read` (measured: "Download without files:read").
@@ -1267,68 +1266,36 @@ closed when the start returns (`ThreadSession.connect`).
 ### Starting and resuming the agent session
 
 - The agent session is started on first use (`ThreadSession.ensureConnected`), and only in a folder
-  the owner has trusted in Claude Code. An SDK session never shows Claude Code's trust dialog, and
-  Claude Code uses a repository's own hooks, `env` block and helper commands there whether the
-  folder was trusted or not. `trust.workspaceTrusted`, which the core asks through
-  `AgentBackend.folderTrusted`, reads Claude Code's record
-  (`projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json`) by Claude Code's rules: in a git
-  repository the repository root decides (the main checkout's root for a worktree) and a trusted
-  parent does not cover it; outside git, a trusted folder covers its subdirectories. Claude Code
-  holds the `permissions.allow` rules and `additionalDirectories` of a folder's
-  `.claude/settings.json` to that folder's own record: where only a parent's trust covers the
-  folder, the session starts and those rules are left out. Which repository a folder belongs to is
-  read from the filesystem (`trust.locate`) and never asked of git there, since git would answer
-  from the folder's own `.git` file, `commondir` and `core.worktree`, which whoever supplied the
-  folder wrote. The first folder up the path that holds a `.git` entry is the repository's root and
-  is keyed on itself, whatever that entry says. One case moves the key: the entry is a file naming
-  `<main>/.git/worktrees/<id>`, and the `gitdir` file in that directory, which git writes on the
-  main checkout's side, names this folder back; the key is then the main checkout. Paths are
-  compared as directories on disk (device and inode), so a path in another case or Unicode form is
-  the same folder and a name one space longer is another. A folder git would take for a bare
-  repository outside the root's own `.git` has no key and counts as untrusted, with everything below
-  it. That is told by the names of its entries alone (a `HEAD`, with `objects` and `refs` or a
-  `commondir`), so a folder that only looks like a git dir counts too. The check runs no command, so
-  nothing in a folder can hold it. The daemon's own git (footer, `!status`, `!open`) runs only in
-  a repository whose key is trusted (`trust.trustedRepository`): a trusted folder does not stand
-  for a repository inside it, since git would run the filters that repository's config names. The
-  small files read there (a `.git` file and a worktree's `gitdir`) are cut at their line ends as
-  git cuts them. The gate for a session's start and for `!bind` is `trust.workspaceTrusted`. Trust
-  is by path, as in Claude Code: a folder
-  placed at a path the owner trusted, or at the path of a worktree deleted and not pruned, passes
-  for it, and a repository placed at a trusted path covers the worktrees it registers. A path in the
-  record that passes through a symlink trusts nothing. An untrusted folder starts nothing, and the
-  reply says to open `claude` there in the terminal once and accept the dialog. A `!bind` runs the
-  same checks (`directory.checkDirectory`: missing, unreadable, untrusted): the channel is bound,
-  and the answer gives the reason instead of promising a session. Not verified: the daemon on Windows;
-  folder trust and the footer's git are exercised there by the tests in CI alone.
+  the owner has trusted in Claude Code, since an SDK session never shows Claude Code's trust
+  dialog. The core asks `AgentBackend.folderTrusted`; for Claude, `trust.workspaceTrusted` reads
+  Claude Code's own record (`projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json`) by its
+  rules, without running git: a repository's root decides, a trusted parent does not cover it, and
+  outside a repository a trusted folder covers its subdirectories. The daemon's own git (footer,
+  `!status`, `!open`) runs only in a repository whose key is trusted (`trust.trustedRepository`).
+  An untrusted folder starts nothing, and the reply says to open `claude` there in the terminal
+  once and accept the dialog; `!bind` runs the same checks (`directory.checkDirectory`: missing,
+  unreadable, untrusted) and gives the reason instead of promising a session. What the owner does
+  is in [How trust applies to git](setup.md#how-trust-applies-to-git); how a folder's repository
+  and key are found, and what the daemon has not verified on Windows, is in the header of
+  `src/agent/claude/trust.ts`.
 - The session asks the back end for a start with the thread's own directory, the thread's stored
   session id to resume, its stored effort level and the owner's own settings sources (user, project
   and local): the `StartOptions` built in `ThreadSession.connect`. `ClaudeSession` makes the SDK's
-  options of them: the directory as `cwd`, `resume`, `effort`, `settingSources`,
-  `includePartialMessages`, the permission callback, the two hooks,
-  `allowDangerouslySkipPermissions`, which makes `!bypass on` possible without turning it on, and
-  the extra argument `replay-user-messages` (above, "A prompt taken into a report turn"). Four
-  more make the session start as a terminal session does: `systemPrompt` set to the `claude_code`
-  preset, since the SDK otherwise sends a minimal prompt of its own; `toolConfig` with
-  `askUserQuestion.previewFormat` set to `markdown`, without which Claude writes no preview on a
-  question's options; and in `env` the variables
-  `CLAUDE_CODE_FORK_SUBAGENT=1` (every subagent runs in the background, as in the terminal) and
-  `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`. `env` replaces the environment the process
-  inherits, so it holds those two, then the daemon's own environment, then the variables of
-  Claude Code the owner's file sets (`VARIABLES` in `src/agent/claude/module.ts`): a later one
-  wins. Last comes `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`, which nothing overrides: Claude
-  Code then writes a `session_state_changed` record at each change between `running`, `idle`
-  and `requires_action`, and the back end passes it on as `state_changed` (`working`, `idle`,
-  `waiting`). The session the usage probe starts gets none of this. The SDK
-  runs Claude Code in its non-interactive mode, which treats the two servers built into Claude Code
-  differently from the terminal (measured: "Built-in servers"). Computer use is offered in an
-  interactive session only and is never there. The Chrome integration is connected only when Claude
-  Code is started with `--chrome`, so the session gets that flag when the owner chose "Enabled by
-  default" in `/chrome` (`chrome.chromeEnabled` reads `claudeInChromeDefaultEnabled` in
-  `~/.claude.json` at every start, inside `ClaudeBackend.start`). The daemon adds no rule of its own
-  to the browser tools: a call Claude Code asks about goes through the permission callback like any
-  other (measured: "Chrome in an SDK session"), and what a thread in bypass does with them is Claude
-  Code's decision. The MCP servers the owner configured load as in the terminal.
+  options of them (`ClaudeSession.#options`), and four more make the session start as a terminal
+  session does: the `claude_code` system prompt, `askUserQuestion.previewFormat` set to
+  `markdown`, `CLAUDE_CODE_FORK_SUBAGENT=1` and `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`. The
+  environment is the terminal's defaults, then the daemon's own, then the Claude Code variables
+  the owner's file sets (`VARIABLES` in `src/agent/claude/module.ts`), then
+  `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`, which nothing overrides: the back end passes the
+  `session_state_changed` record on as `state_changed` (`working`, `idle`, `waiting`). The session
+  the usage probe starts gets none of this. The reason for each option, with the measurement and
+  the date, is the comment above its constant in `src/agent/claude/session.ts`.
+  Of the two servers built into Claude Code, computer use is never there in an SDK session and the
+  Chrome integration is there only when the owner chose "Enabled by default" in `/chrome`
+  (`chrome.chromeEnabled`, read at every start; measured: "Built-in servers"). The daemon adds no
+  rule of its own to the browser tools: a call Claude Code asks about goes through the permission
+  callback like any other (measured: "Chrome in an SDK session"). The MCP servers the owner
+  configured load as in the terminal.
 - After the start, `AgentSession.info` gives the commands the session offers, with their aliases
   (for `!help` and `!`), its models, and the permission mode Claude Code started in
   (`ThreadSession.nativeMode`, kept as reported). All three are read from the SDK's initialization
@@ -1763,10 +1730,10 @@ keep it, and the next Claude Code process in that thread gets it back from
 `bypassPermissions`; an explicit off in a folder whose own settings start in bypass sets `default`,
 so the folder's bypass does not return silently; never chosen leaves Claude Code's own mode. This is
 needed since Claude Code's own `--resume` never restores `bypassPermissions` (documented: "Resume
-and bypass"). A restart says nothing about bypass in a thread: it outlives one. A session `!resume`
-opens starts in its new thread with bypass never chosen (it follows the folder's own mode) and no
-`/effort` level set, whatever the session had before: both belong to the thread, not to the Claude
-Code session id, and `!resume` never touches or waits on any other thread.
+and bypass"). A restart says nothing about bypass in a thread: it outlives one. Bypass and the `/effort` level
+belong to the thread, not to the Claude Code session id, so a session `!resume` opens starts with
+both unset (what the owner sees: [Answers and limits of the
+words](setup.md#answers-and-limits-of-the-words)).
 
 ### The title on the root
 
@@ -1830,55 +1797,34 @@ are the core's, in `src/core/files/` (`listing`, `changed`, `read`, `paths`, `wa
 for any chat. A provider reaches them through `core/port.ts`; the Slack provider's picker, modal and
 upload are in [Opening a file](slack-provider.md#opening-a-file).
 
-The search reads the folder from disk, and the changed files come from git. Which repositories the
-folder has is `listing.repositoriesOf`: the one holding the folder when `SessionManager.repository`
-(the footer's own `trustedRepository` lookup) finds it usable, otherwise
-the usable ones found at most two levels below it, by `folders.foldersWithin`, the walk `!bind`
-uses, which never enters a repository; the lookups of those candidates run together. A repository
-deeper than two levels is not looked up, so its files are walked like any folder.
-`Listings.repositories` keeps the answer for a folder for `listing.REPOSITORIES_TTL` (5 seconds), so the
-listing and the changed files of one modal ask once. Where git runs in several repositories (the
-listing, `changed.changedIn`), at most `listing.GIT_CHAINS` run at once. Inside one the files come
-from git, through the footer's `footer.runGit`: `ls-files --cached --others --exclude-standard`,
-which leaves out what `.gitignore` excludes, as the terminal's `@` file picker does under
-`respectGitignore`. Everywhere else `listing.walkFiles` reads the disk: regular files, no symlinked
-folder entered, no `.git` entered, none of the usable repositories' roots (git lists those).
-`Listings` joins the two for a folder, within `listing.LISTING_BUDGET` (2 seconds; what is found by
-then is the answer), and keeps the result for `listing.LISTING_TTL` (30 seconds)
-(`listing.LISTING_PARTIAL_TTL`, 3 seconds, when it ran out of time or a repository's git list failed or timed
-out, so an incomplete listing is not taken for a complete one) so the keystrokes of one search do
-not walk the folder again; `!open <words>` reads the same listing. A request for a folder being
-listed waits for that listing, and a request that gives up does not stop it; at most
-`listing.LISTING_KEPT` folders are kept, the expired ones removed on the next request. Paths are
-relative to the session's folder.
+The search reads the folder from disk, and the changed files come from git:
 
-A kept listing is never the reason for "no match": `Listings.search` lists the folder again first
-when a kept listing finds none, so a file made since is found. The listing it answers from says
-whether it is complete (`Listing.complete`); a search over one that is not carries that into its
-answer (`Found.complete`): `!open <words>` says `texts.OPEN_NO_MATCH_PARTIAL` instead of "no match",
-posts the matches with `texts.OPEN_PARTIAL` instead of opening a single match on its own, and the
-modal adds the same line under its rows. The files that match are checked on disk
-(`read.regularFiles`) only until the rows are full when a modal asks (`limit` of `modal.ROW_LIMIT`),
-so typing costs ten checks and not one for each match; past ten the count in the heading is the
-matches by name, and below ten it is exact. `!open <words>` checks all of them.
+- **Repositories.** `listing.repositoriesOf` takes the one holding the folder when
+  `SessionManager.repository` finds it usable, else the usable ones at most two levels below it
+  (the walk `!bind` uses, which never enters a repository). A repository deeper is not looked up,
+  so its files are walked like any folder.
+- **The listing.** Inside a repository the files are `ls-files --cached --others
+  --exclude-standard`, as the terminal's `@` picker does under `respectGitignore`; elsewhere
+  `listing.walkFiles` reads the disk (regular files, no symlinked folder, no `.git`). `Listings`
+  joins the two within 2 seconds (what is found by then is the answer), keeps the result for 30
+  seconds (3 when it ran out of time or a repository's list failed), and at most 16 folders. The
+  repositories of a folder are kept for 5 seconds, and git runs in at most 4 at once.
+- **No match.** A kept listing is never the reason for "no match": `Listings.search` lists the
+  folder again first. A search over an incomplete listing says so (`Found.complete`): `!open
+  <words>` answers `texts.OPEN_NO_MATCH_PARTIAL` and the modal adds the same line under its rows.
+  The files that match are checked on disk only until the modal's ten rows are full.
+- **Changed files.** The union over the same repositories (`changed.changedIn`): `status` under
+  `--no-optional-locks` plus `diff-tree` from the repository's start commit to `HEAD`. No command
+  writes the index, so none can leave an `index.lock` that stops the owner's own `git`.
+- **The start commit.** `changed.startCommit` is where `HEAD` was when the thread started, read
+  from HEAD's reflog at the thread's start (the provider passes the root's `thread_ts` as epoch
+  seconds). It is computed when `!open` builds the list and kept nowhere, so a restart gives the
+  same answer. A reflog that does not go back that far gives its oldest entry, unless the
+  repository was made or cloned since the thread began: then every file counts. With no reflog
+  or no commit yet, the list is the uncommitted and untracked files.
 
-The changed files are the union over the same repositories (`changed.changedIn`): `status` under
-`--no-optional-locks` with `diff-tree` from the repository's start commit to `HEAD`. No command
-writes the index, and `status` does not report a file that was only touched (the measurements are in
-the header of `src/core/files/listing.ts` and repeated by
-`test/core/files/changed.test.ts`). The start commit is `changed.startCommit`: where the
-repository's `HEAD` was when the thread started, from HEAD's reflog at the thread's start (the provider turns the `thread_ts` into epoch seconds,
-`open.startedAt`; `git rev-parse --verify --quiet HEAD@{<seconds> +0000}`, through `--git-dir`, so a linked worktree
-reads its own log). It is computed when `!open` builds the list and kept nowhere: no handler touches
-it when a prompt arrives, and a daemon restarted any number of times gives the same answer. A reflog
-that does not go back that far gives its oldest entry (git's own answer), unless that entry's old
-value is null, which means the repository was made or cloned since the thread began: then the start
-is the empty tree and every file counts (`rev-list -g --until` says whether the log begins after the
-thread, `rev-list -g --count` and `rev-parse HEAD@{<count>}` whether the oldest entry has an old
-value, `hash-object -t tree /dev/null` is the empty tree of the repository's hash algorithm). With
-no reflog (`core.logAllRefUpdates` off), or no commit yet, there is no start and the list is the
-uncommitted and untracked files. A thread that began on one branch and is now on another counts
-what the other branch holds beyond where `HEAD` was.
+The commands, their measurements (git 2.54.0, 2026-10-05 and 2026-10-06) and each rule above are
+in the doc comments of `src/core/files/listing.ts` and `src/core/files/changed.ts`.
 
 ## Updating allaboard
 
