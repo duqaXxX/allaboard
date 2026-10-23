@@ -16,6 +16,7 @@ import {
   failsCounted,
   folded,
   preview,
+  proposedPlan,
 } from "../../../src/core/reply/previews.ts";
 import { NAMES } from "../../support/names.ts";
 import { recordedEvents } from "../../support/replay.ts";
@@ -295,4 +296,20 @@ test("a command is titled by its description, when it has one that says somethin
 test("only a failed command is counted with the calls that ended well", () => {
   assert.ok(failsCounted("Bash"));
   assert.ok(!failsCounted("Read") && !failsCounted("WebFetch"));
+});
+
+test("an ExitPlanMode approval shows the plan and drops the file path", () => {
+  const plan = "# Plan\n\n1. Read the code\n2. Change it\n";
+  const input = { plan, planFilePath: "/home/dev/.claude/plans/x.md" };
+  assert.equal(proposedPlan("ExitPlanMode", input), "# Plan\n\n1. Read the code\n2. Change it");
+  assert.equal(proposedPlan("ExitPlanMode", { plan }), "# Plan\n\n1. Read the code\n2. Change it");
+});
+
+test("a plan preview is only for the measured shape of ExitPlanMode", () => {
+  assert.equal(proposedPlan("Bash", { plan: "x" }), null);
+  assert.equal(proposedPlan("ExitPlanMode", { plan: "  " }), null);
+  assert.equal(proposedPlan("ExitPlanMode", { planFilePath: "/p" }), null);
+  assert.equal(proposedPlan("ExitPlanMode", { plan: 3 }), null);
+  // an extra key would be hidden behind the preview: the input is shown whole instead
+  assert.equal(proposedPlan("ExitPlanMode", { plan: "x", allowedPrompts: [] }), null);
 });

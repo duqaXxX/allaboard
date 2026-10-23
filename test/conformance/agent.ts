@@ -409,7 +409,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       assert.ok(effortLevels.length > 0 && effortLevels.every((level) => level.trim() !== ""));
       assert.equal(new Set(effortLevels).size, effortLevels.length);
       assert.ok(permissionModes.default.trim() !== "");
-      for (const mode of [permissionModes.auto, permissionModes.bypass]) {
+      for (const mode of [permissionModes.auto, permissionModes.bypass, permissionModes.plan]) {
         assert.ok(mode === null || mode.trim() !== "", "a role the back end lacks is null");
       }
     });

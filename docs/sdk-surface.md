@@ -323,7 +323,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `PermissionMode` | `"bypassPermissions"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
 | `PermissionMode` | `"default"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
 | `PermissionMode` | `"dontAsk"` | value | session.ts: PERMISSION_MODES | reference | none |
-| `PermissionMode` | `"plan"` | value | session.ts: PERMISSION_MODES | reference | none |
+| `PermissionMode` | `"plan"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
 | `PermissionResult.behavior` | `"allow"` | value | requests.ts: permissionResult, questionResult | reference | none |
 | `PermissionResult.behavior` | `"deny"` | value | requests.ts: permissionResult, questionResult | reference | none |
 | `SDKAssistantMessage.message.content[].type` | `"advisor_tool_result"` | value | translate.ts: assistant | measured | none |

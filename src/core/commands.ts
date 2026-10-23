@@ -28,6 +28,11 @@ export interface Bypass {
   readonly on: boolean;
 }
 
+export interface Plan {
+  readonly kind: "plan";
+  readonly on: boolean;
+}
+
 export interface Status {
   readonly kind: "status";
 }
@@ -89,6 +94,7 @@ export type Word =
   | Guide
   | Bind
   | Bypass
+  | Plan
   | Status
   | Stop
   | Resume
@@ -106,6 +112,7 @@ export const WORD = {
   guide: "guide",
   bind: "bind",
   bypass: "bypass",
+  plan: "plan",
   status: "status",
   stop: "stop",
   resume: "resume",
@@ -158,6 +165,16 @@ export function parseBang(text: string): Command | null {
           return { kind: "bypass", on: true };
         case "off":
           return { kind: "bypass", on: false };
+        default:
+          return { kind: "invalid" };
+      }
+    case "plan":
+      switch (rest.toLowerCase()) {
+        case "":
+        case "on":
+          return { kind: "plan", on: true };
+        case "off":
+          return { kind: "plan", on: false };
         default:
           return { kind: "invalid" };
       }

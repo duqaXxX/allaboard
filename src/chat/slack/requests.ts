@@ -10,7 +10,7 @@
  */
 
 import type { PermissionRequest, Question, QuestionOption } from "../../agent/seam.ts";
-import { answerOf, type Names, named, oneLine, texts } from "../../core/port.ts";
+import { answerOf, type Names, named, oneLine, proposedPlan, texts } from "../../core/port.ts";
 import { PY_SPACE, strip } from "../../text.ts";
 import { isRecord } from "../../values.ts";
 import { shownAsWritten } from "./reply/escape.ts";
@@ -121,7 +121,10 @@ export function approvalBlocks(
   if (request.description) {
     blocks.push(context(head(shownAsWritten(request.description), SECTION_LIMIT)));
   }
-  const detail = JSON.stringify(request.input, null, 2);
+  // An `ExitPlanMode` request shows the plan alone, as text in the same code blocks as any
+  // other input: markdown would draw a link, a mention or a fence the model wrote.
+  const detail =
+    proposedPlan(request.toolName, request.input) ?? JSON.stringify(request.input, null, 2);
   const chunks = codeChunks(detail, SECTION_LIMIT - length("```\n\n```"));
   const room = MESSAGE_BLOCKS - blocks.length - 1; // the actions block closes it
   let codeBlocks: Block[];

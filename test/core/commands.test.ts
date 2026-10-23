@@ -63,6 +63,9 @@ const parseCases: [string, Command | null][] = [
   ["!bind", { kind: "bind", path: "" }], // alone: the folders a session can start in
   ["!bypass on", { kind: "bypass", on: true }],
   ["!bypass OFF", { kind: "bypass", on: false }],
+  ["!plan", { kind: "plan", on: true }],
+  ["!plan on", { kind: "plan", on: true }],
+  ["!PLAN off", { kind: "plan", on: false }],
   ["!open", { kind: "open", target: "" }], // alone: the picker
   ["!OPEN  setup ", { kind: "open", target: "setup" }],
   ["!open docs/my file.md", { kind: "open", target: "docs/my file.md" }],
@@ -91,6 +94,7 @@ const parseCases: [string, Command | null][] = [
   ["!delete", { kind: "passthrough", text: "delete" }],
   ["!bypass", { kind: "invalid" }],
   ["!bypass maybe", { kind: "invalid" }],
+  ["!plan maybe", { kind: "invalid" }],
   ["!status", { kind: "status" }],
   ["  !stop", { kind: "stop" }],
   ["!compact", { kind: "passthrough", text: "compact" }],
@@ -210,6 +214,7 @@ test("the guide and the help explain every word of the daemon", () => {
     "guide",
     "bind",
     "bypass",
+    "plan",
     "status",
     "stop",
     "resume",

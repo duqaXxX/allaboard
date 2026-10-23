@@ -121,6 +121,7 @@ import {
 import {
   BypassUnavailable,
   DirectoryUnavailable,
+  PlanUnavailable,
   SessionClosed,
   SessionGone,
   StartsBlocked,
@@ -1053,10 +1054,13 @@ export class ThreadSession {
       : null;
   }
 
-  async setBypass(on: boolean): Promise<void> {
-    const client = await this.ensureConnected();
+  /**
+   * Set `wanted` on `client`; the mode now in force, which is the default one when the agent
+   * refuses to return to auto. Throws `SessionClosed` when a close took the client mid-call.
+   */
+  private async applyMode(client: AgentSession, wanted: string): Promise<string> {
     const modes = this.deps.agent.capabilities.permissionModes;
-    let mode = this.modeFor(on);
+    let mode = wanted;
     try {
       try {
         await client.setPermissionMode(mode);
@@ -1075,12 +1079,58 @@ export class ThreadSession {
       if (this.closedFlag) throw new SessionClosed(); // the close disconnected the client under the call
       throw error;
     }
+    return mode;
+  }
+
+  async setBypass(on: boolean): Promise<void> {
+    const client = await this.ensureConnected();
+    const mode = await this.applyMode(client, this.modeFor(on));
     this.clientBypass = on;
     this.mode = mode;
     // The session closed while the mode was being set: the thread this would write to may
     // already be gone, so the switch is never recorded after the fact.
     if (this.closedFlag) throw new SessionClosed();
     this.deps.state.setBypass(this.channelId, this.threadId, on);
+  }
+
+  /**
+   * Whether the session runs in the agent's plan mode, as the agent last reported it. Session
+   * only: a reconnect starts in the thread's normal mode (`ensureConnected`) and nothing is
+   * stored.
+   */
+  get planning(): boolean {
+    const plan = this.deps.agent.capabilities.permissionModes.plan;
+    return plan !== null && this.mode === plan;
+  }
+
+  /**
+   * The mode `!plan off` returns to: bypass when the thread's is on, else the mode the agent
+   * started in, and the default one when that was plan itself (the owner's settings start the
+   * folder in plan: setting it again would leave plan mode running).
+   */
+  private modeAfterPlan(plan: string): string {
+    const mode = this.modeFor(this.bypass);
+    return mode === plan ? this.deps.agent.capabilities.permissionModes.default : mode;
+  }
+
+  /**
+   * `!plan` or `!plan off` typed in the thread: true once switched, false, changing nothing,
+   * before Start. Off returns to the mode the thread would otherwise have (bypass when it is
+   * on). Like `switchBypass`, it waits for a Start being applied.
+   */
+  async switchPlan(on: boolean): Promise<boolean> {
+    const plan = this.deps.agent.capabilities.permissionModes.plan;
+    // Before anything is sent: the agent has no plan mode to go into or leave.
+    if (plan === null) throw new PlanUnavailable();
+    const release = await this.setupLock.acquire();
+    try {
+      if (this.beforeStart) return false;
+      const client = await this.ensureConnected();
+      this.mode = await this.applyMode(client, on ? plan : this.modeAfterPlan(plan));
+      return true;
+    } finally {
+      release();
+    }
   }
 
   /**
@@ -1561,7 +1611,7 @@ export class ThreadSession {
       );
     }
     const state = texts.fill(texts.named(texts.STATUS_STATE, this.names), {
-      mode: this.bypass ? (this.bypassMode ?? this.mode) : this.mode,
+      mode: this.bypass && !this.planning ? (this.bypassMode ?? this.mode) : this.mode,
       // Only a turn's first event carries the version, never the start (measured).
       version: this.cliVersion || (this.client !== null ? texts.VERSION_PENDING : "not started"),
       activity,
@@ -3861,6 +3911,7 @@ export class ThreadSession {
     const model = this.modelSwitched ?? context.model;
     return {
       bypass: this.bypass,
+      planning: this.planning,
       model: model === null ? null : modelName(this.models, model),
       ...this.effortFields(),
       folder: this.directory,

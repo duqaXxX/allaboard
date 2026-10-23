@@ -90,6 +90,7 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!stop` | Stops every session of the channel; in a thread, that one |
 | `!resume` | Lists the folder's sessions, the terminal's included, with a Resume button each |
 | `!bypass on` / `off` | Switches a session to `bypassPermissions` and back |
+| `!plan` / `!plan off` | Switches a session to plan mode and back |
 | `!open` | Shares a file of the session's folder into the thread |
 | `!tag <name>` | Tags and pins the thread's first message |
 | `!untag` | Takes the tag and the pin away |

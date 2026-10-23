@@ -42,6 +42,8 @@ export interface PermissionModes {
   readonly auto: PermissionMode | null;
   /** The mode that skips permission requests. */
   readonly bypass: PermissionMode | null;
+  /** The mode that plans before it acts: the agent proposes, the owner approves. */
+  readonly plan: PermissionMode | null;
 }
 
 /** What an agent says it is doing (`state_changed`), for one that declares `declaredState`. */

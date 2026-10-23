@@ -88,6 +88,7 @@ test("a reply is one message: text and task lines in order, what runs, then the 
   await reply.closeOut();
   await reply.showFooter({
     bypass: true,
+    planning: false,
     model: "model-a",
     effort: null,
     effortObserved: null,
@@ -149,6 +150,7 @@ test("the footer goes under the reply it is drawn on, and a footer drawn before 
   const thread = provider.thread(sent.ref);
   const footer = {
     bypass: false,
+    planning: false,
     model: "model-a",
     effort: null,
     effortObserved: null,

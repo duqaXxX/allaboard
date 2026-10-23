@@ -33,6 +33,9 @@ const FULL_GUIDE = [
   "**Bypass**",
   "`!bypass on`, sent inside a session's thread, lets Claude Code run every tool without asking in that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ bypass while it is on.",
   "",
+  "**Plan mode**",
+  "`!plan`, sent inside a session's thread, makes Claude Code plan before it acts: it proposes a plan and asks you to approve it. `!plan off` leaves plan mode, and so does `!bypass on` or `!bypass off`. It belongs to the running session: a restart of allaboard or an idle close puts the session back in its normal mode.",
+  "",
   "**Tags**",
   "`!tag <name>`, sent inside a session's thread, marks it: Slack shows `[name]` at the start of the thread's first message and keeps the thread at hand, and where Claude Code can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose session has not started yet is marked in Slack alone.",
   "",
@@ -76,6 +79,7 @@ const APPROVALS = line("When Claude Code asks permission");
 const SESSIONS = line("`!status` typed in the channel");
 const FILES = ["**Files**", line("`!open`, sent inside")];
 const BYPASS = ["**Bypass**", line("`!bypass on`")];
+const PLAN = ["**Plan mode**", line("`!plan`, sent inside")];
 const TAGS = ["**Tags**", line("`!tag <name>`, sent inside")];
 const DELETE = ["**Deleting a thread**", line("`!delete-thread`, sent inside")];
 
@@ -131,6 +135,12 @@ test("without bypass the third step and the Bypass section leave it out", () => 
   const { removed, added } = difference(linesOf({ bypass: false }));
   assert.deepEqual(removed, [STEP_THREE, ...BYPASS]);
   assert.deepEqual(added, [`${STEP_THREE_HEAD}the **Model** and ${EFFORT}${STEP_THREE_TAIL}`]);
+});
+
+test("without plan the Plan mode section is gone", () => {
+  const { removed, added } = difference(linesOf({ plan: false }));
+  assert.deepEqual(removed, PLAN);
+  assert.deepEqual(added, []);
 });
 
 test("without commands the Commands section is gone", () => {

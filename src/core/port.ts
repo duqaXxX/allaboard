@@ -113,6 +113,7 @@ export type { FooterField, FooterKey } from "./footer.ts";
 export { footerFields, formatWorkDuration, valueWithDetail } from "./footer.ts";
 export type { Instance } from "./instance.ts";
 export { Fold, shownPreview } from "./reply/fold.ts";
+export { proposedPlan } from "./reply/previews.ts";
 export { formatDuration } from "./reply/renderer.ts";
 export type { Tail, TailEntry } from "./reply/tail.ts";
 export { isLast, isOvertaken, tails } from "./reply/tail.ts";

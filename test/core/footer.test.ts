@@ -39,6 +39,7 @@ const DAY = 24 * HOUR;
 function fields(known: Partial<FooterFields> = {}): FooterFields {
   return {
     bypass: false,
+    planning: false,
     model: null,
     effort: null,
     effortObserved: null,
