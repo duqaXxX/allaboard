@@ -1,0 +1,43 @@
+{
+ "recording": "model-refusal-no-fallback",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "> ⚠️ claude-opus-5-5 refused this request (cyber); no other model answered.",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "> ⚠️ claude-opus-5-5 refused this request (cyber); no other model answered.",
+    "notice": true
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

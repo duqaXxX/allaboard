@@ -2316,6 +2316,11 @@ export class ThreadSession {
         const compaction =
           (event.type === "compacted" || event.type === "compaction_started") &&
           (this.sent.length > 0 || this.injectedExpected);
+        // A refusal opens a turn the same way: a fork or a side question that falls back
+        // while the thread is idle (`scope: local`) has no result to end a reply it would open.
+        if (event.type === "model_refused" && this.sent.length === 0 && !this.injectedExpected) {
+          return;
+        }
         if (!TURN_EVENTS.has(event.type) && !compaction) return;
         worded = !compaction;
         if (call) {

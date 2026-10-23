@@ -24,7 +24,7 @@ import { basename, join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { agentInfo } from "../../../src/agent/claude/info.ts";
 import { questionResult } from "../../../src/agent/claude/requests.ts";
-import { ResumeRefused } from "../../../src/agent/seam.ts";
+import { ResumeRefused, type SessionEvent } from "../../../src/agent/seam.ts";
 import type { Reply } from "../../../src/chat/seam.ts";
 import { Status, ThreadStatus } from "../../../src/chat/slack/reply/status.ts";
 import { resolvePath } from "../../../src/core/paths.ts";
@@ -4164,6 +4164,55 @@ test("a switch inside a model turn outlives that turn and goes to the usage at t
   await (await session.submit("list the files")).done.wait(); // the usage names another id
   await h.idle();
   assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "), "the usage speaks alone");
+});
+
+test("the footer names the model that answered after a refusal of the session's model", async (t) => {
+  // The usage still names the model the turn started on, as after any switch inside a turn.
+  const h = harnessFor(t)({ turns: [sdkMessages("model-refusal-fallback")] });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-opus-5-5");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 4.8 · "), statuses(h).at(-1));
+  assert.ok((await session.status()).includes("Model: `Opus 4.8`"));
+});
+
+const REFUSED_LOCAL: SessionEvent = {
+  type: "model_refused",
+  text: "A fork fell back.",
+  originalModel: "claude-opus-5-5",
+  fallbackModel: "claude-opus-4-8",
+  category: null,
+  retracted: false,
+};
+
+test("a refusal told while the thread is idle with nothing sent opens no reply", async (t) => {
+  // A fork or a side question that falls back (`scope: local`) has no result to end a reply.
+  const h = harnessFor(t)({ turns: [] });
+  const session = h.session();
+  await session.ensureConnected();
+  h.clients[0]?.inject([event(REFUSED_LOCAL)]);
+  await h.idle();
+  assert.equal(h.slack.callsTo("chat.startStream").length, 0);
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+  assert.ok(session.idle);
+});
+
+test("a refusal inside the turn of a prompt that was sent is shown", async (t) => {
+  const turn = sdkMessages("tools");
+  const h = harnessFor(t)({ turns: [[event(REFUSED_LOCAL), ...turn]] });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  const written = JSON.stringify([
+    ...h.slack.callsTo("chat.startStream"),
+    ...h.slack.callsTo("chat.appendStream"),
+    ...h.slack.callsTo("chat.stopStream"),
+    ...h.slack.callsTo("chat.postMessage"),
+    ...h.slack.callsTo("chat.update"),
+  ]);
+  assert.ok(written.includes("A fork fell back."));
 });
 
 test("a model turn after a switch gives the footer back to the usage", async (t) => {

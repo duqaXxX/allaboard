@@ -1,0 +1,131 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "text": "Let me look at the",
+     "type": "markdown"
+    },
+    {
+     "text": "> ⚠️ Opus 5.5's safeguards flagged this session. You may be seeing this for the first time: Opus 5.5 is more capable and has stronger safeguards as a result, which can sometimes flag non-cybersecurity work. We're improving these safeguards to reduce the amount of incorrectly flagged messages. Opus 4.8 is answering instead, or you can edit and retry with Opus 5.5. Send feedback with /feedback or learn more: https://support.claude.com/en/articles/8106465\n>\n> Details: `[cyber]`\n>\n> ↩ Retracted: the claude-opus-5-5 attempt above.",
+     "type": "markdown"
+    },
+    {
+     "text": "The folder holds three files.",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   []
+  ],
+  "message_texts": [
+   "Let me look at the\n\n> ⚠️ Opus 5.5's safeguards flagged this session. You may be seeing this for the first time: Opus 5.5 is more capable and has stronger safeguards as a result, which can sometimes flag non-cybersecurity work. We're improving these safeguards to reduce the amount of incorrectly flagged messages. Opus 4.8 is answering instead, or you can edit and retry with Opus 5.5. Send feedback with /feedback or learn more: https://support.claude.com/en/articles/8106465\n>\n> Details: `[cyber]`\n>\n> ↩ Retracted: the claude-opus-5-5 attempt above.\n\nThe folder holds three files."
+  ],
+  "pushes": 1
+ },
+ "recording": "model-refusal-fallback",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "Let me look at the",
+      "type": "markdown_text"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\n> ⚠️ Opus 5.5's safeguards flagged this session. You may be seeing this for the first time: Opus 5.5 is more capable and has stronger safeguards as a result, which can sometimes flag non-cybersecurity work. We're improving these safeguards to reduce the amount of incorrectly flagged messages. Opus 4.8 is answering instead, or you can edit and retry with Opus 5.5. Send feedback with /feedback or learn more: https://support.claude.com/en/articles/8106465\n>\n> Details: `[cyber]`\n>\n> ↩ Retracted: the claude-opus-5-5 attempt above.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nThe folder holds three files.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "blocks": [
+     {
+      "text": "Let me look at the",
+      "type": "markdown"
+     },
+     {
+      "text": "> ⚠️ Opus 5.5's safeguards flagged this session. You may be seeing this for the first time: Opus 5.5 is more capable and has stronger safeguards as a result, which can sometimes flag non-cybersecurity work. We're improving these safeguards to reduce the amount of incorrectly flagged messages. Opus 4.8 is answering instead, or you can edit and retry with Opus 5.5. Send feedback with /feedback or learn more: https://support.claude.com/en/articles/8106465\n>\n> Details: `[cyber]`\n>\n> ↩ Retracted: the claude-opus-5-5 attempt above.",
+      "type": "markdown"
+     },
+     {
+      "text": "The folder holds three files.",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "Let me look at the",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

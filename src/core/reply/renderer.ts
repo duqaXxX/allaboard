@@ -268,6 +268,9 @@ export class TurnRenderer {
       case "agent_error":
         await this.#failed(event);
         break;
+      case "model_refused":
+        await this.#refused(event);
+        break;
       case "call_started":
         await this.#callStarted(event);
         break;
@@ -560,6 +563,30 @@ export class TurnRenderer {
         ? texts.fill(texts.COMPACTED, { before: formatTokens(before), after: formatTokens(after) })
         : texts.COMPACTED_PLAIN;
     await this.#text(`${this.#wroteText ? "\n\n" : ""}${said}\n\n`, { notice: true });
+  }
+
+  /**
+   * The model refused: the agent's own words as a quoted warning, or a sentence built from the
+   * fields when it gave none. What the refused attempt wrote is already in the reply, which only
+   * appends: it stays, and a line after the warning says it was retracted.
+   */
+  async #refused(event: EventOf<"model_refused">): Promise<void> {
+    const model = this.#modelName(event.originalModel);
+    const said =
+      event.text !== ""
+        ? event.text
+        : texts.fill(texts.REFUSED_NO_FALLBACK, {
+            model,
+            category: event.category === null ? "" : ` (${event.category})`,
+          });
+    const quote = (lines: string): string =>
+      splitLines(lines)
+        .map((text) => `> ${text}`.trimEnd())
+        .join("\n");
+    const parts = [quote(`${texts.REFUSED_MARK}${said}`)];
+    if (event.retracted) parts.push(quote(texts.fill(texts.REFUSED_RETRACTED, { model })));
+    await this.#writeLaunches();
+    await this.#line(parts.join("\n>\n"));
   }
 
   async #failed(event: EventOf<"agent_error">): Promise<void> {
