@@ -390,6 +390,24 @@ whether the card's `details` count toward the 12,000 characters of a message wri
 `chat.update`. The six lines of 80 characters and the title keep the card and the footer inside
 the margin `blocks.MESSAGE_LIMIT` leaves.
 
+### The loop card
+
+A scheduled run is drawn on one message per thread, which `SlackThread.showLoop` posts the first
+time and rewrites with `chat.update` on every later run, so a run notifies nobody. The message is
+a context block with the label the core made (`Scheduled run · every minute · run 14`), then a
+markdown block with the run's final words, mentions quieted as in a reply. Past 3,000 characters
+the card keeps the end of the words, after a leading `…`: the end of a run is what it concluded.
+A run with no words keeps the label alone, since a markdown block's text may not be empty. The
+writes of one thread's card run one after the other, and the rewrite takes the shared limiter. A
+write that fails (the card was deleted by hand) forgets the card, and the next run posts a new
+one.
+
+`SlackThread.endLoop` posts the loop's last line (`Scheduled loop ended · 14 runs`, or the paused
+or stopped line the core chose) as a new context message, after the card's last write, so it is
+the newest message of the thread and its one push. It also forgets the card: a later run posts a
+new one. The card's id is kept in memory only, so after a restart the next run posts a new card
+too. How the card looks on desktop and iOS has not been checked.
+
 ### Pushes and threads
 
 Slack's push behaviour is what makes this shape: a stream in a thread the owner started notifies
