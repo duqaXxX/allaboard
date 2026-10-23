@@ -299,7 +299,10 @@ export interface Listing {
 /**
  * What a search for `words` found: the files that exist, at most the limit asked, ranked; `count`
  * is how many there are (the matches by name once the check stopped at the limit); `complete` is
- * false when the listing it came from was cut or failed.
+ * false when the listing it came from was cut or failed. A search over an incomplete listing says
+ * so to the owner: `!open <words>` answers `OPEN_NO_MATCH_PARTIAL` instead of "no match", posts the
+ * matches with `OPEN_PARTIAL` instead of opening a single match on its own, and the modal adds the
+ * same line under its rows.
  */
 export interface Found {
   readonly paths: readonly string[];

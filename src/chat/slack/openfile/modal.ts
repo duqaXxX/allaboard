@@ -277,6 +277,7 @@ export function modalView(
     max_length: QUERY_LIMIT,
     placeholder: plainTextObject(slackTexts.OPEN_QUERY_HINT),
     dispatch_action_config: { trigger_actions_on: ["on_character_entered" as const] },
+    // Only the view `views.open` takes sets the field's initial value and focus.
     ...(opening ? { focus_on_load: true, ...(words ? { initial_value: words } : {}) } : {}),
   };
   const blocks: KnownBlock[] = [

@@ -458,73 +458,38 @@ channel as read and rings nothing.
 `!open` shares a file of a session's folder into its thread, where Slack shows it in its own file
 viewer. The word reaches the provider as `ChatProvider.openFile`, which `words.wordFlow` calls with
 the session's folder and the words typed after `!open`; a chat that declares no `fileUpload`
-answers `texts.OPEN_UNAVAILABLE` instead. The core decides what is offered, which files changed
-since the thread started and which paths are safe to read (`src/core/files/`, described in
-[Files offered by `!open`](architecture.md#files-offered-by-open)); the provider draws the picker and
-the modal and uploads the file. `src/chat/slack/openfile/` holds `modal` and `read.uploadFile`, and
-the class `Open` the handlers (`Open.openWord`, `Open.openFile`, `Open.openModal`,
-`Open.updateModal`, `Open.onOpenChoose`, `Open.onOpenQuery`, `Open.onOpenSubmit`). The file goes up
-with the Slack client's `files.uploadV2` (`files:write`, in `read.uploadFile`): the file itself, its
-basename as the name and its path from the folder as the title, and nothing posted on success. The
-size cap is Slack's limit for a snippet, `read.SNIPPET_LIMIT`, which `Open.openFile` hands to the
-core's `readOpenable`; `Open.foundFiles` turns the thread's `thread_ts` into epoch seconds
-(`open.startedAt`) for `changedIn`.
+answers `texts.OPEN_UNAVAILABLE` instead. The core decides what is offered and which paths are safe
+to read (`src/core/files/`, described in [Files offered by `!open`](architecture.md#files-offered-by-open));
+the provider draws the picker and the modal and uploads the file. The mechanism of each step is in
+the doc comments of the symbols named here.
 
-`!open` alone posts a message with one button (`modal.pickerBlocks`, action
-`modal.OPEN_BUTTON_ACTION`); `!open <words>` with several matches posts the count and the same
-button, carrying the words (at most `modal.QUERY_LIMIT` characters) as its value. The click is
-handled by `Open.onOpenChoose`: it acknowledges, checks the owner, the workspace and the channel
-(`Answers.admitted`), resolves the thread to the folder of its own entry in `state.json`
-(`Open.threadFolder`), never the channel's, and opens the modal with `views.open`. The click's
-`trigger_id` lives 3 seconds, which the channel check, the wait for the rows and `views.open` share:
-the owner check and the thread's folder are local, so the listing starts before the channel check's
-two calls to Slack, and the rows are waited for until `modal.OPEN_WAIT` seconds after the click came
-in. When they are ready the modal opens with them, else it opens with a line that says the files are
-being listed and an update fills it. The rows come from `Open.foundFiles`: the changed files, newest
-first, while the search field is empty, and `Listings.search` over the folder's listing otherwise.
-
-`modal.modalView` builds the view: an input block holding the search field (`dispatch_action` with
-`trigger_actions_on: ["on_character_entered"]`, so each character is a `block_actions` event) and,
-when there are rows, an input block holding a radio button group of at most `modal.ROW_LIMIT` (10)
-options, whose label says what the rows are. An option's text is the file name as `plain_text` with
-`emoji` false (shortened in its middle past 75 characters), so a name is never read as formatting;
-its description is the folder (shortened from the left past 75, left out for a file at the root),
-its value the path; a path over 150 characters gets no row. The search field keeps its `block_id`
-and `action_id` in every view, which is what makes Slack keep the typed text through `views.update`
-(the views.update reference, "Preserving input entry"). The same rule keeps the state of the rows'
-radio group, a chosen row included, so its `block_id` is `open_choice_block:<mark>` with a mark of
-the rows' values: other rows, another id, and the old choice is dropped. Only the view `views.open`
-takes sets the field's initial value and focus. The thread travels in the view's `private_metadata`
-(`modal.Target`) and comes back untrusted: each handler resolves it to the folder of that thread's
-own session and refuses anything else.
-
-Each typed character reaches `Open.onOpenQuery`, which checks the owner and the workspace alone (no
-call to Slack for the channel: it runs once per character, and its rows reach only the owner's own
-modal), reads the text from the action's `value` (else from `view.state.values`) and calls
-`Open.updateModal`. Each character is handled on its own and their updates can finish in any order.
-The daemon is the only writer of its modals, so an update carries no `hash` (optional in
-`views.update`); `modal.ModalUpdates` orders them by the event's `action_ts` (the first fill of a
-slow-opening modal has key 0): `ModalUpdates.claim` refuses an event not newer than one already
-taken, one update of a view runs at a time (`ModalUpdates.lock`), and each checks that it is still
-the newest when its turn comes and again before it writes (`ModalUpdates.current`), so an update
-made stale while it waited is never sent. A rejection by Slack is logged by its error code and
-dropped. At most `modal.MODALS_KEPT` views are tracked, and a view whose modal was submitted
-(`ModalUpdates.forget`) is never tracked again.
-
-The modal's **Open** button is a `view_submission` handled by `Open.onOpenSubmit`. The answer to
-Slack is the first thing sent and makes no call to it: with no row chosen it is
-`response_action: "errors"` on the radio block, or on the search field when the view has no radio
-block (nothing to choose from); with a row, a plain acknowledgement, which closes the modal. A row
-counts only when it is among the options of the submitted view's own radio block (`modal.chosenIn`),
-so a choice Slack kept from other rows is none. The row's value is untrusted input, and
-`read.readOpenable` resolves the links, refuses a path that leaves the folder or is no regular file,
-then opens the resolved path once (`O_NOFOLLOW | O_NONBLOCK`), reads the size from that descriptor
-and reads at most `read.SNIPPET_LIMIT` (1 MB) from it; an empty file is refused before any upload
-(`texts.OPEN_EMPTY`). Every other failure of the open, the stat or the read is a `read.NotAFile` too,
-and the owner reads `texts.OPEN_NOT_A_FILE` of it; when it has a cause with an error code
-(`EACCES`, `ENOENT`), `Open.openFile` logs that code once with the channel and thread ids, never
-the path. Slack gets those bytes, as a `Buffer` in the upload's `file` field: handing it
-the path would let the library open the path again, following links and with no size limit.
+- **The picker.** `!open` alone posts a message with one button (`modal.pickerBlocks`);
+  `!open <words>` with several matches posts the count and the same button, carrying the words.
+  `Open.onOpenChoose` checks the owner, the workspace and the channel (`Answers.admitted`), takes
+  the folder from the thread's own entry in `state.json` (`Open.threadFolder`), never the
+  channel's, and opens the modal with `views.open`. The click's `trigger_id` lives 3 seconds, so
+  the rows are waited for `modal.OPEN_WAIT` (1 second) after the click; when they are not ready the
+  modal opens with a line that says the files are being listed, and an update fills it.
+- **The modal.** `modal.modalView` builds a search field that sends an event for each character
+  and, when there are rows, a radio group of at most `modal.ROW_LIMIT` (10) options: the file name
+  (shortened in its middle past 75 characters), its folder as the description, its path as the
+  value; a path over 150 characters gets no row. The thread travels in `private_metadata`
+  (`modal.Target`) and comes back untrusted: each handler resolves it to the folder of that
+  thread's own session.
+- **Typing.** `Open.onOpenQuery` checks the owner and the workspace alone, with no call to Slack
+  for the channel, and calls `Open.updateModal`. The updates of one modal are written in the order
+  of the events (`modal.ModalUpdates`), and one made stale while it waited is never sent. A
+  rejection by Slack is logged by its error code and dropped.
+- **Open.** `Open.onOpenSubmit` answers Slack first, without a call to it: with no row chosen an
+  error on the radio block (on the search field when there are no rows), else a plain
+  acknowledgement that closes the modal. A row counts only when it is among the options of the
+  submitted view's own radio block (`modal.chosenIn`).
+- **Reading and uploading.** The row's value is untrusted input: `read.readOpenable` of the core
+  resolves it, holds it to the folder, opens it once and reads at most `read.SNIPPET_LIMIT`
+  (1 MB, Slack's limit for a snippet); an empty file is refused (`texts.OPEN_EMPTY`), and any other
+  failure is a `read.NotAFile` the owner reads as `texts.OPEN_NOT_A_FILE`. `read.uploadFile` sends
+  the bytes with `files.uploadV2` (`files:write`): the basename as the name, the path from the
+  folder as the title, and nothing posted on success.
 
 ## The session index
 

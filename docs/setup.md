@@ -25,8 +25,11 @@ sequence leaves out.
 - [Node.js](https://nodejs.org/) 22.19 or later, which brings `npm`. It does not have to be the
   Node your terminal uses: see [A Node of its own](#a-node-of-its-own).
 - A Slack workspace where you are the only member: a workspace admin could read or export what
-  Claude prints, and whoever controls your Slack account controls the machine. On the free plan
-  Slack allows one workspace; use it only if nobody else is in it (see Part 5).
+  Claude prints, and whoever controls your Slack account controls the machine (see Part 5). A
+  workspace of your own costs nothing: one email address can join as many workspaces as you like
+  ([Join a Slack workspace](https://slack.com/help/articles/212675257-Join-a-Slack-workspace),
+  read 2026-10-23). Slack's [pricing page](https://slack.com/pricing) lists "1" under Workspaces
+  for Free, Pro and Business+ (read 2026-10-23) and does not say whether that counts per person.
 - Full Disk Access for the Node executable that runs allaboard, only if your projects
   live in a folder macOS protects, such as `~/Documents` or `~/Desktop`. Without it a session
   there fails to start. The step is under [Folders macOS protects](#folders-macos-protects).
@@ -254,7 +257,7 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
      starts.
    - two questions about Claude Code: how long a command may run, in hours
      (`BASH_DEFAULT_TIMEOUT_MS`; Enter means 4, a number of hours with a dot for decimals such
-     as `1.5`, from 0.02 (1 minute) to 596.5), written in milliseconds, and the folder of a login of its own
+     as `1.5`, from 0.02 (72 seconds) to 596.5), written in milliseconds, and the folder of a login of its own
      (`CLAUDE_CONFIG_DIR`, skipped with Enter, absolute or starting with `~/`; it need not exist
      yet, see [Part 6](#an-instance-with-its-own-claude-code-login)). A skipped one is not
      written. The 4 hours replace the 30 minutes after which Claude Code stops a command left in
@@ -342,7 +345,9 @@ it asks for; the daemon does not check the value in the file.
 `CLAUDE_CONFIG_DIR` is a variable of Claude Code too, and allaboard reads it as well: it looks in
 that folder for Claude Code's trust record, its Chrome setting and the transcripts of the
 sessions. It is an absolute path, or starts with `~/`, and a relative one stops the start with
-`CLAUDE_CONFIG_DIR must be an absolute path, or one starting with ~/; it is "<value>"`. When the
+`CLAUDE_CONFIG_DIR must be an absolute path, or one starting with ~/; it is "<value>"` (when
+the value comes from allaboard's own environment and not from `.env`, the name is followed by
+`, set in the daemon's environment and not in .env,`). When the
 file leaves it out, the variable in allaboard's own environment applies, and when that is absent
 too, Claude Code's usual `~/.claude` and `~/.claude.json`.
 
@@ -589,10 +594,9 @@ The bot answers one person, and the rest of this list protects what that person 
   your sign-ins, and a thread in bypass may do so without asking. Leave it off in `/chrome` if
   you do not want that reachable from Slack.
 - The footer, `!status` and `!open` run git only in a repository you trusted in Claude Code by
-  itself. A repository inside a trusted folder (one Claude clones during the session, or one
-  unpacked from an archive) can name filters in its config that git would run outside the approval
-  prompt, so it shows no branch and lists no changed files until you open `claude` in it once and
-  accept the trust dialog. Accept it only for a repository whose config you know.
+  itself, since a repository's config can name filters git would run outside the approval prompt.
+  Accept the dialog only for a repository whose config you know ([How trust applies to
+  git](#how-trust-applies-to-git)).
 - With a static public IP, you can also restrict the tokens to it under **OAuth & Permissions**,
   **Restrict API Token Usage**. With a dynamic IP, the first address change stops the bot with
   `invalid_auth`.
@@ -1154,25 +1158,25 @@ a `!` is never a command.
 | `!allaboard update` / `restart` | Offers an update, or restarts allaboard | Refused |
 | `!clear` (or `!reset`, `!new`) | Opens a new session (harmless: nothing to clear yet) | Refused: `One thread is one session: send a new message in the channel to start a new one.` |
 | `!login`, `!logout` | Answered with how to do it on the host | Same, only you see it |
-| any other `!name [args]` | Opens a new session, asks its model, effort and bypass, and after **Start** runs `/name args` there if it offers that command, else sends the text as written. A command [limits.md](limits.md) lists as not offered (`!rewind`, `!diff`...) is answered in the channel instead, with what to do in its place, and opens no session | Runs `/name args` in that session if it offers the command, else shows the commands it could mean (below); an alias of a command is sent as written. A command listed as not offered is answered for you alone, and nothing reaches Claude Code |
+| any other `!name [args]` | Opens a session; after **Start** runs `/name args` if the agent offers it, else sends the text as written. A command [limits.md](limits.md) lists as not offered is answered in the channel and opens no session | Runs `/name args` if the session offers it, else suggests the commands it could mean. A command not offered is answered for you alone |
 | `!` alone | Opens a session and asks its setup, then sends `!` as written | Shows every command (below) |
-| a message, or one with files | Opens a new session, asks its model, effort and bypass, and after **Start** sends the message; the reply appears in the thread and grows as Claude works | Continues that session |
-| a question from Claude | Appears as one line with **Answer** and **Skip** | Same |
+| a message, or one with files | Opens a session, asks its setup, and after **Start** sends the message; the reply grows in the thread | Continues that session |
+| a question from Claude | One line with **Answer** and **Skip** | Same |
 
 #### Answers and limits of the words
 
 - `!bind`
   - At the top level: Lists `ALLOWED_ROOT` itself (shown as `.`) and the folders up to two levels below it, never inside a git repository, that Claude Code trusts, with a **Bind** button each; the channel's own folder is marked when it is listed. At most 20 are shown, in path order; when there are more, the higher levels fill the list first. A click never ends a running turn: it is refused until every session of the channel is idle
-  - In a thread: Refused, in an ephemeral message: `!bind works in the channel, not inside a thread.`
+  - In a thread: Refused, in an ephemeral message: `` `!bind` works in the channel, not inside a thread.``
 - `!bind <folder>`
   - At the top level: Binds the channel to a folder under `ALLOWED_ROOT`, given relative to it (`!bind my-project`); an absolute path inside it works too. A typed path may go deeper than the two levels the list shows (`!bind clients/acme/api`). A new channel does nothing else until bound. The answer names the folder each existing thread keeps working in, when it differs from the new one; every prompt sent in that thread after the bind gets the same notice, as an ephemeral message
   - In a thread: Same refusal as above
 - `!bypass on` / `off`
-  - At the top level: Refused, in a post in the channel: `Bypass belongs to one session: send !bypass on inside its thread.`
-  - In a thread: Switches that session to `bypassPermissions` and back, kept in `state.json` per thread: an idle close and a restart of allaboard keep it, `!resume` starts a session with it off. The answer is a line only you see, `Bypass is on in this session: every tool runs without asking, until !bypass off. It survives a restart.` or `Bypass is off in this session: Claude Code follows your permission settings again.`, and a ✅ on your word, which stays after a reload. Before the setup's Start (the setup waits, or was cancelled) the word changes nothing and answers `This session has not started yet: tick Bypass in its setup and press Start. If no setup is shown, send a message here first.`
+  - At the top level: Refused, in a post in the channel: ``Bypass belongs to one session: send `!bypass on` inside its thread.``
+  - In a thread: Switches that session to `bypassPermissions` and back, kept in `state.json` per thread: an idle close and a restart of allaboard keep it, `!resume` starts a session with it off. The answer is a line only you see, ``Bypass is on in this session: every tool runs without asking, until `!bypass off`. It survives a restart.`` or `Bypass is off in this session: Claude Code follows your permission settings again.`, and a ✅ on your word, which stays after a reload. Before the setup's Start (the setup waits, or was cancelled) the word changes nothing and answers `This session has not started yet: tick Bypass in its setup and press Start. If no setup is shown, send a message here first.`
 - `!plan` / `!plan off`
-  - At the top level: Refused, in a post in the channel: `Plan mode belongs to one session: send !plan inside its thread.`
-  - In a thread: `!plan` switches that session to Claude Code's plan mode, where it plans first and asks you to approve the plan before it acts; `!plan off` returns to the mode the thread would otherwise have (bypass when it is on; when your settings start the folder in plan, the default mode). While it plans, the footer and the channel's list show `⏸ plan` in place of `⚡ bypass`. The answer is a line only you see, `Plan mode is on in this session: Claude Code plans first and asks you to approve the plan. !plan off leaves it, and so does !bypass on or !bypass off.` or `Plan mode is off in this session.`, and a ✅ on your word. Plan mode is not stored: it lasts for the running session, and a restart of allaboard or an idle close reopens the session in the mode your settings give (measured on 2026-10-22: a session put in plan and resumed after a restart came back in that mode). Approving the plan returns to the mode from before it. Before the first message the word changes nothing and answers `This session has not started yet: send a message here first, then !plan.`; `!status` names the mode on its `Mode:` line.
+  - At the top level: Refused, in a post in the channel: ``Plan mode belongs to one session: send `!plan` inside its thread.``
+  - In a thread: `!plan` switches that session to Claude Code's plan mode, where it plans first and asks you to approve the plan before it acts; `!plan off` returns to the mode the thread would otherwise have (bypass when it is on; when your settings start the folder in plan, the default mode). While it plans, the footer and the channel's list show `⏸ plan` in place of `⚡ bypass`. The answer is a line only you see, ``Plan mode is on in this session: Claude Code plans first and asks you to approve the plan. `!plan off` leaves it, and so does `!bypass on` or `!bypass off`.`` or `Plan mode is off in this session.`, and a ✅ on your word. Plan mode is not stored: it lasts for the running session, and a restart of allaboard or an idle close reopens the session in the mode your settings give (measured on 2026-10-22: a session put in plan and resumed after a restart came back in that mode). Approving the plan returns to the mode from before it. Before the first message the word changes nothing and answers ``This session has not started yet: send a message here first, then `!plan`.``; `!status` names the mode on its `Mode:` line.
   - The plan comes as an approval that shows the plan's text alone (the file path Claude Code also sends is left out) as text in code blocks, the way any request shows its input: a link, a mention, a fence or HTML in it shows as the characters the model wrote and draws nothing. A plan longer than one message shows its start and its end with a line saying how many characters are not shown; Deny it if you do not know what was left out. A request whose input holds anything besides the plan and the path is shown whole, as any tool's is.
 - `!status`
   - At the top level, in small text: The channel's directory, then every thread of it that holds a session, live or closed, newest first and ten at most, each linked to its thread and led by its root's mark (⏳ working, ✋ waiting for you, ✅ or ❌ at rest, with how long ago when at rest), its bypass and running tasks, and its folder when it moved elsewhere
@@ -1199,8 +1203,8 @@ a `!` is never a command.
   - At the top level: Refused, in a post in the channel: ``Deleting a thread belongs to one session: send `!delete-thread` inside its thread.``
   - In a thread: Asks first, in a message only you see under your word, titled `Delete this thread?`, with the Home tab's warning and the buttons `Delete thread` and `Cancel`. Either button takes the question away; `Delete thread` then deletes the thread as the Home tab's Delete does ("Deleting a thread"). A thread that is working or waiting for you is refused before the question: ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` So is a thread with a pinned message: ``This thread is pinned, so it is not deleted. `!untag` removes its tag and its pin.`` when the first message carries a tag, ``This thread is pinned, so it is not deleted. Unpin its first message in Slack, then delete it.`` when it is pinned by hand, and ``A message of this thread is pinned, so it is not deleted. Unpin it in Slack, then delete it.`` when a reply is. A pin added after the question, or while the delete runs, is caught when you confirm, with the same line. Anything after the word shows the list of words. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot delete a thread here, so `!delete-thread` does nothing.`` and `!help` and `!guide` leave it out
 - `!resume`
-  - At the top level: Lists the twenty newest sessions of the channel's directory that no thread holds (not of other worktrees), terminal and Slack alike, as a post in the channel, each with the first 8 characters of its session id and a **Resume** button. A session already open in a thread of any channel has no row: the twenty rows are sessions you can resume, and a line under the list counts the open ones (`3 more are open in their own threads.`). A click resumes the session in the thread of your `!resume` message and removes the list from the channel; a list posted before that change answers `This list is out of date: send !resume again for a current one.`
-  - In a thread: Refused, in an ephemeral message: `!resume works in the channel, not inside a thread.`
+  - At the top level: Lists the twenty newest sessions of the channel's directory that no thread holds (not of other worktrees), terminal and Slack alike, as a post in the channel, each with the first 8 characters of its session id and a **Resume** button. A session already open in a thread of any channel has no row: the twenty rows are sessions you can resume, and a line under the list counts the open ones (`3 more are open in their own threads.`). A click resumes the session in the thread of your `!resume` message and removes the list from the channel; a list posted before that change answers ``This list is out of date: send `!resume` again for a current one.``
+  - In a thread: Refused, in an ephemeral message: `` `!resume` works in the channel, not inside a thread.``
 - `!resume <id or name>`
   - At the top level: A Resume click, or the id (its first 8 characters, as the list shows them, or any longer start) or the name (set with `/rename` or generated by Claude Code, and must match one session), resumes that session in the thread of your `!resume` message, with bypass never chosen (the folder's own mode) and no `/effort` level set, whatever it had before; refused when the session is already open in another thread; it never touches or waits on any other thread
   - In a thread: Same refusal as above
@@ -1209,7 +1213,7 @@ a `!` is never a command.
   - In a thread: Same, in an ephemeral message
 - `!allaboard update` / `restart`
   - At the top level: `update` asks npm for the latest version and posts an offer with an **Update** button; a click installs exactly the version shown, and running turns finish before allaboard restarts on it. `restart` restarts allaboard once running turns finish. Both need a service that starts allaboard again (`allaboard service install`)
-  - In a thread: Refused, in an ephemeral message: ``!allaboard update works in the channel, not inside a thread.``
+  - In a thread: Refused, in an ephemeral message: `` `!allaboard update` works in the channel, not inside a thread.``
 - `!login`, `!logout`
   - At the top level: Never sent to Claude Code, and no session starts. Answered in the channel: ``Log in on the host: on that machine, run `claude`, then `/login`. The login is never done from Slack.`` (for `!logout`: ``Log out on the host: on that machine, run `claude`, then `/logout`. It is never done from Slack.``)
   - In a thread: Never sent to Claude Code. The same answer, as a message only you see
@@ -1220,18 +1224,15 @@ a `!` is never a command.
   - At the top level: Appears as one line with **Answer** and **Skip**; Answer opens a form with one question at a time, the options (one or several), **Other** as the last option (choosing it shows a field, **Your answer**) and optional **Notes** while an option is chosen (not for Other alone); with several questions a line of tabs marks each answered question with ☒ and the page you are on in bold; **Next** moves on once the question has an answer; the last question's **Review** shows all the answers, each with an **Edit** button that opens that question again (its button then reads **Review** and leads back), and **Submit answers** sends them (a question's notes show under its answer); with one question **Submit** sends; **Close** shuts the form and Answer reopens it where you left it
   - In a thread: Same
 
-Where `!open` takes its files. The search reads the session's folder from disk, so it is there in a
-folder that is not a repository too, and a path relative to the folder is what it lists and `!open`
-takes. Inside a repository git may run in (see `A session starts only in a folder you have
-trusted`, above) the files are the tracked ones and the untracked ones that are not ignored, as the
-`@` file picker of Claude Code does with its `respectGitignore` setting at its default; everywhere
-else the folder is walked, regular files only. A listing stops after 2 seconds with the files found
-so far, and is kept for 30 seconds (3 when it was incomplete). The changed files are those changed
-in the session, committed since the thread started or not, plus untracked files that are not
-ignored, newest first, with paths relative to the session's folder. No git command `!open` runs
-writes the index, so none can leave an `index.lock` that stops your own `git`. The file is read
-once, from the path checked, never following a link or exceeding 1 MB, and handed to Slack as
-bytes. Which repositories count, how the start of a thread is found and the cache lifetimes are in
+Where `!open` takes its files. The search reads the session's folder from disk, so it works in a
+folder that is not a repository too, and the paths are relative to that folder. Inside a repository
+git may run in (see `A session starts only in a folder you have trusted`, above) the files are the
+tracked ones and the untracked ones that are not ignored, as the `@` file picker of Claude Code does
+with its `respectGitignore` setting at its default; everywhere else the folder is walked, regular
+files only. The changed files are those changed in the session, committed since the thread started
+or not, plus untracked files that are not ignored, newest first. The file is read once, from the
+path checked, never following a link or exceeding 1 MB, and handed to Slack as bytes. How a listing
+is built and kept, which repositories count and how the start of a thread is found are in
 [Files offered by `!open`](architecture.md#files-offered-by-open).
 
 The modal shows 10 rows, the most a Slack radio group holds, with the real count in the line above
@@ -1267,10 +1268,12 @@ click or
 `This session is already open in another thread: <link>.` instead, with a permalink to that thread: one
 session never runs in two threads at once.
 
-A message with files: Claude sees a JPEG, PNG, GIF or WebP image (up to 7.5 MB and 8000x8000 px;
+### Files in a message
+
+A message with files: Claude sees a JPEG, PNG, GIF or WebP image (up to 7.5 MB, 10 MB once base64-encoded, and 8000x8000 px;
 at most 5 images and 15 MB of images per message) as an image. Any other image type (SVG, HEIC,
-TIFF...) is refused. A text, source code, PDF, JSON, XML, YAML or Jupyter notebook file, up to 100
-MB, reaches Claude as the path of a copy in `$TMPDIR/allaboard/` (an instance's own folder, see
+TIFF...) is refused. A text or source code file (JavaScript, shell, SQL and TOML
+included), a PDF, JSON, XML, YAML or Jupyter notebook file, up to 100 MB, reaches Claude as the path of a copy in `$TMPDIR/allaboard/` (an instance's own folder, see
 [Part 6](#part-6-a-second-instance)), kept 3 days; any other
 file (archives, Office documents, binaries) is refused. A file past a limit, or one that fails to
 download, stops the whole message, and the reply says which file and why.
@@ -1678,7 +1681,7 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort`, the status of its root message (`working` or `waiting`) and the one it ended with (`done` or `error`), the text its root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file), the ids (`open_replies`, `requests`) of the replies and request messages still open, and one word for the kind of each request (`request_kinds`: `question`, `approval`, `setup` or `hold`), which the repair after a crash needs. At the top of the file, `update_notice`: the version of the update you were last told of, written once one was told; and `restart_notice`: the channel and the id of the message that said allaboard was restarting, and the version an update asked for, written just before a restart asked from a channel and removed by the next start. Apart from `root_prompt`, never a message's text |
+| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice, the `/effort` level, the status of its root message, the ids and kinds of the replies and requests a crash repair needs, and the text the root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file); at the top of the file, `update_notice` and `restart_notice`. The fields one by one and how they are written are in [State and the single-instance lock](architecture.md#state-and-the-single-instance-lock) |
 
 `state.json` looks like this; you never need to edit it:
 
@@ -1692,14 +1695,14 @@ and writes the names, as version 3, on its next save. If you select modules othe
 file names, allaboard does not start and the message names both pairs: select the ones the file
 names again, or delete the file and bind the channels again.
 
-allaboard keeps `state.json` clean on its own, when it starts and then every 6 hours, and the
-Home tab's **Refresh** runs the same pass when you press it. It forgets a channel Slack answers `channel_not_found` about, with its threads, a thread whose first
-message Slack answers `thread_not_found` about, or returns as a deleted-message tombstone (asked only
-in channels Slack found in the same pass), a thread whose Claude Code session no longer exists, and a thread that has no session and was opened more than a
-day ago. Anything it cannot tell for certain stays: a rate limit, a
-server error or an unreadable folder removes nothing, and neither does a thread or a channel
-with a session open at that moment. When Slack finds none of the bound channels it forgets none
-and says so in the log, since that is what a bot token of another workspace looks like.
+allaboard keeps `state.json` clean on its own: when it starts, every 6 hours, and when you press the
+Home tab's **Refresh**. It forgets only what an answer makes certain: a channel Slack says is gone,
+with its threads; a thread whose first message is gone; a thread whose Claude Code session no
+longer exists; a thread with no session opened more than a day ago. Anything it cannot tell for
+certain stays (a rate limit, a server error or an unreadable folder removes nothing), and so does
+a thread or a channel with a session open at that moment. When Slack finds none of the bound
+channels it forgets none and says so in the log, since that is what a bot token of another
+workspace looks like. The rules are in [Cleaning `state.json`](architecture.md#cleaning-statejson).
 
 A private channel the bot was removed from answers `channel_not_found` too, so it is forgotten
 like a deleted one. After inviting the bot back, send `!bind` there again; `!resume` brings back

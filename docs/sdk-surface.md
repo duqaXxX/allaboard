@@ -117,8 +117,8 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SessionStore` | `append` | option | goals.ts: goalStore | package | P33 |
 | `SessionStore` | `load` | option | goals.ts: goalStore | package | P7 |
 | `ToolConfig` | `askUserQuestion` | option | session.ts: TOOL_CONFIG | reference | none |
-| `ToolConfig.askUserQuestion` | `previewFormat` | option | session.ts: TOOL_CONFIG | reference | none |
-| `ToolConfig.askUserQuestion.previewFormat` | `"markdown"` | value | session.ts: TOOL_CONFIG | reference | none |
+| `ToolConfig.askUserQuestion` | `previewFormat` | option | session.ts: TOOL_CONFIG | package | none |
+| `ToolConfig.askUserQuestion.previewFormat` | `"markdown"` | value | session.ts: TOOL_CONFIG | package | none |
 | `PermissionResult` | `behavior` | option | requests.ts: permissionResult, questionResult | reference | none |
 | `PermissionResult` | `message` | option | requests.ts: permissionResult, questionResult | reference | none |
 | `PermissionResult` | `updatedInput` | option | requests.ts: permissionResult, questionResult | reference | none |
