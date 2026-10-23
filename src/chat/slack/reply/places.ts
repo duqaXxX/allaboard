@@ -180,6 +180,14 @@ export class ThreadPlaces {
    * Work out every reply's tail with `tails` of the core and hand each its own. Sync: a reply
    * whose tail did not change does nothing. Called whenever a reply's position or its resting
    * changes. A reply that stops holding the list may be let go of from then on.
+   *
+   * The list sits on the lowest reply of the whole thread once its turn has ended and its last
+   * message is no stream (`tails`). A newer reply takes it off the older one as soon as it has a
+   * message and shows it once it rests: while it is still a stream no reply shows the list, so
+   * the card never sits between two replies (seen on Slack desktop, 2026-10-15). The holder is
+   * not let go of while it holds the list, so that the list can always be taken off it; the
+   * close of the thread settles every reply that ever held it (`settleListed`). Taking the list
+   * off a reply is an edit, and no write of the list notifies.
    */
   place(): void {
     const result = this.tailsOf();

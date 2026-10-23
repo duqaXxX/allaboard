@@ -26,7 +26,20 @@ export interface ActiveTurn {
   /** Null for a turn the agent started itself, to report a task. */
   readonly turn: Turn | null;
   readonly renderer: TurnRenderer;
-  /** Prompts whose replay arrived while this turn ran: the agent took them into it. */
+  /**
+   * Prompts whose replay arrived while this turn ran: the agent took them into it. When the
+   * turn's `turn_ended` says the agent started it, `ThreadSession.finish` releases them
+   * (`ThreadSession.settle`: out of `sent`, `Turn.done` set) and adds the note
+   * `texts.TAKEN_INTO_REPLY_ONE` to the reply, through the same end notes as a restart's
+   * `N messages were not sent`. A prompt whose replay did not come during the turn waits for its
+   * own turn. An `AgentSession.interrupt` with such a prompt queued ends a report turn with
+   * `error_during_execution`, and the prompt then runs as a turn of its own. A prompt already
+   * taken in when `!stop` ends the turn with a result the agent started is released with the
+   * note like any other (not measured: what Claude Code does with it on an interrupt). If the
+   * session is abandoned first (`ThreadSession.abandon`: a lost process, a close, a restart), the
+   * prompt is listed among the messages not sent, whether or not Claude Code had taken it in;
+   * its replay is not kept.
+   */
   readonly taken: Turn[];
   /**
    * Set by `ThreadSession.finish` when a close cancelled it before the reply was closed out: the

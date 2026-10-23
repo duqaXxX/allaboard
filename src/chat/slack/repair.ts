@@ -46,8 +46,12 @@ export const SLACK_BLOCKS = 50;
  * `note` is the line that says it stopped. Never rejects. False when the message is there and
  * was not rewritten (a failed read, a failed rewrite), so the caller can ask again; a stop that
  * failed is not a reason to, since Slack ends a stream itself and the rewrite says the rest. A
- * message Slack no longer has (`GONE`) counts as ended, and one that already carries `note` in
- * a context block is left as it is: a rewrite whose answer was lost may have landed.
+ * message Slack no longer has (`GONE`: `channel_not_found`, `message_not_found` or
+ * `thread_not_found`) counts as ended, and one that already carries `note` in a context block is
+ * left as it is: a rewrite whose answer was lost may have landed. A message left open only
+ * because it showed the list of what still runs holds a finished answer, so it loses the block
+ * and gets no note. The stream's own stop is the one notification the reply owes; the edit never
+ * notifies, and nothing is posted.
  */
 export async function endReply(
   slack: WebClient,

@@ -467,8 +467,10 @@ export function cardBlock(update: TaskUpdate): TaskCardBlock {
 
 /**
  * A task's line, and under it the step of an agent that has made a call. How long the agent has
- * run as `now` (on the steady clock) reads it, worded as a task's end line words its duration, and
- * its count of calls end the agent's line, not the step's: they are the agent's.
+ * run as `now` (on the steady clock) reads it, from its start (`RunningAgent.since`), worded by
+ * `formatDuration` as a task's end line words its duration (`30s`, `4m 12s`), and its count of
+ * calls (`1 call` for one) end the agent's line, not the step's: they are the agent's. The second
+ * line reads `  ⎿ <step>`, and the pair counts as one entry of the card's lines.
  */
 function runningRows(line: RunningLine, now: number): string {
   if (line.agent === null) return take(line.text, CARD_LINE_LIMIT);
@@ -480,8 +482,14 @@ function runningRows(line: RunningLine, now: number): string {
 
 /**
  * The card of the list of what still runs: one `task_card` that keeps its `block_id` for its whole
- * life, since Slack leaves a card with a fixed id open across an edit (measured 2026-10-12,
- * desktop). Past `RUNNING_LIST_LINES` tasks the rest is told as `+N more`; an agent's step is part
+ * life, since Slack leaves a card with a fixed id open across an edit. Measured 2026-10-12 on
+ * Slack desktop: the card stays open across `chat.update` when the text above it changes, when a
+ * line of its `details` is added or removed and when its title changes; a collapsible `container`
+ * does not stay open, and a `task_card` inside a `container` is refused; a message with two
+ * blocks that share one `task_id` is refused (`invalid_blocks`), which `FakeSlack` does not check
+ * and `test/chat/slack/reply/sinks.test.ts` does. Not measured: whether the card's `details`
+ * count toward the 12,000 characters of a message written by `chat.update`. Past
+ * `RUNNING_LIST_LINES` tasks the rest is told as `+N more`; an agent's step is part
  * of its task's entry. `now` is the steady clock's reading, against which an agent's start is
  * measured.
  */

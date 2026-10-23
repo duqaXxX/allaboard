@@ -890,7 +890,10 @@ export class ReplySink implements Sink {
   /**
    * The list of what still runs this reply shows under its last message from now on, as the
    * thread's places worked it out. A change is written unless the last message is a stream, which
-   * a stop ends (the reply's rest or its end).
+   * a stop ends (the reply's rest or its end). A write of the card that failed, or whose answer
+   * was lost, is written again: the message's shown blocks are forgotten, and a reply at rest
+   * tries once more after `FINAL_RETRY_SECONDS` (`retryLater`). A stream's stop carries no card,
+   * since no stop with a `task_card` in its `blocks` was measured: the edit that follows adds it.
    */
   assign(list: RunningList | null): void {
     const moved = !isDeepStrictEqual(list, this.assigned);
