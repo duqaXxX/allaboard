@@ -119,6 +119,17 @@ test("!plan belongs to a session", async (t) => {
   assert.equal(world.inChannel().at(-1), texts.PLAN_TOP_LEVEL);
 });
 
+test("!plan with a request says the word takes none, in the channel and in a thread", async (t) => {
+  const agent = new WithPlan();
+  const world = await MessagesWorld.make(t, { agent });
+  await world.says("!plan\nPrepare a plan for a file");
+  assert.equal(world.inChannel().at(-1), texts.PLAN_TAKES_NO_TEXT);
+  const ref = await world.opened();
+  await world.says("!plan prepare a plan", ref.thread);
+  assert.equal(world.shown(ref).at(-1), texts.PLAN_TAKES_NO_TEXT);
+  assert.deepEqual(agent.modes, []);
+});
+
 test("!plan switches a started session to plan mode and !plan off returns to its mode", async (t) => {
   const agent = new WithPlan();
   const world = await MessagesWorld.make(t, { agent });

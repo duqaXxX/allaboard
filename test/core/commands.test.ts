@@ -94,7 +94,8 @@ const parseCases: [string, Command | null][] = [
   ["!delete", { kind: "passthrough", text: "delete" }],
   ["!bypass", { kind: "invalid" }],
   ["!bypass maybe", { kind: "invalid" }],
-  ["!plan maybe", { kind: "invalid" }],
+  ["!plan maybe", { kind: "plan", on: null }], // a request after the word is not taken
+  ["!plan\nPrepare a plan", { kind: "plan", on: null }],
   ["!status", { kind: "status" }],
   ["  !stop", { kind: "stop" }],
   ["!compact", { kind: "passthrough", text: "compact" }],

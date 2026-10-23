@@ -188,6 +188,11 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
         return;
       }
       case "plan": {
+        if (command.on === null) {
+          if (session === null) await talk.inChannel(channel, texts.PLAN_TAKES_NO_TEXT);
+          else await talk.tell(ref, texts.PLAN_TAKES_NO_TEXT);
+          return;
+        }
         if (session === null) {
           await talk.inChannel(channel, texts.PLAN_TOP_LEVEL);
           return;
