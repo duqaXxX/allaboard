@@ -30,7 +30,8 @@ export interface Bypass {
 
 export interface Plan {
   readonly kind: "plan";
-  readonly on: boolean;
+  /** Null when the word came with a request, which it does not take. */
+  readonly on: boolean | null;
 }
 
 export interface Status {
@@ -176,7 +177,8 @@ export function parseBang(text: string): Command | null {
         case "off":
           return { kind: "plan", on: false };
         default:
-          return { kind: "invalid" };
+          // A request sent with the word: the owner is told how plan mode is set, not the help.
+          return { kind: "plan", on: null };
       }
     case "status":
       if (rest === "") return { kind: "status" };

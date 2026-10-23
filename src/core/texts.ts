@@ -403,11 +403,14 @@ export const BYPASS_ON_THREAD =
 export const BYPASS_OFF_THREAD = naming(
   "Bypass is off in this session: {agent} follows your permission settings again.",
 );
-export const PLAN_TOP_LEVEL = "Plan mode belongs to one session: send `!plan` inside its thread.";
+export const PLAN_TOP_LEVEL =
+  "Plan mode is set per thread: start a thread with a first message, then send `!plan` on its own inside it, and your request after.";
+export const PLAN_TAKES_NO_TEXT =
+  "`!plan` takes no text: send `!plan` on its own inside a thread, then your request as a separate message.";
 // Shown only by an agent with no plan mode.
 export const PLAN_UNAVAILABLE = naming("{agent} has no plan mode.");
 export const PLAN_BEFORE_START =
-  "This session has not started yet: send a message here first, then `!plan`.";
+  "This thread has no session yet: send a first message, then `!plan`, then your request.";
 // Plan mode ends with the plan's approval, `!plan off`, or a `!bypass` word (which sets a mode).
 export const PLAN_ON_THREAD = naming(
   "Plan mode is on in this session: {agent} plans first and asks you to approve the plan. " +

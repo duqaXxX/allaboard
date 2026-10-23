@@ -53,6 +53,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `!plan` sent with a request (`!plan` and a prompt in one message) answered with the whole
+  help. It now says the word takes no text, and the top-level and before-the-first-message
+  answers say how plan mode is set: a first message opens the thread, then `!plan`, then the
+  request.
 - The channel's `✅ Done:` line names a thread by its title once the root shows one. It read the
   root at the turn's end, often before the title reached it, and kept the owner's first words; it
   is now edited when the thread's title is written or changed with `!rename`.
