@@ -54,7 +54,7 @@ function footerLine(footer: FooterFields): string {
   return [
     // No number: the scenarios run on the real clock, and their footers must read the same.
     footer.work === null ? null : "worked",
-    footer.bypass ? "bypass" : null,
+    footer.planning ? "plan" : footer.bypass ? "bypass" : null,
     footer.model,
     footer.effort === null || footer.effortObserved === null
       ? footer.effort

@@ -78,7 +78,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   effortLevels: Object.freeze(["brief", "full"]),
   effortDefault: "standard",
   liveEffort: false,
-  permissionModes: Object.freeze({ default: PLAIN_MODE, auto: null, bypass: null }),
+  permissionModes: Object.freeze({ default: PLAIN_MODE, auto: null, bypass: null, plan: null }),
   subagents: false,
   backgroundTasks: false,
   foldedNotifications: false,

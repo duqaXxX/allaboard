@@ -919,6 +919,7 @@ left unfinished does not hide the next turn's text.
 | `agent_error` with `parentCallId` set | an `assistant` record that carries `error` | nothing in the reply's text; its words become a nested line of the call's card, when the call has one (note 4) |
 | `agent_error` of kind `authentication` | the same, with `error` `authentication_failed` | a note asking to run `claude` and `/login` on the host. Claude Code sends this category for a 401 and for a 403 alike |
 | any other `agent_error` | the same, with any other `error` | the text of the message, as a notice (note 5) |
+| `model_refused` | a `system` record of subtype `model_refusal_fallback` (with a `model_changed` to `fallback_model` after it, unless `scope` is `local`) or `model_refusal_no_fallback` | a quoted warning (`> ⚠️ ` and the record's `content`, or `<model> refused this request (<category>); no other model answered.` when `content` is empty), and when `retracted_message_uuids` holds any, `> ↩ Retracted: the <model> attempt above.`. What the refused attempt wrote stays: the reply only grows. Written as a line, so it does not stand in for the turn's final text |
 | `compacted` | a `system` record of subtype `compact_boundary` | `Compacted the conversation: 15.0k → 2.0k tokens.`, from its `compact_metadata`, whether the owner asked (`!compact`) or Claude Code compacted on its own (note 6) |
 | `turn_ended` | a `result` record | its text, when nothing else was written (note 7) |
 

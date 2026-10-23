@@ -24,7 +24,7 @@ import { basename, join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { agentInfo } from "../../../src/agent/claude/info.ts";
 import { questionResult } from "../../../src/agent/claude/requests.ts";
-import { ResumeRefused } from "../../../src/agent/seam.ts";
+import { ResumeRefused, type SessionEvent } from "../../../src/agent/seam.ts";
 import type { Reply } from "../../../src/chat/seam.ts";
 import { Status, ThreadStatus } from "../../../src/chat/slack/reply/status.ts";
 import { resolvePath } from "../../../src/core/paths.ts";
@@ -374,6 +374,36 @@ test("a restart rebuilds a stored thread with its bypass", async (t) => {
   assert.equal(h.clients[1]?.modes.at(-1), "default");
   assert.ok(!new StateStore(path).thread(CHANNEL, THREAD)?.bypass);
   await restarted.close();
+});
+
+test("plan mode is session only: a reconnect does not reapply it, and a bypass word ends it", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] }, {});
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait(); // the setup's Start is behind it
+  assert.equal(await session.switchPlan(true), true);
+  assert.deepEqual(h.clients[0]?.modes, ["plan"]);
+  assert.ok(session.planning);
+  assert.ok((await session.status()).includes("Mode: `plan`"));
+  // Nothing is stored about it.
+  assert.equal(thread(h).bypass, null);
+  // A bypass word sets a mode of its own, which replaces plan.
+  await session.setBypass(true);
+  assert.ok(!session.planning);
+  assert.deepEqual(h.clients[0]?.modes, ["plan", "bypassPermissions"]);
+  // Bypass on: leaving plan mode returns to bypass.
+  assert.equal(await session.switchPlan(true), true);
+  assert.equal(await session.switchPlan(false), true);
+  assert.deepEqual(h.clients[0]?.modes.slice(-2), ["plan", "bypassPermissions"]);
+  // A new client (a restart, an idle close) starts as the thread would without plan.
+  const path = join(h.tmpPath, "state.json");
+  const restarted = new SessionManager({ ...h.deps, state: new StateStore(path) }).get(
+    CHANNEL,
+    THREAD,
+  );
+  await restarted?.ensureConnected();
+  assert.deepEqual(h.clients[1]?.modes, ["bypassPermissions"]);
+  assert.ok(!restarted?.planning);
+  await restarted?.close();
 });
 
 test("queue waits while approval pending", async (t) => {
@@ -2340,6 +2370,36 @@ test("bypass from the folder s own settings shows and turns off", async (t) => {
   assert.ok(!statuses(h).at(-1)?.startsWith("⚡ bypass"));
 });
 
+test("!plan off in a folder whose settings start in plan returns to the default mode", async (t) => {
+  const info = infoOf({ commands: [], current_permission_mode: "plan" });
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], info });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  assert.ok(session.planning);
+  assert.equal(await session.switchPlan(false), true);
+  assert.deepEqual(h.clients[0]?.modes, ["default"]);
+  assert.ok(!session.planning);
+  assert.ok((await session.status()).includes("Mode: `default`"));
+});
+
+test("the footer shows plan in place of bypass while planning, and bypass again after", async (t) => {
+  const h = harnessFor(t)({
+    turns: [sdkMessages("tools"), sdkMessages("tools"), sdkMessages("tools")],
+  });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await session.setBypass(true);
+  await session.switchPlan(true);
+  await (await session.submit("again")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("⏸ plan"), statuses(h).at(-1));
+  assert.ok(!statuses(h).at(-1)?.includes("⚡"));
+  await session.switchPlan(false);
+  await (await session.submit("third")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("⚡ bypass"), statuses(h).at(-1));
+});
+
 test("a stored bypass off is sent when the agent reports no mode, with one line in the log", async (t) => {
   // The initialize answer without `current_permission_mode`, which no SDK type declares: what a
   // release that drops the field gives. The process may have started in bypass.
@@ -4164,6 +4224,55 @@ test("a switch inside a model turn outlives that turn and goes to the usage at t
   await (await session.submit("list the files")).done.wait(); // the usage names another id
   await h.idle();
   assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "), "the usage speaks alone");
+});
+
+test("the footer names the model that answered after a refusal of the session's model", async (t) => {
+  // The usage still names the model the turn started on, as after any switch inside a turn.
+  const h = harnessFor(t)({ turns: [sdkMessages("model-refusal-fallback")] });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-opus-5-5");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 4.8 · "), statuses(h).at(-1));
+  assert.ok((await session.status()).includes("Model: `Opus 4.8`"));
+});
+
+const REFUSED_LOCAL: SessionEvent = {
+  type: "model_refused",
+  text: "A fork fell back.",
+  originalModel: "claude-opus-5-5",
+  fallbackModel: "claude-opus-4-8",
+  category: null,
+  retracted: false,
+};
+
+test("a refusal told while the thread is idle with nothing sent opens no reply", async (t) => {
+  // A fork or a side question that falls back (`scope: local`) has no result to end a reply.
+  const h = harnessFor(t)({ turns: [] });
+  const session = h.session();
+  await session.ensureConnected();
+  h.clients[0]?.inject([event(REFUSED_LOCAL)]);
+  await h.idle();
+  assert.equal(h.slack.callsTo("chat.startStream").length, 0);
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+  assert.ok(session.idle);
+});
+
+test("a refusal inside the turn of a prompt that was sent is shown", async (t) => {
+  const turn = sdkMessages("tools");
+  const h = harnessFor(t)({ turns: [[event(REFUSED_LOCAL), ...turn]] });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  const written = JSON.stringify([
+    ...h.slack.callsTo("chat.startStream"),
+    ...h.slack.callsTo("chat.appendStream"),
+    ...h.slack.callsTo("chat.stopStream"),
+    ...h.slack.callsTo("chat.postMessage"),
+    ...h.slack.callsTo("chat.update"),
+  ]);
+  assert.ok(written.includes("A fork fell back."));
 });
 
 test("a model turn after a switch gives the footer back to the usage", async (t) => {

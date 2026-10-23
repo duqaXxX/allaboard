@@ -266,6 +266,27 @@ export function answered(
   };
 }
 
+// The tool that asks the owner to approve a plan, and the two keys its input holds (measured on
+// SDK 0.3.303, 2026-10-20).
+const PLAN_TOOL = "ExitPlanMode";
+const PLAN_KEYS: ReadonlySet<string> = new Set(["plan", "planFilePath"]);
+
+/**
+ * The plan an `ExitPlanMode` approval asks for, as the text the agent wrote, without the
+ * path of the file it also names. Null for any other tool, and for an input that holds more or
+ * less than the measured shape: Approve hands the agent the whole input, so an input that could
+ * hide something behind the plan is shown whole, as any tool's is.
+ */
+export function proposedPlan(
+  name: string,
+  input: Readonly<Record<string, unknown>>,
+): string | null {
+  if (name !== PLAN_TOOL) return null;
+  const { plan } = input;
+  if (typeof plan !== "string" || plan.trim() === "") return null;
+  return Object.keys(input).every((key) => PLAN_KEYS.has(key)) ? plan.trim() : null;
+}
+
 /**
  * The terminal's view of a finished `Edit` or `Write` from what it did to a file, or null for
  * any other tool and for a call that reports no change. `cwd` is the session's folder.

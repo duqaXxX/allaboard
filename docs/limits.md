@@ -69,13 +69,14 @@ The first rows are about how a session runs, the others about commands.
 | The agent that answers questions about Claude Code, the skills on artifacts | `claude-code-guide` and three skills | Not listed | `L6` | none |  |
 | Running a shell command yourself | Claude may suggest that you type `! <command>` | Claude is not told of it, and in Slack `!` starts a command | `L5` | none |  |
 | Go back to an earlier point of the conversation or of the code | `/rewind` | Not offered | `P23` | [#13](https://github.com/duqaXxX/allaboard/issues/13) | `/rewind`, `Query.rewindFiles` |
-| Plan before any edit | `/plan`, or the mode switch on the keyboard | Not offered | `P23` | [#12](https://github.com/duqaXxX/allaboard/issues/12) | `/plan` |
+| Plan before any edit | `/plan`, or the mode switch on the keyboard | `/plan` is not offered; `!plan` inside a thread does the same by the SDK's permission mode switch, and `!plan off` leaves it. Plan mode lasts for the running session only: it does not survive a restart of allaboard or an idle close, and the session reopens in the mode your settings give (a session put in plan and resumed after a restart came back in that mode, not in plan: measured twice on 2026-10-22, SDK 0.3.304, Claude Code 2.1.304). `!bypass on` or `!bypass off` sent during plan mode ends it. Approving the plan restores the mode from before it (measured 2026-10-20, SDK 0.3.303) | `P23` | none | `/plan` |
 | Branch the conversation, or ask a side question | `/branch`, `/fork`, `/subtask`, `/btw`, `/background` | Not offered | `P23` | [#4](https://github.com/duqaXxX/allaboard/issues/4) | `/branch`, `/fork`, `/subtask`, `/btw`, `/background` |
 | Move a running session to another working directory | `/cd` | Not offered: the SDK fixes a session's working directory when it starts, so a thread works in the folder its channel was bound to (the command is refused, measured 2026-10-20 on Claude Code 2.1.303) | `P23` | none | `/cd` |
 | Review the changes, export or copy a reply | `/diff`, `/export`, `/copy` | Not offered; ask Claude for the diff, and copy from Slack | `P23` | [#14](https://github.com/duqaXxX/allaboard/issues/14) | `/diff`, `/export`, `/copy` |
 | Open the panels that manage a session | `/permissions`, `/memory`, `/hooks`, `/skills`, `/tasks`, `/sandbox` | Not offered; the settings you made in the terminal apply | `P23` | [#15](https://github.com/duqaXxX/allaboard/issues/15) | `/permissions`, `/memory`, `/hooks`, `/skills`, `/tasks`, `/sandbox` |
 | Let Claude use the apps on your screen | Computer use, a server built into Claude Code | Not available: Claude Code offers it in an interactive session only | `P24` | [#16](https://github.com/duqaXxX/allaboard/issues/16) |  |
 | Dictate a message | `/voice`, from the microphone | Not offered; an audio clip is the closest thing, below | `P23` | none | `/voice` |
+| Text a refused request wrote before the fallback model answered | When a model refuses and Claude Code retries on another, the terminal removes the messages it retracted | A reply only grows, so the text and the cards the refused attempt had already written stay, and a line after the warning says `↩ Retracted: the <model> attempt above.`. The warning is Claude Code's own sentence, quoted; the daemon does not tell which of the retracted messages is which, so nothing is marked in place. The sentence is the notice's `content`, shown as Claude Code wrote it. A fallback of a fork or a side question that is told while the thread is idle, with no prompt sent and no report awaited, shows nothing | by hand: a refusal cannot be provoked on demand | none | `SDKModelRefusalFallbackMessage` |
 
 The rows on how a session runs were measured on 2026-10-13 with Claude Code 2.1.296 and the
 TypeScript SDK 0.3.296. The first request of an interactive session and of a session started
@@ -126,9 +127,9 @@ same session started with `--chrome` listed
 Claude in Chrome as connected, which is a different server.
 
 For some rows the SDK has a way of its own, which allaboard does not use: a program can
-set a session's permission mode to `plan`, rewind the files of a session to an earlier message,
-and resume a session as a fork. The first two were run with the TypeScript SDK 0.3.303 (Claude
-Code 2.1.303) on 2026-10-20, and their issues hold the measurements.
+rewind the files of a session to an earlier message and resume a session as a fork. The first
+was run with the TypeScript SDK 0.3.303 (Claude Code 2.1.303) on 2026-10-20, and its issue holds
+the measurement. The SDK's permission mode switch to `plan` is what `!plan` uses.
 
 ## Limits of Slack
 

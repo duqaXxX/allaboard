@@ -11,7 +11,12 @@ test("the Claude back end declares what the core adapts to", () => {
     effortLevels: ["low", "medium", "high", "xhigh", "max"],
     effortDefault: "auto",
     liveEffort: true,
-    permissionModes: { default: "default", auto: "auto", bypass: "bypassPermissions" },
+    permissionModes: {
+      default: "default",
+      auto: "auto",
+      bypass: "bypassPermissions",
+      plan: "plan",
+    },
     subagents: true,
     backgroundTasks: true,
     foldedNotifications: true,

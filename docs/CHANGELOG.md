@@ -7,6 +7,31 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!plan` switches a session to the agent's plan mode and `!plan off` returns to the mode the
+  thread would otherwise have, bypass included. It is the second permission word the owner can
+  set, session only: nothing is stored, so a restart of allaboard or an idle close reopens the
+  session in its normal mode, and `!bypass on` or `off` sent during plan mode ends it. An agent
+  declares it in `PermissionModes.plan` (null for none, and the word is refused). `!status` shows
+  the mode while it is plan.
+- The approval of Claude Code's `ExitPlanMode` shows the plan's text alone, without the file path,
+  as text in the code blocks every request uses for its input, so a link, a mention or a fence in
+  the plan draws nothing and notifies nobody. A plan too long for one message shows its start and
+  its end with a line that says how much is not shown. An input with any other key is shown
+  whole, as before.
+- While a session plans, its footer and the channel's session list show `⏸ plan` in place of
+  `⚡ bypass`. `!plan off` returns to the default mode when the owner's settings start the folder
+  in plan. A session put in plan and resumed after a restart came back in the settings' mode
+  (measured 2026-10-22, SDK 0.3.304).
+- The reply shows when a model refuses a request. When Claude Code retries on another model, the
+  reply carries Claude Code's own sentence as a quoted warning (`> ⚠️ Opus 5.5's safeguards
+  flagged this session. …`), and the footer and `!status` name the model that answers from then
+  on. When no model answers, the line reads `<model> refused this request (<category>); no other
+  model answered.` unless Claude Code wrote words of its own. What the refused attempt had
+  already written stays in the reply, followed by `↩ Retracted: the <model> attempt above.`: the
+  terminal removes it, a reply cannot (`docs/limits.md`). The new agent seam event is
+  `model_refused`; `model_refusal_fallback` and `model_refusal_no_fallback` were declared by the
+  SDK and not read before. Their recordings, `model-refusal-fallback.jsonl` and
+  `model-refusal-no-fallback.jsonl`, are written by hand to the `sdk.d.ts` 0.3.304 shape.
 - `!status` in a thread lists the jobs the agent has scheduled (a `/loop`), one `Loop` line each
   with the cadence in plain words (`every minute`, `every 2 hours`, else the cron as written) and
   the start of the prompt. The agent seam gains a `scheduled_jobs` event and a `scheduledJobs`

@@ -87,11 +87,28 @@ export class WithFolderTrust extends PlainAgent {
   }
 }
 
+/** A plain agent with a plan mode, as Claude has; the mode switch is recorded on the session. */
+export class WithPlan extends PlainAgent {
+  override readonly capabilities = {
+    ...PLAIN_CAPABILITIES,
+    permissionModes: { default: "standard", auto: null, bypass: "unrestricted", plan: "planning" },
+  };
+  readonly modes: string[] = [];
+
+  override async start(options: StartOptions, requests: RequestHandler) {
+    const session = await super.start(options, requests);
+    session.setPermissionMode = async (mode) => {
+      this.modes.push(mode);
+    };
+    return session;
+  }
+}
+
 /** A plain agent with a mode that runs tools without asking, as Claude has. */
 export class WithBypass extends PlainAgent {
   override readonly capabilities = {
     ...PLAIN_CAPABILITIES,
-    permissionModes: { default: "standard", auto: null, bypass: "unrestricted" },
+    permissionModes: { default: "standard", auto: null, bypass: "unrestricted", plan: null },
   };
 
   override async start(options: StartOptions, requests: RequestHandler) {

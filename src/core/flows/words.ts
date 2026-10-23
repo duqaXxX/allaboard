@@ -10,7 +10,7 @@ import { errorName } from "../../values.ts";
 import { helpText, WORD, type Word } from "../commands.ts";
 import { guideText } from "../guide.ts";
 import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
-import { BypassUnavailable } from "../sessions/errors.ts";
+import { BypassUnavailable, PlanUnavailable } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
@@ -63,6 +63,7 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
   const { chat, agent } = deps;
   const unserved = new Set<string>();
   if (agent.capabilities.permissionModes.bypass === null) unserved.add(WORD.bypass);
+  if (agent.capabilities.permissionModes.plan === null) unserved.add(WORD.plan);
   if (!agent.capabilities.sessionListing) unserved.add(WORD.resume);
   if (!chat.capabilities.fileUpload) unserved.add(WORD.open);
   if (!chat.capabilities.threadTags) {
@@ -137,6 +138,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
           models: have.models,
           efforts: have.effortLevels.length > 0,
           bypass: have.permissionModes.bypass !== null,
+          plan: have.permissionModes.plan !== null,
           commands: have.commands,
           questions: have.questions,
           backgroundTasks: have.backgroundTasks,
@@ -181,6 +183,30 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
           await talk.tell(
             ref,
             command.on ? texts.BYPASS_ON_THREAD : named(texts.BYPASS_OFF_THREAD, names),
+          );
+        }
+        return;
+      }
+      case "plan": {
+        if (session === null) {
+          await talk.inChannel(channel, texts.PLAN_TOP_LEVEL);
+          return;
+        }
+        let switched: boolean;
+        try {
+          switched = await session.switchPlan(command.on);
+        } catch (error) {
+          if (!(error instanceof PlanUnavailable)) throw error;
+          await talk.tell(ref, named(texts.PLAN_UNAVAILABLE, names));
+          return;
+        }
+        if (!switched) {
+          await talk.tell(ref, texts.PLAN_BEFORE_START);
+        } else {
+          await talk.acknowledge(ref, message);
+          await talk.tell(
+            ref,
+            command.on ? named(texts.PLAN_ON_THREAD, names) : texts.PLAN_OFF_THREAD,
           );
         }
         return;

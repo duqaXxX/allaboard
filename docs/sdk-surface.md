@@ -181,6 +181,15 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKMessageOrigin` | `kind` | field | translate.ts: result, user | reference | none |
 | `SDKMessageOrigin` | `runId` | field | translate.ts: user | package | none |
 | `SDKMessageOrigin` | `senderTaskId` | field | translate.ts: user | reference | none |
+| `SDKModelRefusalFallbackMessage` | `api_refusal_category` | field | translate.ts: refusalFallback | package | none |
+| `SDKModelRefusalFallbackMessage` | `content` | field | translate.ts: refusalFallback | package | none |
+| `SDKModelRefusalFallbackMessage` | `fallback_model` | field | translate.ts: refusalFallback | package | none |
+| `SDKModelRefusalFallbackMessage` | `original_model` | field | translate.ts: refusalFallback | package | none |
+| `SDKModelRefusalFallbackMessage` | `retracted_message_uuids` | field | translate.ts: refusalFallback | package | none |
+| `SDKModelRefusalFallbackMessage` | `scope` | field | translate.ts: refusalFallback | package | none |
+| `SDKModelRefusalNoFallbackMessage` | `api_refusal_category` | field | translate.ts: refusalNoFallback | package | none |
+| `SDKModelRefusalNoFallbackMessage` | `content` | field | translate.ts: refusalNoFallback | package | none |
+| `SDKModelRefusalNoFallbackMessage` | `original_model` | field | translate.ts: refusalNoFallback | package | none |
 | `SDKPartialAssistantMessage` | `event` | field | translate.ts: kindOf, messageStart, contentBlockStart, contentBlockDelta | reference | none |
 | `SDKPartialAssistantMessage` | `parent_tool_use_id` | field | translate.ts: parentOf | reference | none |
 | `SDKResultMessage` | `is_error` | field | translate.ts: endingOf; session.ts: ClaudeSession.#pump | reference | none |
@@ -314,7 +323,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `PermissionMode` | `"bypassPermissions"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
 | `PermissionMode` | `"default"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
 | `PermissionMode` | `"dontAsk"` | value | session.ts: PERMISSION_MODES | reference | none |
-| `PermissionMode` | `"plan"` | value | session.ts: PERMISSION_MODES | reference | none |
+| `PermissionMode` | `"plan"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
 | `PermissionResult.behavior` | `"allow"` | value | requests.ts: permissionResult, questionResult | reference | none |
 | `PermissionResult.behavior` | `"deny"` | value | requests.ts: permissionResult, questionResult | reference | none |
 | `SDKAssistantMessage.message.content[].type` | `"advisor_tool_result"` | value | translate.ts: assistant | measured | none |
@@ -329,6 +338,9 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKMessageOrigin.kind` | `"human"` | value | translate.ts: result | reference | none |
 | `SDKMessageOrigin.kind` | `"peer"` | value | translate.ts: user | reference | none |
 | `SDKMessageOrigin.kind` | `"task-notification"` | value | translate.ts: user | package | none |
+| `SDKModelRefusalFallbackMessage.scope` | `"local"` | value | translate.ts: refusalFallback | package | none |
+| `SDKModelRefusalFallbackMessage.subtype` | `"model_refusal_fallback"` | value | translate.ts: HANDLERS | package | none |
+| `SDKModelRefusalNoFallbackMessage.subtype` | `"model_refusal_no_fallback"` | value | translate.ts: HANDLERS | package | none |
 | `SDKPartialAssistantMessage.event.content_block.type` | `"text"` | value | translate.ts: contentBlockStart | measured | none |
 | `SDKPartialAssistantMessage.event.delta.type` | `"text_delta"` | value | translate.ts: contentBlockDelta | measured | none |
 | `SDKPartialAssistantMessage.event.type` | `"content_block_delta"` | value | translate.ts: HANDLERS | measured | none |
@@ -405,8 +417,6 @@ union, none of which any recording carries.
 - `SDKLocalCommandOutputMessage`
 - `SDKMemoryRecallMessage`
 - `SDKMirrorErrorMessage`
-- `SDKModelRefusalFallbackMessage`
-- `SDKModelRefusalNoFallbackMessage`
 - `SDKNotificationMessage`
 - `SDKPermissionDeniedMessage`
 - `SDKPluginInstallMessage`
@@ -452,6 +462,15 @@ no check covers them here.
 - `"stopped"` among the values of `SDKTaskUpdatedMessage.patch.status` is in the translator's
   `TERMINAL_TASK_STATUSES`, taken from the Python SDK's list. The declaration of `patch.status`
   lacks it and the recordings show `"completed"` and `"failed"` only.
+- The rows of `SDKModelRefusalFallbackMessage` and `SDKModelRefusalNoFallbackMessage` stand on
+  `sdk.d.ts` 0.3.304 and on two recordings written by hand to that shape
+  (`model-refusal-fallback.jsonl`, `model-refusal-no-fallback.jsonl`), with the `content` of a
+  fallback measured on Claude Code 2.1.302 (2026-10-22) and the empty `content` of a refusal
+  with no fallback measured on 2.1.258. No real stream of either is recorded: the order of the
+  notice among the stream's records, and the form of the uuids in `retracted_message_uuids` for
+  a message of several blocks ("per-block derived uuids", `sdk.d.ts`), are unmeasured. The
+  daemon reads `retracted_message_uuids` for whether it holds any, never for their values. The
+  rows are `package` because the reference page was not read for them.
 - `SDKControlInitializeResponse.current_permission_mode` is in `server-info.json` and in no
   declaration. `CanUseTool.title` is declared and was absent in both permission calls measured on
   SDK 0.3.296 on 2026-10-10. `"human"` of `SDKMessageOrigin.kind` is in no recording: the results

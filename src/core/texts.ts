@@ -335,6 +335,12 @@ export const TASKS_LAUNCHED = "**{n} background tasks launched**";
 export const TASKS_LAUNCHED_BRANCH = "├ {description}";
 export const TASKS_LAUNCHED_LAST = "└ {description}";
 export const PROMPT_IMAGE = "an image";
+// A refusal in the reply: the agent's own words behind the mark, or the sentence built from
+// what it said when it gave none; and the mark of what the refused attempt left in the reply.
+export const REFUSED_MARK = "⚠️ ";
+export const REFUSED_NO_FALLBACK =
+  "{model} refused this request{category}; no other model answered.";
+export const REFUSED_RETRACTED = "↩ Retracted: the {model} attempt above.";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";
 // A goal's lines in its reply, in the terminal's words (captured 2026-10-20, Claude Code 2.1.303).
@@ -397,6 +403,17 @@ export const BYPASS_ON_THREAD =
 export const BYPASS_OFF_THREAD = naming(
   "Bypass is off in this session: {agent} follows your permission settings again.",
 );
+export const PLAN_TOP_LEVEL = "Plan mode belongs to one session: send `!plan` inside its thread.";
+// Shown only by an agent with no plan mode.
+export const PLAN_UNAVAILABLE = naming("{agent} has no plan mode.");
+export const PLAN_BEFORE_START =
+  "This session has not started yet: send a message here first, then `!plan`.";
+// Plan mode ends with the plan's approval, `!plan off`, or a `!bypass` word (which sets a mode).
+export const PLAN_ON_THREAD = naming(
+  "Plan mode is on in this session: {agent} plans first and asks you to approve the plan. " +
+    "`!plan off` leaves it, and so does `!bypass on` or `!bypass off`.",
+);
+export const PLAN_OFF_THREAD = "Plan mode is off in this session.";
 export const STOPPED = "Stopped the current turn.";
 // An answered question, as the terminal keeps it in the transcript.
 export const ANSWERED = naming("User answered {author}'s questions:");
@@ -504,6 +521,7 @@ export const STATUS_CHANNEL_IDLE = "idle";
 export const STATUS_CHANNEL_SINCE = " · {ago}";
 export const STATUS_CHANNEL_SESSION = "Session"; // the link's label for a session with no title yet
 export const STATUS_CHANNEL_BYPASS = " · ⚡ bypass";
+export const STATUS_CHANNEL_PLAN = " · ⏸ plan";
 export const STATUS_CHANNEL_FOLDER = " · folder `{directory}`";
 export const STATUS_CHANNEL_LINK_FALLBACK = "thread `{thread_ts}`";
 export const HELP_OWN = "**allaboard**";
@@ -522,6 +540,9 @@ export const HELP_WORDS: readonly Named[] = [
     "relative to the allowed root; in the channel, refused inside a thread",
   "`!bypass on|off` run every tool without asking, until `!bypass off`; it survives a " +
     "restart; inside a thread, refused in the channel",
+  "`!plan [off]` plan before acting: {agent} proposes a plan and asks you to approve it; " +
+    "`!plan off` leaves plan mode; this session only, it does not survive a restart; inside a " +
+    "thread, refused in the channel",
   "`!resume [session]` this directory's sessions, or resume one by id or name in the " +
     "thread of your `!resume` message; in the channel, refused inside a thread",
   "`!open [file]` share a file of the session's folder into the thread, where {chat} opens it in " +
@@ -671,6 +692,13 @@ export const GUIDE_BYPASS = naming(
     "`!bypass on`, sent inside a session's thread, lets {agent} run every tool without asking in " +
     "that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ " +
     "bypass while it is on.",
+);
+export const GUIDE_PLAN = naming(
+  "**Plan mode**\n" +
+    "`!plan`, sent inside a session's thread, makes {agent} plan before it acts: it proposes a plan " +
+    "and asks you to approve it. `!plan off` leaves plan mode, and so does `!bypass on` or " +
+    "`!bypass off`. It belongs to the running session: a restart of allaboard or an idle close " +
+    "puts the session back in its normal mode.",
 );
 export const GUIDE_TAGS = naming(
   "**Tags**\n" +

@@ -377,7 +377,7 @@ test("declared state off: what the agent says of its state changes no line", asy
 test("bypass with no bypass mode: the word is refused and nothing is stored", async (t) => {
   const h = harnessFor(t)({});
   lacking(h, {
-    permissionModes: { default: "default", auto: null, bypass: null },
+    permissionModes: { default: "default", auto: null, bypass: null, plan: null },
   });
   const session = h.session();
   await session.ensureConnected();
@@ -393,7 +393,7 @@ test("bypass with no bypass mode: the word is refused and nothing is stored", as
 test("a stored bypass on an agent with no bypass mode: the connect fails and no mode is set", async (t) => {
   const h = harnessFor(t)({});
   lacking(h, {
-    permissionModes: { default: "default", auto: null, bypass: null },
+    permissionModes: { default: "default", auto: null, bypass: null, plan: null },
   });
   const session = h.session();
   h.state.setSession(CHANNEL, THREAD, "session-1");

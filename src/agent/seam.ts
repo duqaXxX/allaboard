@@ -42,6 +42,8 @@ export interface PermissionModes {
   readonly auto: PermissionMode | null;
   /** The mode that skips permission requests. */
   readonly bypass: PermissionMode | null;
+  /** The mode that plans before it acts: the agent proposes, the owner approves. */
+  readonly plan: PermissionMode | null;
 }
 
 /** What an agent says it is doing (`state_changed`), for one that declares `declaredState`. */
@@ -516,6 +518,21 @@ export type SessionEvent =
       readonly category: string;
       readonly text: string;
       readonly parentCallId: string | null;
+    }
+  /**
+   * The model refused a request. `fallbackModel` is the model that answers instead, or null
+   * when none did. `text` is the agent's own sentence about it, which can be empty. `retracted`:
+   * the agent withdrew what the refused attempt had written, and the reply still holds it.
+   * Said when the agent decides, so a switch of the session's model (`model_changed`) follows
+   * it. A refusal says which attempt it concerns by position only: it carries no call.
+   */
+  | {
+      readonly type: "model_refused";
+      readonly text: string;
+      readonly originalModel: string;
+      readonly fallbackModel: string | null;
+      readonly category: string | null;
+      readonly retracted: boolean;
     }
   /**
    * The agent's process is gone and the core did not close it. The last event of the session:

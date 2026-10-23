@@ -945,3 +945,65 @@ test("a note with no choice sends nothing", () => {
   });
   assert.equal(draftAnswers(draft, TWO), null);
 });
+
+// --- ExitPlanMode: the plan as text in the generic code blocks ---
+
+const PLAN_INPUT = {
+  plan: "## Plan\n\n1. Read `src/a.ts`\n2. Change it",
+  planFilePath: "/home/dev/.claude/plans/sample.md",
+};
+
+test("an ExitPlanMode approval shows the plan alone in the generic code blocks", () => {
+  const blocks = approvalBlocks("abc", permission({ toolName: "ExitPlanMode", input: PLAN_INPUT }));
+  assert.deepEqual(blocks, [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: "Claude Code asks to use *ExitPlanMode*" },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "```\n## Plan\n\n1. Read `\u200bsrc/a.ts`\u200b\n2. Change it\n```",
+      },
+    },
+    blocks.at(-1),
+  ]);
+  assert.ok(!JSON.stringify(blocks).includes("planFilePath"));
+  assert.deepEqual(actionIds(blocks), [APPROVAL_ALLOW, APPROVAL_DENY]);
+});
+
+test("a plan with a link, mentions and a fence shows as literal text", () => {
+  const plan = "[x](http://evil.example) <!here> <@U000ALICE>\n```\nrm -rf\n```\n<!-- c -->";
+  const blocks = approvalBlocks("abc", permission({ toolName: "ExitPlanMode", input: { plan } }));
+  const shown = blocks.filter((b) => b.type === "section").map((b) => b.text.text as string);
+  assert.equal(
+    shown[1],
+    "```\n[x](http://evil.example) &lt;!here&gt; &lt;@U000ALICE&gt;\n`\u200b`\u200b`\u200b\nrm -rf\n`\u200b`\u200b`\u200b\n&lt;!-- c --&gt;\n```",
+  );
+});
+
+test("a plan longer than the approval limit is cut by the rule every input follows", () => {
+  const long = `${"a".repeat(200_000)}\nTHE END`;
+  const plan = approvalBlocks(
+    "abc",
+    permission({ toolName: "ExitPlanMode", input: { plan: long } }),
+  );
+  const same = approvalBlocks("abc", permission({ toolName: "Bash", input: { command: long } }));
+  // Full to Slack's limit, the actions block closing it, the start and the end kept.
+  assert.ok(plan.length === 50 && plan.at(-1)?.type === "actions");
+  assert.ok(plan.at(-2)?.text.text.includes("THE END"));
+  const notice = plan.filter((b) => b.type === "context").flatMap((b) => b.elements[0].text);
+  assert.ok(notice.some((n: string) => n.includes("not shown")));
+  assert.equal(plan.length, same.length);
+  assert.equal(plan.filter((b) => b.type === "context").length, 1);
+});
+
+test("an ExitPlanMode input with another key is shown whole, as any input is", () => {
+  const blocks = approvalBlocks(
+    "abc",
+    permission({ toolName: "ExitPlanMode", input: { ...PLAN_INPUT, extra: "x" } }),
+  );
+  assert.ok(JSON.stringify(blocks).includes("extra"));
+  assert.ok(JSON.stringify(blocks).includes("planFilePath"));
+});

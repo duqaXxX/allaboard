@@ -12,7 +12,13 @@ import { fill } from "../../../src/core/texts.ts";
 import { shellQuote } from "../../../src/text.ts";
 import { OWNER } from "../../support/memory-chat.ts";
 import { call, die, hold, type PlainAgent } from "../../support/plain-agent.ts";
-import { MessagesWorld, PLAIN_NAMES, WithBypass, WithFolderTrust } from "./messages-world.ts";
+import {
+  MessagesWorld,
+  PLAIN_NAMES,
+  WithBypass,
+  WithFolderTrust,
+  WithPlan,
+} from "./messages-world.ts";
 
 const header = (directory: string): string => fill(texts.STATUS_CHANNEL_HEADER, { directory });
 const linkTo = (thread: string): string =>
@@ -139,6 +145,17 @@ test("a row says bypass, and the folder of a thread the channel left behind", as
       texts.STATUS_CHANNEL_BYPASS +
       fill(texts.STATUS_CHANNEL_FOLDER, { directory: world.folder }),
   );
+});
+
+test("a row says plan in place of bypass while the session plans", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new WithPlan() });
+  const ref = await world.opened("one");
+  await world.says("!bypass on", ref.thread);
+  await world.says("!plan", ref.thread);
+  await world.says("!status");
+  const row = world.inChannel().at(-1)?.split("\n")[1] ?? "";
+  assert.ok(row.includes(texts.STATUS_CHANNEL_PLAN), row);
+  assert.ok(!row.includes(texts.STATUS_CHANNEL_BYPASS), row);
 });
 
 test("a title the agent cannot list leaves the row with no time", async (t) => {

@@ -85,7 +85,11 @@ export function channelStatus(deps: FlowDeps, talk: Talk): ChannelStatus {
     if (live?.runningKinds) {
       line += ` · ${fill(texts.RUNNING, { counts: live.runningKinds })}`;
     }
-    if (live === null ? stored.bypass === true : live.bypass) line += texts.STATUS_CHANNEL_BYPASS;
+    // The mode in force: plan replaces bypass while it lasts, and only a live session has it.
+    if (live?.planning) line += texts.STATUS_CHANNEL_PLAN;
+    else if (live === null ? stored.bypass === true : live.bypass) {
+      line += texts.STATUS_CHANNEL_BYPASS;
+    }
     const directory = live?.directory ?? stored.directory;
     if (directory !== channelDirectory) {
       line += fill(texts.STATUS_CHANNEL_FOLDER, { directory });

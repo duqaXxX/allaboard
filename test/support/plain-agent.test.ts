@@ -88,6 +88,7 @@ test("the plain agent declares what the plan's table lists", () => {
     default: PLAIN_MODE,
     auto: null,
     bypass: null,
+    plan: null,
   });
   const lacks = ["subagents", "backgroundTasks", "compaction", "usageLimits", "models"] as const;
   for (const capability of [
