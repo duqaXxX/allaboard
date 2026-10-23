@@ -1658,8 +1658,10 @@ messages not sent, whether or not Claude Code had taken it in; its replay is not
   turn. It runs through the same start and end of a turn as any other, with a `LoopReply`
   (`core/reply/loop-card.ts`) as its reply: the renderer feeds it, it keeps the words and drops
   the calls, and it writes them with `ThreadChat.showLoop` when the turn's body ends. A run moves
-  no status reaction, owes no footer and starts no timing of work, and its end releases no prompt
-  (`ActiveTurn.run`). An approval or a question a run asks goes the normal way.
+  no status reaction, owes no footer of its own and starts no timing of work, and its end releases
+  no prompt (`ActiveTurn.run`). Its result builds the footer for the card instead
+  (`ThreadSession.dateRun`: the same `footer` an ordinary reply gets, with the run's own duration
+  and end time), carried in `LoopCard.footer` and dated by `LoopCard.at`. An approval or a question a run asks goes the normal way.
 - A turn is not taken for a run when a prompt of the owner's was replayed since the last turn
   started (`promptReplayed`: Claude Code runs it in a turn of its own after a cron took the turn
   that was guessed to be its), when a background task runs, or when a report was given up on

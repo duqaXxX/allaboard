@@ -39,8 +39,10 @@ All notable changes to this project are documented here. The format follows
   that holds a scheduled job is no longer closed after an hour idle: the list is believed for 7
   days after the agent last reported it, the time Claude Code keeps a job.
 - A scheduled run (a turn the agent opens by itself while a job is believed) no longer opens a
-  reply of its own. The thread gets one card, `Scheduled run · every minute · run 14`, that each
-  run rewrites with its final words, so a run notifies nobody; the card shows no tool calls. When
+  reply of its own. The thread gets one card, `Scheduled run · every minute · run 14 · 22:18`,
+  that each run rewrites with its final words and the footer of an ordinary reply, drawn with the
+  data of that run and the time of the run in the label, so a run notifies nobody; the card shows
+  no tool calls and only the latest run. `LoopCard` carries `at` and `footer`. When
   the last job is deleted or the 7 days pass, one message says `Scheduled loop ended · 14 runs`.
   The chat seam gains `ThreadChat.showLoop` and `endLoop` and the capability `loopCard`. When the
   process goes away (a restart, `!stop`, a lost process) with a recurring job still believed, the

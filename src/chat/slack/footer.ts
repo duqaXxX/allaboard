@@ -37,19 +37,24 @@ function short(field: FooterField): string {
 }
 
 /**
- * `34m 17s · done <time>`. The time is Slack's own date formatting, which draws it in the time
- * zone and the 12 or 24 hour clock of the device that reads it; the fallback, for a client that
- * cannot, carries the zone as Slack's page recommends. Not escaped: the control sequence must
- * reach Slack as written.
+ * A moment as the time of day, Slack's own date formatting: drawn in the time zone and the 12 or
+ * 24 hour clock of the device that reads it, with the zone in the fallback. Not escaped: the
+ * control sequence must reach Slack as written.
  */
-function workPart(work: NonNullable<FooterFields["work"]>): string {
+export function slackTime(epochMs: number): string {
   const fallback = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
-  }).format(work.doneAt);
-  const time = `<!date^${Math.floor(work.doneAt / 1000)}^{time}|${fallback}>`;
-  return `${formatWorkDuration(work.durationMs)} · done ${time}`;
+  }).format(epochMs);
+  return `<!date^${Math.floor(epochMs / 1000)}^{time}|${fallback}>`;
+}
+
+/**
+ * `34m 17s · done <time>`.
+ */
+function workPart(work: NonNullable<FooterFields["work"]>): string {
+  return `${formatWorkDuration(work.durationMs)} · done ${slackTime(work.doneAt)}`;
 }
 
 /**
