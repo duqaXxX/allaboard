@@ -20,6 +20,7 @@ import {
   type EventOf,
   recordedEvents as events,
   eventsOf as of,
+  translated,
   splitTurns as turns,
 } from "../../support/replay.ts";
 
@@ -1523,3 +1524,88 @@ for (const [command, text] of [
     assert.deepEqual(of(resultEvents(wire), "effort_changed"), []);
   });
 }
+
+// A refusal and the model that answers instead: `model-refusal-fallback.jsonl` and
+// `model-refusal-no-fallback.json` are written by hand to the shapes of `SDKModelRefusal*Message`
+// in the SDK's `sdk.d.ts` (0.3.304); the words of the first were measured on Claude Code 2.1.302
+// (2026-10-22), and the second holds the empty `content` measured on 2.1.258.
+
+const FALLBACK_AT = 8;
+const NO_FALLBACK_AT = 2;
+const REFUSED_WORDS = (record("model-refusal-fallback", FALLBACK_AT).content as string).slice(
+  0,
+  40,
+);
+
+test("a fallback after a refusal gives the agent's words, the two models and the retraction", () => {
+  const made = perRecord("model-refusal-fallback")[FALLBACK_AT] as SessionEvent[];
+  const refused = of(made, "model_refused");
+  assert.equal(refused.length, 1);
+  assert.equal(refused[0]?.text.slice(0, 40), REFUSED_WORDS);
+  assert.ok(refused[0]?.text.endsWith("Details: `[cyber]`"));
+  assert.deepEqual(
+    { ...refused[0], text: "" },
+    {
+      type: "model_refused",
+      text: "",
+      originalModel: "claude-opus-5-5",
+      fallbackModel: "claude-opus-4-8",
+      category: "cyber",
+      retracted: true,
+    },
+  );
+});
+
+test("a fallback of the session moves the model the footer names", () => {
+  const made = perRecord("model-refusal-fallback")[FALLBACK_AT] as SessionEvent[];
+  assert.deepEqual(of(made, "model_changed"), [
+    { type: "model_changed", model: "claude-opus-4-8" },
+  ]);
+});
+
+test("a fallback of one agent alone leaves the model of the session", () => {
+  const wire = { ...record("model-refusal-fallback", FALLBACK_AT), scope: "local" };
+  assert.deepEqual(of(translated([wire]), "model_changed"), []);
+  assert.equal(of(translated([wire]), "model_refused").length, 1);
+});
+
+test("a fallback from an older CLI, with no scope, is the session's", () => {
+  const { scope: _, ...wire } = record("model-refusal-fallback", FALLBACK_AT);
+  assert.deepEqual(of(translated([wire]), "model_changed"), [
+    { type: "model_changed", model: "claude-opus-4-8" },
+  ]);
+});
+
+test("a fallback that retracted nothing says so", () => {
+  for (const retracted_message_uuids of [[], undefined]) {
+    const wire = { ...record("model-refusal-fallback", FALLBACK_AT), retracted_message_uuids };
+    assert.equal(of(translated([wire]), "model_refused")[0]?.retracted, false);
+  }
+});
+
+test("a refusal with no fallback gives its fields, and no model change", () => {
+  const made = perRecord("model-refusal-no-fallback")[NO_FALLBACK_AT];
+  assert.deepEqual(made, [
+    {
+      type: "model_refused",
+      text: "",
+      originalModel: "claude-opus-5-5",
+      fallbackModel: null,
+      category: "cyber",
+      retracted: false,
+    },
+  ]);
+});
+
+test("a refusal names no category when the API gave none", () => {
+  const wire = {
+    ...record("model-refusal-no-fallback", NO_FALLBACK_AT),
+    api_refusal_category: null,
+  };
+  assert.equal(of(translated([wire]), "model_refused")[0]?.category, null);
+});
+
+test("a refusal record with no original model gives no event", () => {
+  const { original_model: _, ...wire } = record("model-refusal-no-fallback", NO_FALLBACK_AT);
+  assert.deepEqual(translated([wire]), []);
+});

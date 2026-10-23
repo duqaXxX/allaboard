@@ -1825,3 +1825,75 @@ test("a command with no text to show is not timed", async () => {
   assert.equal(sink.tasks[0]?.startedAt, null);
   assert.equal(sink.tasks[0]?.details, null);
 });
+
+// A refusal and the model that answers instead: `model-refusal-fallback` and
+// `model-refusal-no-fallback`, written by hand (see `test/agent/claude/translate.test.ts`).
+
+const DISPLAY: Readonly<Record<string, string>> = {
+  "claude-opus-5-5": "Opus 5.5",
+  "claude-opus-4-8": "Opus 4.8",
+};
+
+async function renderDisplayed(events: readonly SessionEvent[]): Promise<string> {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(sink, NAMES, null, true, undefined, (id) => DISPLAY[id] ?? id);
+  for (const event of events) await renderer.feed(event);
+  await renderer.close();
+  await renderer.closeOut();
+  return sink.texts.join("");
+}
+
+test("a fallback shows the agent's words as a quoted warning, and keeps the refused text", async () => {
+  const reply = await renderDisplayed(recordedEvents("model-refusal-fallback"));
+  const refused = reply.indexOf("Let me look at the");
+  const warning = reply.indexOf("> ⚠️ Opus 5.5's safeguards flagged this session.");
+  const answer = reply.indexOf("The folder holds three files.");
+  assert.ok(refused !== -1, "the retracted text stays");
+  assert.ok(refused < warning && warning < answer, "in the order it happened");
+  assert.ok(reply.includes("\n>\n> Details: `[cyber]`"), "every line of the words is quoted");
+  const [refusal] = eventsOf(recordedEvents("model-refusal-fallback"), "model_refused");
+  assert.ok(refusal);
+  const quoted = refusal.text
+    .split("\n")
+    .map((line, i) => (i === 0 ? `> ⚠️ ${line}` : line ? `> ${line}` : ">"))
+    .join("\n");
+  assert.ok(reply.includes(quoted), "verbatim, link included");
+});
+
+test("a fallback that retracted something marks it, naming the model", async () => {
+  const [recorded] = eventsOf(recordedEvents("model-refusal-fallback"), "model_refused");
+  assert.ok(recorded);
+  const marked = await renderDisplayed([recorded]);
+  assert.ok(marked.includes("> ↩ Retracted: the Opus 5.5 attempt above."));
+  const unmarked = await renderDisplayed([{ ...recorded, retracted: false }]);
+  assert.equal(unmarked.includes("Retracted"), false);
+});
+
+test("a refusal with no words builds its line from the fields", async () => {
+  const [recorded] = eventsOf(recordedEvents("model-refusal-no-fallback"), "model_refused");
+  assert.ok(recorded);
+  assert.equal(recorded.text, "");
+  assert.equal(
+    (await renderDisplayed([recorded])).trim(),
+    "> ⚠️ Opus 5.5 refused this request (cyber); no other model answered.",
+  );
+  assert.equal(
+    (await renderDisplayed([{ ...recorded, category: null }])).trim(),
+    "> ⚠️ Opus 5.5 refused this request; no other model answered.",
+  );
+});
+
+test("a refusal with words shows them, not the line built from the fields", async () => {
+  const [recorded] = eventsOf(recordedEvents("model-refusal-no-fallback"), "model_refused");
+  assert.ok(recorded);
+  const reply = await renderDisplayed([{ ...recorded, text: "Declined.\nAsk again." }]);
+  assert.equal(reply.trim(), "> ⚠️ Declined.\n> Ask again.");
+});
+
+test("a refusal's line does not take the place of the turn's final text", async () => {
+  const [recorded] = eventsOf(recordedEvents("model-refusal-no-fallback"), "model_refused");
+  const [ended] = eventsOf(recordedEvents("tools"), "turn_ended");
+  assert.ok(recorded && ended);
+  const reply = await renderDisplayed([recorded, { ...ended, finalText: "Final words." }]);
+  assert.ok(reply.includes("Final words."));
+});
