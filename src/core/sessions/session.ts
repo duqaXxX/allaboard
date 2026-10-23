@@ -500,8 +500,15 @@ export class ThreadSession {
   }
 
   /**
-   * The owner's last word on bypass in this thread, as state.json holds it (a restart keeps
-   * it): true on, false off, null never chosen.
+   * The owner's last word on bypass in this thread, as state.json holds it: true on, false off,
+   * null never chosen. An idle close and a restart of the daemon, whatever its cause, keep it,
+   * and `ensureConnected` gives the next agent process the mode back through
+   * `AgentSession.setPermissionMode`: on sets the bypass mode, an explicit off in a folder whose
+   * own settings start in bypass sets the default one (so the folder's bypass does not return
+   * silently), never chosen leaves the agent's own mode. Claude Code's own `--resume` never
+   * restores `bypassPermissions` (documented: "Resume and bypass" in `docs/architecture.md`).
+   * Bypass and the effort level belong to the thread, not to the agent's session id, so a
+   * session `!resume` opens starts with both unset.
    */
   get bypassChoice(): boolean | null {
     return this.deps.state.thread(this.channelId, this.threadId)?.bypass ?? null;
@@ -631,7 +638,9 @@ export class ThreadSession {
 
   /**
    * The jobs the agent has scheduled and the session still believes in: its last list, unless
-   * it is older than the agent keeps a job (`LOOPS_BELIEVED_SECONDS`).
+   * it is older than the agent keeps a job (`LOOPS_BELIEVED_SECONDS`). The list comes with the
+   * `scheduled_jobs` event of an agent that declares `scheduledJobs`, is kept in memory only,
+   * and `!status` shows it.
    */
   get scheduledJobs(): readonly ScheduledJob[] {
     const stale = this.deps.clock.time() - this.jobsListedAt >= LOOPS_BELIEVED_SECONDS;
@@ -2034,6 +2043,12 @@ export class ThreadSession {
    * turn that prompt gets of its own. One that arrives inside a running turn means the agent
    * took the prompt into that turn, which then ends with one result for both (measured
    * 2026-10-06, CLI 2.1.286): `finish` releases it.
+   *
+   * The session never waits for a replay: the back end makes `prompt_taken` only of a record
+   * whose uuid it sent, and an id that names no prompt still held as sent (in `sent`, or the
+   * active turn's own) is ignored. A replay with no turn running names the prompt of the turn
+   * that starts next (`whoseTurn`), whatever the session was waiting for. The worker sends one
+   * prompt at a time, so a turn takes in at most one.
    */
   private acknowledge(promptId: string): boolean {
     const active = this.active;
@@ -3039,7 +3054,10 @@ export class ThreadSession {
 
   /**
    * Close an agent process nothing has needed for IDLE_CLOSE_SECONDS. Silent: idle means
-   * nothing is running, sent or queued for `close()` to end with a line.
+   * nothing is running, sent or queued for `close()` to end with a line. The next message
+   * rebuilds the `ThreadSession` and starts the agent again with the stored session id to
+   * resume, silently, as any other start does. A thread whose agent lists a scheduled job is
+   * not closed: the agent starts its turns by itself, and a closed process would stop them.
    */
   private async closeWhenIdle(signal: AbortSignal): Promise<void> {
     // A session with a scheduled job is idle by the hour and not for closing: the agent wakes
@@ -3070,7 +3088,8 @@ export class ThreadSession {
    * `prompt-replay-*`, `compact` and `auto-compact*` (CLI 2.1.286 and 2.1.292). A replay
    * therefore names the turn's prompt, whatever was awaited. And when a task's notification is
    * waiting to be reported, a turn that opens with words (`worded`) and no replay is that
-   * report, not the plain prompt that waits beside it.
+   * report, not the plain prompt that waits beside it (measured: "Prompt replay" and "Prompt
+   * sent before a notification" in `docs/architecture.md`).
    *
    * Everywhere else the answer is the older guess, which `settle` corrects at the turn's end.
    * No recording covers those turns: one that opens with a compaction starts before its

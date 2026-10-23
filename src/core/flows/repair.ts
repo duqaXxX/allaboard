@@ -28,6 +28,22 @@ export type RepairState = Pick<
  * fields is cleared when the chat repaired it or said its message is gone, and kept when the
  * chat did not: the next start asks again, once, and so does every start after it for as long
  * as the chat keeps refusing and the thread is in the state.
+ *
+ * Each open reply is ended where it stands with `texts.STOPPED_BEFORE_ANSWER`. A request is
+ * withdrawn when the thread had an open reply, which carries the stopped line. With none, a
+ * question or an approval (the kinds that stand for a turn: it opened the turn, and a reply
+ * starts on its first write, so no reply message exists) is rewritten into that line, an edit
+ * that notifies nobody, so the thread does not show the owner's message alone; a rewrite the
+ * chat refuses falls back to the withdrawal. A thread gets the line once per start: after the
+ * first successful rewrite the other requests are withdrawn. A second line can appear across two
+ * starts, when a withdrawal the chat refused at the first start is rewritten at the second. The
+ * setup form, the same-folder hold and an entry with no kind are always withdrawn: the owner's
+ * message was never sent for them, and a line saying an answer stopped would be false. A root
+ * left working or waiting gets the error status, only where the chat has `reactions`; one the
+ * chat did not show keeps its word for the next start beside the error one as `ended`, which is
+ * what a list of the sessions reads first. `ThreadChat.withdraw` and `endReply` answer whether
+ * the chat did it; `rewrite` rejects when it did not. A failed `state.json` write is logged and
+ * swallowed, never left to break startup.
  */
 export async function repair(chat: ChatProvider, state: RepairState): Promise<void> {
   for (const [channelId, threadId, thread] of state.repairsPending()) {

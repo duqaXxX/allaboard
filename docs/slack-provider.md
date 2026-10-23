@@ -347,48 +347,26 @@ closes its cards first.
 ### The list of what still runs
 
 While a subagent or a background command runs, one `task_card` lists it, above the footer's
-divider if the reply has one, in the thread's last reply once it rests: the lowest reply of the
-whole thread, when its turn has ended and its last message is no stream (`tails` of the core,
-applied by `ThreadPlaces.place`). A newer reply takes the list off the older one as soon as it
-has a message, and shows it once it rests: while it is still a stream no reply shows the list, so
-the card never sits between two replies (seen on Slack desktop, 2026-10-15). The newer reply
-asks for that before it creates its first message (`ThreadPlaces.opens`), and the older one
-writes its edit at once, not after the debounce (`ReplySink.unlist`): the message is created
-once the list is off. `ThreadChat.showRunning` hands the list over and
-the reply that holds it writes it with its next pass, on a reply at rest or one whose end has
-landed. The card is `{ type: "task_card", block_id: "running-list", task_id: "running-list",
-status: "in_progress" }` with the title the core made (`2 agents · 1 shell still running`, cut at
-`blocks.CARD_TITLE_LIMIT`) and `details` of up to `blocks.RUNNING_LIST_LINES` lines, one per task,
-then `+N more`. A subagent that has made a call (`RunningLine.agent`) ends its line with
-` · <duration> · <n> calls` (`1 call` for one), has a second line under it with the call it is
-at, `  ⎿ <step>`, and counts as one entry of those lines. `<duration>` is how long the agent has run when the card is
-drawn, from its start (`RunningAgent.since`) to the steady clock's reading, worded by
-`formatDuration` as a task's end line words it (`30s`, `4m 12s`). The `block_id` is the same for the card's whole life, and no tool call's id has
-that form. Taking the list off a reply is an edit too, and no write of it notifies.
+divider, in the thread's last reply once it rests.
 
-A stream's stop carries no card; the edit that follows adds it, since no stop with a `task_card`
-in its `blocks` was measured. A message that shows the list stays among the open
-replies (`ReplySink.keepsOpen`), and `repair.endReply` removes the block whose `block_id` or
-`task_id` is `running-list`, where it closes a left-over card as an error; on a message that only
-the list kept open it writes no note. `ThreadPlaces` does not let go of the
-reply that holds the list while it does, so that the list can always be taken off it; the close
-of the thread settles every reply that ever held it, let go of or not. A reply takes the list only
-from what the places assigned it once it rests, so the ending of a reply whose end is still on its
-way never carries a second card. A write of the card that failed, or whose
-answer was lost, is written again: the message's shown blocks are forgotten, and a reply at rest
-tries once more after `FINAL_RETRY_SECONDS`. When a continuation is written, the message before it
-is rewritten in the same pass, so that neither the footer nor the card is in two messages. After a
-crash `repair.endReply` takes the card off a message that only the list kept open and writes no
-note on it; one that also has a running call or an open stream keeps the note.
-
-Measured on 2026-10-12, Slack on desktop: a `task_card` with a fixed `block_id` stays open
-across `chat.update` when the text above it changes, when a line of its `details` is added or
-removed, and when its title changes. A collapsible `container` does not stay open, and a
-`task_card` inside a `container` is refused. A message with two blocks that share one `task_id` is
-refused (`invalid_blocks`); `FakeSlack` does not check it, and `sinks.test.ts` does. Not measured:
-whether the card's `details` count toward the 12,000 characters of a message written by
-`chat.update`. The six lines of 80 characters and the title keep the card and the footer inside
-the margin `blocks.MESSAGE_LIMIT` leaves.
+- It sits on the lowest reply of the whole thread, when its turn has ended and its last message is
+  no stream. A newer reply takes it off the older one as soon as it has a message and shows it
+  once it rests, so the card never sits between two replies (seen on Slack desktop, 2026-10-15;
+  `ThreadPlaces.place`, `ThreadPlaces.opens`, `ReplySink.unlist`).
+- The card has the `block_id` and `task_id` `running-list` for its whole life, the title the core
+  made (`2 agents · 1 shell still running`) and up to `blocks.RUNNING_LIST_LINES` lines, one per
+  task, then `+N more`. A subagent that has made a call ends its line with its duration and its
+  call count and has a second line with the call it is at (`blocks.runningListBlock`).
+- Every write of it is an edit and notifies nobody. A stream's stop carries no card, so the edit
+  that follows it adds the card; a write that failed is tried again after
+  `sinks.FINAL_RETRY_SECONDS` (`ReplySink.assign`).
+- A message that shows the list stays among the open replies (`ReplySink.keepsOpen`), and
+  `repair.endReply` takes the block off after a crash; on a message that only the list kept open
+  it writes no note.
+- Slack keeps a `task_card` with a fixed `block_id` open across `chat.update` (measured
+  2026-10-12, Slack desktop; the client version was not recorded). A collapsible `container` does
+  not, and a `task_card` inside one is refused. What else was measured, and what was not, is in
+  the doc comment of `blocks.runningListBlock`.
 
 ### The loop card
 
