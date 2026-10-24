@@ -72,6 +72,13 @@ export interface Guide {
   readonly kind: "guide";
 }
 
+/** `!!command`: the terminal's `!` bash mode, run by the daemon once the owner confirms it. */
+export interface Shell {
+  readonly kind: "shell";
+  /** As typed, line breaks kept; never empty. */
+  readonly command: string;
+}
+
 export interface Allaboard {
   readonly kind: "allaboard";
   /** `show`: the version that runs and the latest; `update` offers the latest; `restart` restarts. */
@@ -104,6 +111,7 @@ export type Word =
   | Untag
   | DeleteThread
   | Allaboard
+  | Shell
   | Invalid;
 export type Command = Word | Passthrough;
 
@@ -122,6 +130,8 @@ export const WORD = {
   untag: "untag",
   "delete-thread": "delete-thread",
   allaboard: "allaboard",
+  // Typed `!!`: Slack's `!` stands for the terminal's `/`, so `!!` stands for its `!`.
+  shell: "!",
 } as const satisfies Record<Exclude<Word["kind"], "invalid">, string>;
 
 export const DESCRIPTION_LIMIT = 100;
@@ -147,6 +157,10 @@ export function parseBang(text: string): Command | null {
   if (!stripped.startsWith("!")) return null;
   const body = stripped.slice(1);
   if (body === "" || STARTS_WITH_SPACE.test(body)) return null;
+  if (body.startsWith("!")) {
+    const command = strip(body.slice(1));
+    return command === "" ? { kind: "invalid" } : { kind: "shell", command };
+  }
   // The word ends at any whitespace: a line break after it (a code block that follows the
   // word, a second line) separates it from its arguments as a space does.
   const split = WORD_AND_REST.exec(body);
@@ -424,7 +438,8 @@ export function commandPool(
       const usage = /^`([^`]+)`\s*([\s\S]*)$/.exec(line);
       const name = usage?.[1]?.slice(1).split(" ", 1)[0];
       if (usage === null || name === undefined) return [];
-      if (unserved.has(name) || REFUSED_IN_THREAD.has(name)) return [];
+      // `!!` is a syntax of its own, never what a mistyped `!word` meant.
+      if (unserved.has(name) || REFUSED_IN_THREAD.has(name) || name === WORD.shell) return [];
       const bare = !(usage[1] as string).includes(" ");
       const described = (usage[2] as string).split(";", 1)[0] as string;
       return [

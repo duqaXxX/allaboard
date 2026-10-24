@@ -1,7 +1,7 @@
 /**
  * The agent's permission requests and questions as Slack draws them: the approval message, the
- * one-line question with Answer and Skip, the form that asks it one question at a time, and the
- * answered question that replaces a request. Every limit here is Slack's. What is pending and
+ * one-line question with Answer and Skip, the form that asks it one question at a time, the
+ * answered question that replaces a request, and the confirmation of the owner's shell command. Every limit here is Slack's. What is pending and
  * what the answer is belong to `core/requests.ts`.
  *
  * Everything the model wrote (the title, the description, the input, a question's header) goes
@@ -13,6 +13,7 @@ import type { PermissionRequest, Question, QuestionOption } from "../../agent/se
 import { answerOf, type Names, named, oneLine, proposedPlan, texts } from "../../core/port.ts";
 import { PY_SPACE, strip } from "../../text.ts";
 import { isRecord } from "../../values.ts";
+import type { ShellRequest } from "../seam.ts";
 import { shownAsWritten } from "./reply/escape.ts";
 import * as slackTexts from "./texts.ts";
 
@@ -24,6 +25,8 @@ const TAB_LIMIT = 40; // a question's header in the tab row
 
 export const APPROVAL_ALLOW = "approval_allow";
 export const APPROVAL_DENY = "approval_deny";
+export const SHELL_RUN = "shell_run";
+export const SHELL_CANCEL = "shell_cancel";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
@@ -125,25 +128,47 @@ export function approvalBlocks(
   // other input: markdown would draw a link, a mention or a fence the model wrote.
   const detail =
     proposedPlan(request.toolName, request.input) ?? JSON.stringify(request.input, null, 2);
-  const chunks = codeChunks(detail, SECTION_LIMIT - length("```\n\n```"));
   const room = MESSAGE_BLOCKS - blocks.length - 1; // the actions block closes it
-  let codeBlocks: Block[];
-  if (chunks.length > room) {
-    // Past one message, the start and the end stay (a payload hides at the end of padding)
-    // and a line says how much is not shown, so the owner can Deny rather than guess.
-    const shown = chunks.slice(0, room - 2);
-    const tail = chunks.at(-1) as string;
-    const hidden = chunks.slice(room - 2, -1).reduce((total, chunk) => total + length(chunk), 0);
-    const notice = texts.fill(slackTexts.APPROVAL_CUT, { count: hidden.toLocaleString("en-US") });
-    codeBlocks = [...shown.map(code), context(notice), code(tail)];
-  } else {
-    codeBlocks = chunks.map(code);
-  }
-  blocks.push(...codeBlocks, {
+  blocks.push(...codeBlocks(detail, room, slackTexts.APPROVAL_CUT), {
     type: "actions",
     elements: [
       button(APPROVAL_ALLOW, "Approve", approvalId, "primary"),
       button(APPROVAL_DENY, "Deny", approvalId, "danger"),
+    ],
+  });
+  return blocks;
+}
+
+/**
+ * `detail` as code blocks, at most `room` of them. Past that, the start and the end stay (a
+ * payload hides at the end of padding) and `cutNotice` says how much is not shown, so the owner
+ * can refuse rather than guess.
+ */
+function codeBlocks(detail: string, room: number, cutNotice: string): Block[] {
+  const chunks = codeChunks(detail, SECTION_LIMIT - length("```\n\n```"));
+  if (chunks.length <= room) return chunks.map(code);
+  const shown = chunks.slice(0, room - 2);
+  const tail = chunks.at(-1) as string;
+  const hidden = chunks.slice(room - 2, -1).reduce((total, chunk) => total + length(chunk), 0);
+  const notice = texts.fill(cutNotice, { count: hidden.toLocaleString("en-US") });
+  return [...shown.map(code), context(notice), code(tail)];
+}
+
+/**
+ * The confirmation of a shell command the owner sent: the folder, the whole command as Run will
+ * run it, Run and Cancel. Only Run is `primary`, and Cancel is no `danger`: it destroys nothing.
+ */
+export function shellBlocks(requestId: string, request: ShellRequest): Block[] {
+  const heading = texts.fill(slackTexts.SHELL_PROMPT, { folder: shownAsWritten(request.folder) });
+  const blocks: Block[] = [
+    { type: "section", text: { type: "mrkdwn", text: head(heading, SECTION_LIMIT) } },
+  ];
+  const room = MESSAGE_BLOCKS - blocks.length - 1;
+  blocks.push(...codeBlocks(request.command, room, slackTexts.SHELL_CUT), {
+    type: "actions",
+    elements: [
+      button(SHELL_RUN, slackTexts.SHELL_RUN_BUTTON, requestId, "primary"),
+      button(SHELL_CANCEL, slackTexts.SHELL_CANCEL_BUTTON, requestId),
     ],
   });
   return blocks;

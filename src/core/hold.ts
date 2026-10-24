@@ -4,7 +4,8 @@
  * resolved folder, the daemon asks
  * `Another session is working in this folder: <link>. Send anyway?`, with two buttons,
  * `Send anyway` and `Don't send`, which the code calls Continue and Cancel.
- * The session setup (`setup.ts`) is the other one: model, effort and bypass, then Start.
+ * The session setup (`setup.ts`) is another: model, effort and bypass, then Start. The third is
+ * the confirmation of a shell command the owner sent (`!!`): Run or Cancel.
  *
  * Kept in memory only, like `Approvals`: a hold never outlives the process (`!stop`, a top-level
  * `!stop` of its channel, and a drain all cancel one exactly as Cancel does), so nothing here
@@ -14,8 +15,14 @@ import { randomBytes } from "node:crypto";
 import type { ModelInfo } from "../agent/seam.ts";
 import type { Choice } from "./setup.ts";
 
-/** What the owner chose: `true` for Continue on the same-folder hold, the `Choice` of a setup. */
+/**
+ * What the owner chose: `true` for Continue on the same-folder hold or Run on a shell command's
+ * confirmation, the `Choice` of a setup.
+ */
 export type HoldAnswer = true | Choice;
+
+/** Which question holds the message: an answer is checked to be of its request's kind. */
+export type HoldKind = "hold" | "setup" | "shell";
 
 /** One question waiting for the owner. */
 export interface Pending {
@@ -26,10 +33,10 @@ export interface Pending {
   /** Whether `answer` is settled. */
   decided: boolean;
   messageTs: string | null;
+  readonly kind: HoldKind;
   /**
-   * What the asker needs back with a click that carries only the id (the setup's model list,
-   * empty for an agent that lists none). Null exactly for the same-folder hold: it is how an
-   * answer is checked to be of the request's kind.
+   * What the asker needs back with a click that carries only the id: the setup's model list,
+   * empty for an agent that lists none; null for the other kinds.
    */
   readonly context: readonly ModelInfo[] | null;
   /**
@@ -55,6 +62,7 @@ export class Holds {
     channelId: string,
     threadId: string,
     context: readonly ModelInfo[] | null = null,
+    kind: HoldKind = context === null ? "hold" : "setup",
   ): [holdId: string, pending: Pending] {
     const holdId = randomBytes(16).toString("base64url");
     let settle: (answer: HoldAnswer | null) => void = () => {};
@@ -67,6 +75,7 @@ export class Holds {
       answer,
       decided: false,
       messageTs: null,
+      kind,
       context,
       cancelled: false,
     };

@@ -130,6 +130,7 @@ export class AskingWorld {
       holds: this.holds,
       names,
       allowedRoot: folder,
+      shellCommands: true,
       stopped: this.stopping.signal,
       now: () => this.clock.time(),
     };

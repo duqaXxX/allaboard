@@ -442,6 +442,19 @@ export const HOLD_UNPOSTED = naming(
 export const HOLD_GONE =
   "This question is no longer open: it was already answered, or allaboard restarted.";
 export const NOT_SENT = "Not sent.";
+export const SHELL_EXITED = "✓ exit 0 · {seconds}";
+export const SHELL_FAILED = "✗ exit {code} · {seconds}";
+export const SHELL_TIMED_OUT = "✗ timed out after {seconds}";
+export const SHELL_SIGNALLED = "✗ ended by {signal} · {seconds}";
+export const SHELL_STOPPED = "Stopped after {seconds}.";
+export const SHELL_NOT_STARTED = "✗ the command could not start:";
+export const SHELL_LINES_LEFT_OUT = "… {count} lines above not shown";
+export const SHELL_OFF = "Shell commands are turned off for this instance (`ALLABOARD_SHELL`).";
+export const SHELL_UNAVAILABLE = naming("{agent} cannot be told of a shell command you run.");
+export const SHELL_TITLE = "Run this command?";
+export const SHELL_OUTSIDE_SESSION = "`!!` runs a shell command inside a session's thread.";
+export const SHELL_FIRST_PROMPT =
+  "Send this session its first prompt before a shell command: it starts with its setup.";
 // Session setup: asked once per top-level message, before the first prompt of a new session.
 export const SETUP_FALLBACK = "Set up this session";
 // The line that replaces the setup's controls once the owner started the session.
@@ -559,6 +572,9 @@ export const HELP_WORDS: readonly Named[] = [
   "`!delete-thread` delete every message of this session's thread from {chat}, once you confirm; " +
     "the session stays in {agent} and `!resume` lists it again; refused while the thread works " +
     "or waits for you; inside a thread, refused in the channel",
+  "`!! <command>` run a shell command in the session's folder, as the terminal's `!` does, " +
+    "once you click Run; {agent} gets the command and its output and answers; inside a " +
+    "thread, refused in the channel",
   "`!allaboard [update|restart]` the version that runs and the latest one; `update` offers the " +
     "latest and installs it on your click, `restart` restarts allaboard, both once running turns " +
     "finish; `update` and `restart` in the channel, refused inside a thread",
@@ -710,6 +726,13 @@ export const GUIDE_TAGS = naming(
     "session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new " +
     "`!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose " +
     "session has not started yet is marked in {chat} alone.",
+);
+export const GUIDE_SHELL = naming(
+  "**Shell commands**\n" +
+    "`!!command`, sent inside a session's thread, is the terminal's `!command`: allaboard shows " +
+    "it with **Run** and **Cancel**, then runs it with Bash in the session's folder and shows " +
+    "its output; {agent} gets the command and its output, and answers. `!stop` stops a command " +
+    "that runs.",
 );
 export const GUIDE_DELETE = naming(
   "**Deleting a thread**\n" +

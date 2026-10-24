@@ -646,6 +646,7 @@ test("with no reply only a question or an approval becomes the stopped line", as
     ["approval", true],
     ["setup", false],
     ["hold", false],
+    ["shell", false],
   ] as const) {
     const { state, slack } = makeState();
     state.addRequest(CHANNEL, THREAD, "1790000000.000002", kind);
@@ -666,7 +667,7 @@ test("with no reply only a question or an approval becomes the stopped line", as
 });
 
 test("with a reply every kind of request is deleted", async () => {
-  for (const kind of ["question", "approval", "setup", "hold"] as const) {
+  for (const kind of ["question", "approval", "setup", "hold", "shell"] as const) {
     const { state, slack } = makeState();
     withOpenReply(state, slack);
     state.addRequest(CHANNEL, THREAD, "1790000000.000002", kind);

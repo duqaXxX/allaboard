@@ -79,6 +79,22 @@ test("loads a private env", () => {
   assert.equal(config.configDir, directory);
 });
 
+test("shell commands are on unless the file turns them off", () => {
+  const directory = scratch();
+  writeEnv(directory, directory);
+  assert.equal(load(directory).shellCommands, true);
+  writeEnv(directory, directory, { ALLABOARD_SHELL: "OFF" });
+  assert.equal(load(directory).shellCommands, false);
+  writeEnv(directory, directory, { ALLABOARD_SHELL: "on" });
+  assert.equal(load(directory).shellCommands, true);
+});
+
+test("a mistyped shell switch stops the daemon instead of leaving the commands on", () => {
+  const directory = scratch();
+  writeEnv(directory, directory, { ALLABOARD_SHELL: "of" });
+  assert.throws(() => load(directory), /ALLABOARD_SHELL must be on or off; it is "of"/);
+});
+
 test("reads an env that starts with a byte order mark", () => {
   // Some editors write one, and python-dotenv, whose reading the loader follows, strips it.
   const directory = scratch();

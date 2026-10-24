@@ -102,8 +102,7 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
       case "hold": {
         // (sync) What the log says of a refused answer is read with the resolve it explains.
         const held = holds.get(requestId);
-        // A setup carries the model list it offered; a hold carries none (`Pending.context`).
-        if (held?.context != null) {
+        if (held !== null && held.kind !== "hold") {
           logRefused("hold decision, wrong kind", ref, message, {
             send: given.send,
             held: true,
@@ -124,6 +123,31 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
             send: given.send,
             held: held !== null,
             decided: held?.decided ?? false,
+          });
+          await talk.tell(ref, texts.HOLD_GONE);
+          return false;
+        }
+        await talk.removeRequest(ref, resolved.messageTs ?? message);
+        return true;
+      }
+
+      case "shell": {
+        const held = holds.get(requestId);
+        if (held === null || held.kind !== "shell") {
+          logRefused("shell decision", ref, message, {
+            run: given.run,
+            held: held !== null,
+            kind_matches: false,
+          });
+          await talk.tell(ref, texts.HOLD_GONE);
+          return false;
+        }
+        const resolved = holds.resolve(requestId, ref.channel, ref.thread, given.run ? true : null);
+        if (resolved === null) {
+          logRefused("shell decision", ref, message, {
+            run: given.run,
+            held: true,
+            decided: held.decided,
           });
           await talk.tell(ref, texts.HOLD_GONE);
           return false;

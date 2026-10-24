@@ -302,7 +302,7 @@ export interface ThreadChat {
   notice(text: string): Promise<void>;
   /**
    * Puts a request to the owner: a tool's permission, the agent's questions, the same-folder
-   * hold or a session's setup. `requestId` is what the owner's answer comes back with
+   * hold, a session's setup or the confirmation of a shell command. `requestId` is what the owner's answer comes back with
    * (`ChatInbound.answer`); `title` is the request in one line. Resolves with the message that
    * shows it; rejects with `ChatError` when it could not be shown.
    */
@@ -410,8 +410,23 @@ export interface SetupRequest {
   readonly selection: SetupSelection;
 }
 
+/** A shell command the owner sent (`!!`), run in `folder` once confirmed. */
+export interface ShellRequest {
+  readonly type: "shell";
+  readonly requestId: string;
+  /** As typed, line breaks kept. */
+  readonly command: string;
+  /** The session's folder, as `!status` names it. */
+  readonly folder: string;
+}
+
 /** What `ThreadChat.ask` puts to the owner. */
-export type OwnerRequest = PermissionRequest | QuestionRequest | HoldRequest | SetupRequest;
+export type OwnerRequest =
+  | PermissionRequest
+  | QuestionRequest
+  | HoldRequest
+  | SetupRequest
+  | ShellRequest;
 
 /** The owner's answer to a request, by the request's type. */
 export type OwnerAnswer =
@@ -429,7 +444,9 @@ export type OwnerAnswer =
   /** Whether the held message is sent. */
   | { readonly type: "hold"; readonly send: boolean }
   /** The controls as the owner left them; the core checks them against what it offered. */
-  | { readonly type: "setup"; readonly selection: SetupSelection };
+  | { readonly type: "setup"; readonly selection: SetupSelection }
+  /** Whether the shell command runs. */
+  | { readonly type: "shell"; readonly run: boolean };
 
 /** A list a word posts in a channel, each row with a control of its own. */
 export type OwnerList =

@@ -7,7 +7,7 @@
  */
 import { ChatError, type MessageId, type ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
-import { helpText, WORD, type Word } from "../commands.ts";
+import { helpText, type Shell, WORD, type Word } from "../commands.ts";
 import { guideText } from "../guide.ts";
 import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import { BypassUnavailable, PlanUnavailable } from "../sessions/errors.ts";
@@ -47,11 +47,14 @@ function stoppedText(goal: string | null, deps: FlowDeps): string {
   return `${texts.STOPPED_THREAD}\n${line}`;
 }
 
-/** What a word does. `message` is the word's own message in the chat. */
+/**
+ * What a word does. `message` is the word's own message in the chat. A shell command is no word
+ * of this flow: it waits in the thread's order, as a prompt does (`messages`).
+ */
 export type WordFlow = (
   ref: ThreadRef,
   message: MessageId,
-  command: Word,
+  command: Exclude<Word, Shell>,
   place: WordPlace,
 ) => Promise<void>;
 
@@ -71,6 +74,7 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
     unserved.add(WORD.untag);
   }
   if (!chat.capabilities.threadDelete) unserved.add(WORD["delete-thread"]);
+  if (!agent.capabilities.shellCommands || !deps.shellCommands) unserved.add(WORD.shell);
   // A daemon built without a way to update itself offers no `!allaboard`.
   if (others.allaboard === undefined) unserved.add(WORD.allaboard);
   return unserved;
@@ -146,6 +150,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
           fileUpload: chat.capabilities.fileUpload,
           threadTags: chat.capabilities.threadTags,
           threadDelete: chat.capabilities.threadDelete,
+          shell: have.shellCommands && deps.shellCommands,
           updates: allaboard !== undefined,
         };
         await talk.say(channel, where, guideText(names, offered), { ownerOnly: quiet });

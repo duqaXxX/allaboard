@@ -325,6 +325,7 @@ export class World {
       holds: this.holds,
       names: NAMES,
       allowedRoot: this.root,
+      shellCommands: true,
       stopped: this.chat.stopped,
       now: () => this.now(),
       ...(options.updates !== undefined && { updates: options.updates }),

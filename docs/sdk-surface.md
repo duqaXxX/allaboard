@@ -101,7 +101,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `canUseTool` | option | session.ts: ClaudeSession.#options | reference | P11 |
 | `Options` | `cwd` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `effort` | option | session.ts: ClaudeSession.#options | reference | P16 |
-| `Options` | `env` | option | session.ts: ClaudeSession.#options | reference | none |
+| `Options` | `env` | option | session.ts: ClaudeSession.#options, sessionEnvironment | reference | none |
 | `Options` | `extraArgs` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `hooks` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `includePartialMessages` | option | session.ts: ClaudeSession.#options | reference | none |

@@ -325,6 +325,7 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
 | `SLACK_USER_TOKEN` | your own `xoxp-…` token, for the Home tab's Delete and Clean up, for `!delete-thread`, for `!tag` and `!untag`, and for the session's title on the thread's first message; allaboard starts without it, and the Home tab then has no Edit button |
 | `ALLABOARD_AGENT` | optional: the agent allaboard drives; `claude` when absent, the only one this release has |
 | `ALLABOARD_CHAT` | optional: the chat allaboard is driven from; `slack` when absent, the only one this release has |
+| `ALLABOARD_SHELL` | optional: `on` or `off`, whether `!!<command>` runs your shell commands; `on` when absent |
 | `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
 | `CLAUDE_CONFIG_DIR` | optional: Claude Code's own variable, the folder of a login of its own, for an instance that drives a second account; see [Part 6](#an-instance-with-its-own-claude-code-login) |
 
@@ -350,6 +351,11 @@ the value comes from allaboard's own environment and not from `.env`, the name i
 `, set in the daemon's environment and not in .env,`). When the
 file leaves it out, the variable in allaboard's own environment applies, and when that is absent
 too, Claude Code's usual `~/.claude` and `~/.claude.json`.
+
+`ALLABOARD_SHELL=off` turns `!!<command>` off for the instance: the word then answers ``Shell
+commands are turned off for this instance (`ALLABOARD_SHELL`).`` and `!help` and `!guide` leave it
+out. Any value other than `on` or `off`, in any case, stops the start with `ALLABOARD_SHELL must
+be on or off; it is "<value>"`, so a mistyped `off` never leaves the commands on.
 
 The workspace ID is not configured: allaboard reads it from Slack at startup with the bot
 token and rejects events from any other workspace.
@@ -588,6 +594,10 @@ The bot answers one person, and the rest of this list protects what that person 
   thread it keeps. That proves whose message went, not who removed it.
 - Files you attach are copied to `$TMPDIR/allaboard/` (`$TMPDIR/allaboard-<name>/` for a named
   instance; mode `700`) and stay there for 3 days, so a conversation resumed after a restart still finds them.
+- `!!<command>` runs a shell command on this Mac from Slack, after you click **Run**, outside
+  Claude Code's permission rules and its sandbox, as the terminal's `!` does. The click passes
+  the same owner check as the message, so it guards against your own mistakes and not against
+  someone holding your Slack account. `ALLABOARD_SHELL=off` turns it off for the instance.
 - Trust a folder in Claude Code only after reading its `.claude/` settings and hooks: trusting it
   is what lets a session from Slack start there.
 - With Chrome enabled by default in Claude Code, a session from Slack acts in your browser with
@@ -1152,6 +1162,7 @@ a `!` is never a command.
 | `!tag <name>` | Refused | Puts `[name]` at the start of the thread's first message, pins it, and tags the session in Claude Code |
 | `!untag` | Refused | Takes the tag and the pin away |
 | `!delete-thread` | Refused | Asks you to confirm, then deletes the thread |
+| `!!<command>` | Refused | Asks you to confirm, runs the command in the session's folder, and Claude answers its output |
 | `!resume` | Lists the sessions you can resume, with a **Resume** button each | Refused |
 | `!resume <id or name>` | Resumes that session in the thread of your message | Refused |
 | `!allaboard` | Shows the version, the latest one and the update state | Same, only you see it |
@@ -1202,6 +1213,9 @@ a `!` is never a command.
 - `!delete-thread`
   - At the top level: Refused, in a post in the channel: ``Deleting a thread belongs to one session: send `!delete-thread` inside its thread.``
   - In a thread: Asks first, in a message only you see under your word, titled `Delete this thread?`, with the Home tab's warning and the buttons `Delete thread` and `Cancel`. Either button takes the question away; `Delete thread` then deletes the thread as the Home tab's Delete does ("Deleting a thread"). A thread that is working or waiting for you is refused before the question: ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` So is a thread with a pinned message: ``This thread is pinned, so it is not deleted. `!untag` removes its tag and its pin.`` when the first message carries a tag, ``This thread is pinned, so it is not deleted. Unpin its first message in Slack, then delete it.`` when it is pinned by hand, and ``A message of this thread is pinned, so it is not deleted. Unpin it in Slack, then delete it.`` when a reply is. A pin added after the question, or while the delete runs, is caught when you confirm, with the same line. Anything after the word shows the list of words. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot delete a thread here, so `!delete-thread` does nothing.`` and `!help` and `!guide` leave it out
+- `!!<command>`
+  - At the top level: Refused, in a post in the channel: `` `!!` runs a shell command inside a session's thread.``
+  - In a thread: The terminal's `!<command>`. Posts `Run this command in <folder>?` with the whole command in a code block and the buttons **Run** and **Cancel**. **Run** takes the request away and runs the command with Bash in the session's folder, with the environment a session gets and nothing on its input, for at most `BASH_DEFAULT_TIMEOUT_MS` (2 minutes when absent). The reply then shows `✓ exit 0 · 0.1 s` (or `✗ exit <code>`, `✗ ended by <signal>`, `✗ timed out after <n> s`), the command and the last 40 lines of its output, 3,000 characters at most, and Claude's answer below them in the same message: Claude Code gets the command and its output as the terminal adds them, each stream cut to 30,000 characters (its start and its end kept). **Cancel** answers `Not sent.` and runs nothing. A command confirmed while a turn runs waits for it, and a message you send after `!!` waits for the command. A process the command leaves in the background (`server &`) keeps running once the command returns. `!stop` ends a running command and what it started, shows `Stopped after <n> s.` with the output so far, and tells Claude nothing. A session whose first prompt was never sent answers `Send this session its first prompt before a shell command: it starts with its setup.`; an edited message never runs a command. Refused with ``Shell commands are turned off for this instance (`ALLABOARD_SHELL`).`` when the instance turned it off
 - `!resume`
   - At the top level: Lists the twenty newest sessions of the channel's directory that no thread holds (not of other worktrees), terminal and Slack alike, as a post in the channel, each with the first 8 characters of its session id and a **Resume** button. A session already open in a thread of any channel has no row: the twenty rows are sessions you can resume, and a line under the list counts the open ones (`3 more are open in their own threads.`). A click resumes the session in the thread of your `!resume` message and removes the list from the channel; a list posted before that change answers ``This list is out of date: send `!resume` again for a current one.``
   - In a thread: Refused, in an ephemeral message: `` `!resume` works in the channel, not inside a thread.``

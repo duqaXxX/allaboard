@@ -90,9 +90,10 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
 }
 
 /**
- * Only a question or an approval stands for a turn the owner's message started; the setup form
- * and the hold wait before that message is sent, and an entry with no kind (a file written
- * before the kinds) is taken for neither.
+ * Only a question or an approval stands for a turn the owner's message started; the setup form,
+ * the hold and a shell command's confirmation wait before that message is sent (a command the
+ * crash left unconfirmed never runs), and an entry with no kind (a file written before the
+ * kinds) is taken for neither.
  */
 function isTurnRequest(kind: RequestKind | undefined): boolean {
   return kind === "question" || kind === "approval";

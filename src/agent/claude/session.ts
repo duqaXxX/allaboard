@@ -211,6 +211,16 @@ const SESSION_SIGNALS: Readonly<Record<string, string>> = {
   CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: "1",
 };
 
+/**
+ * The environment a thread's session runs in: the terminal's defaults, under the daemon's own
+ * environment and the owner's variables, and the signals the daemon reads from the stream on top.
+ */
+export function sessionEnvironment(
+  variables: Readonly<Record<string, string>> = {},
+): Record<string, string | undefined> {
+  return { ...TERMINAL_DEFAULTS, ...process.env, ...variables, ...SESSION_SIGNALS };
+}
+
 // A level outside what `CAPABILITIES` declares, or a mode Claude Code does not take, is refused
 // (the seam's contract).
 function effortOf(level: string): EffortLevel {
@@ -294,7 +304,7 @@ export class ClaudeSession implements AgentSession {
         // `env` replaces the environment the process would inherit, so the daemon's own is
         // passed on: over the terminal's defaults, and under what the owner's file sets. What
         // the daemon reads from the stream is not the owner's to turn off.
-        env: { ...TERMINAL_DEFAULTS, ...process.env, ...variables, ...SESSION_SIGNALS },
+        env: sessionEnvironment(variables),
         // A goal's changes reach only the transcript, which this store is handed as it is
         // written. `eager` delivers each entry at once; the SDK flushes the store before it
         // yields a `result` (`sdk.mjs` 0.3.304), so a turn's changes come before its end.

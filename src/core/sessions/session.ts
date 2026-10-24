@@ -56,6 +56,8 @@ import type {
   QuestionRequest,
   ScheduledJob,
   SessionEvent,
+  ShellMode,
+  ShellRun,
   TaskKind,
 } from "../../agent/seam.ts";
 import { ResumeRefused } from "../../agent/seam.ts";
@@ -94,6 +96,7 @@ import {
 import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import { DENY, type Decision, toAnswer } from "../requests.ts";
 import { type Choice, DEFAULT } from "../setup.ts";
+import { runShell, shellHead } from "../shell.ts";
 import * as texts from "../texts.ts";
 import {
   FAILURE_LIMIT,
@@ -184,6 +187,8 @@ export class ThreadSession {
   private interrupting = false;
   /** Set once the turn `stop()` interrupted has closed its reply (`stopLanded`). */
   private stopTail: Event | null = null;
+  /** Stops the owner's shell command while it runs (`!stop`); null when none runs. */
+  private shellStop: AbortController | null = null;
   // True from `reactError` until new work starts (`submit`, `startTurn`), so a standing ❌ is
   // never mistaken for idle-and-done. What the chat shows cannot serve this alone: it only
   // changes once the chat has answered, which a quick turn can easily outrun.
@@ -868,7 +873,7 @@ export class ThreadSession {
    * the caller's lookup and this call; the caller retries once, against a freshly looked-up
    * session.
    */
-  async submit(prompt: PromptContent): Promise<Turn> {
+  async submit(prompt: PromptContent, shell: string | null = null): Promise<Turn> {
     if (this.closedFlag) throw new SessionClosed();
     this.workStartedAt ??= this.now();
     // Counted, not just checked-and-cancelled: `idle` reads false for as long as this stays
@@ -883,7 +888,7 @@ export class ThreadSession {
       // reader had not read yet. So the reply is awaited here only when making it does wait,
       // which is what the check below is for.
       const made = this.sink();
-      turn = new Turn(prompt, made instanceof Promise ? await made : made);
+      turn = new Turn(prompt, made instanceof Promise ? await made : made, shell);
       if (this.closedFlag) {
         // The session closed (an idle close or a restart, or `ensureConnected`'s SessionGone
         // branch, which already drained the queue) while the reply was made: no worker will
@@ -1347,8 +1352,12 @@ export class ThreadSession {
     const hold = this.deps.holds.cancel(this.channelId, this.threadId);
     const held = hold !== null;
     if (hold !== null) await this.deleteRequest(hold.messageTs);
+    // A shell command of the owner's that runs is stopped like a turn, and the rest still stops.
+    const shell = this.shellStop !== null;
+    this.shellStop?.abort();
+    if (shell) this.react("done");
     const client = this.client;
-    if (client === null) return held ? null : false;
+    if (client === null) return shell ? true : held ? null : false;
     const tasks = this.background ? this.runningTaskIds() : [];
     // A task that has just ended by itself leaves the agent about to open the turn that reports
     // it (1.3 to 1.8 s later, measured on Claude Code 2.1.302), and carry on from
@@ -1359,7 +1368,7 @@ export class ThreadSession {
       // shows: the interrupt ends it, and the setup then fails into `forgetSetup`, which the
       // cancelled hold turns into `Not sent.`
       if (held && this.applying) await this.interruptApplied(client);
-      return held ? null : false;
+      return shell ? true : held ? null : false;
     }
     // What the agent said it was doing is void once the owner stops it. It says `idle` only
     // after an interrupted turn's result (recorded 2026-10-14), and no recording holds what it
@@ -1921,17 +1930,27 @@ export class ThreadSession {
       const turn = await this.queue.get(signal);
       this.taken = turn;
       try {
-        const client = await this.ensureConnected(signal);
+        let client = await this.ensureConnected(signal);
         this.refreshUsage();
+        if (turn.shell !== null) {
+          // A drain that has begun runs no command; one that begins while it runs drops it below.
+          if (this.draining) {
+            await this.dropForDrain(turn);
+            continue;
+          }
+          if (!(await this.runShell(turn, turn.shell, signal))) {
+            this.taken = null;
+            this.idleTimerCheck();
+            continue;
+          }
+          // The run can take minutes: the process may have been lost meanwhile.
+          client = await this.ensureConnected(signal);
+        }
         if (!this.settled.isSet) await this.settled.wait(signal);
         // (sync) from the check to the send: a drain raises every flag before its first
         // await, so no turn is sent in between.
         if (this.draining) {
-          this.taken = null;
-          // A prompt genuinely dropped by the drain, reacting ❌; like the queued ones, it
-          // gets no reply of its own, only a note.
-          await this.drop([turn], texts.BECAUSE_RESTARTED, { error: true });
-          this.idleTimerCheck(); // only cancels: draining itself blocks it from arming
+          await this.dropForDrain(turn);
           continue;
         }
         this.sent.push(turn);
@@ -2123,7 +2142,7 @@ export class ThreadSession {
         // Known or not (a prompt a guess already settled is no longer sent): the turn it
         // starts is the owner's.
         if (this.active === null) this.promptReplayed = true;
-        this.acknowledge(event.promptId);
+        if (this.acknowledge(event.promptId)) await this.headTaken(event.promptId);
         return;
       case "state_changed":
         if (event.state !== this.agentState) {
@@ -3230,6 +3249,9 @@ export class ThreadSession {
     } else {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
       renderer = this.newRenderer(turn.sink);
+      // A shell command's run opens the reply, before the agent's answer to it.
+      opening = turn.head;
+      turn.head = null;
       // The ends told since the last turn and not reported: the agent takes their notifications
       // into this turn, and the terminal prints their lines before its answer.
       const unsaid = [...(this.opening ?? []), ...this.ended].map(([, line]) => line);
@@ -4092,17 +4114,76 @@ export class ThreadSession {
     }
   }
 
+  /** Drops `turn`, which a drain will never send, with a note. */
+  private async dropForDrain(turn: Turn): Promise<void> {
+    this.taken = null;
+    // A prompt genuinely dropped by the drain, reacting ❌; like the queued ones, it gets no
+    // reply of its own, only a note.
+    await this.drop([turn], texts.BECAUSE_RESTARTED, { error: true });
+    this.idleTimerCheck(); // only cancels: draining itself blocks it from arming
+  }
+
+  /**
+   * A prompt the agent took into the turn that runs: a shell command's run, when it is one, is
+   * written there, where the agent answers it.
+   */
+  private async headTaken(promptId: string): Promise<void> {
+    const active = this.active;
+    const turn = active?.taken.find((candidate) => candidate.uuid === promptId);
+    if (active == null || turn?.head == null) return;
+    const head = turn.head;
+    turn.head = null;
+    await active.renderer.feedNotice(head);
+  }
+
+  /**
+   * Runs the owner's shell command of `turn` in the session's folder. True when its run is to
+   * be sent: what the thread shows of it waits on the turn (`Turn.head`) and the agent's prompt
+   * replaces the typed command. False when `!stop` stopped it: the reply says so and ends, and
+   * the agent is told nothing, as a command stopped in the terminal leaves nothing behind.
+   */
+  private async runShell(turn: Turn, command: string, signal: AbortSignal): Promise<boolean> {
+    // The word is refused for an agent that declares no `shellCommands`, so one that queued a
+    // command has its mode.
+    const mode = this.deps.agent.shell as ShellMode;
+    const stop = new AbortController();
+    this.shellStop = stop;
+    let run: ShellRun;
+    try {
+      run = await runShell(command, {
+        folder: this.resolved,
+        environment: mode.environment,
+        timeoutMs: mode.timeoutMs,
+        clock: this.deps.clock,
+        signal: AbortSignal.any([signal, stop.signal]),
+      });
+    } finally {
+      this.shellStop = null;
+    }
+    // A close cancelled the worker: whoever closes ends the turn.
+    if (signal.aborted) throw signal.reason;
+    if (run.end === "stopped") {
+      await this.fail(turn, shellHead(run));
+      return false;
+    }
+    turn.head = shellHead(run);
+    turn.prompt = mode.prompt(run);
+    return true;
+  }
+
   /**
    * End a turn's reply with a line saying why, and release whoever waits on it. `error` reacts
-   * ❌.
+   * ❌. A shell command that ran and was never answered shows its run first.
    */
   private async fail(
     turn: Turn,
     text: string,
     options: { readonly error?: boolean } = {},
   ): Promise<void> {
+    const head = turn.head;
+    turn.head = null;
     try {
-      await turn.sink.text(text, { notice: true });
+      await turn.sink.text(head === null ? text : `${head}\n\n${text}`, { notice: true });
       await turn.sink.finish([]);
       this.trackLanding(await turn.sink.closeOut(), turn.sink);
       if (options.error) this.reactError();

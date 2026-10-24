@@ -39,6 +39,9 @@ const FULL_GUIDE = [
   "**Tags**",
   "`!tag <name>`, sent inside a session's thread, marks it: Slack shows `[name]` at the start of the thread's first message and keeps the thread at hand, and where Claude Code can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose session has not started yet is marked in Slack alone.",
   "",
+  "**Shell commands**",
+  "`!!command`, sent inside a session's thread, is the terminal's `!command`: allaboard shows it with **Run** and **Cancel**, then runs it with Bash in the session's folder and shows its output; Claude Code gets the command and its output, and answers. `!stop` stops a command that runs.",
+  "",
   "**Deleting a thread**",
   "`!delete-thread`, sent inside a session's thread, asks you to confirm, then deletes every message of the thread from Slack, yours and the bot's. The session stays in Claude Code: `!resume` lists it again. A thread that is working or waiting for you is not deleted: `!stop` it first.",
   "",
@@ -82,6 +85,7 @@ const BYPASS = ["**Bypass**", line("`!bypass on`")];
 const PLAN = ["**Plan mode**", line("`!plan`, sent inside")];
 const TAGS = ["**Tags**", line("`!tag <name>`, sent inside")];
 const DELETE = ["**Deleting a thread**", line("`!delete-thread`, sent inside")];
+const SHELL = ["**Shell commands**", line("`!!command`, sent inside")];
 
 const EFFORT = "the **Effort** (`Default` leaves Claude Code's own choice)";
 const STEP_THREE_HEAD = "3. Before that first message is sent, the thread asks for ";
@@ -190,6 +194,12 @@ test("without fileUpload the Files section is gone", () => {
 test("without threadTags the Tags section is gone", () => {
   const { removed, added } = difference(linesOf({ threadTags: false }));
   assert.deepEqual(removed, TAGS);
+  assert.deepEqual(added, []);
+});
+
+test("without shell the Shell commands section is gone", () => {
+  const { removed, added } = difference(linesOf({ shell: false }));
+  assert.deepEqual(removed, SHELL);
   assert.deepEqual(added, []);
 });
 

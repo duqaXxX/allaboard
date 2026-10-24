@@ -38,15 +38,17 @@ export type SessionsChange = (changed: readonly ThreadRef[]) => void;
 
 /**
  * What a request message is, one word stored beside its id for the crash repair: a question or an
- * approval of a turn, the session's setup form, the same-folder hold.
+ * approval of a turn, the session's setup form, the same-folder hold, the confirmation of a shell
+ * command.
  */
-export type RequestKind = "question" | "approval" | "setup" | "hold";
+export type RequestKind = "question" | "approval" | "setup" | "hold" | "shell";
 
 const REQUEST_KINDS: ReadonlySet<unknown> = new Set<RequestKind>([
   "question",
   "approval",
   "setup",
   "hold",
+  "shell",
 ]);
 
 export interface ThreadState {

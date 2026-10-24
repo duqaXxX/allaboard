@@ -5,6 +5,21 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `!!<command>` in a session's thread runs a shell command, as the terminal's `!<command>` does.
+  The thread first shows the command with **Run** and **Cancel**; Run runs it with Bash in the
+  session's folder, for at most `BASH_DEFAULT_TIMEOUT_MS`, and the reply shows how it ended (an
+  exit code, a signal, the time limit) and the last 40 lines of its output, 3,000 characters at
+  most, then Claude's answer to it. A process the command leaves in the background keeps
+  running. Claude Code gets the command and
+  its output as the terminal adds them. `!stop` ends a running command and tells Claude nothing.
+  A message sent after `!!` waits for the command. An agent declares it with `shellCommands` and
+  `AgentBackend.shell`; the confirmation is a new request type, `ShellRequest`, stored as `shell`
+  in `request_kinds`, and a crash withdraws it unanswered.
+- `ALLABOARD_SHELL` in `.env`, `on` or `off`, turns `!!` off for an instance; absent, it is on.
+  Any other value stops the start.
+
 ## [0.9.0] - 2026-10-24
 
 ### Added

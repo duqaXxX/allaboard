@@ -12,7 +12,7 @@
  */
 
 import type { CommandInfo } from "../../agent/seam.ts";
-import type { InboundMessage, ThreadRef } from "../../chat/seam.ts";
+import type { InboundMessage, ShellRequest, ThreadRef } from "../../chat/seam.ts";
 import { strip } from "../../text.ts";
 import {
   type Command,
@@ -24,12 +24,14 @@ import {
   parseBang,
   rankCandidates,
   refusedInThread,
+  type Shell,
 } from "../commands.ts";
 import { SessionClosed, SessionGone } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import { Mutex } from "../sessions/tasks.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
+import { askOwner } from "./ask-owner.ts";
 import type { MessagesFlow, OtherFlows } from "./contract.ts";
 import type { FlowDeps, Report, Talk } from "./talk.ts";
 import { unservedWords, wordFlow } from "./words.ts";
@@ -310,6 +312,86 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
   }
 
   /**
+   * `!!command`: the owner's shell command, run in the session's folder once the owner confirms
+   * it, then told to the session, whose answer is the turn's reply. In the thread's arrival
+   * order, as a prompt is, so a message sent after it waits for the confirmation. Refused where
+   * the instance turned it off, for an agent that cannot be told of it, outside a session's
+   * thread and in a session that has not started (its setup comes first).
+   */
+  async function shell(
+    ref: ThreadRef,
+    command: Shell,
+    opened: ThreadSession | null,
+  ): Promise<void> {
+    // Outside a session's thread it is answered in the channel, as the words of one session are.
+    if (opened === null) {
+      await talk.inChannel(ref.channel, texts.SHELL_OUTSIDE_SESSION);
+      return;
+    }
+    if (!deps.shellCommands) {
+      await talk.tell(ref, texts.SHELL_OFF);
+      return;
+    }
+    if (!agent.capabilities.shellCommands || agent.shell === undefined) {
+      await talk.tell(ref, named(texts.SHELL_UNAVAILABLE, names));
+      return;
+    }
+    if (opened.neverRan) {
+      await talk.tell(ref, texts.SHELL_FIRST_PROMPT);
+      return;
+    }
+    await arrival(ref, async () => {
+      let session = opened;
+      if (talk.stopped) return;
+      if (refusing(session)) {
+        await talk.refuseRestarting(ref);
+        return;
+      }
+      const answer = await askOwner(deps, talk, ref, session, {
+        kind: "shell",
+        title: texts.SHELL_TITLE,
+        request: (requestId): ShellRequest => ({
+          type: "shell",
+          requestId,
+          command: command.command,
+          folder: session.directory,
+        }),
+      });
+      if (answer === null) return;
+      // Run left the waiting mark standing for the submit to replace (`holdEnd`): any other way
+      // out puts back the mark the thread had, as `submitToSession` does after a hold.
+      const held = session;
+      let submitted = false;
+      let failed = false;
+      try {
+        // Retried once against a freshly looked-up session, as a prompt is.
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            if (talk.stopped) return;
+            if (refusing(session)) {
+              await talk.refuseRestarting(ref);
+              return;
+            }
+            await session.submit(`!!${command.command}`, command.command);
+            submitted = true;
+            return;
+          } catch (error) {
+            if (!(error instanceof SessionClosed) || attempt > 0) throw error;
+            const fresh = sessions.get(ref.channel, ref.thread);
+            if (fresh === null) throw new SessionGone(names);
+            session = fresh;
+          }
+        }
+      } catch (error) {
+        failed = true;
+        throw error;
+      } finally {
+        if (!submitted) await held.reactHoldAbandoned({ error: failed });
+      }
+    });
+  }
+
+  /**
    * One message that passed its provider's checks, routed by where it was written: a known
    * session's thread, a thread that holds none, or the channel.
    */
@@ -346,6 +428,11 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
           command = { kind: "passthrough", text: "" };
         }
       }
+    }
+    if (command !== null && command.kind === "shell") {
+      const typed = command;
+      await talk.replyOnFailure(ref, () => shell(ref, typed, session), wordReport(ref, session));
+      return;
     }
     if (command !== null && command.kind !== "passthrough") {
       const typed = command;

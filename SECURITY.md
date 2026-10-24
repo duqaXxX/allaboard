@@ -17,7 +17,10 @@ allaboard runs Claude Code on the owner's machine on behalf of one Slack user. I
   (`~/.config/allaboard/.env`, or `~/.config/allaboard-<name>/.env` for a named instance), or
   message content written to a log;
 - two instances served by one Slack app, which the daemon refuses at startup;
-- an approval request that shows the owner something other than what Approve lets run;
+- an approval request that shows the owner something other than what Approve lets run, or a
+  shell command's confirmation that shows something other than what Run runs;
+- a shell command (`!!`) that runs without the owner's Run, runs again after an edit of its
+  message, or runs on an instance whose `ALLABOARD_SHELL` is `off`;
 - a reply that notifies anyone: a mention sequence (`<!here>`, `<!channel>`, `<@…>`) in Claude's
   words that reaches Slack as a mention;
 - a session started in a folder the owner has not trusted in Claude Code;

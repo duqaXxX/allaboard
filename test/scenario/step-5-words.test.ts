@@ -119,7 +119,7 @@ test("!stop ends the turn that runs, in a thread or in the channel, and says so 
 // one that speaks of none.
 const OFFERED_WORDS = texts.HELP_WORDS_ANY.map((line) => named(line, NAMES)).filter(
   (line) =>
-    !["`!bypass", "`!plan", "`!open", "`!tag", "`!untag", "`!delete-thread"].some((word) =>
+    !["`!bypass", "`!plan", "`!open", "`!tag", "`!untag", "`!delete-thread", "`!!"].some((word) =>
       line.startsWith(word),
     ),
 );
@@ -313,6 +313,7 @@ test("!guide describes only what this agent and this chat can serve", async (t) 
       fileUpload: false,
       threadTags: false,
       threadDelete: false,
+      shell: false,
       // The daemon always gives the core a way to update itself.
       updates: true,
     }),

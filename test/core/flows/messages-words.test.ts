@@ -27,7 +27,16 @@ const identity = (text: string): string => text;
 
 // The plain agent has no bypass mode and the memory chat no file upload: `!bypass` and `!open`
 // are refused when typed, and the help does not list them.
-const UNSERVED = new Set(["bypass", "plan", "open", "tag", "untag", "delete-thread", "allaboard"]);
+const UNSERVED = new Set([
+  "bypass",
+  "plan",
+  "open",
+  "tag",
+  "untag",
+  "delete-thread",
+  "allaboard",
+  "!",
+]);
 // It keeps no record of trust either, so its `!bind` line speaks of none.
 const NO_TRUST = false;
 
@@ -90,6 +99,7 @@ const PLAIN_OFFER: GuideOffer = {
   fileUpload: false,
   threadTags: false,
   threadDelete: false,
+  shell: false,
   updates: false,
 };
 

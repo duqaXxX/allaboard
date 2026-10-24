@@ -33,6 +33,7 @@ test("the Claude back end declares what the core adapts to", () => {
     sessionTitles: true,
     goals: true,
     scheduledJobs: true,
+    shellCommands: true,
   });
 });
 

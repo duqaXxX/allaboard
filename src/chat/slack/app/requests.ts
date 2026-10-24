@@ -26,6 +26,7 @@ import {
   QUESTION_SKIP,
   questionView,
   refusedView,
+  SHELL_RUN,
 } from "../requests.ts";
 import { readChoice, readSelection, setupBlocks } from "../setup.ts";
 import * as slackTexts from "../texts.ts";
@@ -110,6 +111,22 @@ export class Requests {
       str(action.value),
       { type: "hold", send: action.action_id === HOLD_CONTINUE },
       // A click that names no message is still answered: nothing is removed for it.
+      text(record(body.message).ts),
+    );
+  };
+
+  /** Run, or Cancel: the two buttons of a shell command's confirmation. */
+  onShellDecision = async (ack: Ack, body: Payload): Promise<void> => {
+    await ack();
+    const [user, team] = interactionActor(body);
+    const channel = text(record(body.channel).id);
+    const threadTs = clickThread(body);
+    if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
+    const action = firstAction(body);
+    await this.parts.inbound.answer(
+      { channel, thread: threadTs },
+      str(action.value),
+      { type: "shell", run: action.action_id === SHELL_RUN },
       text(record(body.message).ts),
     );
   };

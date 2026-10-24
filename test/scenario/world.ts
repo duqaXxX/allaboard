@@ -125,6 +125,10 @@ export interface WorldOptions {
   readonly home?: string;
   /** The identities of the memory chat (`ChatProvider.identities`); its default when absent. */
   readonly identities?: readonly string[];
+  /** The plain agent reads the owner's shell commands (`shellCommands`). */
+  readonly shell?: boolean;
+  /** More lines of the `.env`, after the selection and the allowed root. */
+  readonly env?: readonly string[];
 }
 
 /** A promise settled from outside. */
@@ -189,6 +193,7 @@ export class World {
         `ALLABOARD_AGENT=${AGENT_NAME}`,
         `ALLABOARD_CHAT=${CHAT_NAME}`,
         `ALLOWED_ROOT=${this.root}`,
+        ...(options.env ?? []),
       ].join("\n"),
     );
     chmodSync(env, 0o600);
@@ -196,7 +201,11 @@ export class World {
     this.clock.now = START_TIME;
     this.signals.setMaxListeners(0);
     this.store = new PlainStore({ now: () => START_TIME * 1000 });
-    this.entry = plainAgent({ store: this.store, turns: this.turns });
+    this.entry = plainAgent({
+      store: this.store,
+      turns: this.turns,
+      ...(options.shell === true && { shell: {} }),
+    });
     this.chat = memoryChat(
       options.identities === undefined ? {} : { identities: options.identities },
     );

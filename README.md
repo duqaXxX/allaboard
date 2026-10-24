@@ -95,6 +95,7 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!tag <name>` | Tags and pins the thread's first message |
 | `!untag` | Takes the tag and the pin away |
 | `!delete-thread` | Deletes the thread, once you confirm |
+| `!!<command>` | Runs a shell command in the session's folder once you click Run; Claude Code answers its output |
 | `!allaboard` | Shows the version that runs and the latest; `update` installs the newer one, `restart` restarts |
 | `!help` | Lists the commands a session offers |
 

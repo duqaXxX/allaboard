@@ -226,6 +226,7 @@ export class ListsWorld {
       holds,
       names,
       allowedRoot: root,
+      shellCommands: true,
       stopped: new AbortController().signal,
       now: () => clock.time(),
     };
