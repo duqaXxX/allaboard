@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.10.0] - 2026-10-25
+
 ### Added
 
 - The release probe prints Claude Code's changelog after the claims: every entry between the CLI
