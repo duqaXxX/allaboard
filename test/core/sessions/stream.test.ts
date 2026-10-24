@@ -652,7 +652,7 @@ test("a crossed owner query leaves the footer off while the task it crossed stil
   await h.until(() => h.clients[0]?.queries.join() === "start it,next");
   assert.ok(carrier !== owner.sink);
   inside(session).injectedExpected = true; // a report was expected too: the guess that goes wrong
-  inside(session).ended = [[taskId, "✓ the task ended"]];
+  inside(session).ended = [[taskId, { text: "✓ the task ended", card: null }]];
   h.clients[0]?.inject(splitTurns(sdkMessages("tools"))[0] ?? []);
   await owner.done.wait();
   assert.ok(h.replies().at(-1)?.startsWith("✓ the task ended"));

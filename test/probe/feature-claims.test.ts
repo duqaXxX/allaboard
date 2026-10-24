@@ -175,6 +175,8 @@ function sent(to: string, output: string): SessionEvent[] {
       summary: "READY",
       durationMs: 900,
       callId: "toolu_0",
+      report: null,
+      reportSent: false,
       foldNamed: true,
     },
     {

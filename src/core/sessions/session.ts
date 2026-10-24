@@ -139,6 +139,45 @@ export const logger = getLogger("allaboard.core.sessions");
 
 type TaskEnded = Extract<SessionEvent, { type: "task_ended" }>;
 
+/** A card of the daemon's under an end line: a subagent's words, closed under `title`. */
+export interface EndCard {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+}
+
+/** A task's end as the thread says it: its line, and the card of its words when it has one. */
+export interface EndLine {
+  readonly text: string;
+  readonly card: EndCard | null;
+}
+
+/**
+ * Writes `ends` into `renderer`: each run of lines as one text, `first` for the first run (an
+ * opening) and a line for the next, and a subagent's card right under its own line.
+ */
+export async function writeEnds(
+  renderer: TurnRenderer,
+  ends: readonly EndLine[],
+  first: (text: string) => Promise<void>,
+): Promise<void> {
+  let run: string[] = [];
+  let write = first;
+  const flush = async (): Promise<void> => {
+    if (run.length === 0) return;
+    await write(run.join("\n"));
+    write = (text) => renderer.feedLine(text);
+    run = [];
+  };
+  for (const end of ends) {
+    run.push(end.text);
+    if (end.card === null) continue;
+    await flush();
+    await renderer.feedCard(end.card.id, end.card.title, end.card.body);
+  }
+  await flush();
+}
+
 /** What the list shows of a subagent: when it started, its latest call and how many it made. */
 interface Step {
   readonly since: number;
@@ -259,8 +298,14 @@ export class ThreadSession {
   // to the subagent, which reports it: the terminal prints no line for it in the conversation
   // (captured 2026-10-14, Claude Code 2.1.296), and neither does a reply.
   private readonly ownedBySubagent = new Set<string>();
+  /** The running tasks a subagent started (`parentTaskId`), each with that subagent's task id. */
+  private readonly parents = new Map<string, string>();
+  /** The words each waiting subagent's message showed, so that its final end does not repeat them. */
+  private readonly messages = new Map<string, string>();
+  /** The cards of subagents' words made so far: each gets an id of its own. */
+  private cardsMade = 0;
   /** End lines of agents with no card that ended while a message waited for its turn. */
-  private endedAhead: string[] = [];
+  private endedAhead: EndLine[] = [];
   // Each task's type and description, for the list of what still runs and the task's end line.
   private readonly tasks = new Map<
     string,
@@ -278,13 +323,13 @@ export class ThreadSession {
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
   // The task id finds the reply that started it (the report renders there when that reply is
   // the last thing in the thread).
-  private ended: Array<readonly [taskId: string, line: string]> = [];
+  private ended: Array<readonly [taskId: string, line: EndLine]> = [];
   // The end lines the turn that has just begun reports, set aside when the agent starts it. A
   // task that ends after that start is told to the agent in a later turn, and the terminal
   // prints its line there (measured 2026-10-14, Claude Code 2.1.296: of two agents ending 0.3 s
   // apart, the second was notified after the first report turn began, and that turn knew of
   // the first alone).
-  private opening: Array<readonly [taskId: string, line: string]> | null = null;
+  private opening: Array<readonly [taskId: string, line: EndLine]> | null = null;
   // Tasks whose end arrived without their notification yet, by the clock time it arrived: the
   // notification starts the turn that reports them. The CLI can suppress it (SDK
   // TaskUpdatedMessage docstring), so a stop waits for it only INJECTED_TURN_WAIT.
@@ -1461,6 +1506,8 @@ export class ThreadSession {
           summary: "",
           durationMs: null,
           callId: null,
+          report: null,
+          reportSent: false,
           foldNamed: false,
         });
       }
@@ -2248,6 +2295,7 @@ export class ThreadSession {
       }
     }
     if (task !== null) {
+      this.trackOwnWork(task);
       const inner = this.nestingReply(task);
       if (inner !== null) {
         // A task of a call inside another call (a long command a subagent runs) is that call's
@@ -2294,7 +2342,7 @@ export class ThreadSession {
         ) {
           this.unfolded.set(event.taskId, reply);
         }
-        if (writing !== null) await writing.feedLine(this.endedLine(event));
+        if (writing !== null) await this.writeEnds(writing, [this.endedLine(event)]);
         else if (this.sent.length > 0) this.endedAhead.push(this.endedLine(event));
       }
     }
@@ -2319,6 +2367,7 @@ export class ThreadSession {
       this.unreported.delete(event.taskId);
       this.stopped.delete(event.taskId);
       this.ownedBySubagent.delete(event.taskId);
+      this.noteMessage(event);
       // Read above for the end line, which comes after the terminal task_updated (recorded
       // order); a task whose notification never comes goes with the process.
       this.tasks.delete(event.taskId);
@@ -2481,6 +2530,49 @@ export class ThreadSession {
     }
   }
 
+  /**
+   * Keeps which running tasks a subagent started (`parentTaskId`), before a nested one is handed
+   * to its subagent's card: a command the subagent runs is that call's work, and still the work
+   * the subagent waits on. A task that ended is none, notification or not (SDK docstring: the
+   * notification can be suppressed).
+   */
+  private trackOwnWork(task: TaskEvent): void {
+    if (task.type === "task_started") {
+      if (task.parentTaskId !== null && this.tasks.has(task.parentTaskId)) {
+        this.parents.set(task.taskId, task.parentTaskId);
+      }
+    } else if (task.type === "task_ended" || (task.type === "task_updated" && task.terminal)) {
+      this.parents.delete(task.taskId);
+    }
+  }
+
+  /**
+   * The words a subagent's end shows as its message, or null: a report it sent stands at once,
+   * what it said last only once nothing of its own runs, and the same words are not shown twice
+   * for one task (the agent repeats a report it sent with its final end). Reads only:
+   * `noteMessage` records what was shown, once the end is told.
+   */
+  private messageOf(event: TaskEnded, kind: TaskKind): string | null {
+    const report = (event.report ?? "").trim();
+    if (kind !== "subagent" || event.status !== "completed" || report === "") return null;
+    if (!event.reportSent && this.waitsOnOwnWork(event.taskId)) return null;
+    return this.messages.get(event.taskId) === report ? null : report;
+  }
+
+  /** After a subagent's end was told: what it showed is not shown again; a final end forgets. */
+  private noteMessage(event: TaskEnded): void {
+    const [kind] = this.tasks.get(event.taskId) ?? ["other"];
+    const report = this.messageOf(event, kind);
+    if (report !== null) this.messages.set(event.taskId, report);
+    if (!this.waitsOnOwnWork(event.taskId)) this.messages.delete(event.taskId);
+  }
+
+  /** Whether a task the subagent `taskId` started still runs. */
+  private waitsOnOwnWork(taskId: string): boolean {
+    for (const parent of this.parents.values()) if (parent === taskId) return true;
+    return false;
+  }
+
   private recordTask(event: TaskStarted): void {
     this.tasks.set(event.taskId, [event.kind, event.description, event.agentType]);
     if (event.kind === "subagent" && event.callId !== null) {
@@ -2552,24 +2644,49 @@ export class ThreadSession {
    * The terminal's line for a task's end: a command's own summary, or `Agent "..." finished`
    * from the task's description, plus the duration when the task reports one. An agent that
    * failed says why, as the terminal's line does (`Agent "..." failed: <reason>`, captured
-   * 2026-10-13 on Claude Code 2.1.296): its summary is the reason then, not a report.
+   * 2026-10-13 on Claude Code 2.1.296): its summary is the reason then, not a report. A
+   * subagent's words come as a card under the line (`messageOf`).
    */
-  private endedLine(event: TaskEnded): string {
-    const [kind, description] = this.tasks.get(event.taskId) ?? ["other", ""];
+  private endedLine(event: TaskEnded): EndLine {
+    const [kind, description, agentType] = this.tasks.get(event.taskId) ?? ["other", "", null];
+    const name = TASK_WORDS[kind][1];
     let text: string;
+    let marked = true;
     if (SUMMARY_IS_END_LINE.has(kind) && event.summary) {
       text = oneLine(event.summary, 200);
     } else {
       const origin = this.taskReplies.get(event.taskId);
-      const label = description || (origin?.taskTitle(event.taskId) ?? null);
-      const name = TASK_WORDS[kind][1];
-      const outcome = event.status === "completed" ? "finished" : event.status;
-      text = `${name} "${oneLine(label || event.taskId, 120)}" ${outcome}`;
-      if (kind === "subagent" && event.status === "failed" && event.summary) {
-        text += `: ${oneLine(event.summary, FAILURE_LIMIT)}`;
+      const label = oneLine(description || origin?.taskTitle(event.taskId) || event.taskId, 120);
+      if (
+        kind === "subagent" &&
+        event.status === "completed" &&
+        this.waitsOnOwnWork(event.taskId)
+      ) {
+        // A subagent whose own background work still runs is not done: it resumes once that
+        // work ends, and the terminal says so, with its usual mark for every line (the
+        // notification's summary is a note for Claude). No ✓, which would claim an end.
+        text = `${name} "${label}" ${texts.AGENT_WAITING}`;
+        marked = false;
+      } else {
+        const outcome = event.status === "completed" ? "finished" : event.status;
+        text = `${name} "${label}" ${outcome}`;
+        if (kind === "subagent" && event.status === "failed" && event.summary) {
+          text += `: ${oneLine(event.summary, FAILURE_LIMIT)}`;
+        }
       }
     }
-    return endedLine(text, event.status, event.durationMs);
+    const line = endedLine(text, event.status, event.durationMs, marked);
+    const report = this.messageOf(event, kind);
+    if (report === null) return { text: line, card: null };
+    // Cut by code points, as every other cut of the core: no emoji is split in half.
+    const points = Array.from(report);
+    const body =
+      points.length > texts.MESSAGE_LIMIT
+        ? `${points.slice(0, texts.MESSAGE_LIMIT - 1).join("")}…`
+        : report;
+    this.cardsMade += 1;
+    const title = texts.fill(texts.MESSAGE_FROM, { name: agentType ?? name });
+    return { text: line, card: { id: `message-${this.cardsMade}`, title, body } };
   }
 
   /**
@@ -2585,7 +2702,7 @@ export class ThreadSession {
    * Monitor's event), and a report the agent named the task of needs none.
    */
   private openingTarget(): readonly [
-    text: string | null,
+    ends: readonly EndLine[],
     target: TurnRenderer | null,
     aside: boolean,
   ] {
@@ -2623,9 +2740,9 @@ export class ThreadSession {
     target ??= this.restingLast();
     // The tasks that ended inside a turn are reported now, or given up on.
     this.unfolded.clear();
-    const ends = lines.map(([, line]) => line).join("\n");
+    const ends = lines.map(([, line]) => line);
     // End lines are lines about the work.
-    return [ends || null, target, ends !== ""];
+    return [ends, target, ends.length > 0];
   }
 
   /**
@@ -2740,22 +2857,22 @@ export class ThreadSession {
     const [first] = pending;
     const holder =
       first === undefined ? null : (this.taskReplies.get(first[0]) ?? this.showing(first[0]));
-    const [text, target, aside] = this.openingTarget();
+    const [ends, target, aside] = this.openingTarget();
     try {
       if (held.length > 0) {
         const renderer = target ?? this.newRenderer(this.newReply());
-        await this.standalone(held, text, aside, renderer, signal);
-      } else if (said && target !== null && text !== null) {
+        await this.standalone(held, ends, aside, renderer, signal);
+      } else if (said && target !== null && ends.length > 0) {
         // Into the reply that started the task, which the sweep below then ends. A reply that
         // is no longer the last thing in the thread gets no line: none is posted for it.
-        await target.feedLine(text);
+        await this.writeEnds(target, unsaid);
       } else if (said && this.promptOwed()) {
         // A message of the owner's waits below that reply: its own reply says the line.
         this.endedAhead.push(...unsaid);
       } else if (said && holder !== null && !holder.closedOut) {
         // Something sits below that reply and nothing is coming: the line is written where the
         // task started, by an edit that notifies nobody, as its card ended in place before.
-        await holder.feedLine(unsaid.join("\n"));
+        await this.writeEnds(holder, unsaid);
       }
     } catch (error) {
       if (error instanceof Cancelled) throw error;
@@ -3236,6 +3353,7 @@ export class ThreadSession {
     let renderer: TurnRenderer;
     let opening: string | null = null;
     let openingAside = false;
+    let openingEnds: readonly EndLine[] = [];
     if (run) {
       this.loopRuns += 1;
       renderer = this.newRenderer(new LoopReply(this.thread, this.runLabel(), this.now()));
@@ -3245,9 +3363,9 @@ export class ThreadSession {
       // follows for it, but only a reply that is still tracked, not ended and the last thing in
       // the thread (`openingTarget`); otherwise into the last reply when at rest, and with none
       // it gets a reply of its own at the bottom.
-      const [text, target, aside] = this.openingTarget();
+      const [ends, target, aside] = this.openingTarget();
       renderer = target ?? this.newRenderer(this.newReply());
-      opening = text;
+      openingEnds = ends;
       openingAside = aside;
     } else {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
@@ -3284,9 +3402,10 @@ export class ThreadSession {
       this.footerOwedTo = this.reply(renderer);
     }
     if (opening !== null) await renderer.feedOpening(opening, openingAside);
+    await writeEnds(renderer, openingEnds, (text) => renderer.feedOpening(text, openingAside));
     const ahead = this.endedAhead;
     this.endedAhead = [];
-    if (ahead.length > 0) await renderer.feedLine(ahead.join("\n"));
+    await this.writeEnds(renderer, ahead);
     if (this.notice !== null) {
       const notice = this.notice;
       this.notice = null;
@@ -3298,13 +3417,18 @@ export class ThreadSession {
     return active;
   }
 
+  /** End lines where the turn is, each subagent's card under its own line. */
+  private async writeEnds(renderer: TurnRenderer, ends: readonly EndLine[]): Promise<void> {
+    await writeEnds(renderer, ends, (text) => renderer.feedLine(text));
+  }
+
   /**
    * The turn the CLI never started to report an ended task, on its own reply (usually the one
    * that started the task, `renderer`; `expireInjectedTurn` resolves it).
    */
   private async standalone(
     events: readonly TaskEvent[],
-    text: string | null,
+    ends: readonly EndLine[],
     aside: boolean,
     renderer: TurnRenderer,
     signal?: AbortSignal,
@@ -3313,7 +3437,7 @@ export class ThreadSession {
       this.workStartedAt ??= this.now();
       this.footerOwedTo = this.reply(renderer);
     }
-    if (text !== null) await renderer.feedOpening(text, aside);
+    await writeEnds(renderer, ends, (text) => renderer.feedOpening(text, aside));
     for (const event of events) await renderer.feed(event);
     await this.closeReply(renderer, { signal });
   }
@@ -3363,6 +3487,8 @@ export class ThreadSession {
     this.opening = null;
     this.endedAhead = [];
     this.ownedBySubagent.clear();
+    this.parents.clear();
+    this.messages.clear();
     this.unreported.clear();
     this.notificationWaits = false;
     this.unfolded.clear();

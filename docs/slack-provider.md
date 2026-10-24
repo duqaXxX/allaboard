@@ -363,6 +363,8 @@ divider, in the thread's last reply once it rests.
 - A message that shows the list stays among the open replies (`ReplySink.keepsOpen`), and
   `repair.endReply` takes the block off after a crash; on a message that only the list kept open
   it writes no note.
+- A card of a subagent's words (`TaskUpdate.message`) shows its output, its body, also once
+  complete (`blocks.cardFields`); a call's card keeps its result to itself.
 - Slack keeps a `task_card` with a fixed `block_id` open across `chat.update` (measured
   2026-10-12, Slack desktop; the client version was not recorded). A collapsible `container` does
   not, and a `task_card` inside one is refused. What else was measured, and what was not, is in

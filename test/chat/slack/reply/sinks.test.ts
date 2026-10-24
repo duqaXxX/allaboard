@@ -292,6 +292,7 @@ function tool(
     output: null,
     name,
     task: false,
+    message: false,
     calls: 0,
     preview: null,
     folded: null,
@@ -4115,6 +4116,7 @@ test("a running card in a full message keeps its title and gains no line", async
     tool("a1", "Agent", "in_progress", {
       details: `Read: notes.md\n${"x".repeat(400)}`,
       task: true,
+      message: false,
       calls: 2,
     }),
   );

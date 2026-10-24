@@ -101,6 +101,7 @@ function upd(
     output: null,
     name: "",
     task: false,
+    message: false,
     calls: 0,
     preview: null,
     folded: null,
@@ -158,6 +159,7 @@ const SCENARIOS: Record<string, Op[]> = {
       upd("a", `Agent: ${R.repeat(200)}`, "in_progress", {
         name: "Agent",
         task: true,
+        message: false,
         calls: 3,
         details: lines(30, (i) => `Read: ${G}${i}`).join("\n"),
       }),
@@ -168,6 +170,7 @@ const SCENARIOS: Record<string, Op[]> = {
       upd("a", `Agent: ${R.repeat(200)}`, "in_progress", {
         name: "Agent",
         task: true,
+        message: false,
         calls: 4,
         details: lines(35, (i) => `Read: ${G}${i}`, 25).join("\n"),
       }),
@@ -255,6 +258,7 @@ const SCENARIOS: Record<string, Op[]> = {
         upd(`t${i}`, `Agent: ${R}${i}`, "in_progress", {
           name: "Agent",
           task: true,
+          message: false,
           details: lines(30, () => G.repeat(60)).join("\n"),
         }),
       ],

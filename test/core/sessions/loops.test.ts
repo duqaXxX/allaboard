@@ -472,6 +472,8 @@ test("a turn that comes after a report was given up on is not taken for a run", 
       summary: "",
       durationMs: null,
       callId: null,
+      report: null,
+      reportSent: false,
       foldNamed: false,
     }),
   ]);

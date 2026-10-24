@@ -55,6 +55,7 @@ function line(
     output: null,
     name: "",
     task: false,
+    message: false,
     calls: 0,
     preview: null,
     folded: null,
@@ -108,10 +109,16 @@ export function goalAchievedLine(
 
 /**
  * How a task's end opens the agent's report of it: the notification's own summary, as the
- * terminal prints it (`Agent "..." finished · 10s`), with the duration when there is one.
+ * terminal prints it (`Agent "..." finished · 10s`), with the duration when there is one, after
+ * the ✓ or ✗ of its status unless `marked` is false (a line that claims no end).
  */
-export function endedLine(summary: string, status: string, durationMs: number | null): string {
-  const said = `${status === "failed" ? "✗" : "✓"} ${summary}`;
+export function endedLine(
+  summary: string,
+  status: string,
+  durationMs: number | null,
+  marked = true,
+): string {
+  const said = marked ? `${status === "failed" ? "✗" : "✓"} ${summary}` : summary;
   return durationMs === null ? said : `${said} · ${formatDuration(durationMs / 1000)}`;
 }
 
@@ -506,6 +513,30 @@ export class TurnRenderer {
   async feedLine(text: string): Promise<void> {
     await this.#writeLaunches();
     await this.#line(text, true);
+  }
+
+  /**
+   * A card of the daemon's, closed with `title` and open with `body`: what a subagent said back,
+   * under its end line, as the terminal's `ctrl+o` opens it. A task's card, which a chat does not
+   * fold among the calls; `id` keeps it one card through the reply's rewrites.
+   */
+  async feedCard(id: string, title: string, body: string): Promise<void> {
+    await this.#writeLaunches();
+    await this.#set({
+      id,
+      title,
+      status: "complete",
+      details: null,
+      output: body,
+      name: "",
+      task: true,
+      message: true,
+      calls: 0,
+      preview: null,
+      folded: null,
+      startedAt: null,
+    });
+    this.#wroteLine = true;
   }
 
   /** `aside`: a line about the work, which a chat may draw smaller (a task's end). */

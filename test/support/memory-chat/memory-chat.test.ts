@@ -42,6 +42,7 @@ function line(id: string, title: string, folded: string | null = null): TaskUpda
     output: null,
     name: "Read",
     task: false,
+    message: false,
     calls: 0,
     preview: null,
     folded,

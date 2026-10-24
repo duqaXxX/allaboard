@@ -1533,12 +1533,21 @@ closed when the start returns (`ThreadSession.connect`).
   appended after that reply's own body with one line per task it reports, the tasks that had ended when the agent began the turn (a `session_started` with no prompt queued sets their lines aside; a task that ends after it waits for the next report), as the terminal prints it (`ThreadSession.endedLine`): a command's notification
   `summary`, which already reads `Background command "..." completed (exit code 0)`, or
   `Agent "<description>" finished` built from the task's `task_started` event, since an agent's
-  `summary` is its result, except for an agent that failed, whose summary is the reason and follows the words; plus the duration when the notification's `usage` reports `duration_ms`
+  `summary` can be its result or a note for the model, except for an agent that failed, whose summary is the reason and follows the words, and for a completed agent that a task it started still outlives (`ThreadSession.waitsOnOwnWork`, from the `parentTaskId` of each task it starts): it is not done, and the line is the terminal's `Agent "<description>" is waiting on its own background work` (`texts.AGENT_WAITING`, Claude Code 2.1.299 on), written with no mark; plus the duration when the notification's `usage` reports `duration_ms`
   (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
   that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
   report renders into the thread's last reply when that one is at rest (tracked, not ended, and
   last: `ThreadSession.restingLast`), also when the turn names no task; with no such reply it gets a reply of its own at the bottom. The next queued message waits for it to finish.
-  With no task end seen, no line opens it (`ThreadSession.openingTarget`).
+  With no task end seen, no line opens it (`ThreadSession.openingTarget`). A background
+  subagent's end also gives its words a card under its end line, as the terminal's message
+  from it that `ctrl+o` opens: titled `Message from <type>`, the words its body, up to
+  `texts.MESSAGE_LIMIT` characters (`texts.MESSAGE_FROM`, `ThreadSession.messageOf`,
+  `TurnRenderer.feedCard`, a `TaskUpdate` with `message` set, which a chat shows open on its
+  output). They are the event's `report`: in the Claude
+  back end the notification's `handback_report.text` when the subagent handed its report back
+  (auto mode; the summary is then a note for Claude), else its `summary`. A report it sent
+  (`reportSent`) shows at once, while it waits on its own work too; what it only said last shows
+  once nothing of its own runs; the same words are not shown twice for one task.
 
   A background task that ends while a turn runs is reported either by that turn or by a turn the
   agent opens by itself once it has ended (recorded 2026-10-15 on Claude Code 2.1.300:

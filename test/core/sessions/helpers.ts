@@ -37,7 +37,7 @@ export interface Inside {
   tasks: Map<string, readonly [string, string]>;
   agentCalls: Map<string, string>;
   steps: Map<string, unknown>;
-  ended: Array<readonly [string, string]>;
+  ended: Array<readonly [string, { readonly text: string; readonly card: unknown }]>;
   unreported: Map<string, number>;
   stopped: Set<string>;
   unlanded: Set<Reply>;
@@ -468,4 +468,16 @@ export function repoUnder(tmpPath: string): string {
   const repo = join(tmpPath, "app");
   execFileSync("git", ["init", "-q", "-b", "feature-x", repo], { env: gitEnv() });
   return repo;
+}
+
+/** `cards` without the cards of subagents' words, which a background subagent's end adds. */
+export function toolCards<T extends { title?: unknown }>(cards: readonly T[]): T[] {
+  return cards.filter((card) => !String(card.title).startsWith("Message from "));
+}
+
+/** The titles of the cards of subagents' words among `cards`. */
+export function messageTitles(cards: readonly { title?: unknown }[]): string[] {
+  return cards
+    .map((card) => String(card.title))
+    .filter((title) => title.startsWith("Message from "));
 }

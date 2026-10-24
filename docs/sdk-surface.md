@@ -216,6 +216,8 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKTaskNotificationMessage` | `summary` | field | translate.ts: taskNotification | reference | none |
 | `SDKTaskNotificationMessage` | `task_id` | field | translate.ts: taskNotification | reference | none |
 | `SDKTaskNotificationMessage` | `tool_use_id` | field | translate.ts: taskNotification | reference | none |
+| `SDKTaskNotificationMessage` | `handback_report` | field | translate.ts: taskNotification | measured | none |
+| `SDKTaskNotificationMessage.handback_report` | `text` | field | translate.ts: taskNotification | measured | none |
 | `SDKTaskNotificationMessage` | `usage` | field | translate.ts: taskNotification | reference | none |
 | `SDKTaskNotificationMessage.usage` | `duration_ms` | field | translate.ts: taskNotification | package | none |
 | `SDKTaskProgressMessage` | `description` | field | translate.ts: taskProgress | reference | none |

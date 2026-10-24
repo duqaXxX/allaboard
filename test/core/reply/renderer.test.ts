@@ -1897,3 +1897,17 @@ test("a refusal's line does not take the place of the turn's final text", async 
   const reply = await renderDisplayed([recorded, { ...ended, finalText: "Final words." }]);
   assert.ok(reply.includes("Final words."));
 });
+
+test("a subagent's words are a card of the daemon's, closed on its title and open on them", async () => {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(sink, NAMES);
+  await renderer.feedLine('✓ Agent "Sleep then date" finished · 34s');
+  await renderer.feedCard("message-1", "Message from mechanical", "Sat Oct 24 22:03:05 CEST 2026");
+  const [card] = sink.tasks;
+  assert.equal(card?.id, "message-1");
+  assert.equal(card?.title, "Message from mechanical");
+  assert.equal(card?.output, "Sat Oct 24 22:03:05 CEST 2026");
+  assert.equal(card?.status, "complete");
+  // A task's card: not folded among the calls.
+  assert.equal(card?.task, true);
+});

@@ -67,6 +67,11 @@ export interface TaskUpdate {
   readonly name: string;
   /** A subagent's or a background command's line. */
   readonly task: boolean;
+  /**
+   * A card of words to read (a subagent's message), not a call: its `output` is its body, which
+   * a chat shows whatever the status, as it keeps a call's result to itself.
+   */
+  readonly message: boolean;
   /** Calls made inside it (a subagent's), counted in its title. */
   readonly calls: number;
   readonly preview: Preview | null;
