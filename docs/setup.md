@@ -1418,7 +1418,9 @@ setting is:
   second message holds the footer alone and comes once the session has ended; it does not come
   when something was written below the reply meanwhile, such as `Stopped.`, or when a later
   reply ends the session.
-- An approval request and a question ring.
+- An approval request and a question ring. So does a shell command's confirmation (`!!`), a new
+  message in the thread as an approval request is (not measured on a phone), and the reply to the
+  command then rings as any reply does: two notifications for one command.
 - A reply that fails outright rings once, as any reply ending does.
 - A restart ends the reply as any reply ending does, so it rings once. A `!stop` typed in the
   thread rings once, with its answer `Stopped.`; typed in the channel it does not ring. A reply
