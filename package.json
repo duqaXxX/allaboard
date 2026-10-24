@@ -44,7 +44,7 @@
     "check": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.309",
+    "@anthropic-ai/claude-agent-sdk": "0.3.310",
     "@inquirer/input": "5.1.7",
     "@inquirer/password": "5.2.3",
     "@inquirer/select": "5.2.6",
