@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The release probe prints Claude Code's changelog after the claims: every entry between the CLI
+  of the newest certified release below the probed one and the CLI under test, unfiltered, read
+  from the `anthropics/claude-code` repository (`probe/changelog.ts`). A run that cannot fetch it
+  logs one line and goes on. Claim `P41` records a background subagent's end in bypass mode and
+  in auto mode: the form of the notification's summary (the words, or the hand-back note) and how
+  many of the subagent's own background tasks still run at each notification. On 0.3.310 it
+  holds: two notifications in each mode, the first while the subagent's own command still runs.
+  The probe's shape check reads the keys of a usage report's `model_usage` as data, as it does
+  for `modelUsage`.
 - `!!<command>` in a session's thread runs a shell command, as the terminal's `!<command>` does.
   The thread first shows the command with **Run** and **Cancel**; Run runs it with Bash in the
   session's folder, for at most `BASH_DEFAULT_TIMEOUT_MS`, and the reply shows how it ended (an

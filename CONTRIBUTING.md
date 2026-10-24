@@ -151,8 +151,8 @@ service run it.
 allaboard pins `@anthropic-ai/claude-agent-sdk` to an exact version in `package.json` and runs the
 Claude Code CLI that package bundles. The suite replays recorded streams, so it cannot see what a
 new Claude Code CLI does differently. The **probe** can. It runs the daemon's own session code
-against the real CLI the SDK bundles, with Slack faked, and uses your Claude Code login and Haiku
-tokens from your plan, so it runs on your machine and is not part of `npm test`:
+against the real CLI the SDK bundles, with Slack faked, and uses your Claude Code login and tokens
+from your plan (Haiku, and Sonnet for the one scene that needs auto mode), so it runs on your machine and is not part of `npm test`:
 
 ```
 node probe/main.ts            # the pinned SDK, if it is not certified yet; if it is, its stored report
@@ -241,6 +241,10 @@ is listed to be read by hand. The rows the reference never named and no claim co
 `node probe/main.ts --surface` lists them and checks the table alone, with no token spent. A
 change that reads a new field, key or value of the SDK adds its row there in the same pull
 request; `test/agent/claude/sdk-surface.test.ts` fails on an imported SDK name with no row.
+
+A run on a release that is not certified yet also prints, after the claims, Claude Code's own
+changelog from the CLI of the newest certified release below it to the CLI under test, every
+entry (`probe/changelog.ts`).
 
 A `--latest` run also prints what the release adds beside what it could change: the names its
 `sdk.d.ts` declares that the pinned one does not and the names it no longer declares, under "Added

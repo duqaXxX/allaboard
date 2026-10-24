@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Translator } from "../../src/agent/claude/translate.ts";
 import type { QuestionRequest, SessionEvent } from "../../src/agent/seam.ts";
 
 // The shapes below are those measured on Claude Code 2.1.304 with SDK 0.3.304 (2026-10-21,
@@ -323,4 +324,141 @@ test("a shell card needs the command line its call's input carries", async () =>
   assert.equal(missing.holds, false);
   assert.equal(judgeShellCard(true, run, false, "").holds, false);
   assert.equal(judgeShellCard(false, undefined, false, "none").caused, false);
+});
+
+// The records of a background subagent that starts a background command, in the shapes recorded
+// on 2026-10-24 (2.1.309; `subagent-handback` for the note and the report apart, the child's
+// start as `test/core/sessions/sessions.test.ts` has it); the content is synthetic.
+const NOTE =
+  'This agent\'s report was delivered to you as a message from "a1" (its SubagentHandback call). Read it there; it is not repeated here.\n';
+const agentStart = {
+  type: "system",
+  subtype: "task_started",
+  task_id: "a1",
+  tool_use_id: "toolu_agent",
+  description: "Start a sleep",
+  subagent_type: "general-purpose",
+  is_backgrounded: true,
+  task_type: "local_agent",
+};
+const childStart = {
+  type: "system",
+  subtype: "task_started",
+  task_id: "b1",
+  tool_use_id: "toolu_child",
+  description: "Sleep 20",
+  task_type: "local_bash",
+  is_backgrounded: true,
+  parent_task_id: "a1",
+  owned_by_subagent: true,
+};
+const notification = (taskId: string, toolUseId: string, over: object) => ({
+  type: "system",
+  subtype: "task_notification",
+  task_id: taskId,
+  tool_use_id: toolUseId,
+  status: "completed",
+  output_file: "/tmp/x.output",
+  ...over,
+});
+const agentNote = (words: string) =>
+  notification("a1", "toolu_agent", {
+    summary: NOTE,
+    handback: "send",
+    handback_report: { text: words },
+  });
+const childEnd = notification("b1", "toolu_child", {
+  summary: 'Background command "Sleep 20" completed (exit code 0)',
+});
+
+function played(raw: object[]): SessionEvent[] {
+  const translator = new Translator();
+  return raw.flatMap((record) => translator.translate(record));
+}
+
+test("a subagent still running its command at the first notification is waiting, then done", async () => {
+  const { handbackFacts, judgeHandback } = await scenes();
+  const auto = [agentStart, childStart, agentNote("started"), childEnd, agentNote("slept")];
+  const facts = handbackFacts(played(auto), auto);
+  assert.deepEqual(facts.notifications, [
+    { form: "note", handback: "send", reportText: true, running: 1 },
+    { form: "note", handback: "send", reportText: true, running: 0 },
+  ]);
+  assert.equal(facts.started, 1);
+  assert.equal(facts.settled, true);
+
+  const bypass = [
+    agentStart,
+    childStart,
+    notification("a1", "toolu_agent", { summary: "It started and ended." }),
+  ];
+  const plain = handbackFacts(played(bypass), bypass);
+  assert.deepEqual(plain.notifications, [
+    { form: "words", handback: null, reportText: false, running: 1 },
+  ]);
+
+  assert.equal(plain.lastReport, true);
+  assert.equal(plain.sent, false);
+  assert.equal(facts.sent, true);
+
+  const done = judgeHandback({ bypass: plain, auto: facts });
+  assert.equal(done.caused, true);
+  assert.equal(done.holds, true);
+  assert.deepEqual(Object.keys(done.seen), ["bypass", "auto"]);
+  // The facts hold no summary text and no id.
+  assert.ok(!JSON.stringify(done.seen).includes("a1"));
+  assert.ok(!JSON.stringify(done.seen).includes("slept"));
+});
+
+test("a subagent that started no background task is not a caused hand-back", async () => {
+  const { handbackFacts, judgeHandback } = await scenes();
+  const none = [agentStart, agentNote("started")];
+  const facts = handbackFacts(played(none), none);
+  assert.equal(facts.started, 0);
+  const judged = judgeHandback({ bypass: facts, auto: facts });
+  assert.equal(judged.caused, false);
+  assert.match(judged.detail, /started no background task/);
+  assert.equal(handbackFacts([], []).notifications.length, 0);
+});
+
+test("an auto mode end with no hand-back does not hold", async () => {
+  const { handbackFacts, judgeHandback } = await scenes();
+  // The summary is the agent's words and no report apart: the back end reads a report, but it
+  // is not a sent one.
+  const bare = [
+    agentStart,
+    childStart,
+    notification("a1", "toolu_agent", { summary: "It started." }),
+    childEnd,
+    notification("a1", "toolu_agent", { summary: "It slept." }),
+  ];
+  const facts = handbackFacts(played(bare), bare);
+  const judged = judgeHandback({ bypass: facts, auto: facts });
+  assert.equal(judged.caused, true);
+  assert.equal(judged.holds, false);
+  assert.match(judged.detail, /auto/);
+  // A last end with no words at all fails in the mode it happens in.
+  const empty = [agentStart, childStart, notification("a1", "toolu_agent", { summary: "" })];
+  const emptyFacts = handbackFacts(played(empty), empty);
+  const silent = judgeHandback({ bypass: emptyFacts, auto: facts });
+  assert.equal(silent.holds, false);
+  assert.match(silent.detail, /bypass/);
+});
+
+test("a subagent first notified after its own task ended shows no wait: not caused", async () => {
+  const { handbackFacts, judgeHandback } = await scenes();
+  const late = [
+    agentStart,
+    childStart,
+    childEnd,
+    notification("a1", "toolu_agent", { summary: "It started and ended." }),
+  ];
+  const facts = handbackFacts(played(late), late);
+  assert.deepEqual(
+    facts.notifications.map((notice) => notice.running),
+    [0],
+  );
+  const judged = judgeHandback({ bypass: facts, auto: facts });
+  assert.equal(judged.caused, false);
+  assert.match(judged.detail, /had ended at every notification/);
 });

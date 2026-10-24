@@ -35,6 +35,7 @@ const MAPS = new Set([
   "wire_tool_inputs",
   "modelUsage",
   "model_usage_since_last_result",
+  "model_usage",
   "answers",
   "tool_uses",
   "by_type",
