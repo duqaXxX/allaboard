@@ -29,7 +29,7 @@ import {
   recordOf,
   sdkMessages,
 } from "../../support/sessions.ts";
-import { pending, send, splitBackground, withResult } from "./helpers.ts";
+import { pending, play, send, splitBackground, withResult } from "./helpers.ts";
 
 const WITH_JOB = sdkJson("stop-hook-session-crons") as JsonObject;
 const WITHOUT_JOB = { ...WITH_JOB, session_crons: [] };
@@ -538,4 +538,71 @@ test("the end of a loop is said after the turn that deleted it, not in the middl
   await (await session.submit("stop the loop")).done.wait();
   await h.until(() => loopMessages(h).length === 2);
   assert.deepEqual(busyWhenEnded, [false]);
+});
+
+test("a run's background task reports on the card, with no message of its own", async (t) => {
+  const [h, session] = await looping(t);
+  const [first, notice, injected] = splitBackground();
+  const replies = messageCount(h);
+  h.clients[0]?.inject(withStopHook(first, { ...WITH_JOB, session_crons: [JOB] }));
+  await h.until(() => loopMessages(h).length === 1);
+  await h.until(() => !session.busy);
+  assert.ok(session.runningKinds !== "", "the run's task outlived the run");
+  h.clients[0]?.inject(notice);
+  h.clients[0]?.inject(withResult(injected, "THE REPORT"));
+  await h.until(() => card(h).includes("THE REPORT"));
+  await h.until(() => session.idle);
+  await h.idle();
+  assert.equal(messageCount(h), replies + 1, "the report rewrites the card");
+  assert.ok(card(h).includes("run 1"), "under the run it belongs to");
+  assert.ok(!card(h).includes("Running in background"), "the run's launch line is gone");
+  assert.equal(
+    h.replies().filter((text) => text.includes("THE REPORT")).length,
+    1,
+    "the card alone",
+  );
+});
+
+test("a run's report that comes after a message of the owner's is an ordinary reply, and leaves the card as it was", async (t) => {
+  const [h, session] = await looping(t);
+  const [first, notice, injected] = splitBackground();
+  h.clients[0]?.inject(withStopHook(first, { ...WITH_JOB, session_crons: [JOB] }));
+  await h.until(() => loopMessages(h).length === 1);
+  await h.until(() => !session.busy);
+  const shown = card(h);
+  // Sent while the run's task runs: the message stands below the card, and the agent takes it
+  // into its report.
+  const asked = await send(h, session, "and now this");
+  const id = h.clients[0]?.sent.at(-1)?.id ?? "";
+  h.clients[0]?.inject(notice);
+  const report = withResult(injected, "THE REPORT");
+  h.clients[0]?.inject([...report.slice(0, -1), replay(id, "and now this"), ...report.slice(-1)]);
+  await h.until(() => asked.done.isSet);
+  await h.until(() => h.replies().some((text) => text.includes("took your message")));
+  await h.idle();
+  assert.equal(card(h), shown, "the card keeps the run's words");
+  await session.close();
+  assert.ok(
+    (loopMessages(h)[1] ?? "").includes("Scheduled loop paused · 1 run"),
+    "the run still counts",
+  );
+});
+
+test("a run's report that comes after an exchange with the owner is an ordinary reply below it", async (t) => {
+  const [h, session] = await looping(t);
+  const [first, notice, injected] = splitBackground();
+  h.clients[0]?.inject(withStopHook(first, { ...WITH_JOB, session_crons: [JOB] }));
+  await h.until(() => loopMessages(h).length === 1);
+  await h.until(() => !session.busy);
+  const shown = card(h);
+  const asked = await send(h, session, "and now this");
+  play(h, withStopHook(sdkMessages("tools"), { ...WITH_JOB, session_crons: [JOB] }));
+  await asked.done.wait();
+  const before = messageCount(h);
+  h.clients[0]?.inject(notice);
+  h.clients[0]?.inject(withResult(injected, "THE REPORT"));
+  await h.until(() => messageCount(h) === before + 1);
+  await h.until(() => !session.busy);
+  await h.idle();
+  assert.equal(card(h), shown, "the card above the exchange keeps the run's words");
 });

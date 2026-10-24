@@ -1137,6 +1137,24 @@ export function chatConformance(
         },
       );
 
+      gated(
+        "is the last message until something is written below it",
+        "loopCard",
+        async ({ rig, provider, ref }) => {
+          const thread = provider.thread(ref);
+          assert.equal(thread.loopCardLast, false, "no card shown yet");
+          await thread.showLoop({ label: "Scheduled run · run 1", at: AT, text: "", footer: null });
+          await rig.settle();
+          assert.equal(thread.loopCardLast, true);
+          await rig.owner.says(ref.channel, "and now this", { thread: ref.thread });
+          await rig.settle();
+          assert.equal(thread.loopCardLast, false, "the owner wrote below it");
+          await thread.showLoop({ label: "Scheduled run · run 2", at: AT, text: "", footer: null });
+          await rig.settle();
+          assert.equal(thread.loopCardLast, false, "a rewrite does not move it down");
+        },
+      );
+
       gated("an empty run still shows its label", "loopCard", async ({ rig, provider, ref }) => {
         await provider
           .thread(ref)

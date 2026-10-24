@@ -1667,12 +1667,22 @@ The order of replays, the cases above and what is released when are in the doc c
   to it, the card is not written for that run, and the run is not counted.
 - A run that left the root at work (it asked for an approval) settles the status at its end as a
   turn does.
+- The report turn of a task a run started (a subagent the run's prompt handed work to) renders
+  into that run's `LoopReply` (`ThreadSession.openingTarget`), while the card is still the newest
+  message of the thread (`LoopReply.newest`, from `ThreadChat.loopCardLast`): the card is
+  rewritten with the report's final words and a footer that times the run from its start to the
+  report's end, and nothing notifies. The report replaces everything the run showed, its launch
+  line too (`LoopReply.rest` marks the run's end with a task still running). With anything below the card (a message of the owner's, a
+  reply), the report is an ordinary reply at the bottom, as for any task whose reply is no longer
+  the last. `LoopReply.last` stays false, so no other report (a Monitor's event, a task of an
+  owner's turn) renders into the card.
 - One card per session, whatever the jobs. The first run posts it and each later run rewrites the
   same message (`chat.update` in the Slack provider, which notifies nobody). Its label is
   `Scheduled run · <cadence> · run N` when exactly one job is believed and `Scheduled run · run N`
   with several, since a run names no job. `ThreadSession.loopRuns` counts the runs.
-- The card shows the run's final words (the result's text, else what was written), the end of
-  them when they are too long. Its body is written once, when the turn's body ends.
+- The card shows the run's final words (the result's text, else what was written), then the
+  daemon's own lines of the run (a launch line, an error) after a blank line, the end of them
+  when they are too long. Its body is written once, when the turn's body ends.
 - The loop ends when the believed list is empty and no turn is active, a run or an owner's
   (`ThreadSession.endLoopIfOver`, called at every turn's end and when the list arrives):
   `ThreadChat.endLoop` posts one new message, `Scheduled loop ended · N runs`, the only push of the

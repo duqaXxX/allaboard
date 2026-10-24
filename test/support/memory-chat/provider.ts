@@ -393,6 +393,12 @@ class MemoryThread implements ThreadChat {
     }
   }
 
+  get loopCardLast(): boolean {
+    const held = loopCards.get(this.#room)?.get(`${this.#ref.channel}/${this.#ref.thread}`);
+    if (held === undefined) return false;
+    return this.#room.messages(this.#ref.channel, this.#ref.thread).at(-1)?.id === held.id;
+  }
+
   async endLoop(line: string): Promise<void> {
     loopCards.get(this.#room)?.delete(`${this.#ref.channel}/${this.#ref.thread}`);
     await this.#post(line, "notice").catch(() => {});

@@ -382,7 +382,9 @@ the card on every run, so it is an edit and no push. A run with no words keeps t
 since a markdown block's text may not be empty; a footer that says nothing is left out. The
 writes of one thread's card run one after the other, and the rewrite takes the shared limiter. A
 write that fails (the card was deleted by hand) forgets the card, and the next run posts a new
-one.
+one. The card takes the thread's places as a reply does (`ThreadPlaces`), so the owner's messages
+below it are seen: `SlackThread.loopCardLast` is true while no message the places know of is newer
+than the card.
 
 `SlackThread.endLoop` posts the loop's last line (`Scheduled loop ended · 14 runs`, or the paused
 or stopped line the core chose) as a new context message, after the card's last write, so it is
