@@ -1356,10 +1356,15 @@ closed when the start returns (`ThreadSession.connect`).
   ends a hold. `Run` queues a `Turn` that carries the command (`ThreadSession.submit`). The worker
   runs it before it sends anything (`ThreadSession.runShell`, over `shell.runShell`: Bash in the
   session's folder, in the environment and with the timeout of the agent's `ShellMode`, the
-  command leading a process group that a stop or the timeout ends whole), then replaces the turn's
-  prompt with `ShellMode.prompt` of the run and keeps `shell.shellHead` for the reply, which
-  `startTurn` writes before the agent's answer. A `!stop` during the run ends it: the reply shows
-  the run as stopped and the agent is sent nothing.
+  command leading a process group that a stop or the timeout ends whole; its output is kept to a
+  head and a tail while it streams, and a process it leaves in the background goes on once Bash
+  exits), then replaces the turn's prompt with `ShellMode.prompt` of the run and keeps
+  `shell.shellHead` on the turn (`Turn.head`). `startTurn` writes it before the agent's answer;
+  when the agent takes the prompt into a turn already running, `ThreadSession.headTaken` writes it
+  there; a turn that fails shows it before the error, and one a drain drops is named in the note
+  with how it ended. After the run the worker connects again and checks `settled` and the drain
+  once more, in the same step as the send. A `!stop` during the run ends it and stops the rest as
+  any `!stop` does: the reply shows the run as stopped and the agent is sent nothing.
 - Session setup: a session's first prompt is held before the same-folder hold and before anything is
   sent: a top-level message that opens a session (a prompt, files, or a `!name` passthrough), and a
   reply in a thread where nothing was ever sent (`ThreadSession.neverRan`: no turn queued and no
