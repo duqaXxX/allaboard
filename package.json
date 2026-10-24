@@ -1,6 +1,6 @@
 {
   "name": "allaboard",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Your Claude Code workspace in Slack: one channel per project, one thread per session, running on your own Mac.",
   "keywords": [
     "slack",
