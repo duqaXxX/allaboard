@@ -24,12 +24,16 @@
  * report lists it first. A limit claim that no longer holds is newly supported: the report asks
  * for a change of docs/limits.md, and the exit status and the certificate are as without it. An
  * already certified release prints that report again from what was stored.
+ *
+ * A run that probes an uncertified release also prints Claude Code's changelog (`changelog.ts`)
+ * from the CLI of that baseline to the CLI under test, every entry, after the claims.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
+import { byVersion, changelogBetween, fetchChangelog } from "./changelog.ts";
 import {
   broken,
   type Certificate,
@@ -251,21 +255,33 @@ function gitEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-/** Version numbers in order: `0.3.99` before `0.3.296`. */
-function byVersion(a: string, b: string): number {
-  const x = a.split(".").map(Number);
-  const y = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(x.length, y.length); i += 1) {
-    const step = (x[i] ?? 0) - (y[i] ?? 0);
-    if (step !== 0) return step;
-  }
-  return 0;
-}
-
 /** The newest certified release below `sdk`: what a run of `sdk` is compared with (null: none). */
 export function baselineOf(known: Certificates, sdk: string): string | null {
   const below = Object.keys(known).filter((version) => byVersion(version, sdk) < 0);
   return below.sort(byVersion).at(-1) ?? null;
+}
+
+/**
+ * Claude Code's changelog from the CLI of the baseline certificate to `cli`, unfiltered; empty
+ * when it cannot be had (one line says why).
+ */
+export async function changelogOf(
+  known: Certificates,
+  from: string | null,
+  cli: string,
+): Promise<string> {
+  // Never a reason to stop a run or to change its status: the block is a look.
+  const baseline = from === null ? undefined : known[from]?.cli;
+  if (baseline === undefined)
+    return "No certified release below this one: no changelog range to show.";
+  try {
+    return changelogBetween(await fetchChangelog(), baseline, cli);
+  } catch (error) {
+    log(
+      `Claude Code's changelog cannot be listed: ${error instanceof Error ? error.message : error}`,
+    );
+    return "";
+  }
 }
 
 function sorted(known: Certificates): Certificates {
@@ -440,6 +456,8 @@ async function run(options: RunOptions): Promise<number> {
   // claims: it asks for a look, and stops no certificate.
   const commandChanges = changes(await offeredNow(), recorded());
   const commands = commandsReport(commandChanges, cli);
+  // Fetched while the scenes run, and never rejected: a slow host costs no wait of its own.
+  const changelog = changelogOf(known, from, cli);
   // Read before the scenes too: what the release adds is a look for a person, never a verdict.
   const added =
     options.pinnedDeclarations === null
@@ -457,6 +475,8 @@ async function run(options: RunOptions): Promise<number> {
   console.log(compared(results, known, options.observations, cli, sdk));
   console.log(`\n${commands}`);
   if (added) console.log(`\n${added}`);
+  const entries = await changelog;
+  if (entries) console.log(`\n${entries}`);
   // The streams the scenes produced against the fixtures: a shape no test has read stops the
   // certificate until its fixture is recorded again or the shape is accepted.
   let shapes = differences(records, fixtures, accepted);

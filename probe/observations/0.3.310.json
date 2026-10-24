@@ -73,6 +73,36 @@
     "P40": {
       "category": "model_not_found"
     },
+    "P41": {
+      "auto": [
+        {
+          "form": "note",
+          "handback": "send",
+          "reportText": true,
+          "running": 1
+        },
+        {
+          "form": "note",
+          "handback": "send",
+          "reportText": true,
+          "running": 0
+        }
+      ],
+      "bypass": [
+        {
+          "form": "words",
+          "handback": null,
+          "reportText": false,
+          "running": 1
+        },
+        {
+          "form": "words",
+          "handback": null,
+          "reportText": false,
+          "running": 0
+        }
+      ]
+    },
     "L1": {},
     "L2": {},
     "L3": {},

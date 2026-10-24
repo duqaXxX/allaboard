@@ -122,6 +122,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "api error": ["P40"],
   question: ["P36"],
   "ended subagent": ["P35"],
+  "subagent hand-back": ["P41"],
 };
 
 /** `text` without any path of this machine, one line, cut to `limit` characters. */
@@ -2200,6 +2201,189 @@ async function endedSubagent(s: Stage): Promise<Seen> {
   return { P35: judgeResumed(live.events) };
 }
 
+/** What one notification of a background subagent's end said, content-free. */
+export type HandbackNotice = {
+  /** `note` when the summary is Claude Code's note about the hand-back, else `words`. */
+  readonly form: "note" | "words";
+  /** The record's undocumented `handback`, when a string. */
+  readonly handback: string | null;
+  /** Whether `handback_report.text` is a non-empty string. */
+  readonly reportText: boolean;
+  /** How many tasks the subagent started were still running at this notification. */
+  readonly running: number;
+};
+
+/** The first background subagent of the events, the tasks it started and its notifications. */
+export interface HandbackFacts {
+  /** How many tasks the subagent started in the background. */
+  readonly started: number;
+  /** Whether the subagent's task has ended and none of those tasks still runs. */
+  readonly settled: boolean;
+  readonly notifications: readonly HandbackNotice[];
+  /** Whether the back end read a report from the subagent's last end. */
+  readonly lastReport: boolean;
+  /** Whether the back end read one of its ends as a report handed back (`reportSent`). */
+  readonly sent: boolean;
+}
+
+/**
+ * The pair P41 records for one mode: the form of the summary and the tasks the subagent still
+ * ran at each of its notifications. The fixed words of the note are the name of the tool the
+ * note points to (`SubagentHandback`, measured 2026-10-24 on 2.1.309 in auto mode; bypass mode
+ * gave the agent's last words as the summary). `handback` and `handback_report` are not in
+ * `sdk.d.ts` 0.3.310. The records and the events are two views of one stream, so the n-th
+ * notification of the subagent is the n-th `task_ended` event of its task; a notification the
+ * back end did not turn into an event counts the tasks as the events end.
+ */
+export function handbackFacts(
+  events: readonly SessionEvent[],
+  raw: readonly unknown[],
+): HandbackFacts {
+  const agent = ofType(events, "task_started").find(
+    (event) => event.kind === "subagent" && event.background === true,
+  );
+  if (agent === undefined) {
+    return { started: 0, settled: false, notifications: [], lastReport: false, sent: false };
+  }
+  const children = events.flatMap((event, at) =>
+    event.type === "task_started" &&
+    event.parentTaskId === agent.taskId &&
+    event.background === true
+      ? [{ id: event.taskId, at }]
+      : [],
+  );
+  const endings = events.flatMap((event, at) =>
+    event.type === "task_ended" ? [{ id: event.taskId, at, event }] : [],
+  );
+  const own = endings.filter((ending) => ending.id === agent.taskId);
+  const notices = raw
+    .filter(isRecord)
+    .filter(
+      (record) =>
+        record.type === "system" &&
+        record.subtype === "task_notification" &&
+        record.task_id === agent.taskId,
+    );
+  const notifications = notices.map((record, n): HandbackNotice => {
+    const at = own[n]?.at ?? events.length;
+    const running = children.filter(
+      (child) => child.at < at && !endings.some((end) => end.id === child.id && end.at < at),
+    ).length;
+    const report = isRecord(record.handback_report) ? record.handback_report.text : null;
+    return {
+      form:
+        typeof record.summary === "string" && record.summary.includes("SubagentHandback")
+          ? "note"
+          : "words",
+      handback: typeof record.handback === "string" ? record.handback : null,
+      reportText: typeof report === "string" && report !== "",
+      running,
+    };
+  });
+  // The agent's own end after every task it started: a subagent that waited on its task is
+  // notified again once that task has ended, and that notification is the one P41 needs.
+  const last = own.at(-1)?.at ?? -1;
+  const settled =
+    own.length > 0 &&
+    children.every((child) => endings.some((end) => end.id === child.id && end.at < last));
+  return {
+    started: children.length,
+    settled,
+    notifications,
+    lastReport: (own.at(-1)?.event.report ?? null) !== null,
+    sent: own.some((ending) => ending.event.reportSent),
+  };
+}
+
+/** Why a mode did not give P41 what it needs, or null when it did. */
+function handbackGap(mode: string, facts: HandbackFacts): string | null {
+  if (facts.notifications.length === 0) return `${mode}: no notification of a background subagent`;
+  if (facts.started === 0) return `${mode}: the subagent started no background task`;
+  // The waiting the terminal draws needs a notification with the agent's own task running: one
+  // that came only after its task had ended shows the end, never the wait.
+  if (facts.notifications.every((notice) => notice.running === 0)) {
+    return `${mode}: the subagent's own task had ended at every notification`;
+  }
+  return null;
+}
+
+/**
+ * P41: a background subagent's end in two modes, the summary's form and the tasks it still ran
+ * at each notification. It holds when the last notification gives the back end's `task_ended` a
+ * report in both modes, and when in auto mode a notification marks it sent (`reportSent`). It is
+ * caused only when each mode saw a notification while the subagent's own task still ran.
+ */
+export function judgeHandback(facts: {
+  readonly bypass: HandbackFacts;
+  readonly auto: HandbackFacts;
+}): Observation {
+  const gap = handbackGap("bypass", facts.bypass) ?? handbackGap("auto", facts.auto);
+  if (gap !== null) return observation(false, false, gap);
+  const seen = { bypass: facts.bypass.notifications, auto: facts.auto.notifications };
+  const detail = !facts.bypass.lastReport
+    ? "bypass: the last end carries no report"
+    : !facts.auto.lastReport
+      ? "auto: the last end carries no report"
+      : !facts.auto.sent
+        ? "auto: no notification reached the back end as a sent report"
+        : "";
+  return observation(true, detail === "", detail, seen);
+}
+
+/** How long the P41 scene waits for a mode's subagent and its task to end. */
+const HANDBACK_LIMIT = 120_000;
+
+/**
+ * One mode of P41: a session in `mode` (a refused change means the mode was not caused) asks
+ * for a background subagent that starts `sleep 20` in the background and ends at once.
+ */
+async function handbackMode(
+  s: Stage,
+  name: "bypass" | "auto",
+  model: string,
+): Promise<HandbackFacts | string> {
+  const word = CAPABILITIES.permissionModes[name];
+  if (word === null) return `${name}: the back end has no such mode`;
+  const folder = join(s.root, `handback-${name}`);
+  await mkdir(folder);
+  const live = await s.open(folder, { model });
+  try {
+    await live.session.setPermissionMode(word);
+  } catch (error) {
+    return `${name}: the mode was refused (${s.scrubbed(error instanceof Error ? error.message : String(error), 80)})`;
+  }
+  const mark = s.records.length;
+  const from = live.events.length;
+  await live.turn(
+    "Use the Agent tool with run_in_background set to true to start a subagent whose prompt tells it: " +
+      "start `sleep 20` with the Bash tool and run_in_background set to true, then end at once " +
+      "replying `started`. Then reply: done",
+  );
+  const settled = await live.until(
+    from,
+    (events) => handbackFacts(events, s.records.slice(mark)).settled,
+    HANDBACK_LIMIT,
+  );
+  // Facts from a mode cut short would read as a change of Claude Code's.
+  if (!settled)
+    return `${name}: the subagent had not ended after its task in ${HANDBACK_LIMIT / 1000} s`;
+  await live.quiet();
+  return handbackFacts(live.events.slice(from), s.records.slice(mark));
+}
+
+async function subagentHandback(s: Stage): Promise<Seen> {
+  const bypass = await handbackMode(s, "bypass", PROBE_MODEL);
+  // Auto mode is refused on the haiku alias (measured 2026-10-08) and works on sonnet.
+  const auto = await handbackMode(s, "auto", "sonnet");
+  const missing = [bypass, auto].filter((one) => typeof one === "string");
+  if (typeof bypass === "string" || typeof auto === "string") {
+    return { P41: observation(false, false, missing.join("; ")) };
+  }
+  return {
+    P41: judgeHandback({ bypass, auto }),
+  };
+}
+
 // How many turns the generated-title scene gives Claude Code to write a title, and how long it
 // waits after each for the title to reach the transcript.
 const TITLE_TURNS = 3;
@@ -2317,6 +2501,7 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
       Object.assign(seen, await attempt("api error", s, () => apiError(s)));
       Object.assign(seen, await attempt("question", s, () => question(s)));
       Object.assign(seen, await attempt("ended subagent", s, () => endedSubagent(s)));
+      Object.assign(seen, await attempt("subagent hand-back", s, () => subagentHandback(s)));
     } finally {
       await Promise.allSettled(s.lives.map((live) => live.session.close()));
       await forgetSessions(root, log);

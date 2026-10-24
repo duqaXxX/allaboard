@@ -5,7 +5,20 @@
       "aborted:boolean": "2.1.304",
       "api_error_status:number": "2.1.304",
       "local_command_outcome.kind:string": "2.1.304",
-      "local_command_outcome:object": "2.1.304"
+      "local_command_outcome:object": "2.1.304",
+      "usage_report.session.model_usage.*.cacheCreationInputTokens:number": "2.1.310",
+      "usage_report.session.model_usage.*.cacheReadInputTokens:number": "2.1.310",
+      "usage_report.session.model_usage.*.canonicalModel:string": "2.1.310",
+      "usage_report.session.model_usage.*.contextWindow:number": "2.1.310",
+      "usage_report.session.model_usage.*.costBasis:string": "2.1.310",
+      "usage_report.session.model_usage.*.costUSD:number": "2.1.310",
+      "usage_report.session.model_usage.*.inputTokens:number": "2.1.310",
+      "usage_report.session.model_usage.*.maxOutputTokens:number": "2.1.310",
+      "usage_report.session.model_usage.*.outputTokens:number": "2.1.310",
+      "usage_report.session.model_usage.*.provider:string": "2.1.310",
+      "usage_report.session.model_usage.*.thinkingTokens:number": "2.1.310",
+      "usage_report.session.model_usage.*.webSearchRequests:number": "2.1.310",
+      "usage_report.session.model_usage.*:object": "2.1.310"
     },
     "rate_limit_event": {
       "rate_limit_info.unifiedWindows.five_hour.status:string": "2.1.310",
@@ -45,7 +58,8 @@
       "model_usage_since_last_result.*.thinkingTokens:number": "2.1.309",
       "model_usage_since_last_result.*.webSearchRequests:number": "2.1.309",
       "model_usage_since_last_result.*:object": "2.1.309",
-      "model_usage_since_last_result:object": "2.1.309"
+      "model_usage_since_last_result:object": "2.1.309",
+      "origin.handbackReportText:string": "2.1.310"
     },
     "stream_event/message_delta": {
       "event.context_management:null": "2.1.304",
@@ -69,6 +83,7 @@
       "message.content[].source.media_type:string": "2.1.304",
       "message.content[].source.type:string": "2.1.304",
       "message.content[].source:object": "2.1.304",
+      "origin.handbackReportText:string": "2.1.310",
       "tool_use_result.file.base64:string": "2.1.304",
       "tool_use_result.file.dimensions.displayHeight:number": "2.1.304",
       "tool_use_result.file.dimensions.displayWidth:number": "2.1.304",
