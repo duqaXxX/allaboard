@@ -46,5 +46,10 @@ test("a command runs in the environment a thread's session gets", () => {
   const environment = shellMode({ CLAUDE_CONFIG_DIR: "/somewhere" }).environment;
   assert.equal(environment.CLAUDE_CONFIG_DIR, "/somewhere");
   assert.equal(environment.CLAUDE_CODE_FORK_SUBAGENT, "1");
-  assert.equal(environment.PATH, process.env.PATH);
+  // Every variable of the daemon's own, by the name it carries (`Path` on Windows).
+  for (const [name, value] of Object.entries(process.env)) {
+    if (name !== "CLAUDE_CONFIG_DIR" && !name.startsWith("CLAUDE_CODE_")) {
+      assert.equal(environment[name], value, name);
+    }
+  }
 });
