@@ -22,6 +22,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.310, which bundles Claude Code 2.1.310. The
+  release probe certified it on 2026-10-24: the SDK surface table holds and so do the 47 claims.
+  The `sdk.d.ts` of 0.3.310 changes only doc comments against 0.3.309's. A `rate_limit_event`
+  now carries a `status` under each of `rate_limit_info.unifiedWindows.five_hour` and
+  `seven_day`; the source does not read the event's fields, and both paths are accepted on
+  2.1.310. The release still offers `/plugin-authoring`, which the recorded `server-info.json`
+  does not list.
 - The report of a background task a scheduled run started (a subagent the loop's prompt hands
   work to) rewrites that run's loop card, with no push, while the card is the thread's newest
   message: the card shows the report's final words in place of the run's words and launch line,
