@@ -350,7 +350,10 @@ export function cardFields(update: TaskUpdate): CardFields {
   }
   const fields: CardFields = { title: take(title, CARD_TITLE_LIMIT), status: update.status };
   const output = update.output;
-  if (view) {
+  if (update.message) {
+    // A subagent's words, model-written as a reply is: no mention in them notifies anybody.
+    if (output) fields.output = take(quietMentions(output, true), CARD_TEXT_LIMIT);
+  } else if (view) {
     if (view.summary) fields.output = take(view.summary, CARD_TEXT_LIMIT);
   } else if (output && (update.status === "error" || output === STOPPED)) {
     fields.output = take(output, CARD_TEXT_LIMIT);

@@ -718,6 +718,8 @@ test("a background command is a task of the call that launched it", () => {
       summary: 'Background command "Sleep for 5 seconds then print done" completed (exit code 0)',
       durationMs: null,
       callId: call,
+      report: null,
+      reportSent: false,
       foldNamed: false,
     },
   ]);
@@ -793,6 +795,8 @@ test("a task no call started names none", () => {
       summary: "/list-files",
       durationMs: null,
       callId: null,
+      report: null,
+      reportSent: false,
       foldNamed: false,
     },
   ]);
@@ -1254,6 +1258,34 @@ test("a subagent's hand-back names the task whose report the turn is", () => {
   const ended = all.findIndex((event) => event.type === "turn_ended");
   const worded = all.findIndex((event, index) => index > at && event.type === "text_started");
   assert.ok(ended < at && at < worded);
+});
+
+test("a subagent's end carries its words apart from the note the summary is", () => {
+  const all = events("subagent-handback");
+  const ends = of(all, "task_ended");
+  const agent = of(all, "task_started").find((event) => event.taskType === "local_agent");
+  assert.ok(agent);
+  const own = ends.find((event) => event.taskId === agent.taskId);
+  assert.equal(own?.report, "subagent-ok");
+  assert.equal(own?.reportSent, true);
+  assert.ok(own?.summary.startsWith("This agent's report was delivered"));
+  // A command says no words of a subagent's.
+  assert.ok(ends.filter((event) => event.taskId !== agent.taskId).every((e) => e.report === null));
+});
+
+test("a hand-back with no text shows no words, never the note for Claude", () => {
+  const records = sdkRecords("subagent-handback").map((record) =>
+    record.type === "system" &&
+    record.subtype === "task_notification" &&
+    "handback_report" in record
+      ? { ...record, handback_report: {} }
+      : record,
+  );
+  const translator = new Translator();
+  const all = records.flatMap((record) => translator.translate(record));
+  const agent = of(all, "task_started").find((event) => event.taskType === "local_agent");
+  const own = of(all, "task_ended").find((event) => event.taskId === agent?.taskId);
+  assert.equal(own?.report, null);
 });
 
 test("a message from a peer that names no task of the session starts no report", () => {

@@ -270,6 +270,7 @@ function line(id: string, title: string, status: TaskUpdate["status"]): TaskUpda
     output: null,
     name: "Read",
     task: false,
+    message: false,
     calls: 0,
     preview: null,
     folded: null,

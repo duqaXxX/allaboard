@@ -16,6 +16,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { harnessFor, type Item, isResult, recordOf, sdkMessages } from "../../support/sessions.ts";
+import { messageTitles } from "./helpers.ts";
 
 const NAME = "background-forms";
 const LAUNCHED =
@@ -76,10 +77,12 @@ test("a Monitor, a command and an agent in the background read in one form", asy
       // and its stop is the end line of any task in the background.
       `✓ ticks\n\n${MONITOR_SAID}`,
       `${SHELL_ENDED}\n\n${SHELL_SAID}`,
+      // The agent replied `ok`: its words are a card under this line (`messageTitles`).
       `${AGENT_ENDED} · 23s`,
     ].join("\n\n"),
     AGENT_SAID,
   ]);
+  assert.deepEqual(messageTitles(h.cards()), ["Message from general-purpose"]);
   // The form adds no stream: one reply for the owner's turn, and the ending of the last report.
   assert.equal(h.slack.callsTo("chat.startStream").length, 1);
   assert.equal(h.slack.callsTo("chat.postMessage").length, 1);

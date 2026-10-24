@@ -10,6 +10,7 @@
       "details": null,
       "folded": null,
       "id": "toolu_01AjEWFfmc2WpgadcvgwEfyn",
+      "message": false,
       "name": "Write",
       "output": "File created successfully at: /home/dev/project/notes.txt (file state is current in your context — no need to Read it back)",
       "preview": {
@@ -72,6 +73,7 @@
      "details": null,
      "folded": null,
      "id": "toolu_01AjEWFfmc2WpgadcvgwEfyn",
+     "message": false,
      "name": "Write",
      "output": "File created successfully at: /home/dev/project/notes.txt (file state is current in your context — no need to Read it back)",
      "preview": {

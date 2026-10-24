@@ -29,6 +29,13 @@ All notable changes to this project are documented here. The format follows
   words after a blank line. With
   a message of the owner's or another reply below the card, the report is an ordinary reply, as
   before. The chat seam gains `ThreadChat.loopCardLast`.
+- A background subagent that ends while a task it started still runs reads
+  `Agent "<description>" is waiting on its own background work · 13s`, with no mark, as the
+  terminal writes it, instead of `✓ ... finished`.
+- A background subagent's words are a card under its end line, closed on `Message from <type>`
+  and open on what it said, as the terminal's message from it that `ctrl+o` opens. The agent
+  seam's `task_ended` gains `report` and `reportSent`; the chat seam's `TaskUpdate` gains
+  `message`, a card whose output is its body.
 
 ## [0.9.0] - 2026-10-24
 

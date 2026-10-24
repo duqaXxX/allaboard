@@ -332,6 +332,16 @@ export const TASK_LAUNCHED = "**{name}**({description}){model}\n⎿ Running in b
 // The terminal's one line for several agents started in one message, with what each does under
 // it as a tree (captured the same day: `2 background agents launched`), for every task.
 export const TASKS_LAUNCHED = "**{n} background tasks launched**";
+// The title of the card of a subagent's words, the terminal's header for them: `› Message from
+// mechanical`, which `ctrl+o` opens on the report (captured 2026-10-24 on Claude Code 2.1.310).
+// The card opens and closes as the chat draws it; the report is its body.
+export const MESSAGE_FROM = "Message from {name}";
+// How much of a subagent's words the message keeps.
+export const MESSAGE_LIMIT = 1500;
+// The terminal's words for a subagent that ended its turn while work it started in the background
+// still runs: `Agent "<description>" is waiting on its own background work · 13s` (captured
+// 2026-10-24 on Claude Code 2.1.310; the same words reach the model on 2.1.309).
+export const AGENT_WAITING = "is waiting on its own background work";
 export const TASKS_LAUNCHED_BRANCH = "├ {description}";
 export const TASKS_LAUNCHED_LAST = "└ {description}";
 export const PROMPT_IMAGE = "an image";

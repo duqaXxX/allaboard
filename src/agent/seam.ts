@@ -455,6 +455,17 @@ export type SessionEvent =
       readonly durationMs: number | null;
       readonly callId: string | null;
       /**
+       * What a background subagent said back with this end, its own words, to show as its
+       * message; null for any other task and when it said none.
+       */
+      readonly report: string | null;
+      /**
+       * Whether the subagent sent `report` as its report, which stands whatever of its own work
+       * still runs; false when it is only what it said last as its turn ended, which is its
+       * answer only once nothing of its own runs.
+       */
+      readonly reportSent: boolean;
+      /**
        * Whether the agent will name this task in `notification_folded` should a running turn
        * take its notification. False when it cannot tell for this task (the SDK gave the run no
        * id), or when no notification of the task's own follows its end (a stopped task): the core

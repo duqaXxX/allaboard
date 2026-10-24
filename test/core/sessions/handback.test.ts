@@ -28,12 +28,15 @@ import {
   recordOf,
   sdkMessages,
 } from "../../support/sessions.ts";
-import { inside } from "./helpers.ts";
+import { inside, messageTitles } from "./helpers.ts";
 
 const NAME = "subagent-handback";
 const AGENT_ENDED = '✓ Agent "Run echo subagent-ok" finished';
 const SHELL_ENDED = '✓ Background command "Wait 15 seconds" completed (exit code 0)';
 const HANDED_BACK = "The subagent finished: `echo subagent-ok` printed `subagent-ok`.";
+// The card of the subagent's words, titled as the terminal's header for them (captured 2026-10-24
+// on Claude Code 2.1.310); its body is the notification's `handback_report`.
+const MESSAGE_FROM = "Message from general-purpose";
 const SHELL_REPORTED = "The command `sleep 15` ended with exit code 0, so both tasks are done.";
 
 interface Recording {
@@ -111,6 +114,7 @@ test("a hand-back is reported in the reply that started the subagent, and the tu
   noExtraMessage(h);
   const body = h.bodies()[0] ?? "";
   assert.ok(body.indexOf(AGENT_ENDED) < body.indexOf(HANDED_BACK) && body.includes(AGENT_ENDED));
+  assert.deepEqual(messageTitles(h.cards()), [MESSAGE_FROM]);
   h.clients[0]?.inject(shell);
   await h.until(() => h.bodies().join("\n").includes(SHELL_REPORTED));
   await settle(h);

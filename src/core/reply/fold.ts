@@ -223,6 +223,7 @@ function card(
     output: null,
     name,
     task: false,
+    message: false,
     calls: 0,
     preview: null,
     folded: line,

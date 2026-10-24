@@ -159,6 +159,7 @@ function taskUpdate(value: Json | undefined): TaskUpdate {
     output: optional(fields.output, "output"),
     name: text(fields.name, "name"),
     task: fields.task === true,
+    message: fields.message === true,
     calls: Number(fields.calls),
     preview,
     folded: optional(fields.folded, "folded"),

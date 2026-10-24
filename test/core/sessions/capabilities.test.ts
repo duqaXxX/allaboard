@@ -268,6 +268,8 @@ function subagentTurn(): Item[] {
       summary: "looked",
       durationMs: 5,
       callId: "agent-1",
+      report: null,
+      reportSent: false,
       foldNamed: false,
     }),
     event({

@@ -66,6 +66,8 @@ interface Memory {
    * read; the oldest go past RUNS_KEPT.
    */
   readonly runs: Map<string, string>;
+  /** The subagents started in the background: their notification says their words. */
+  readonly agents: Set<string>;
 }
 
 // Runs remembered for a notification that may never be folded (one a turn of its own reports).
@@ -451,6 +453,15 @@ function taskStarted(memory: Memory, record: WireRecord): SessionEvent[] {
     }
   }
   const taskType = words(record.task_type);
+  // A subagent the call waits for (a skill run in a fork) ends with no words of its own: its
+  // summary is the command it ran (`skill-fork-command`).
+  if (TASK_KINDS.get(taskType ?? "") === "subagent" && record.is_backgrounded === true) {
+    memory.agents.add(taskId);
+    for (const kept of memory.agents) {
+      if (memory.agents.size <= RUNS_KEPT) break;
+      memory.agents.delete(kept);
+    }
+  }
   return [
     {
       type: "task_started",
@@ -501,6 +512,16 @@ function taskNotification(memory: Memory, record: WireRecord): SessionEvent[] {
   // `monitor-expired-in-turn`), and no stopped task of the other recordings
   // (`interrupt`, `stop-close-resume`, `background-forms`) has its end replayed with its run.
   const runId = string(record.run_id);
+  // A subagent's words: with a hand-back (auto mode, `SubagentHandback`), the report apart from
+  // the summary, which is then a note for Claude ("This agent's report was delivered to you as a
+  // message ..."); with none (bypass), the summary itself. `handback_report` is not in `sdk.d.ts`
+  // 0.3.309: measured in `subagent-handback` (2.1.296) and on 2.1.309 on 2026-10-24, in both
+  // modes. A task this process did not see start is no known subagent.
+  // A hand-back with no text says nothing: its summary is still the note, never the words.
+  const handBack = isRecord(record.handback_report) ? record.handback_report : null;
+  const handedBack = handBack === null ? null : words(handBack.text);
+  const own = handBack === null ? words(summary) : handedBack;
+  const report = memory.agents.has(taskId) ? own : null;
   return [
     {
       type: "task_ended",
@@ -509,6 +530,8 @@ function taskNotification(memory: Memory, record: WireRecord): SessionEvent[] {
       summary,
       durationMs: number(usage.duration_ms),
       callId: words(record.tool_use_id),
+      report,
+      reportSent: report !== null && handedBack !== null,
       foldNamed: reported !== "stopped" && runId !== null && memory.runs.has(runId),
     },
   ];
@@ -659,6 +682,7 @@ export class Translator {
     unnamed: false,
     compacting: false,
     runs: new Map(),
+    agents: new Set(),
   };
 
   /** The daemon is sending a prompt under `promptId`: its replay will be `prompt_taken`. */

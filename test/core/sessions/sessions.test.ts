@@ -85,6 +85,7 @@ import {
   isReport,
   isToolResult,
   logged,
+  messageTitles,
   nestedBackgroundEndingMidTurn,
   nestedBackgroundRunning,
   pending,
@@ -99,6 +100,7 @@ import {
   stoppedEnd,
   systemRecord,
   taskCards,
+  toolCards,
   toolUseOf,
   withResult,
   withTaskStatus,
@@ -1024,6 +1026,135 @@ test("a background agent s end reads as in the terminal", async (t) => {
   assert.ok(!line.includes("README.md"));
 });
 
+/** `agentEnd` with the note Claude Code writes for a subagent's report (`subagent-handback`). */
+function agentNoted(taskId: string, toolUseId: string): Item {
+  const ended = agentEnd(taskId, toolUseId);
+  const summary =
+    'This agent\'s report was delivered to you as a message from "a1" (its SubagentHandback call). Read it there; it is not repeated here.\n';
+  // The note always comes with the report apart (recorded in `subagent-handback`, 2.1.296).
+  return {
+    record: { ...recordOf(ended), summary, handback: "send", handback_report: { text: "done" } },
+  };
+}
+
+/** A command a subagent started in the background, in the shape recorded on 2026-10-24 (2.1.309). */
+function childStarted(taskId: string, parent: string): Item {
+  return {
+    record: {
+      type: "system",
+      subtype: "task_started",
+      task_id: taskId,
+      tool_use_id: "toolu_child",
+      description: "Sleep 30 seconds then print date",
+      task_type: "local_bash",
+      is_backgrounded: true,
+      parent_task_id: parent,
+      owned_by_subagent: true,
+      session_id: "00000000-0000-0000-0000-000000000001",
+      uuid: "00000000-0000-0000-0000-000000000003",
+    },
+  };
+}
+
+function childEnded(taskId: string): Item[] {
+  const base = {
+    session_id: "00000000-0000-0000-0000-000000000001",
+    uuid: "00000000-0000-0000-0000-000000000004",
+  };
+  return [
+    {
+      record: {
+        ...base,
+        type: "system",
+        subtype: "task_updated",
+        task_id: taskId,
+        patch: { status: "completed", end_time: 1 },
+      },
+    },
+    {
+      record: {
+        ...base,
+        type: "system",
+        subtype: "task_notification",
+        task_id: taskId,
+        tool_use_id: "toolu_child",
+        status: "completed",
+        output_file: "/home/dev/tasks/child",
+        summary: 'Background command "Sleep 30 seconds then print date" completed (exit code 0)',
+      },
+    },
+  ];
+}
+
+// Claude Code 2.1.299 says when "an agent is only waiting on its own background work". The
+// notification's summary is a note for Claude either way: the terminal's words come from what
+// the agent still runs (measured 2026-10-24, SDK 0.3.309: two sessions, each end set against the
+// words the model got for it).
+async function agentEnds(
+  t: TestContext,
+  before: (agent: string) => Item[],
+): Promise<[body: string, cards: string[]]> {
+  const first = at(splitTurns(sdkMessages("subagent")), 0);
+  const started = systemRecord(first, "task_started");
+  const h = harnessFor(t)({ turns: [first] });
+  await (await h.session().submit("start it")).done.wait();
+  assert.ok(typeof started.tool_use_id === "string");
+  const agent = String(started.task_id);
+  h.clients[0]?.inject([
+    ...before(agent),
+    agentNoted(agent, started.tool_use_id),
+    ...sdkMessages("tools"),
+  ]);
+  await h.until(() => (h.bodies()[0] ?? "").includes(`"${started.description}" `));
+  await h.sleep(0.05);
+  return [at(h.bodies(), 0), messageTitles(h.cards())];
+}
+
+test("a subagent whose own background work still runs is waiting, with no mark", async (t) => {
+  const [body, cards] = await agentEnds(t, (agent) => [childStarted("bchild1", agent)]);
+  const first = at(splitTurns(sdkMessages("subagent")), 0);
+  const description = String(systemRecord(first, "task_started").description);
+  assert.ok(
+    body.split("\n").includes(`Agent "${description}" is waiting on its own background work · 10s`),
+    body,
+  );
+  assert.ok(!body.includes(`✓ Agent "${description}"`), "no end is claimed");
+  assert.ok(!body.includes("delivered to you"));
+  // A report it sent stands while it waits, as the terminal shows it (auto mode): its card.
+  assert.deepEqual(cards, ["Message from general-purpose"]);
+});
+
+test("what a waiting subagent said last is no message until it is done", async (t) => {
+  // Bypass: no hand-back, the summary is what the agent said as its turn ended.
+  const first = at(splitTurns(sdkMessages("subagent")), 0);
+  const started = systemRecord(first, "task_started");
+  const h = harnessFor(t)({ turns: [first] });
+  await (await h.session().submit("start it")).done.wait();
+  assert.ok(typeof started.tool_use_id === "string");
+  const agent = String(started.task_id);
+  const provisional = agentEnd(agent, started.tool_use_id);
+  const said = { record: { ...recordOf(provisional), summary: "No output yet." } };
+  h.clients[0]?.inject([childStarted("bchild1", agent), said, ...sdkMessages("tools")]);
+  await h.until(() => (h.bodies()[0] ?? "").includes("is waiting on its own background work"));
+  await h.sleep(0.05);
+  const body = at(h.bodies(), 0);
+  assert.deepEqual(messageTitles(h.cards()), [], body);
+  assert.ok(!body.includes("No output yet."));
+});
+
+test("a subagent whose own work has ended is finished", async (t) => {
+  const [body, cards] = await agentEnds(t, (agent) => [
+    childStarted("bchild1", agent),
+    ...childEnded("bchild1"),
+  ]);
+  const first = at(splitTurns(sdkMessages("subagent")), 0);
+  const description = String(systemRecord(first, "task_started").description);
+  assert.ok(body.includes(`✓ Agent "${description}" finished · 10s`), body);
+  assert.deepEqual(cards, ["Message from general-purpose"]);
+  assert.ok(!body.includes("is waiting on its own background work"));
+  assert.ok(!body.includes("delivered to you"));
+});
+
 test("the task record is bounded", async (t) => {
   const [first] = splitBackground();
   const renamed = first.map((item) => {
@@ -1668,7 +1799,7 @@ test("a background agent is a launch line, and its calls write nothing", async (
   h.clients[0]?.inject(later.flat());
   await h.until(() => h.reactions().at(-1) === Status.DONE && session.idle, 3.0);
   // No card at any point, for the agent or for what it ran, and one launch line.
-  assert.deepEqual(h.slack.messageCards().flat(), []);
+  assert.deepEqual(toolCards(h.slack.messageCards().flat()), []);
   const body = at(h.bodies(), 0);
   assert.equal(body.split("Running in background").length - 1, 1);
   assert.ok(body.includes('✓ Agent "Run ls and report contents" finished'));
@@ -1692,7 +1823,7 @@ test("a background agent that ends while a turn runs has its end line in that tu
   const body = at(h.bodies(), 0);
   assert.equal(body.split('✓ Agent "Run ls and report contents" finished').length - 1, 1);
   assert.ok(body.indexOf("Running in background") < body.indexOf("✓ Agent"));
-  assert.deepEqual(h.slack.messageCards().flat(), []);
+  assert.deepEqual(toolCards(h.slack.messageCards().flat()), []);
   assert.equal(session.runningKinds, "");
 });
 
@@ -1755,7 +1886,7 @@ test("closing the session leaves no card and no stream for running tasks", async
   await h.manager.closeAll();
   assert.equal(runningTitle(at(h.slack.messageBlocks(), 0)), null);
   // A command left running has no card to stop: the list is all that showed it.
-  assert.deepEqual(h.cards(), []);
+  assert.deepEqual(toolCards(h.cards()), []);
   assert.ok(noStreamOpen(h));
 });
 
@@ -4965,7 +5096,7 @@ test("a subagent s commands have no card and no end line in the report", async (
   assert.ok(body.split("✓ ").length - 1 === 1 && body.includes('✓ Agent "'));
   // The agent runs in the background: a launch line, and no card for it or for its commands.
   assert.equal(body.split("Running in background").length - 1, 1);
-  assert.deepEqual(h.slack.messageCards().flat(), []);
+  assert.deepEqual(toolCards(h.slack.messageCards().flat()), []);
   assert.ok(noStreamOpen(h));
 });
 
@@ -5041,7 +5172,7 @@ test("a background subagent s api error is the reason in its end line", async (t
   const lines = text.split("\n");
   assert.equal(lines.filter((line) => line.includes("API Error")).length, 1);
   assert.ok(lines.some((line) => line.startsWith(`✗ Agent "Synthetic subtask" failed: ${reason}`)));
-  assert.deepEqual(h.slack.messageCards().flat(), []);
+  assert.deepEqual(toolCards(h.slack.messageCards().flat()), []);
   assert.ok(!h.reactions().includes(Status.ERROR)); // the main turn and its report both succeeded
   assert.deepEqual(
     log.entries.filter((entry) => entry.level === "WARNING").map((entry) => entry.message),
@@ -5153,7 +5284,7 @@ test("a subagent s command and the agent s second end close the reply as before"
   assert.ok(noStreamOpen(h));
   // No card at all: the agent that started the command has a launch line, and the command,
   // left running, has none.
-  assert.deepEqual(h.cards(), []);
+  assert.deepEqual(toolCards(h.cards()), []);
   assert.equal(h.slack.streamTs.length, 1); // every report rendered into the reply that began it
   // The command's end is told to the subagent, which reports it: the terminal prints no line
   // for it in the conversation (captured 2026-10-14), only the agent's own ends.
@@ -5176,7 +5307,9 @@ test("a command a continued subagent starts after a restart gets no end line eit
   await h.until(() => session.idle && h.reactions().at(-1) === Status.DONE, 3.0);
   const body = h.bodies().join("\n");
   assert.ok(!body.includes("Background command"), body);
-  assert.equal(body.split("✓ Agent ").length - 1, 2, body);
+  // The first end comes while the subagent's command still runs: it waits on its own work.
+  assert.equal(body.split("is waiting on its own background work").length - 1, 1, body);
+  assert.equal(body.split("✓ Agent ").length - 1, 1, body);
 });
 
 test("a posted and a removed request are logged by id and age only", async (t) => {
