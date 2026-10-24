@@ -47,6 +47,8 @@ import type {
   RequestHandler,
   ScheduledJob,
   SessionEvent,
+  ShellMode,
+  ShellRun,
   StartOptions,
 } from "../../src/agent/seam.ts";
 import { ResumeRefused } from "../../src/agent/seam.ts";
@@ -95,6 +97,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   sessionTitles: false,
   goals: false,
   scheduledJobs: false,
+  shellCommands: false,
 });
 
 /** The two commands of the agent, run by a prompt `/echo text` and `/count text`. */
@@ -703,12 +706,23 @@ export interface PlainAgentOptions {
   readonly store?: PlainStore;
   /** The script: one array of steps per turn. A test that shares it across agents shares the rest of it. */
   readonly turns?: PlainStep[][];
+  /**
+   * The agent reads the owner's shell commands (`shellCommands`), each as one text naming the
+   * command, its end and its output; `timeoutMs` is how long one may run (10 s when absent).
+   */
+  readonly shell?: { readonly timeoutMs?: number };
+}
+
+/** How the plain agent is told of a shell command: one text, which a test reads back. */
+export function plainShellPrompt(run: ShellRun): string {
+  return `ran ${run.command} (${run.end} ${run.exitCode}): ${run.stdout}${run.stderr}`;
 }
 
 export class PlainAgent implements AgentBackend {
   readonly name = PLAIN_NAME;
   readonly words = PLAIN_WORDS;
-  readonly capabilities = PLAIN_CAPABILITIES;
+  readonly capabilities: Capabilities;
+  readonly shell?: ShellMode;
   readonly store: PlainStore;
   /** The script not yet played. */
   readonly turns: PlainStep[][];
@@ -722,6 +736,15 @@ export class PlainAgent implements AgentBackend {
   constructor(options: PlainAgentOptions = {}) {
     this.store = options.store ?? new PlainStore();
     this.turns = options.turns ?? [];
+    this.capabilities = PLAIN_CAPABILITIES;
+    if (options.shell !== undefined) {
+      this.capabilities = Object.freeze({ ...PLAIN_CAPABILITIES, shellCommands: true });
+      this.shell = {
+        timeoutMs: options.shell.timeoutMs ?? 10_000,
+        environment: { PATH: process.env.PATH },
+        prompt: plainShellPrompt,
+      };
+    }
   }
 
   /** Scripts the next turn, after those already scripted. */

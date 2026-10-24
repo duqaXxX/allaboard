@@ -205,6 +205,10 @@ function setup(requestId: string): OwnerRequest {
   };
 }
 
+function shell(requestId: string): OwnerRequest {
+  return { type: "shell", requestId, command: "git status --short", folder: "~/work" };
+}
+
 /** A request of each type, and the answer its control gives. */
 const REQUESTS: ReadonlyArray<{
   readonly name: string;
@@ -226,6 +230,7 @@ const REQUESTS: ReadonlyArray<{
     answer: { type: "question", answers: { [QUESTION.text]: "red" }, notes: {} },
   },
   { name: "hold", control: "click", request: hold, answer: { type: "hold", send: true } },
+  { name: "shell", control: "click", request: shell, answer: { type: "shell", run: true } },
   {
     name: "setup",
     control: "form",

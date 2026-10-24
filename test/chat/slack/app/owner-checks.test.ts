@@ -33,7 +33,7 @@ import {
   TAG_ACTION,
   TODAY,
 } from "../../../../src/chat/slack/home.ts";
-import { QUESTION_EDIT } from "../../../../src/chat/slack/requests.ts";
+import { QUESTION_EDIT, SHELL_CANCEL, SHELL_RUN } from "../../../../src/chat/slack/requests.ts";
 import {
   SETUP_BYPASS,
   SETUP_EFFORT,
@@ -329,6 +329,15 @@ const CASES: readonly Case[] = [
       arrange: async (world, sender) => {
         const [holdId, pending] = world.holds.open(CHANNEL, CLICK_THREAD);
         return { body: sentBy(click(actionId, holdId), sender), acted: () => pending.decided };
+      },
+    }),
+  ),
+  ...[SHELL_RUN, SHELL_CANCEL].map(
+    (actionId): Case => ({
+      listener: `action ${actionId}`,
+      arrange: async (world, sender) => {
+        const [shellId, pending] = world.holds.open(CHANNEL, CLICK_THREAD, null, "shell");
+        return { body: sentBy(click(actionId, shellId), sender), acted: () => pending.decided };
       },
     }),
   ),

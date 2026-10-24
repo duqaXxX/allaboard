@@ -1,12 +1,19 @@
 /**
- * The question that holds the owner's message: the same-folder hold and the session's setup.
+ * The question that holds the owner's message: the same-folder hold, the session's setup and
+ * the confirmation of a shell command.
  * It is shown through the chat seam, waits on a `Holds` entry that only the owner's answer, a
  * `!stop` or a drain settles, and ends with the message sent or not.
  */
 import type { ModelInfo } from "../../agent/seam.ts";
-import type { HoldRequest, MessageId, SetupRequest, ThreadRef } from "../../chat/seam.ts";
+import type {
+  HoldRequest,
+  MessageId,
+  SetupRequest,
+  ShellRequest,
+  ThreadRef,
+} from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
-import type { HoldAnswer, Pending } from "../hold.ts";
+import type { HoldAnswer, HoldKind, Pending } from "../hold.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
 import { named } from "../texts.ts";
@@ -18,9 +25,9 @@ export type Settle = (answer: HoldAnswer, shownAt: MessageId, pending: Pending) 
 /** The question to put: what to show, and what to do with the answer. */
 export interface Question {
   /** Stored beside the message, for the crash repair. */
-  readonly kind: "setup" | "hold";
+  readonly kind: HoldKind;
   /** The request, given the id only its answer carries. */
-  readonly request: (requestId: string) => HoldRequest | SetupRequest;
+  readonly request: (requestId: string) => HoldRequest | SetupRequest | ShellRequest;
   /** The request in one line. */
   readonly title: string;
   readonly settle?: Settle;
@@ -53,7 +60,12 @@ export async function askOwner(
     await talk.refuseRestarting(ref);
     return null;
   }
-  const [holdId, pending] = holds.open(ref.channel, ref.thread, question.context ?? null);
+  const [holdId, pending] = holds.open(
+    ref.channel,
+    ref.thread,
+    question.context ?? null,
+    question.kind,
+  );
   let shownAt: MessageId;
   try {
     shownAt = await talk.thread(ref).ask(holdId, question.request(holdId), question.title);

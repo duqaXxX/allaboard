@@ -14,6 +14,9 @@ const [AGENT_VARIABLE, CHAT_VARIABLE] = SELECTORS;
 /** The variables the core itself requires; each module names its own. */
 export const REQUIRED = ["ALLOWED_ROOT"] as const;
 
+/** `on` or `off`: whether `!!` runs the owner's shell commands; absent, on. */
+export const SHELL_VARIABLE = "ALLABOARD_SHELL";
+
 /** The configuration is missing, unsafe or invalid; the message says what to fix. */
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -54,6 +57,8 @@ export interface Config {
   readonly chat: string;
   readonly allowedRoot: string;
   readonly configDir: string;
+  /** `!!` runs the owner's shell commands (`ALLABOARD_SHELL`). */
+  readonly shellCommands: boolean;
   /** The values of the agent's `required` and `optional` variables the file sets. */
   readonly agentVariables: Variables;
   /** The values of the chat's `required` and `optional` variables the file sets. */
@@ -129,6 +134,17 @@ function isDirectory(path: string): boolean {
     if (code === "ENOENT" || code === "ENOTDIR") return false;
     throw error;
   }
+}
+
+/**
+ * Whether `!!` is on: `on` or `off` in any case, on when the file does not set it. Any other value
+ * throws `ConfigError`: a mistyped `off` must not leave the commands on.
+ */
+function shellSwitch(written: string | undefined): boolean {
+  if (written === undefined) return true;
+  const value = written.toLowerCase();
+  if (value === "on" || value === "off") return value === "on";
+  throw new ConfigError(`${SHELL_VARIABLE} must be on or off; it is "${written}"`);
 }
 
 /**
@@ -244,8 +260,9 @@ export function loadConfig(modules: Modules, configDir: string, env: Env = proce
     throw new ConfigError(`missing in ${envPath}: ${missing.join(", ")}`);
   }
   const root = allowedRootOf(values.ALLOWED_ROOT as string);
+  const shellCommands = shellSwitch(values.ALLABOARD_SHELL);
   return Object.defineProperties(
-    { agent, chat, allowedRoot: root, configDir },
+    { agent, chat, allowedRoot: root, configDir, shellCommands },
     {
       agentVariables: {
         value: hiddenVariables([...agentModule.required, ...agentModule.optional], values),

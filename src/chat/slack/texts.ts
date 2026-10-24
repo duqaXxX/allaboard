@@ -106,6 +106,11 @@ export const BIND_BUTTON = "Bind";
 // `Continue` beside `Cancel` made the second look the lesser choice.
 export const HOLD_CONTINUE_BUTTON = "Send anyway";
 export const HOLD_CANCEL_BUTTON = "Don't send";
+export const SHELL_PROMPT = "Run this command in `{folder}`?";
+export const SHELL_RUN_BUTTON = "Run";
+export const SHELL_CUT =
+  "_{count} characters of this command are not shown: Cancel it unless you know them._";
+export const SHELL_CANCEL_BUTTON = "Cancel";
 export const SETUP_HEADER = "*Choose how this session starts*";
 export const SETUP_EFFORT_OPTION = "Effort: {level}";
 export const SETUP_BYPASS_OPTION = "Bypass permissions";

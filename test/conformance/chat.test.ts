@@ -19,6 +19,8 @@ import {
   APPROVAL_DENY,
   QUESTION_OPEN,
   QUESTION_SKIP,
+  SHELL_CANCEL,
+  SHELL_RUN,
 } from "../../src/chat/slack/requests.ts";
 import { RESUME_ACTION } from "../../src/chat/slack/resume.ts";
 import { SETUP_START } from "../../src/chat/slack/setup.ts";
@@ -235,6 +237,9 @@ function slackPerson(
           return;
         case "hold":
           await dispatch(click(answer.send ? HOLD_CONTINUE : HOLD_CANCEL));
+          return;
+        case "shell":
+          await dispatch(click(answer.run ? SHELL_RUN : SHELL_CANCEL));
           return;
         case "setup": {
           const { model, effort, bypass } = answer.selection;

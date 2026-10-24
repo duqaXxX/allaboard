@@ -75,6 +75,8 @@ import {
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
+  SHELL_CANCEL,
+  SHELL_RUN,
 } from "../requests.ts";
 import { RESUME_ACTION } from "../resume.ts";
 import { SETUP_BYPASS, SETUP_EFFORT, SETUP_MODEL, SETUP_START } from "../setup.ts";
@@ -407,6 +409,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(SETUP_EFFORT, requests.onSetupEdit, { acknowledgeOnly: true });
   action(SETUP_BYPASS, requests.onSetupEdit, { acknowledgeOnly: true });
   for (const actionId of [HOLD_CONTINUE, HOLD_CANCEL]) action(actionId, requests.onHoldDecision);
+  for (const actionId of [SHELL_RUN, SHELL_CANCEL]) action(actionId, requests.onShellDecision);
   for (const actionId of DECISION_ACTIONS) action(actionId, requests.onDecision);
   action("answer", requests.onQuestionChoice);
   action("other", requests.onQuestionTyping);

@@ -97,7 +97,7 @@ else of it.
 | `ReplySink` (in `sinks`) | writes the model of a reply to Slack as a native stream, then by `chat.update`, and ends it with the footer |
 | `app.buildApp`, `guards` | the Slack listeners, one per inbound path (message, button, modal, Home control), in the classes of `src/chat/slack/app/`: they acknowledge, check the owner, the workspace and the channel, read the payload and call `ChatInbound`; `guards` holds the checks each path runs on its own |
 | `commands` | the `!word` parser and the daemon's own words |
-| `Approvals`, `Holds`, `setup` | the questions the daemon puts to the owner and keeps while it waits: tool permission, a same-folder hold, a session's setup |
+| `Approvals`, `Holds`, `setup` | the questions the daemon puts to the owner and keeps while it waits: tool permission, a same-folder hold, a session's setup, a shell command's confirmation |
 | `StateStore` | `state.json`: the channels, their threads and what crash repair needs |
 | `Home` | the app's Home tab, the session index; `ThreadDeleter` serves its edit mode |
 
@@ -617,9 +617,10 @@ Each thread also carries three fields for crash repair, ids only, never message 
   last while its end has not landed, and removed once nothing of it is left for a repair to close.
   The sink reports each change through the callback `ThreadChat.openReply` was given, and the
   session writes it (`StateStore.replaceOpenReply`).
-- `requests`: the id of every approval, question, setup and same-folder hold message still carrying
-  buttons (added on post, removed on delete or answer), and `request_kinds`, one word for each id:
-  `approval`, `question`, `setup` or `hold` (a word, never the content). The repair reads the word
+- `requests`: the id of every approval, question, setup, same-folder hold and shell confirmation
+  message still carrying buttons (added on post, removed on delete or answer), and `request_kinds`,
+  one word for each id: `approval`, `question`, `setup`, `hold` or `shell` (a word, never the
+  content). The repair reads the word
   to tell a request that stands for a turn from one that waits before the owner's message is sent.
   An entry written before the kinds existed has none and is read as a request to delete.
 - `status`: the root's status while it is ⏳ or ✋ (cleared once ✅ or ❌ is requested). The session
@@ -1346,6 +1347,19 @@ closed when the start returns (`ThreadSession.connect`).
   opened after that point checks `SessionManager.draining` itself, since the drain never revisits
   it). Either way the owner gets `Not sent.`; a hold a message could not post is cancelled and told
   `texts.HOLD_UNPOSTED`, failing closed: nothing is sent into a folder another session is using.
+- A shell command (`!!<command>`, `commands.Shell`): routed before the words, in the thread's
+  arrival lock as a prompt is (`messages.messages`), so a later message of the thread waits for
+  it. It is refused when `ALLABOARD_SHELL` is off (`Config.shellCommands`), when the agent does not
+  declare `shellCommands`, outside a session's thread and in a session that never ran. Otherwise
+  `askOwner` puts a `ShellRequest` to the owner, kept in `hold.Holds` with the kind `shell`, so
+  an answer of another kind never resolves it; `Cancel`, `!stop` and a drain end it as `Don't send`
+  ends a hold. `Run` queues a `Turn` that carries the command (`ThreadSession.submit`). The worker
+  runs it before it sends anything (`ThreadSession.runShell`, over `shell.runShell`: Bash in the
+  session's folder, in the environment and with the timeout of the agent's `ShellMode`, the
+  command leading a process group that a stop or the timeout ends whole), then replaces the turn's
+  prompt with `ShellMode.prompt` of the run and keeps `shell.shellHead` for the reply, which
+  `startTurn` writes before the agent's answer. A `!stop` during the run ends it: the reply shows
+  the run as stopped and the agent is sent nothing.
 - Session setup: a session's first prompt is held before the same-folder hold and before anything is
   sent: a top-level message that opens a session (a prompt, files, or a `!name` passthrough), and a
   reply in a thread where nothing was ever sent (`ThreadSession.neverRan`: no turn queued and no

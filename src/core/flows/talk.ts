@@ -43,6 +43,8 @@ export interface FlowDeps {
   readonly names: Names;
   /** The folder sessions may start under. */
   readonly allowedRoot: string;
+  /** The instance lets `!!` run the owner's shell commands (`ALLABOARD_SHELL`). */
+  readonly shellCommands: boolean;
   /**
    * Aborts when the daemon stops. A flow still in flight then does nothing at its next step: the
    * sessions are closed and the lock is released.

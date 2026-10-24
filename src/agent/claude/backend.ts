@@ -17,6 +17,7 @@ import type {
   ListedSession,
   Repository,
   RequestHandler,
+  ShellMode,
   StartOptions,
   UsageLimits,
 } from "../seam.ts";
@@ -25,6 +26,7 @@ import { chromeEnabled } from "./chrome.ts";
 import { GOAL_CLEAR } from "./goals.ts";
 import { aliveSessions, byLastActivity, directorySessions, projectsDir } from "./listing.ts";
 import { ClaudeSession, type QueryFunction } from "./session.ts";
+import { shellMode } from "./shell.ts";
 import { trustedRepository, untrustedRepository, workspaceTrusted } from "./trust.ts";
 import { type BareStart, UsageProbe } from "./usage-probe.ts";
 
@@ -133,6 +135,7 @@ export class ClaudeBackend implements AgentBackend {
   readonly #configDir: string | undefined;
   readonly #projects: string;
   readonly #probe: UsageProbe;
+  readonly shell: ShellMode;
 
   constructor(options: ClaudeBackendOptions = {}) {
     this.#query = options.query;
@@ -142,6 +145,7 @@ export class ClaudeBackend implements AgentBackend {
     this.#configDir = options.configDir ?? (process.env.CLAUDE_CONFIG_DIR || undefined);
     this.#projects = projectsDir(this.#configDir, this.#home);
     this.words = wordsFor(this.#configDir);
+    this.shell = shellMode(this.#variables);
     const bare = options.bareStart ?? ((folder, requests) => this.startBare(folder, requests));
     this.#probe = new UsageProbe(this.#home, bare, { clock: options.clock });
   }

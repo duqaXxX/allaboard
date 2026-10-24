@@ -39,4 +39,6 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   goals: true,
   // `session_crons` of the Stop hook's input (`hooks.ts`).
   scheduledJobs: true,
+  // `shell.ts`: the terminal's bash-mode records, sent as a prompt.
+  shellCommands: true,
 });

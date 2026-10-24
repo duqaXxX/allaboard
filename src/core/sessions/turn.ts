@@ -10,15 +10,24 @@ import { ASKED_LIMIT, NOT_SENT_START } from "./constants.ts";
 import { Event } from "./tasks.ts";
 
 export class Turn {
-  readonly prompt: PromptContent;
+  /**
+   * What the agent is sent. For a shell command, the command as the owner typed it (`!!…`), which
+   * a note about a turn that never ran quotes, until the run's own prompt replaces it.
+   */
+  prompt: PromptContent;
   sink: Reply;
   readonly done = new Event();
   /** The daemon's own id for the prompt, which the agent names when it takes it. */
   readonly uuid: string = randomUUID();
+  /** The shell command this turn runs before it sends anything (`!!`); null for a prompt. */
+  readonly shell: string | null;
+  /** What the thread shows of the command's run, from its run until a reply shows it. */
+  head: string | null = null;
 
-  constructor(prompt: PromptContent, sink: Reply) {
+  constructor(prompt: PromptContent, sink: Reply, shell: string | null = null) {
     this.prompt = prompt;
     this.sink = sink;
+    this.shell = shell;
   }
 }
 
@@ -83,7 +92,12 @@ export function notSent(turns: readonly Turn[], because: string): string {
     count: turns.length,
     because,
   });
-  const starts = turns.map((turn) => `- "${oneLine(asked(turn.prompt), NOT_SENT_START)}"`);
+  const starts = turns.map((turn) => {
+    // A shell command is quoted as typed, with how it ended when it ran.
+    const typed = turn.shell === null ? asked(turn.prompt) : `!!${turn.shell}`;
+    const ran = turn.head === null ? "" : ` (${turn.head.split("\n", 1)[0]})`;
+    return `- "${oneLine(typed, NOT_SENT_START)}"${ran}`;
+  });
   return [header, ...starts].join("\n");
 }
 

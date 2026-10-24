@@ -427,6 +427,7 @@ test("an agent that declares no optional capability runs a whole turn", async (t
     sessionTitles: false,
     goals: false,
     scheduledJobs: false,
+    shellCommands: false,
   });
   const session = h.session();
   await (await session.submit("list the files")).done.wait();

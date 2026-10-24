@@ -65,7 +65,7 @@ import type { Limiter } from "./reply/limiter.ts";
 import { ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
 import { REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
-import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
+import { answeredBlocks, approvalBlocks, questionBlocks, shellBlocks } from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 import type { RootEditor } from "./tag.ts";
 
@@ -729,6 +729,9 @@ export class SlackThread implements ThreadChat {
       case "setup":
         this.noteSetup(requestId, request);
         blocks = setupBlocks(requestId, request, request.selection);
+        break;
+      case "shell":
+        blocks = shellBlocks(requestId, request);
         break;
     }
     let ts: unknown;

@@ -401,6 +401,7 @@ export class MessagesWorld {
       holds,
       names,
       allowedRoot: folder,
+      shellCommands: true,
       stopped: this.stopping.signal,
       now: () => this.now,
       ...(this.updates === undefined ? {} : { updates: this.updates }),

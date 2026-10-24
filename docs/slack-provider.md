@@ -841,7 +841,7 @@ A Slack listener does five things in this order: it acknowledges, checks who act
 payload, calls the core through `ChatInbound`, and draws what the core asks to be drawn.
 `app.buildApp` builds the Bolt app and registers one listener per inbound path: `message` events,
 the deleted-first-message listener (below, "A deleted first message"), the `file_change` event (below, "An audio clip"), the Approve, Deny, Answer and Skip buttons, the
-question form's Next and Submit, the same-folder hold's two buttons, the setup's Model select and
+question form's Next and Submit, the same-folder hold's two buttons, a shell command's Run and Cancel, the setup's Model select and
 Start (its Effort select and Bypass checkbox are only acknowledged, since Start reads every
 control), the Bind and Resume buttons of the two lists, the Update button of the update offer, `!open`'s Choose a file button with its
 modal's search field and Open, and the session index's controls (its filters, Show all, Edit, Refresh, Delete,
@@ -870,7 +870,7 @@ The buttons and forms keep no such order: each names the message it answers.
 | The owner | The listener reads | The core decides |
 |---|---|---|
 | writes a message, a word included | an `InboundMessage` (`messages.inboundMessage`) | `ChatInbound.message`: `messages.messages`, which hands a word to `words.wordFlow` |
-| answers a request: Approve, Deny, Skip, the question form, the hold's two buttons, the setup's Start | an `OwnerAnswer` | `ChatInbound.answer`: `answers.answersFlow` |
+| answers a request: Approve, Deny, Skip, the question form, the hold's two buttons, Run and Cancel, the setup's Start | an `OwnerAnswer` | `ChatInbound.answer`: `answers.answersFlow` |
 | uses a row of a list: Bind, Resume | a `ListPick` | `ChatInbound.picked`: `lists.lists`, over `bind.binding` and `resume.resuming` |
 
 What stays in the provider is drawing and what only the provider has: the Model select's redraw of

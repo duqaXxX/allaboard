@@ -121,6 +121,11 @@ export interface Capabilities {
    * (a loop). Without it the daemon knows of none and offers nothing about them.
    */
   readonly scheduledJobs: boolean;
+  /**
+   * `AgentBackend.shell`: the session reads a shell command the owner ran, and its
+   * output, as the agent's terminal adds one (`!!command`). Without it the word is not offered.
+   */
+  readonly shellCommands: boolean;
 }
 
 /** The agent's own words, which the daemon's texts are filled with. */
@@ -193,6 +198,32 @@ export interface ImagePart {
 
 /** The owner's text, or the parts of one message when it carries images. */
 export type PromptContent = string | readonly (TextPart | ImagePart)[];
+
+/** How a shell command of the owner's ended, its output cut to what the session may read. */
+export interface ShellRun {
+  readonly command: string;
+  readonly stdout: string;
+  readonly stderr: string;
+  /** The line breaks the command printed on both streams, those cut from them included. */
+  readonly lines: number;
+  /** Null unless the command exited by itself. */
+  readonly exitCode: number | null;
+  /** The signal that ended a command the daemon did not end itself (`SIGKILL`), else null. */
+  readonly signal: string | null;
+  /** `exited`, past its time limit, stopped by the owner, or never started (`stderr` says why). */
+  readonly end: "exited" | "timedOut" | "stopped" | "notStarted";
+  readonly seconds: number;
+}
+
+/** What the daemon needs from the agent to run the owner's shell commands as its terminal does. */
+export interface ShellMode {
+  /** How long a command may run before it is ended. */
+  readonly timeoutMs: number;
+  /** The environment a command runs in: the one the agent's own sessions get. */
+  readonly environment: Readonly<Record<string, string | undefined>>;
+  /** The prompt that hands `run` to the session; it starts a turn, so the session answers it. */
+  prompt(run: ShellRun): PromptContent;
+}
 
 export interface Prompt {
   /** The prompt's own id, a UUID the core makes, which `prompt_taken` names. */
@@ -729,6 +760,8 @@ export interface AgentBackend {
    * Rejects when the agent cannot read it. Present with `sessionTitles`.
    */
   sessionTitle?(folder: string, session: string): Promise<string | null>;
+  /** How a shell command the owner sends runs and reaches a session. Present with `shellCommands`. */
+  readonly shell?: ShellMode;
   /** Ends what the back end keeps running besides its sessions. Safe to call again. */
   close(): Promise<void>;
 }

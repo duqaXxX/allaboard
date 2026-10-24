@@ -107,6 +107,12 @@ const parseCases: [string, Command | null][] = [
   ["!compact\nnotes", { kind: "passthrough", text: "compact notes" }], // the word ends at a line break too
   ["!stop\n", { kind: "stop" }],
   ["!model  opus ", { kind: "passthrough", text: "model opus" }],
+  ["!!ls -la", { kind: "shell", command: "ls -la" }],
+  ["!! git status ", { kind: "shell", command: "git status" }],
+  // The command is the shell's: kept as typed, case and line breaks included.
+  ["!!LS\n| wc -l", { kind: "shell", command: "LS\n| wc -l" }],
+  ["!!", { kind: "invalid" }],
+  ["!! ", { kind: "invalid" }],
 ];
 
 for (const [text, expected] of parseCases) {
@@ -224,6 +230,7 @@ test("the guide and the help explain every word of the daemon", () => {
     "untag",
     "delete-thread",
     "allaboard",
+    "!",
   ]) {
     assert.ok(words.includes(expected), expected);
   }
@@ -418,8 +425,11 @@ const OFFERED = [
 test("the pool holds the daemon's words first, then the session's commands by name", () => {
   const pool = poolOf(OFFERED);
   const daemon = pool.filter((c) => c.group === "daemon").map((c) => c.name);
-  // What a thread takes: `!bind`, `!resume` and `!allaboard` are refused there.
-  const taken = Object.values(WORD).filter((w) => !["bind", "resume", "allaboard"].includes(w));
+  // What a thread takes: `!bind`, `!resume` and `!allaboard` are refused there, and `!!` is no
+  // name a mistyped word could mean.
+  const taken = Object.values(WORD).filter(
+    (w) => !["bind", "resume", "allaboard", WORD.shell].includes(w),
+  );
   assert.deepEqual(daemon.toSorted(), taken.toSorted());
   assert.deepEqual(
     pool.filter((c) => c.group === "agent").map((c) => c.name),

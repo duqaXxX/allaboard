@@ -461,6 +461,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       holds,
       names,
       allowedRoot: config.allowedRoot,
+      shellCommands: config.shellCommands,
       stopped: stopping.signal,
       now: () => wall.time(),
       updates,

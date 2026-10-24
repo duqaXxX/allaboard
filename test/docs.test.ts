@@ -29,7 +29,7 @@ const FEATURE_NAME_LIMIT = 300;
 // The README is the landing page: a feature's detail goes in docs/setup.md. The limit sits a
 // quarter above the page's length when it was set (677 words, as `str.split` counts them). It is
 // a prompt to ask where new text belongs: raise it when the page needs the words.
-const README_WORD_LIMIT = 935;
+const README_WORD_LIMIT = 955;
 
 const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const LINE_POINTER = /\b[\w./-]+\.(?:ts|py|md|sh|ya?ml|json|toml):\d+/;
@@ -200,7 +200,9 @@ test("the readme lists every word of the daemon and no other", () => {
   // A word added, renamed or removed without its row in the README's table fails here.
   const words = Object.values(WORD).sort();
   const rows = [
-    ...new Set([...readmeSection("Commands").matchAll(/^\| `!([\w-]+)/gm)].map((m) => m[1] ?? "")),
+    ...new Set(
+      [...readmeSection("Commands").matchAll(/^\| `!([\w-]+|!)/gm)].map((m) => m[1] ?? ""),
+    ),
   ].sort();
   assert.deepEqual(rows, words);
 });
@@ -490,7 +492,9 @@ test("the setup guide names every variable scope and word", () => {
     assert.ok(text.includes(`\`${name}\``), `docs/setup.md does not name ${name}`);
   }
   const rows = new Set(
-    [...(text.split("### Commands")[1] ?? "").matchAll(/^\| `!([\w-]+)/gm)].map((m) => m[1] ?? ""),
+    [...(text.split("### Commands")[1] ?? "").matchAll(/^\| `!([\w-]+|!)/gm)].map(
+      (m) => m[1] ?? "",
+    ),
   );
   const missing = Object.values(WORD).filter((word) => !rows.has(word));
   assert.deepEqual(missing, [], `docs/setup.md has no row for ${missing}`);
