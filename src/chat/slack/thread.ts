@@ -62,7 +62,7 @@ import { contextBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
-import { ThreadPlaces } from "./reply/places.ts";
+import { positionOf, ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
 import { REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks, shellBlocks } from "./requests.ts";
@@ -640,8 +640,17 @@ export class SlackThread implements ThreadChat {
     return this.loopWrites;
   }
 
+  get loopCardLast(): boolean {
+    const at = this.loopTs === null ? null : positionOf(this.loopTs);
+    if (at === null) return false;
+    const newest = (this.places ?? this.lease.peek())?.newestAt ?? null;
+    return newest === null || newest <= at;
+  }
+
   /** Posts the card, or rewrites it; a card Slack lost is posted again by the next run. */
   private async writeLoop(card: LoopCard): Promise<void> {
+    // The places track what the owner writes below the card (`loopCardLast`), as for a reply.
+    this.places ??= this.lease.take();
     // The time is Slack's control sequence, which must not be escaped.
     const label = `_${mrkdwnEscape(card.label)} · ${slackTime(card.at)}_`;
     const blocks: KnownBlock[] = [contextBlock(noticeText(label))];

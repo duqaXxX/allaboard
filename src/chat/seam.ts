@@ -360,6 +360,11 @@ export interface ThreadChat {
    */
   showLoop(card: LoopCard): Promise<void>;
   /**
+   * Whether the loop card is the newest message of the thread the chat knows of: nothing of the
+   * owner's and nothing else of the app's below it. False while no card is shown.
+   */
+  readonly loopCardLast: boolean;
+  /**
    * The loop is over: `line` is posted as a new message of the thread, the one push of the loop,
    * and the card is let go, so a later `showLoop` posts a card anew. Never rejects.
    */

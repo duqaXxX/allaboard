@@ -20,6 +20,16 @@ All notable changes to this project are documented here. The format follows
 - `ALLABOARD_SHELL` in `.env`, `on` or `off`, turns `!!` off for an instance; absent, it is on.
   Any other value stops the start.
 
+### Changed
+
+- The report of a background task a scheduled run started (a subagent the loop's prompt hands
+  work to) rewrites that run's loop card, with no push, while the card is the thread's newest
+  message: the card shows the report's final words in place of the run's words and launch line,
+  and a footer timed from the run's start. A launch line on a card now stands apart from the
+  words after a blank line. With
+  a message of the owner's or another reply below the card, the report is an ordinary reply, as
+  before. The chat seam gains `ThreadChat.loopCardLast`.
+
 ## [0.9.0] - 2026-10-24
 
 ### Added

@@ -2600,7 +2600,8 @@ export class ThreadSession {
     this.reportOf = null;
     // The report belongs at the bottom of the thread: only a reply that is still the last thing
     // in it takes the report in; one with a message of the owner's or of another reply below
-    // it would hide the report above them.
+    // it would hide the report above them. So does a run's loop card, for the report of a task
+    // the run started: that report is the run's answer, rewritten on the card with no push (#49).
     const candidates = [
       ...lines.map(([taskId]) => taskId),
       ...this.unfolded.keys(),
@@ -2610,7 +2611,9 @@ export class ThreadSession {
     for (const taskId of candidates) {
       const reply =
         this.unfolded.get(taskId) ?? this.taskReplies.get(taskId) ?? this.showing(taskId);
-      if (reply !== null && !reply.closedOut && this.reply(reply).last) {
+      if (reply === null || reply.closedOut) continue;
+      const shown = this.reply(reply);
+      if (shown instanceof LoopReply ? shown.newest : shown.last) {
         target = reply;
         break;
       }
@@ -3274,8 +3277,9 @@ export class ThreadSession {
       startedAt: this.now(),
     };
     this.active = active;
-    // A run is no work of the owner's: it is timed and footed by no one.
-    if (!run) {
+    // A run is no work of the owner's, nor is the report of a task it started: the card times
+    // and foots them (`dateRun`).
+    if (!(this.reply(renderer) instanceof LoopReply)) {
       this.workStartedAt ??= this.now();
       this.footerOwedTo = this.reply(renderer);
     }
@@ -3305,8 +3309,10 @@ export class ThreadSession {
     renderer: TurnRenderer,
     signal?: AbortSignal,
   ): Promise<void> {
-    this.workStartedAt ??= this.now();
-    this.footerOwedTo = this.reply(renderer);
+    if (!(this.reply(renderer) instanceof LoopReply)) {
+      this.workStartedAt ??= this.now();
+      this.footerOwedTo = this.reply(renderer);
+    }
     if (text !== null) await renderer.feedOpening(text, aside);
     for (const event of events) await renderer.feed(event);
     await this.closeReply(renderer, { signal });
@@ -3656,7 +3662,7 @@ export class ThreadSession {
       if (card instanceof LoopReply) {
         card.setFinal(result.finalText);
         if (handedOver) handed = card.takeOver();
-        else await this.dateRun(card, active, stopped, signal);
+        else await this.dateRun(card, stopped, signal);
       }
       // `!stop` cut this turn short, the owner's own or a report's: its reply ends like any
       // other, and never waits on a task it may still owe (`force`: `!stop` never does).
@@ -3717,16 +3723,12 @@ export class ThreadSession {
 
   /**
    * The footer of a run's end goes to its card, built as an ordinary reply's is, with the run's
-   * own duration: the card is rewritten on every run, so it is an edit and no push.
+   * own duration, from its start to the end of its last turn (the report of a task it started,
+   * when one came): the card is rewritten on every run, so it is an edit and no push.
    */
-  private async dateRun(
-    card: LoopReply,
-    active: ActiveTurn,
-    stopped: boolean,
-    signal?: AbortSignal,
-  ): Promise<void> {
+  private async dateRun(card: LoopReply, stopped: boolean, signal?: AbortSignal): Promise<void> {
     const at = this.now();
-    const work = { durationMs: Math.max(0, at - active.startedAt), doneAt: at };
+    const work = { durationMs: Math.max(0, at - card.startedAt), doneAt: at };
     // A run cut short ends with a process on its way out, which a live read can lose to.
     const live = !stopped && !this.closedFlag;
     card.setEnd(await this.readFooter(signal, live, work), at);

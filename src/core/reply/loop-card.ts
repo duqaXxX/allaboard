@@ -8,8 +8,10 @@
 import type { FooterFields, LoopCard, Reply, ThreadChat } from "../../chat/seam.ts";
 
 export class LoopReply implements Reply {
-  readonly #thread: Pick<ThreadChat, "showLoop">;
+  readonly #thread: Pick<ThreadChat, "showLoop" | "loopCardLast">;
   readonly #label: string;
+  /** When the run began: epoch milliseconds. */
+  readonly startedAt: number;
   /** When the run ended, or began until it has: epoch milliseconds. */
   #at: number;
   #footer: FooterFields | null = null;
@@ -23,16 +25,34 @@ export class LoopReply implements Reply {
   #written = false;
   #dirty = false;
   #handedOver = false;
+  /**
+   * The run ended with a task it started still running (`rest`): the report's turn writes next,
+   * and what it writes replaces the run's words and lines, a launch line that is no longer true
+   * among them.
+   */
+  #reportNext = false;
 
-  constructor(thread: Pick<ThreadChat, "showLoop">, label: string, startedAt: number) {
+  constructor(
+    thread: Pick<ThreadChat, "showLoop" | "loopCardLast">,
+    label: string,
+    startedAt: number,
+  ) {
     this.#thread = thread;
     this.#label = label;
+    this.startedAt = startedAt;
     this.#at = startedAt;
   }
 
-  // A report of an ended task never renders into the card: it belongs under a normal reply.
+  // Never the last reply, so no report of another's task (a Monitor's event, an owner turn's
+  // agent) renders into the card; the report of a task the run started does, while the card is
+  // still the newest message of the thread (`newest`).
   readonly last = false;
   readonly overtaken = false;
+
+  /** Whether nothing sits below the card in the thread: a report written into it is seen. */
+  get newest(): boolean {
+    return this.#thread.loopCardLast;
+  }
 
   async text(
     markdown: string,
@@ -43,6 +63,7 @@ export class LoopReply implements Reply {
     } = {},
   ): Promise<void> {
     if (options.aside === true) return;
+    this.#begin();
     if (options.notice === true || options.ending === true) this.#notices += markdown;
     else this.#words += markdown;
     this.#dirty = true;
@@ -50,6 +71,7 @@ export class LoopReply implements Reply {
 
   /** The run's final words, from the result that ended it: they replace the running text. */
   setFinal(text: string | null): void {
+    if (text !== null && text.trim() !== "") this.#begin();
     this.#final = text;
     this.#dirty = true;
   }
@@ -89,7 +111,18 @@ export class LoopReply implements Reply {
     return true;
   }
 
-  rest(): void {}
+  rest(): void {
+    this.#reportNext = true;
+  }
+
+  /** The first thing the report's turn writes clears what the run showed. */
+  #begin(): void {
+    if (!this.#reportNext) return;
+    this.#reportNext = false;
+    this.#words = "";
+    this.#notices = "";
+    this.#final = null;
+  }
 
   async showFooter(): Promise<boolean> {
     return true;
@@ -98,7 +131,8 @@ export class LoopReply implements Reply {
   #body(): string {
     const final = this.#final;
     const words = final !== null && final.trim() !== "" ? final : this.#words;
-    return `${words}${this.#notices}`.trim();
+    // A line written before the words (a launch line, first in the turn) carries no break.
+    return [words.trim(), this.#notices.trim()].filter((part) => part !== "").join("\n\n");
   }
 
   /** One write of the card per change: the label is shown even when the run said nothing. */
