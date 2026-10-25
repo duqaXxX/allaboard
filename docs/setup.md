@@ -215,7 +215,8 @@ same treatment.
      inside their own Slack thread, and Slack notifies you on a new message in a thread you
      started, whatever this setting is. It governs only the bot's top-level messages (the answer
      to a word typed in the channel, with `!resume`'s list, the upgrade notice, and the
-     `✅ Done:` line that names the thread whose work was done last): with
+     `✅ Done:` or `✋ Waiting:` line that names the thread whose work was done, or that started
+     waiting for you, last): with
      **Just mentions** those stay silent, since the bot writes no `@channel` mention anywhere;
      with **All new posts** they ring too. A word typed inside a thread is answered for you alone
      and never rings.
@@ -1428,7 +1429,7 @@ setting is:
 - Nothing rings while Claude writes.
 
 The channel's own setting (Part 1) governs only the bot's top-level messages (the answer to `!bind`, `!status`, `!resume`'s
-own list, the upgrade notice, the `✅ Done:` line): with **Just mentions** those stay silent, since the bot writes no
+own list, the upgrade notice, the `✅ Done:` and `✋ Waiting:` line): with **Just mentions** those stay silent, since the bot writes no
 `@channel` mention anywhere; with **All new posts** they ring too.
 
 The measurements behind this (what was tried, on what Slack plan and app, and on what date) are

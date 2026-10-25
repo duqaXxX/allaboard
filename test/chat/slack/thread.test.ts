@@ -7,8 +7,8 @@
 import assert from "node:assert/strict";
 import { beforeEach, mock, test } from "node:test";
 import type { PermissionRequest, QuestionRequest } from "../../../src/agent/seam.ts";
-import { ChatError, type SessionStatus } from "../../../src/chat/seam.ts";
-import type { ChannelLine } from "../../../src/chat/slack/channel-line.ts";
+import { ChatError, type OwnerRequest, type SessionStatus } from "../../../src/chat/seam.ts";
+import type { ChannelLine, LineKind } from "../../../src/chat/slack/channel-line.ts";
 import type { Limiter } from "../../../src/chat/slack/reply/limiter.ts";
 import type { ReplySink } from "../../../src/chat/slack/reply/sinks.ts";
 import {
@@ -181,13 +181,14 @@ test("a write of a reply sets the thread status again", async () => {
 /** A line that records which threads it was asked to name, and by which root texts. */
 function recordingLine(): {
   line: ChannelLine;
-  shown: [string, string][];
+  shown: [string, string, LineKind][];
   retitled: [string, string, string][];
 } {
-  const shown: [string, string][] = [];
+  const shown: [string, string, LineKind][] = [];
   const retitled: [string, string, string][] = [];
   const line = {
-    show: async (channel: string, root: string) => void shown.push([channel, root]),
+    show: async (channel: string, root: string, kind: LineKind) =>
+      void shown.push([channel, root, kind]),
     retitle: async (channel: string, root: string, text: string) =>
       void retitled.push([channel, root, text]),
   };
@@ -257,7 +258,66 @@ for (const [status, named] of [
     // The footer's own drawing has its tests in the sink's: here, only that one was written.
     const sink = reply as unknown as ReplySink;
     assert.equal(await sink.showFooterFormatted("main · ctx 6%"), true);
-    assert.deepEqual(shown, named ? [[CHANNEL, THREAD]] : []);
+    assert.deepEqual(shown, named ? [[CHANNEL, THREAD, "done"]] : []);
+  });
+}
+
+/** A turn's end as the reply draws it: a footer, written once the reply closed. */
+async function endTurn(thread: SlackThread): Promise<void> {
+  const reply = thread.openReply(() => {});
+  await reply.text("hello");
+  await reply.finish([]);
+  await reply.closeOut();
+  await (reply as unknown as ReplySink).showFooterFormatted("main · ctx 6%");
+}
+
+// #72: a thread blocked on the agent's request makes the channel unread, once a turn.
+test("the agent's first request of a turn moves the channel's line to name the thread", async () => {
+  const { line, shown } = recordingLine();
+  const { thread } = made({ line });
+  await thread.showStatus("waiting"); // the core's status: the request is not posted yet
+  assert.deepEqual(shown, []);
+  await thread.ask("approval-1", PERMISSION, "Bash: ls");
+  await thread.ask("approval-2", QUESTION, "AskUserQuestion"); // the same turn, once answered
+  assert.deepEqual(shown, [[CHANNEL, THREAD, "waiting"]]);
+  // A turn's footer ends it, whatever the root shows: a background task keeps it from ✅.
+  await endTurn(thread);
+  await thread.ask("approval-3", QUESTION, "AskUserQuestion");
+  for (const end of ["done", "error"] as const) {
+    await thread.showStatus(end); // a turn that ends with no footer
+    await thread.ask(`approval-${end}`, PERMISSION, "Bash: ls");
+  }
+  await thread.clearStatus();
+  await thread.ask("approval-4", PERMISSION, "Bash: ls");
+  assert.deepEqual(shown, Array(5).fill([CHANNEL, THREAD, "waiting"]));
+});
+
+// #72: these answer what the owner has just written in the thread, so he is there.
+for (const request of [
+  {
+    type: "setup",
+    requestId: "setup-1",
+    models: [],
+    efforts: [],
+    bypassOffered: true,
+    selection: { model: "default", effort: "default", bypass: false },
+  },
+  { type: "shell", requestId: "shell-1", command: "git status", folder: "/work/web" },
+  {
+    type: "hold",
+    requestId: "hold-1",
+    other: { channel: CHANNEL, thread: "1792626999.000001" },
+    link: "the other thread",
+  },
+] as const satisfies readonly OwnerRequest[]) {
+  test(`a request the owner set off names nothing in the channel's line [${request.type}]`, async () => {
+    const { line, shown } = recordingLine();
+    const { thread } = made({ line });
+    await thread.ask(request.requestId, request, "Asked");
+    await thread.showStatus("waiting");
+    assert.deepEqual(shown, []);
+    await thread.ask("approval-1", PERMISSION, "Bash: ls"); // the agent's own still counts
+    assert.deepEqual(shown, [[CHANNEL, THREAD, "waiting"]]);
   });
 }
 

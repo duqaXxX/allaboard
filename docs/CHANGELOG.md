@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- The channel's line also names a thread whose agent asks the owner for an approval or an
+  answer, as `✋ Waiting:` with a link to the thread, so the channel shows as unread while the
+  thread is blocked on the owner. It is posted once a turn; the setup form, a `!!` command's
+  confirmation and the same-folder hold post none. The last line posted, waiting or done,
+  replaces the one before.
+
 ## [0.10.0] - 2026-10-25
 
 ### Added

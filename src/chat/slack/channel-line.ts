@@ -1,11 +1,12 @@
 /**
  * One line of the bot's at the bottom of a project channel, naming the thread whose work was done
- * last, so the channel shows as unread in the sidebar. Slack marks a channel unread only for a
- * top-level message of someone else's: a reply in a thread, a mention or a reaction there, an edit
- * and the owner's own messages leave it as read (measured on a dev app on 2026-10-22, iOS and
- * desktop). Each time a session's work is done (its reply's first footer) the bot posts a new
- * line and deletes the one before, so the channel holds one line of the bot's at most and opens at
- * the bottom, on that line.
+ * or that started waiting for the owner last, so the channel shows as unread in the sidebar. Slack
+ * marks a channel unread only for a top-level message of someone else's: a reply in a thread, a
+ * mention or a reaction there, an edit and the owner's own messages leave it as read (measured on
+ * a dev app on 2026-10-22, iOS and desktop). Each time a session's work is done (its reply's first
+ * footer), and when the agent first asks the owner for an approval or an answer in a turn, the bot
+ * posts a new line and deletes the one before, the last event winning, so the channel holds one
+ * line of the bot's at most and opens at the bottom, on that line.
  *
  * The line is found again by its message metadata (`LINE_EVENT`), which `conversations.history`
  * returns for the app's own messages (measured the same day): `state.json` keeps nothing of it.
@@ -53,14 +54,26 @@ export function lineLabel(root: Message | undefined): string {
   return chars.length > LABEL_LIMIT ? `${chars.slice(0, LABEL_LIMIT - 1).join("")}…` : words;
 }
 
+/** What the line says of the thread it names: its work is done, or it waits for the owner. */
+export type LineKind = "done" | "waiting";
+
+// Each kind's word, and its mark: the one the root's reaction shows for the same state.
+const WORDS: Readonly<Record<LineKind, readonly [string, string]>> = {
+  done: ["✅", "Done"],
+  waiting: ["✋", "Waiting"],
+};
+
 /** The line's text and blocks, naming the thread at `permalink` by `label`. */
-function lineContent(label: string, permalink: string) {
+function lineContent(kind: LineKind, label: string, permalink: string) {
+  const [mark, word] = WORDS[kind];
   return {
-    text: `Done: ${label}`,
+    text: `${word}: ${label}`,
     blocks: [
       {
         type: "context",
-        elements: [{ type: "mrkdwn", text: `✅ Done: <${permalink}|${mrkdwnEscape(label)}>` }],
+        elements: [
+          { type: "mrkdwn", text: `${mark} ${word}: <${permalink}|${mrkdwnEscape(label)}>` },
+        ],
       },
     ],
   };
@@ -70,6 +83,7 @@ function lineContent(label: string, permalink: string) {
 interface Named {
   readonly ts: string;
   readonly root: string;
+  readonly kind: LineKind;
   readonly permalink: string;
   label: string;
 }
@@ -98,11 +112,11 @@ export class ChannelLine {
   }
 
   /**
-   * Move the channel's line to the bottom, naming the thread whose root is `rootTs`. Never
-   * rejects: a failure is logged by its code and the reply goes on.
+   * Move the channel's line to the bottom, naming the thread whose root is `rootTs` as `kind`.
+   * Never rejects: a failure is logged by its code and the reply goes on.
    */
-  show(channel: string, rootTs: string): Promise<void> {
-    return this.#queue(channel, () => this.#show(channel, rootTs), "move");
+  show(channel: string, rootTs: string, kind: LineKind): Promise<void> {
+    return this.#queue(channel, () => this.#show(channel, rootTs, kind), "move");
   }
 
   /** Runs `work` after the channel's change in flight; a failure is logged as one to `verb`. */
@@ -139,7 +153,7 @@ export class ChannelLine {
       await this.#slack.chat.update({
         channel,
         ts: named.ts,
-        ...lineContent(label, named.permalink),
+        ...lineContent(named.kind, label, named.permalink),
       });
     } catch (error) {
       // Deleted by hand: the next line is posted as usual.
@@ -152,7 +166,7 @@ export class ChannelLine {
     named.label = label;
   }
 
-  async #show(channel: string, rootTs: string): Promise<void> {
+  async #show(channel: string, rootTs: string, kind: LineKind): Promise<void> {
     const replies = await this.#slack.conversations.replies({ channel, ts: rootTs, limit: 1 });
     const label = lineLabel(replies.messages?.[0] as Message | undefined);
     const link = String(
@@ -160,7 +174,7 @@ export class ChannelLine {
     );
     const posted = await this.#slack.chat.postMessage({
       channel,
-      ...lineContent(label, link),
+      ...lineContent(kind, label, link),
       metadata: { event_type: LINE_EVENT, event_payload: {} },
       unfurl_links: false,
       unfurl_media: false,
@@ -171,7 +185,7 @@ export class ChannelLine {
       ...(this.#left.get(channel) ?? []),
       ...(known !== undefined ? [known.ts] : await this.#earlier(channel, ts)),
     ];
-    this.#posted.set(channel, { ts, root: rootTs, permalink: link, label });
+    this.#posted.set(channel, { ts, root: rootTs, kind, permalink: link, label });
     // Deleted only once the new line is there: the channel never goes without one.
     const left: string[] = [];
     for (const line of new Set(old)) {
