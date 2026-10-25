@@ -124,11 +124,6 @@ export class StatusReaction {
     return this.#current;
   }
 
-  /** What `show` or `clear` was asked for last, whether or not Slack has made it yet. */
-  get wanted(): Status | null {
-    return this.#wanted;
-  }
-
   /**
    * Shows `state`. False when the root is there and does not carry it: after an add that
    * failed, and once no instance calls Slack for reactions. A root Slack no longer has (`GONE`)

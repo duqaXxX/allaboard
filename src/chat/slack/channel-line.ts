@@ -1,12 +1,17 @@
 /**
- * One line of the bot's at the bottom of a project channel, naming the thread whose work was done
+ * One line of the bot's at the bottom of a project channel, naming the thread whose work ended
  * or that started waiting for the owner last, so the channel shows as unread in the sidebar. Slack
  * marks a channel unread only for a top-level message of someone else's: a reply in a thread, a
  * mention or a reaction there, an edit and the owner's own messages leave it as read (measured on
- * a dev app on 2026-10-22, iOS and desktop). Each time a session's work is done (its reply's first
- * footer), and when the agent first asks the owner for an approval or an answer in a turn, the bot
+ * a dev app on 2026-10-22, iOS and desktop). Each time a session's work ends, done or failed (a
+ * `notify` status), and each time the agent asks the owner for an approval or an answer, the bot
  * posts a new line and deletes the one before, the last event winning, so the channel holds one
  * line of the bot's at most and opens at the bottom, on that line.
+ *
+ * A line may mention the owner (`mention`), in `text` alone: a mention there pushes beside a
+ * markdown block and shows nowhere, and stays silent beside a context block alone (measured
+ * 2026-10-25, iOS, "Thread replies" notifications off). Such a line is a markdown block; one with
+ * no mention is a context block, small and grey.
  *
  * The line is found again by its message metadata (`LINE_EVENT`), which `conversations.history`
  * returns for the app's own messages (measured the same day): `state.json` keeps nothing of it.
@@ -25,7 +30,7 @@ import { getLogger, type Logger } from "../../log.ts";
 import { slackUnescape } from "./app/messages.ts";
 import { threadFacts } from "./home.ts";
 import { describe, gone } from "./reply/errors.ts";
-import { mrkdwnEscape } from "./reply/escape.ts";
+import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 import { stripMarkdown } from "./reply/markdown.ts";
 import { retaggedText } from "./tag.ts";
 
@@ -55,20 +60,34 @@ export function lineLabel(root: Message | undefined): string {
   return chars.length > LABEL_LIMIT ? `${chars.slice(0, LABEL_LIMIT - 1).join("")}…` : words;
 }
 
-/** What the line says of the thread it names: its work is done, or it waits for the owner. */
-export type LineKind = "done" | "waiting";
+/** What the line says of the thread it names: its work is done or failed, or it waits for the owner. */
+export type LineKind = "done" | "failed" | "waiting";
 
 // Each kind's word, and its mark: the one the root's reaction shows for the same state.
 const WORDS: Readonly<Record<LineKind, readonly [string, string]>> = {
   done: ["✅", "Done"],
+  failed: ["❌", "Failed"],
   waiting: ["✋", "Waiting"],
 };
 
-/** The line's text and blocks, naming the thread at `permalink` by `label`. */
-function lineContent(kind: LineKind, label: string, permalink: string) {
+/**
+ * The line's text and blocks, naming the thread at `permalink` by `label`, and mentioning the user
+ * `mention` out of sight when given. The label is the root's words, which may hold a mention
+ * sequence: escaped in `text` too, where one would notify.
+ */
+function lineContent(kind: LineKind, label: string, permalink: string, mention?: string) {
   const [mark, word] = WORDS[kind];
+  const text = `${word}: ${mrkdwnEscape(label)}`;
+  if (mention !== undefined) {
+    return {
+      text: `${text} <@${mention}>`,
+      blocks: [
+        { type: "markdown", text: `${mark} ${word}: [${markdownEscape(label)}](${permalink})` },
+      ],
+    };
+  }
   return {
-    text: `${word}: ${label}`,
+    text,
     blocks: [
       {
         type: "context",
@@ -91,6 +110,7 @@ interface Named {
   readonly root: string;
   readonly kind: LineKind;
   readonly permalink: string;
+  readonly mention: string | undefined;
   label: string;
 }
 
@@ -118,11 +138,12 @@ export class ChannelLine {
   }
 
   /**
-   * Move the channel's line to the bottom, naming the thread whose root is `rootTs` as `kind`.
-   * Never rejects: a failure is logged by its code and the reply goes on.
+   * Move the channel's line to the bottom, naming the thread whose root is `rootTs` as `kind`,
+   * mentioning the user `mention` out of sight when given. Never rejects: a failure is logged by
+   * its code and the reply goes on.
    */
-  show(channel: string, rootTs: string, kind: LineKind): Promise<void> {
-    return this.#queue(channel, () => this.#show(channel, rootTs, kind), "move");
+  show(channel: string, rootTs: string, kind: LineKind, mention?: string): Promise<void> {
+    return this.#queue(channel, () => this.#show(channel, rootTs, kind, mention), "move");
   }
 
   /** Runs `work` after the channel's change in flight; a failure is logged as one to `verb`. */
@@ -159,7 +180,8 @@ export class ChannelLine {
       await this.#slack.chat.update({
         channel,
         ts: named.ts,
-        ...lineContent(named.kind, label, named.permalink),
+        // An edit pushes nothing (measured 2026-09-27): the mention keeps the line's form.
+        ...lineContent(named.kind, label, named.permalink, named.mention),
       });
     } catch (error) {
       // Deleted by hand: the next line is posted as usual.
@@ -172,7 +194,7 @@ export class ChannelLine {
     named.label = label;
   }
 
-  async #show(channel: string, rootTs: string, kind: LineKind): Promise<void> {
+  async #show(channel: string, rootTs: string, kind: LineKind, mention?: string): Promise<void> {
     const replies = await this.#slack.conversations.replies({ channel, ts: rootTs, limit: 1 });
     const root = replies.messages?.[0] as Message | undefined;
     const label = lineLabel(root);
@@ -182,7 +204,7 @@ export class ChannelLine {
     const link = await this.#permalink(channel, opened, rootTs);
     const posted = await this.#slack.chat.postMessage({
       channel,
-      ...lineContent(kind, label, link),
+      ...lineContent(kind, label, link, mention),
       metadata: { event_type: LINE_EVENT, event_payload: {} },
       unfurl_links: false,
       unfurl_media: false,
@@ -193,7 +215,7 @@ export class ChannelLine {
       ...(this.#left.get(channel) ?? []),
       ...(known !== undefined ? [known.ts] : await this.#earlier(channel, ts)),
     ];
-    this.#posted.set(channel, { ts, root: rootTs, kind, permalink: link, label });
+    this.#posted.set(channel, { ts, root: rootTs, kind, permalink: link, mention, label });
     // Deleted only once the new line is there: the channel never goes without one.
     const left: string[] = [];
     for (const line of new Set(old)) {

@@ -25,7 +25,7 @@ import { prepareUploads } from "./attachments.ts";
 import { ChannelLine } from "./channel-line.ts";
 import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
-import { type ProbeClient, slackSetup } from "./onboarding.ts";
+import { MENTION_VARIABLE, mentionsOn, type ProbeClient, slackSetup } from "./onboarding.ts";
 import { type ClientOptions, repliesClient, sharedClient } from "./reply/clients.ts";
 import { describe } from "./reply/errors.ts";
 import { UpdateLimiter } from "./reply/limiter.ts";
@@ -185,6 +185,20 @@ export function appTokenKey(appToken: string): string {
   return `app-token:${createHash("sha256").update(appToken).digest("hex")}`;
 }
 
+/**
+ * Whether the messages the owner is told of mention him: `on` or `off` in any case, off when the
+ * file does not set it. With Slack's "Thread replies" notifications on, every reply pushes, and
+ * the channel's line at the end of the work would push once more. Any other value throws
+ * `ConfigError`: a mistyped `on` must not start the daemon silent.
+ */
+function mentionSwitch(written: string | undefined): boolean {
+  if (written === undefined) return false;
+  const on = mentionsOn(written);
+  if (on === null)
+    throw new ConfigError(`${MENTION_VARIABLE} must be on or off; it is "${written}"`);
+  return on;
+}
+
 /** The variable `context` must hold for `name`: the daemon does not start without the required. */
 function variable(context: ChatContext, name: string): string {
   const value = context.variables[name];
@@ -207,7 +221,7 @@ function checkTokens(context: ChatContext): void {
 export function slackChat(options: SlackOptions = {}): ChatEntry {
   return {
     required: ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_OWNER_USER_ID"],
-    optional: ["SLACK_USER_TOKEN"],
+    optional: ["SLACK_USER_TOKEN", MENTION_VARIABLE],
     setup: (instance) => slackSetup(instance, options.probe),
     async build(context: ChatContext): Promise<ChatProvider> {
       checkTokens(context);
@@ -226,6 +240,7 @@ export function slackChat(options: SlackOptions = {}): ChatEntry {
 async function assemble(options: SlackOptions, context: ChatContext): Promise<ChatProvider> {
   const botToken = variable(context, "SLACK_BOT_TOKEN");
   const appToken = variable(context, "SLACK_APP_TOKEN");
+  const mentionOwner = mentionSwitch(context.variables[MENTION_VARIABLE]);
   const clients = options.clients ?? CLIENTS;
   // The clients are built before the chat that stops them: its stop is passed on below.
   const stopping = new AbortController();
@@ -290,6 +305,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     agent: () => context.core().agent,
     ...(roots !== null && { roots, canTag: canTag(owner) }),
     line: new ChannelLine(slack, { botUserId: identity.botUserId }),
+    mentionOwner,
     app: {
       core: () => context.core(),
       config: { botToken, allowedRoot: context.allowedRoot },

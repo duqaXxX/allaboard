@@ -68,7 +68,9 @@ interface Made {
   readonly thread: SlackThread;
 }
 
-function made(options: { replies?: FakeSlack; line?: ChannelLine } = {}): Made {
+function made(
+  options: { replies?: FakeSlack; line?: ChannelLine; mentionOwner?: boolean } = {},
+): Made {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const limiter = new CountingLimiter(slack);
@@ -81,6 +83,7 @@ function made(options: { replies?: FakeSlack; line?: ChannelLine } = {}): Made {
     limiter,
     clock,
     ...(options.line !== undefined && { line: options.line }),
+    ...(options.mentionOwner !== undefined && { mentionOwner: options.mentionOwner }),
   });
   return { slack, clock, limiter, chat, thread: chat.thread({ channel: CHANNEL, thread: THREAD }) };
 }
@@ -182,17 +185,21 @@ test("a write of a reply sets the thread status again", async () => {
 function recordingLine(): {
   line: ChannelLine;
   shown: [string, string, LineKind][];
+  mentions: (string | undefined)[];
   retitled: [string, string, string][];
 } {
   const shown: [string, string, LineKind][] = [];
+  const mentions: (string | undefined)[] = [];
   const retitled: [string, string, string][] = [];
   const line = {
-    show: async (channel: string, root: string, kind: LineKind) =>
-      void shown.push([channel, root, kind]),
+    show: async (channel: string, root: string, kind: LineKind, mention?: string) => {
+      shown.push([channel, root, kind]);
+      mentions.push(mention);
+    },
     retitle: async (channel: string, root: string, text: string) =>
       void retitled.push([channel, root, text]),
   };
-  return { line: line as unknown as ChannelLine, shown, retitled };
+  return { line: line as unknown as ChannelLine, shown, mentions, retitled };
 }
 
 /** A provider with a root editor whose title edit `edit` stands for. */
@@ -242,54 +249,58 @@ test("a title the root refused never reaches the channel's line", async () => {
   assert.deepEqual(retitled, []);
 });
 
-for (const [status, named] of [
-  ["done", true],
-  ["error", false],
+for (const [status, kind] of [
+  ["done", "done"],
+  ["error", "failed"],
 ] as const) {
-  test(`a reply's footer moves the channel's line only for work that ended well [${status}]`, async () => {
-    // #34: a footer is drawn on a stop, an error and a shutdown too; the line says Done.
-    const { line, shown } = recordingLine();
+  test(`the end of the work moves the channel's line, its footer does not [${status}]`, async () => {
+    const { line, shown, mentions } = recordingLine();
     const { thread } = made({ line });
     const reply = thread.openReply(() => {});
     await reply.text("hello");
     await reply.finish([]);
     await reply.closeOut();
+    // A stop's ✅, or a ❌ the owner was told of already: the core asks for no notice.
     await thread.showStatus(status);
     // The footer's own drawing has its tests in the sink's: here, only that one was written.
     const sink = reply as unknown as ReplySink;
     assert.equal(await sink.showFooterFormatted("main · ctx 6%"), true);
-    assert.deepEqual(shown, named ? [[CHANNEL, THREAD, "done"]] : []);
+    assert.deepEqual(shown, []);
+    await thread.showStatus(status, { notify: true });
+    assert.deepEqual(shown, [[CHANNEL, THREAD, kind]]);
+    assert.deepEqual(mentions, [undefined]); // no mentions asked for
   });
 }
 
-/** A turn's end as the reply draws it: a footer, written once the reply closed. */
-async function endTurn(thread: SlackThread): Promise<void> {
-  const reply = thread.openReply(() => {});
-  await reply.text("hello");
-  await reply.finish([]);
-  await reply.closeOut();
-  await (reply as unknown as ReplySink).showFooterFormatted("main · ctx 6%");
-}
+test("the end of the work mentions the owner on the channel's line when asked", async () => {
+  const { line, shown, mentions } = recordingLine();
+  const { thread } = made({ line, mentionOwner: true });
+  await thread.showStatus("working", { notify: true }); // no end: never a line
+  await thread.showStatus("done", { notify: true });
+  await thread.showStatus("error", { notify: true });
+  assert.deepEqual(shown, [
+    [CHANNEL, THREAD, "done"],
+    [CHANNEL, THREAD, "failed"],
+  ]);
+  assert.deepEqual(mentions, [OWNER, OWNER]);
+});
 
-// #72: a thread blocked on the agent's request makes the channel unread, once a turn.
-test("the agent's first request of a turn moves the channel's line to name the thread", async () => {
-  const { line, shown } = recordingLine();
-  const { thread } = made({ line });
-  await thread.showStatus("waiting"); // the core's status: the request is not posted yet
-  assert.deepEqual(shown, []);
-  await thread.ask("approval-1", PERMISSION, "Bash: ls");
-  await thread.ask("approval-2", QUESTION, "AskUserQuestion"); // the same turn, once answered
-  assert.deepEqual(shown, [[CHANNEL, THREAD, "waiting"]]);
-  // A turn's footer ends it, whatever the root shows: a background task keeps it from ✅.
-  await endTurn(thread);
-  await thread.ask("approval-3", QUESTION, "AskUserQuestion");
-  for (const end of ["done", "error"] as const) {
-    await thread.showStatus(end); // a turn that ends with no footer
-    await thread.ask(`approval-${end}`, PERMISSION, "Bash: ls");
+// #20: with Slack's "Thread replies" notifications off, a mention is what pushes. The channel's
+// line carries it (measured 2026-10-25, iOS, beside a markdown block); the request never does.
+test("each of the agent's requests moves the channel's line, mentioning the owner when asked", async () => {
+  for (const mentionOwner of [true, false]) {
+    const { line, shown, mentions } = recordingLine();
+    const { slack, thread } = made({ line, mentionOwner });
+    await thread.showStatus("waiting"); // the core's status: the request is not posted yet
+    assert.deepEqual(shown, []);
+    await thread.ask("approval-1", PERMISSION, "Bash: ls");
+    await thread.ask("approval-2", QUESTION, "AskUserQuestion"); // the same turn, once answered
+    assert.deepEqual(shown, Array(2).fill([CHANNEL, THREAD, "waiting"]));
+    assert.deepEqual(mentions, Array(2).fill(mentionOwner ? OWNER : undefined));
+    for (const posted of slack.callsTo("chat.postMessage")) {
+      assert.ok(!JSON.stringify(posted).includes(`<@${OWNER}>`)); // the line tells him, not this
+    }
   }
-  await thread.clearStatus();
-  await thread.ask("approval-4", PERMISSION, "Bash: ls");
-  assert.deepEqual(shown, Array(5).fill([CHANNEL, THREAD, "waiting"]));
 });
 
 // #72: these answer what the owner has just written in the thread, so he is there.

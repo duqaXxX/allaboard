@@ -50,6 +50,11 @@ const refusals: [string, Record<string, string>, string][] = [
     { SLACK_BOT_TOKEN: BOT, SLACK_APP_TOKEN: APP, SLACK_USER_TOKEN: BOT },
     "SLACK_USER_TOKEN must be the User OAuth Token (xoxp-...)",
   ],
+  [
+    "a mention switch that is neither on nor off",
+    { SLACK_BOT_TOKEN: BOT, SLACK_APP_TOKEN: APP, SLACK_MENTION_OWNER: "yes" },
+    'SLACK_MENTION_OWNER must be on or off; it is "yes"',
+  ],
 ];
 
 for (const [label, variables, message] of refusals) {
@@ -70,3 +75,19 @@ test("a user token of the right kind passes the check", async () => {
     (error: unknown) => !(error instanceof ConfigError),
   );
 });
+
+for (const written of ["on", "OFF"]) {
+  test(`a mention switch set to ${written} passes the check`, async () => {
+    await assert.rejects(
+      unreached.build(
+        contextOf({
+          ...OWNER,
+          SLACK_BOT_TOKEN: BOT,
+          SLACK_APP_TOKEN: APP,
+          SLACK_MENTION_OWNER: written,
+        }),
+      ),
+      (error: unknown) => !(error instanceof ConfigError),
+    );
+  });
+}

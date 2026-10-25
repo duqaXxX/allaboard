@@ -201,6 +201,16 @@ export type SessionStatus = "working" | "waiting" | "done" | "error";
  */
 export type RootStatus = SessionStatus | "restarting";
 
+/** How `ThreadChat.showStatus` changes the root's status. */
+export interface StatusOptions {
+  readonly signal?: AbortSignal;
+  /**
+   * The change ends the session's work, and the owner's own act did not make it: the owner is
+   * told of it, where the chat can tell him of one message among the others.
+   */
+  readonly notify?: boolean;
+}
+
 /** What still runs in a thread: a title and one line per task. */
 export interface RunningList {
   readonly title: string;
@@ -285,7 +295,7 @@ export interface ThreadChat {
    * a `signal`, rejects with its reason when it aborts, and the change may be left half made.
    * False when the chat did not make the change and the root does not show `status`.
    */
-  showStatus(status: RootStatus, signal?: AbortSignal): Promise<boolean>;
+  showStatus(status: RootStatus, options?: StatusOptions): Promise<boolean>;
   /** Leaves the root with no status of this session. */
   clearStatus(): Promise<void>;
   /** Brings the root to the status asked for last: for whoever aborted a change on its way. */
@@ -309,7 +319,9 @@ export interface ThreadChat {
    * Puts a request to the owner: a tool's permission, the agent's questions, the same-folder
    * hold, a session's setup or the confirmation of a shell command. `requestId` is what the owner's answer comes back with
    * (`ChatInbound.answer`); `title` is the request in one line. Resolves with the message that
-   * shows it; rejects with `ChatError` when it could not be shown.
+   * shows it; rejects with `ChatError` when it could not be shown. A permission and a question
+   * wait on the owner wherever he is, and he is told of each, where the chat can tell him of one
+   * message among the others; the others answer what he has just written in the thread.
    */
   ask(requestId: string, request: OwnerRequest, title: string): Promise<MessageId>;
   /**

@@ -353,7 +353,7 @@ and `trustedRepository` and `untrustedRepository` null without `folderTrust`, `s
 | Markup | The core writes a notice (`tell`, `rewrite`, `ChannelChat.notice`) and a reference (`say`) and names which one (`Markup`). Its texts use backticks and Markdown emphasis. `ChatProvider.escape` makes a name safe for one markup (a third kind, `words`, is the owner's own text drawn in a reference: only the chat's control characters are escaped and its formatting marks stay live), `ThreadChat.link` writes a link to a thread or answers null, and `ChatProvider.channelName` writes a channel | `leaves a plain word alone when it escapes it`, `link is a string or nothing` |
 | Ids | `MessageId` and `ThreadRef` are strings the core stores in `state.json` and hands back after a restart: the crash repair ends a reply and withdraws a request by the ids a previous process stored | Not checked across a restart |
 | A request | `ThreadChat.ask` resolves with the id of the message that shows the request, or rejects with `ChatError`; the core then refuses the request. `withdraw` answers true for a request that is already gone. A click on a withdrawn request may still reach `ChatInbound.answer`, which answers false after telling the owner | `ask rejects with ChatError when it could not show the request` |
-| A status | The core hands `showStatus` one of four words and stores the same word. What the word looks like is the provider's | Skipped for a chat without `reactions` |
+| A status | The core hands `showStatus` one of four words and stores the same word, with `notify` on the change that ends the session's work (`status.endsWork`) unless the owner's own act made it. What the word looks like, and how the owner is told, is the provider's | Skipped for a chat without `reactions` |
 
 Not settled by the seam, by the core or by a check: who drops an event the chat delivers twice
 (neither the Slack provider nor the core does), and what a provider does with a click on a
@@ -639,7 +639,7 @@ and says so. Otherwise only a crash leaves them set.
 The writes of these fields are best-effort: a write that fails (a folder that cannot be
 written, a full disk) is caught, logged as one line naming the error and no content, and the
 session goes on. `ThreadSession` does that for the status (`ThreadSession.recordStatus`, which
-`noteStatus`, `noteCrossOverStatus` and the status restored after a hold go through), for the
+every change of the status goes through, from `ThreadSession.setStatus`), for the
 requests and for the clearing at a close; the reply sink does it for the open replies. So a
 prompt still reaches the agent, a permission request is still posted and a close still ends.
 `StateStore` keeps its map ahead of the file after a failed write, until a write succeeds; a
@@ -1432,7 +1432,8 @@ closed when the start returns (`ThreadSession.connect`).
 - Each `ThreadSession` asks its `ThreadChat` for one of four statuses (`working`, `waiting`, `done`,
   `error`; for a chat that declares `reactions` only), and the Slack provider keeps one `StatusReaction` (in `status`) on the thread's own root
   message, which `thread_ts` always is: a top-level owner message, or the owner's own `!resume`
-  message. `ThreadSession.react` asks for a status at once and does not await it, since a reaction
+  message. Every change of the status goes through `ThreadSession.setStatus`, which sets the
+  word asked last, its copy in `state.json` and the root together. `ThreadSession.react` asks for a status at once and does not await it, since a reaction
   must never delay a turn, and the chat makes the changes in the order asked; the one exception is
   `✅`, awaited right after the end of the reply it follows, so it never shows first. `⏳` working: a
   turn is submitted or sent, or a report turn starts. `✋` waiting: an approval or a question is

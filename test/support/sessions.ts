@@ -50,6 +50,7 @@ import type {
   StartOptions,
 } from "../../src/agent/seam.ts";
 import type { ChatCapabilities } from "../../src/chat/seam.ts";
+import type { ChannelLine } from "../../src/chat/slack/channel-line.ts";
 import { UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
@@ -601,6 +602,10 @@ export interface HarnessOptions {
   readonly chatCapabilities?: Partial<ChatCapabilities>;
   /** `null`: no usage cache in the sessions' deps, as for an agent with no limits. */
   readonly usage?: null;
+  /** The channel's line the provider moves (`SlackChatOptions.line`); none when absent. */
+  readonly line?: ChannelLine;
+  /** `SlackChatOptions.mentionOwner`. */
+  readonly mentionOwner?: boolean;
 }
 
 /**
@@ -688,6 +693,8 @@ export class Harness {
       ...(options.finalRetrySeconds !== undefined && {
         finalRetrySeconds: options.finalRetrySeconds,
       }),
+      ...(options.line !== undefined && { line: options.line }),
+      ...(options.mentionOwner !== undefined && { mentionOwner: options.mentionOwner }),
     });
     this.deps = {
       chat:

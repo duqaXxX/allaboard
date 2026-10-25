@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
+import type { ChannelLine, LineKind } from "../../../src/chat/slack/channel-line.ts";
 import { logger } from "../../../src/chat/slack/repair.ts";
 import { type Limiter, UpdateLimiter } from "../../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags, Status } from "../../../src/chat/slack/reply/status.ts";
@@ -33,13 +34,19 @@ const STOPPED_BLOCK = {
 const made: string[] = [];
 
 /** The core's repair, over the Slack provider on `slack`: what the daemon runs at start. */
-function repairCrash(slack: FakeSlack, state: StateStore, limiter: Limiter): Promise<void> {
+function repairCrash(
+  slack: FakeSlack,
+  state: StateStore,
+  limiter: Limiter,
+  line?: ChannelLine,
+): Promise<void> {
   const chat = new SlackChat({
     slack,
     replies: slack,
     identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
     agent: () => AGENT,
     limiter,
+    ...(line !== undefined && { line }),
   });
   return repair(chat, state);
 }
@@ -539,6 +546,37 @@ test("a root left waiting or working gets x and the field clears", async () => {
   assert.equal(thread(state).status, null);
   // What the Home tab shows for it from now on.
   assert.equal(thread(state).ended, "error");
+});
+
+// #20: the crash ended the work the root still showed, and the owner is told it failed.
+test("a root left waiting or working tells the owner its work failed", async () => {
+  resetStatusFlags();
+  const { state, slack } = makeState();
+  state.openThread(CHANNEL, OTHER_THREAD);
+  state.setStatusPending(CHANNEL, THREAD, "working");
+  state.setStatusPending(CHANNEL, OTHER_THREAD, null, "done"); // ended before the crash
+  const shown: [string, LineKind][] = [];
+  const line = {
+    show: async (_c: string, root: string, kind: LineKind) => void shown.push([root, kind]),
+  };
+  await repairCrash(slack, state, new UpdateLimiter(), line as unknown as ChannelLine);
+  assert.deepEqual(shown, [[THREAD, "failed"]]);
+});
+
+// An answer that never reached the chat: the ❌ was shown, and told, while `state.json` kept the
+// pending status for this repair.
+test("a root whose ❌ was shown before the crash is repaired without telling the owner again", async () => {
+  resetStatusFlags();
+  const { state, slack } = makeState();
+  state.setStatusPending(CHANNEL, THREAD, "working", "error");
+  const shown: LineKind[] = [];
+  const line = { show: async (_c: string, _r: string, kind: LineKind) => void shown.push(kind) };
+  await repairCrash(slack, state, new UpdateLimiter(), line as unknown as ChannelLine);
+  assert.deepEqual(
+    slack.callsTo("reactions.add").map((call) => call.name),
+    [Status.ERROR],
+  );
+  assert.deepEqual(shown, []);
 });
 
 test("already reacted and no reaction count as done", async () => {
