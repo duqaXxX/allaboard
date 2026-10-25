@@ -21,13 +21,25 @@
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 5",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Bash**(Sleep for 5 seconds in the background)\n⎿ Running in background",
@@ -52,7 +64,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 5",
+     "id": "fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**SendMessage**(Run sleep 5 in background and wait for completion)\n⎿ Running in background\n\nMessage sent. Waiting for the subagent to complete.\n\n**Bash**(Sleep for 5 seconds in the background)\n⎿ Running in background\n\nStill waiting for the background command to complete.\n\nnoted"
@@ -331,13 +350,25 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 5",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(Sleep for 5 seconds in the background)\n⎿ Running in background",
@@ -376,13 +407,25 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 5",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(Sleep for 5 seconds in the background)\n⎿ Running in background",

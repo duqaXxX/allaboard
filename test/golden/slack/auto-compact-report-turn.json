@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Read 3 files, ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 25; echo ledger-done",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
+     "title": "Read 3 files, ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Bash**(sleep 25; echo ledger-done)\n⎿ Running in background",
@@ -52,7 +64,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 25; echo ledger-done",
+     "id": "fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
+     "status": "complete",
+     "title": "Read 3 files, ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**Bash**(sleep 25; echo ledger-done)\n⎿ Running in background\n\nstarted\n\nCompacted the conversation: 68.2k → 10.7k tokens.\n\nThe background command completed successfully with output: `ledger-done`\n\nAll files have been read and the background process has finished executing. Waiting for next instruction."
@@ -490,13 +509,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Read 3 files, ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 25; echo ledger-done",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
+      "title": "Read 3 files, ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(sleep 25; echo ledger-done)\n⎿ Running in background",
@@ -535,13 +566,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Read 3 files, ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 25; echo ledger-done",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
+      "title": "Read 3 files, ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(sleep 25; echo ledger-done)\n⎿ Running in background",

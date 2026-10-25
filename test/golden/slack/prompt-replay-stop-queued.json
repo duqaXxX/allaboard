@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01GmqDn7crcrCohffpzUfMVm",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 20",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01GmqDn7crcrCohffpzUfMVm",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background",
@@ -21,6 +33,7 @@
      "type": "markdown"
     },
     {
+     "block_id": "task-fold:toolu_01Qh2cMVNiKoB1HDHms6ridr",
      "output": {
       "elements": [
        {
@@ -60,6 +73,12 @@
   ],
   "message_cards": [
    [
+    {
+     "details": "$ sleep 20",
+     "id": "fold:toolu_01GmqDn7crcrCohffpzUfMVm",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    },
     {
      "id": "fold:toolu_01Qh2cMVNiKoB1HDHms6ridr",
      "output": "Stopped",
@@ -214,29 +233,13 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background",
-      "type": "markdown"
-     },
-     {
-      "text": "STARTED",
-      "type": "markdown"
-     },
-     {
-      "output": {
+      "block_id": "task-fold:toolu_01GmqDn7crcrCohffpzUfMVm",
+      "details": {
        "elements": [
         {
          "elements": [
           {
-           "text": "Stopped",
+           "text": "$ sleep 20",
            "type": "text"
           }
          ],
@@ -246,33 +249,9 @@
        "type": "rich_text"
       },
       "status": "complete",
-      "task_id": "fold:toolu_01Qh2cMVNiKoB1HDHms6ridr",
-      "title": "Sleep for 15 seconds in foreground",
+      "task_id": "fold:toolu_01GmqDn7crcrCohffpzUfMVm",
+      "title": "Ran 1 shell command",
       "type": "task_card"
-     },
-     {
-      "text": "PINEAPPLE\n\nKIWI",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "STARTED",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 9,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
      },
      {
       "text": "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background",
@@ -283,6 +262,7 @@
       "type": "markdown"
      },
      {
+      "block_id": "task-fold:toolu_01Qh2cMVNiKoB1HDHms6ridr",
       "output": {
        "elements": [
         {

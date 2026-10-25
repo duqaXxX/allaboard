@@ -1885,8 +1885,12 @@ test("closing the session leaves no card and no stream for running tasks", async
   await (await h.session().submit("start it")).done.wait();
   await h.manager.closeAll();
   assert.equal(runningTitle(at(h.slack.messageBlocks(), 0)), null);
-  // A command left running has no card to stop: the list is all that showed it.
-  assert.deepEqual(toolCards(h.cards()), []);
+  // A command left running has no card to stop: the list is all that showed it. The call that
+  // started it ended, and its run keeps the card that lists its command (#29).
+  assert.deepEqual(
+    toolCards(h.cards()).map((card) => [card.title, card.status]),
+    [["Ran 1 shell command", "complete"]],
+  );
   assert.ok(noStreamOpen(h));
 });
 

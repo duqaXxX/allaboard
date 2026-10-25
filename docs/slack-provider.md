@@ -108,11 +108,13 @@ with the `block_id` `aside-` and the place of its text (`blocks.asideBlock`). A 
 it as the same block in a `blocks` chunk, so the line keeps its size when the update that follows
 the stream's stop writes the message again.
 
-Once the reply's body has ended, each run reads as one line of counts in a `context` block
-(`Ran 3 shell commands, read 1 file`), as the terminal folds a run that
-ended (`TaskUpdate.folded`, `ReplySink.cardBlocks`). A stream cannot replace what it showed, so the
-line is written by the `chat.update` that follows the stream's stop (`ReplySink.end`), which never
-notifies. The reply has ended with the stop: an update that fails is tried once more with the next
+Once the reply's body has ended, a run that lists commands keeps its card, titled with the
+counts, so that it still opens on them as the terminal's `ctrl+o` opens a folded run; its
+`details` are written whole, as a message written by edit is (`blocks.cardFields`). Any other run
+reads as one line of counts in a `context` block (`Read 3 files`), as the terminal folds a run
+that ended (`TaskUpdate.folded`, `ReplySink.cardBlocks`). A stream cannot replace what it showed,
+so the line is written by the `chat.update` that follows the stream's stop (`ReplySink.end`),
+which never notifies. The reply has ended with the stop: an update that fails is tried once more with the next
 write, and the cards stay if that fails too.
 
 The renderer keeps an `Edit` or a `Write` (`previews.PREVIEWED`) from the sink until its result
@@ -382,7 +384,11 @@ divider, in the thread's last reply once it rests.
   complete (`blocks.cardFields`); a call's card keeps its result to itself.
 - Slack keeps a `task_card` with a fixed `block_id` open across `chat.update` (measured
   2026-10-12, Slack desktop; the client version was not recorded). A collapsible `container` does
-  not, and a `task_card` inside one is refused. What else was measured, and what was not, is in
+  not, and a `task_card` inside one is refused. Every card of a call or a run keeps one
+  too, `task-<task_id>` (`blocks.cardBlockId`), which is the id Slack stores a streamed card under: a
+  card the owner opened stays open from its stream through every edit of its message, where an
+  edit with no `block_id` closed it on desktop (measured 2026-10-25; on iOS a card opens in a
+  sheet, which an edit left open either way). What else was measured, and what was not, is in
   the doc comment of `blocks.runningListBlock`.
 
 ### The loop card

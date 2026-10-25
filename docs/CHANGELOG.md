@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- A run of shell commands lost the list of its commands when the reply ended: its card gave way
+  to a grey line of counts that opens on nothing (#29). The card now stays, titled with the
+  counts, and opens on the run's last 10 commands as the terminal's `ctrl+o` does, with no
+  output. A run with no shell command still folds into the grey line.
+- On Slack's desktop app, a card of a reply you had opened closed again each time the reply was
+  written by edit (its footer, or past 280 seconds). Every card of a call or a run now
+  keeps one block id, `task-<task_id>`, the one Slack gives a streamed card, so it stays open.
+
 ## [0.11.0] - 2026-10-25
 
 ### Added

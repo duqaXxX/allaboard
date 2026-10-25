@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01EW2531ZDptrHYYHXJxmz55",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 25",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01EW2531ZDptrHYYHXJxmz55",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
@@ -35,7 +47,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 25",
+     "id": "fold:toolu_01EW2531ZDptrHYYHXJxmz55",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**Bash**(Wait 25 seconds in background)\n⎿ Running in background\n\nstarted\n\nfinished"
@@ -135,41 +154,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
-      "type": "markdown"
-     },
-     {
-      "text": "started\n\nfinished",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "started",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 6,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01EW2531ZDptrHYYHXJxmz55",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 25",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01EW2531ZDptrHYYHXJxmz55",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(Wait 25 seconds in background)\n⎿ Running in background",

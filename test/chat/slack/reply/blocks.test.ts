@@ -45,3 +45,10 @@ test("a mention in a message's words notifies nobody", () => {
   const shown = cardFields(message).output ?? "";
   assert.ok(!shown.includes("<!channel>") && !shown.includes("<@U000BOB>"), shown);
 });
+
+test("a card's block id is the one of its stream, and none past Slack's cap", () => {
+  assert.equal(cardBlock(card({ id: "fold:c1" })).block_id, "task-fold:c1");
+  // Slack refuses a block_id past 255 characters: the card goes without one.
+  assert.equal(cardBlock(card({ id: "x".repeat(250) })).block_id, `task-${"x".repeat(250)}`);
+  assert.equal(cardBlock(card({ id: "x".repeat(251) })).block_id, undefined);
+});

@@ -4,6 +4,7 @@
   "message_blocks": [
    [
     {
+     "block_id": "task-toolu_01P24zAVmj8jzZshmnA3vd6n",
      "output": {
       "elements": [
        {
@@ -903,6 +904,7 @@
    "args": {
     "blocks": [
      {
+      "block_id": "task-toolu_01P24zAVmj8jzZshmnA3vd6n",
       "output": {
        "elements": [
         {

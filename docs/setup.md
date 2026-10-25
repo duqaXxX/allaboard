@@ -1318,7 +1318,7 @@ opens with the end line of each task it reports, `✓ Background command "..." c
 0)`; one with no end to report, such as a turn a Monitor's event opens, shows Claude Code's text
 alone, since the SDK does not say what woke it ([limits.md](limits.md)). An Edit or a Write shows once it has ended, as
 one collapsed block titled with the call (`Update(notes.txt)`) that opens on its diff or on the
-new file's first lines. When the reply ends, each of those cards gives way to its line of counts, in grey (`Ran 2 shell commands, read 1 file`). A reply still
+new file's first lines. When the reply ends, a card of a run with shell commands stays, so that it still opens on them; any other gives way to its line of counts, in grey (`Read 2 files`). A reply still
 running 280 seconds after it started stops being a stream (Slack closes streams at 5 minutes) and
 goes on in the same message, updated instead of streamed; what Claude wrote after its last call
 then arrives in a new message. A turn that ends with a background command

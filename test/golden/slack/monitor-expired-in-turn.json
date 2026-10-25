@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "ToolSearch, Monitor, ran 3 shell commands",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 50\n$ sleep 55",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
+     "title": "ToolSearch, Monitor, ran 3 shell commands",
+     "type": "task_card"
     },
     {
      "text": "**3 background tasks launched**\n├ idle watch\n├ Background sleep 50\n└ Background sleep 55",
@@ -35,7 +47,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 50\n$ sleep 55",
+     "id": "fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
+     "status": "complete",
+     "title": "ToolSearch, Monitor, ran 3 shell commands"
+    }
+   ]
   ],
   "message_texts": [
    "**3 background tasks launched**\n├ idle watch\n├ Background sleep 50\n└ Background sleep 55\n\nThe foreground sleep completed successfully while the background processes continue running.\n\nnoted.\n\nnoted."
@@ -214,6 +233,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "\n$ sleep 50\n$ sleep 55",
       "id": "fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
       "status": "complete",
       "title": "ToolSearch, Monitor, ran 3 shell commands",
@@ -377,41 +397,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "ToolSearch, Monitor, ran 3 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "**3 background tasks launched**\n├ idle watch\n├ Background sleep 50\n└ Background sleep 55",
-      "type": "markdown"
-     },
-     {
-      "text": "The foreground sleep completed successfully while the background processes continue running.\n\nnoted.\n\nnoted.",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "The foreground sleep completed successfully while the background processes continue running.",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 23,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "ToolSearch, Monitor, ran 3 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 50\n$ sleep 55",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
+      "title": "ToolSearch, Monitor, ran 3 shell commands",
+      "type": "task_card"
      },
      {
       "text": "**3 background tasks launched**\n├ idle watch\n├ Background sleep 50\n└ Background sleep 55",

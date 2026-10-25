@@ -294,3 +294,31 @@ test("an ended run keeps no start: the counts line is not timed", () => {
   const [card] = fold.task(call("a", "Bash", "complete", { startedAt: 100, details: "$ ls" }));
   assert.equal(card?.startedAt, null);
 });
+
+test("an ended run that lists commands keeps its card: nothing replaces it (#29)", () => {
+  const fold = new Fold();
+  for (const id of ["a", "b"]) {
+    const fields = { startedAt: 100, details: `$ echo ${id}` };
+    fold.task(call(id, "Bash", "in_progress", fields));
+    fold.task(call(id, "Bash", "complete", fields));
+  }
+  const [card] = fold.task(call("c", "Read", "complete"));
+  assert.equal(card?.title, "Ran 2 shell commands, read 1 file");
+  assert.equal(card?.folded, null);
+  assert.equal(card?.details, "$ echo a\n$ echo b");
+});
+
+test("an ended run lists its last ten commands, its title counting them all", () => {
+  const fold = new Fold();
+  let card: TaskUpdate | undefined;
+  for (let i = 1; i <= 12; i += 1) {
+    const fields = { startedAt: 100, details: `$ echo ${i}` };
+    fold.task(call(`c${i}`, "Bash", "in_progress", fields));
+    [card] = fold.task(call(`c${i}`, "Bash", "complete", fields));
+  }
+  assert.equal(card?.title, "Ran 12 shell commands");
+  assert.deepEqual(
+    card?.details?.split("\n"),
+    Array.from({ length: 10 }, (_, i) => `$ echo ${i + 3}`),
+  );
+});

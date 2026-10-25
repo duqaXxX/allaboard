@@ -79,6 +79,7 @@ import {
   OWNER,
   ResetAfterApply,
   rejected,
+  streamedCardBlockId,
   TEAM,
   THREAD,
   timedOut,
@@ -3340,6 +3341,105 @@ test("the end folds the run into a line with a silent update", async () => {
     context("main · ctx 6%"),
   ]);
   assert.equal(slack.pushes(), 1); // the stop pushed; an update never does
+});
+
+// The commands of `runOfCommands` as a card's details: rich text, one line each.
+const COMMANDS_TEXT = {
+  type: "rich_text",
+  elements: [
+    { type: "rich_text_section", elements: [{ type: "text", text: "npm test\ngit status" }] },
+  ],
+};
+
+/** A run of two timed shell commands, as the renderer sends them: each with its command line. */
+async function runOfCommands(sink: ReplySink): Promise<void> {
+  for (const [id, command] of [
+    ["a", "npm test"],
+    ["b", "git status"],
+  ] as const) {
+    const fields = { details: command, startedAt: 0 };
+    await sink.task(tool(id, "Bash", "in_progress", fields));
+    await settled();
+    await sink.task(tool(id, "Bash", "complete", fields));
+    await settled();
+  }
+}
+
+test("the end keeps a run of shell commands as the card that lists them (#29)", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await runOfCommands(sink);
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  // The stream already shows the card the reply ends with: no edit rewrites it.
+  assert.deepEqual(slack.callsTo("chat.update"), []);
+  assert.deepEqual(slack.messageCards(), [
+    [
+      {
+        id: "fold:a",
+        title: "Ran 2 shell commands",
+        status: "complete",
+        details: "npm test\ngit status",
+      },
+    ],
+  ]);
+  // The stream was told each command once: Slack appends what a card's chunk carries.
+  const sent = allChunks(slack).flatMap((chunk) => (chunk.details ? [str(chunk.details)] : []));
+  assert.deepEqual(sent.join(""), "npm test\ngit status");
+});
+
+test("a run of shell commands keeps its card through the edit of the reply's end", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("Let me look.\n\n");
+  await runOfCommands(sink);
+  await sink.text("Done.");
+  await settled();
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(await sink.showFooterFormatted("footer"), true);
+  const card = list(last(slack.callsTo("chat.update")).blocks).find((b) => b.type === "task_card");
+  assert.deepEqual(card, {
+    type: "task_card",
+    block_id: "task-fold:a",
+    task_id: "fold:a",
+    title: "Ran 2 shell commands",
+    status: "complete",
+    details: COMMANDS_TEXT,
+  });
+});
+
+test("a reply written by edit lists a run's commands under its card of counts", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.text("Working.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await runOfCommands(sink);
+  const card = list(last(slack.callsTo("chat.update")).blocks).find((b) => b.type === "task_card");
+  assert.equal(card?.title, "Ran 2 shell commands");
+  assert.deepEqual(card?.details, COMMANDS_TEXT);
+});
+
+test("a card keeps the block id its stream gave it through every edit of its message", async () => {
+  // Slack's desktop app closes a card the owner opened when an edit changes its block id, and
+  // stores a streamed card under `task-<task_id>` (measured 2026-10-25).
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.task(tool("a", "Agent", "in_progress", { task: true }));
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await sink.text("More.");
+  await settled();
+  await sink.text(" And more.");
+  await settled();
+  const ids = slack
+    .callsTo("chat.update")
+    .map((call) => list(call.blocks).find((b) => b.type === "task_card")?.block_id);
+  assert.ok(ids.length >= 2);
+  assert.ok(ids.every((id) => id === streamedCardBlockId("a")));
 });
 
 test("a reply with no run of calls gets no update at its end", async () => {

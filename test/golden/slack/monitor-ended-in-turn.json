@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "ToolSearch, Monitor, ran 3 shell commands",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 50\n$ sleep 55",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+     "title": "ToolSearch, Monitor, ran 3 shell commands",
+     "type": "task_card"
     },
     {
      "text": "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
@@ -35,7 +47,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 50\n$ sleep 55",
+     "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+     "status": "complete",
+     "title": "ToolSearch, Monitor, ran 3 shell commands"
+    }
+   ]
   ],
   "message_texts": [
    "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds\n\nForeground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.\n\nnoted.\n\nnoted."
@@ -214,6 +233,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "\n$ sleep 50\n$ sleep 55",
       "id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
       "status": "complete",
       "title": "ToolSearch, Monitor, ran 3 shell commands",
@@ -503,41 +523,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "ToolSearch, Monitor, ran 3 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",
-      "type": "markdown"
-     },
-     {
-      "text": "Foreground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.\n\nnoted.\n\nnoted.",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "Foreground Python sleep completed successfully after 30 seconds while the monitor emitted two tick events and two background sleeps continue running.",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 32,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "ToolSearch, Monitor, ran 3 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 50\n$ sleep 55",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01FRgsLwEyCG2zdHrXWMgQG6",
+      "title": "ToolSearch, Monitor, ran 3 shell commands",
+      "type": "task_card"
      },
      {
       "text": "**3 background tasks launched**\n├ tick watch\n├ Background sleep 50 seconds\n└ Background sleep 55 seconds",

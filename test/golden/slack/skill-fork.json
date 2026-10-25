@@ -4,6 +4,7 @@
   "message_blocks": [
    [
     {
+     "block_id": "task-fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
      "status": "complete",
      "task_id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
      "title": "Skill: list-files · 2 calls",
@@ -629,6 +630,7 @@
    "args": {
     "blocks": [
      {
+      "block_id": "task-fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
       "status": "complete",
       "task_id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
       "title": "Skill: list-files · 2 calls",
