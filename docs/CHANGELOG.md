@@ -12,6 +12,9 @@ All notable changes to this project are documented here. The format follows
   (#25). The reply's stream now stops before the request is posted and the reply goes on by edit,
   as after 280 seconds. The stop notifies when you are away from the thread, so a request under a
   streaming reply costs one push more.
+- The channel's line linked the thread's root, so the thread opened at its top and the reply
+  the line is about had to be scrolled to (#77). It now links the thread's last reply, which
+  Slack opens the thread on, as the Home tab's **Open** does.
 
 ### Changed
 

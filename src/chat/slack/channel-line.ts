@@ -23,6 +23,7 @@
 import type { WebClient } from "@slack/web-api";
 import { getLogger, type Logger } from "../../log.ts";
 import { slackUnescape } from "./app/messages.ts";
+import { threadFacts } from "./home.ts";
 import { describe, gone } from "./reply/errors.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
 import { stripMarkdown } from "./reply/markdown.ts";
@@ -72,7 +73,12 @@ function lineContent(kind: LineKind, label: string, permalink: string) {
       {
         type: "context",
         elements: [
-          { type: "mrkdwn", text: `${mark} ${word}: <${permalink}|${mrkdwnEscape(label)}>` },
+          {
+            type: "mrkdwn",
+            // A reply's permalink carries a query (`?thread_ts=…&cid=…`), and mrkdwn reads `&`
+            // as markup.
+            text: `${mark} ${word}: <${mrkdwnEscape(permalink)}|${mrkdwnEscape(label)}>`,
+          },
         ],
       },
     ],
@@ -168,10 +174,12 @@ export class ChannelLine {
 
   async #show(channel: string, rootTs: string, kind: LineKind): Promise<void> {
     const replies = await this.#slack.conversations.replies({ channel, ts: rootTs, limit: 1 });
-    const label = lineLabel(replies.messages?.[0] as Message | undefined);
-    const link = String(
-      (await this.#slack.chat.getPermalink({ channel, message_ts: rootTs })).permalink,
-    );
+    const root = replies.messages?.[0] as Message | undefined;
+    const label = lineLabel(root);
+    // The thread's last reply, which Slack opens the thread on, as the Home tab's Open does; its
+    // root while it has none.
+    const opened = (root !== undefined ? threadFacts(root).latestTs : null) ?? rootTs;
+    const link = await this.#permalink(channel, opened, rootTs);
     const posted = await this.#slack.chat.postMessage({
       channel,
       ...lineContent(kind, label, link),
@@ -198,6 +206,20 @@ export class ChannelLine {
       }
     }
     this.#left.set(channel, left);
+  }
+
+  /** The permalink of `messageTs`, or of the root `rootTs` when Slack no longer has that reply. */
+  async #permalink(channel: string, messageTs: string, rootTs: string): Promise<string> {
+    try {
+      return String(
+        (await this.#slack.chat.getPermalink({ channel, message_ts: messageTs })).permalink,
+      );
+    } catch (error) {
+      if (messageTs === rootTs || !gone(error)) throw error;
+      return String(
+        (await this.#slack.chat.getPermalink({ channel, message_ts: rootTs })).permalink,
+      );
+    }
   }
 
   /** The lines an earlier run left among the channel's latest messages, `except` aside. */

@@ -441,7 +441,10 @@ Once a session's work is done and ended well (its reply's first footer is writte
 `ReplySink.showFooterFormatted`, while its root's status is ✅; a footer drawn on a stop, an
 error or a shutdown moves nothing), `channel-line.ChannelLine` posts one line at the top level,
 `✅ Done:` and a link to the thread named by its root's first line (`channel-line.lineLabel`): the
-session's title once the root shows one, else the owner's first words. When the agent asks
+session's title once the root shows one, else the owner's first words. The link is the permalink
+of the thread's last reply, which Slack opens the thread on, or of its root while it has none (or once
+Slack no longer has that reply): the rule of the session index's Open, through the same
+`home.threadFacts`. When the agent asks
 the owner for an approval or an answer, the thread gets the same line with `✋ Waiting:`, posted
 from `SlackThread.ask` once the request is in the thread, once a turn: a second request after the
 owner answered the first posts nothing until the turn's footer (or its ✅ or ❌) ends the turn.
