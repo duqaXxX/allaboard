@@ -44,6 +44,42 @@ test("a done thread's line is posted at the bottom, linking the thread by its ti
     },
   ]);
   assert.deepEqual(posted?.metadata, { event_type: LINE_EVENT, event_payload: {} });
+  // A thread nobody replied to opens on its root.
+  assert.equal(fake.callsTo("chat.getPermalink")[0]?.message_ts, ROOT);
+});
+
+// #77: as the Home tab's Open, the line opens the thread on its last reply, the one it is about.
+test("a thread with replies is linked by its last reply, its query escaped for mrkdwn", async () => {
+  const fake = slack();
+  const reply = "1792626300.000200";
+  const link = `${LINK.replace(ROOT.replace(".", ""), "1792626300000200")}?thread_ts=${ROOT}&cid=${CHANNEL}`;
+  fake.responses["conversations.replies"] = {
+    ok: true,
+    messages: [
+      {
+        ts: ROOT,
+        user: "U000ALICE",
+        text: "Fix the login page",
+        reply_count: 3,
+        latest_reply: reply,
+      },
+    ],
+  };
+  fake.responses["chat.getPermalink"] = { ok: true, channel: CHANNEL, permalink: link };
+  await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT, "done");
+  assert.equal(fake.callsTo("chat.getPermalink")[0]?.message_ts, reply);
+  const [posted] = fake.callsTo("chat.postMessage");
+  assert.deepEqual(posted?.blocks, [
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `✅ Done: <${link.replace("&", "&amp;")}|Fix the login page>`,
+        },
+      ],
+    },
+  ]);
 });
 
 // #72: a thread blocked on the owner, with the mark its root shows (✋); the line it replaces goes,
@@ -179,6 +215,28 @@ test("after a start, every line an earlier run left is deleted, and nothing else
     fake.callsTo("chat.delete").map((call) => call.ts),
     ["1792626300.000001", "1792626200.000001"],
   );
+});
+
+// A last reply Slack no longer has (deleted by hand) still leaves the thread its line, on its root.
+test("a last reply that is gone is linked by the thread's root instead", async () => {
+  const fake = slack();
+  fake.responses["conversations.replies"] = {
+    ok: true,
+    messages: [{ ts: ROOT, user: "U000ALICE", text: "Fix", latest_reply: "1792626300.000200" }],
+  };
+  fake.responses["chat.getPermalink"] = [
+    rejected("message_not_found"),
+    { ok: true, channel: CHANNEL, permalink: LINK },
+  ];
+  await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT, "done");
+  assert.deepEqual(
+    fake.callsTo("chat.getPermalink").map((call) => call.message_ts),
+    ["1792626300.000200", ROOT],
+  );
+  const [posted] = fake.callsTo("chat.postMessage");
+  assert.deepEqual(posted?.blocks, [
+    { type: "context", elements: [{ type: "mrkdwn", text: `✅ Done: <${LINK}|Fix>` }] },
+  ]);
 });
 
 test("a failure is logged, never thrown, and the channel's next line still comes", async () => {
