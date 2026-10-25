@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01S6eNniLhyVRRXJdAG6mt2n",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 2",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01S6eNniLhyVRRXJdAG6mt2n",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Agent**(Run sleep 7 and answer ok)\n⎿ Running in background",
@@ -35,7 +47,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 2",
+     "id": "fold:toolu_01S6eNniLhyVRRXJdAG6mt2n",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**Agent**(Run sleep 7 and answer ok)\n⎿ Running in background\n\nThe old lighthouse keeper climbed the iron staircase for the thousandth time that year, his weathered hand trailing along the cold metal rail. The steps curved upward in a spiral that seemed to have no end, though Thomas had long since memorized exactly how many there were: 127, one for each year his family had kept this light burning above the rocky Maine coast.\n\nThe beam at the top rotated with a rhythmic whoosh, casting its golden eye across the dark Atlantic. Ships passing in the night depended on this light, though fewer of them came by now. The GPS satellites had stolen much of his purpose, but Thomas maintained the lighthouse with the same devotion his grandfather had shown, and his grandfather before him.\n\nAt seventy-three, his joints complained with every climb, but he welcomed the pain. It meant he was still here, still needed, even if the maritime world had largely moved on. The light clicked and whirred above him, unchanged for sixty years, and perhaps that was the point. Constancy. Reliability. A promise kept to sailors and storms alike.\n\nHe checked the lamp's fuel, polished the great Fresnel lens until it gleamed like a captured moon, and logged the night's observations in the leather journal that documented every day since 1897. His entries were brief: \"Wind east-northeast, 15 knots. Clear skies. All well.\" But in the margins, he sometimes sketched the ships he saw—a fishing vessel, a distant container ship, once a sailboat that reminded him of his daughter's childhood dreams.\n\nHis daughter lived in Boston now, two hours away, yet it might as well have been across the ocean. She called every Sunday, worried about his loneliness, suggested he move to a retirement community. Thomas would smile and promise to consider it, but they both knew he never would. The lighthouse was not simply where he lived; it was who he was.\n\nThe night stretched before him as it always did. Thomas made his tea in the keeper's cottage, an insulated room where he read to the sound of the ocean and the rhythmic turning of the light above. He read old paperbacks—Hemingway, Jack London, anyone who understood the sea's particular cruelty and grace.\n\nAround midnight, a storm rolled in from the northeast. The light above swayed slightly, and the wind howled like something alive. This was when Thomas felt most alive himself. While others hunkered down in their homes, he climbed again to check every mechanism, to ensure the light continued its vigilant rotation. A fishing boat passed nearby, its lights blinking twice, a greeting. He knew the captain—old Pete, who'd been running these waters for forty years. They'd never met, but they were companions nonetheless, bound by salt water and the recognition that some people simply keep their lights burning in the dark.\n\nAs the storm passed and the sky began to soften with pre-dawn gray, Thomas sat in the gallery surrounding the light, his coffee cooling in his hands. The sea was gradually revealing itself again, the chaos giving way to rhythm. He thought of all the sleepless nights he'd kept watch here, all the storms weathered, all the ships guided safely past the rocks.\n\nThe light would turn on. It always did. And as long as it did, Thomas would be here to keep it burning.\n\nnoted"
@@ -5063,41 +5082,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "**Agent**(Run sleep 7 and answer ok)\n⎿ Running in background",
-      "type": "markdown"
-     },
-     {
-      "text": "The old lighthouse keeper climbed the iron staircase for the thousandth time that year, his weathered hand trailing along the cold metal rail. The steps curved upward in a spiral that seemed to have no end, though Thomas had long since memorized exactly how many there were: 127, one for each year his family had kept this light burning above the rocky Maine coast.\n\nThe beam at the top rotated with a rhythmic whoosh, casting its golden eye across the dark Atlantic. Ships passing in the night depended on this light, though fewer of them came by now. The GPS satellites had stolen much of his purpose, but Thomas maintained the lighthouse with the same devotion his grandfather had shown, and his grandfather before him.\n\nAt seventy-three, his joints complained with every climb, but he welcomed the pain. It meant he was still here, still needed, even if the maritime world had largely moved on. The light clicked and whirred above him, unchanged for sixty years, and perhaps that was the point. Constancy. Reliability. A promise kept to sailors and storms alike.\n\nHe checked the lamp's fuel, polished the great Fresnel lens until it gleamed like a captured moon, and logged the night's observations in the leather journal that documented every day since 1897. His entries were brief: \"Wind east-northeast, 15 knots. Clear skies. All well.\" But in the margins, he sometimes sketched the ships he saw—a fishing vessel, a distant container ship, once a sailboat that reminded him of his daughter's childhood dreams.\n\nHis daughter lived in Boston now, two hours away, yet it might as well have been across the ocean. She called every Sunday, worried about his loneliness, suggested he move to a retirement community. Thomas would smile and promise to consider it, but they both knew he never would. The lighthouse was not simply where he lived; it was who he was.\n\nThe night stretched before him as it always did. Thomas made his tea in the keeper's cottage, an insulated room where he read to the sound of the ocean and the rhythmic turning of the light above. He read old paperbacks—Hemingway, Jack London, anyone who understood the sea's particular cruelty and grace.\n\nAround midnight, a storm rolled in from the northeast. The light above swayed slightly, and the wind howled like something alive. This was when Thomas felt most alive himself. While others hunkered down in their homes, he climbed again to check every mechanism, to ensure the light continued its vigilant rotation. A fishing boat passed nearby, its lights blinking twice, a greeting. He knew the captain—old Pete, who'd been running these waters for forty years. They'd never met, but they were companions nonetheless, bound by salt water and the recognition that some people simply keep their lights burning in the dark.\n\nAs the storm passed and the sky began to soften with pre-dawn gray, Thomas sat in the gallery surrounding the light, his coffee cooling in his hands. The sea was gradually revealing itself again, the chaos giving way to rhythm. He thought of all the sleepless nights he'd kept watch here, all the storms weathered, all the ships guided safely past the rocks.\n\nThe light would turn on. It always did. And as long as it did, Thomas would be here to keep it burning.\n\nnoted",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "The old lighthouse keeper climbed the iron staircase for the thousandth time that year, his weathered hand trailing along the cold metal rail. The steps curved upward in a spiral that seemed to have no end, though Thomas had long since memorized exactly how many there were: 127, one for each year hi",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 358,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01S6eNniLhyVRRXJdAG6mt2n",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 2",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01S6eNniLhyVRRXJdAG6mt2n",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Agent**(Run sleep 7 and answer ok)\n⎿ Running in background",

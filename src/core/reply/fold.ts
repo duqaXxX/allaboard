@@ -8,7 +8,8 @@
  *
  * A run is the calls between two pieces of text. Its card shows the last call started that
  * still runs; with none running it shows the counts of every call that ended, which is also the
- * line that replaces the card once the reply's body has ended.
+ * line that replaces the card once the reply's body has ended. A run that lists commands keeps
+ * its card instead, as the terminal's folded line opens on them with ctrl+o.
  *
  * A call with a view of its own never folds: an Edit or a Write that ended well (its preview), a
  * subagent the call waits for or a background command (its task card), a stopped call, and a
@@ -195,7 +196,7 @@ export class Fold {
     const status: TaskStatus = ended.some((call) => call.status === "complete")
       ? "complete"
       : "error";
-    return [card(run.card, line, status, "", line, null, details)];
+    return [card(run.card, line, status, "", details === null ? line : null, null, details)];
   }
 
   private changed(cards: TaskUpdate[]): TaskUpdate[] {
@@ -205,7 +206,7 @@ export class Fold {
   }
 }
 
-/** A run's card: a title and a state, and the line that replaces it at the reply's end. */
+/** A run's card: a title and a state, and the line that replaces it at the reply's end, if any. */
 function card(
   id: string,
   title: string,

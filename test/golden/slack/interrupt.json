@@ -4,6 +4,7 @@
   "message_blocks": [
    [
     {
+     "block_id": "task-fold:toolu_014RM24vF5EeUNHQ57579Vma",
      "output": {
       "elements": [
        {
@@ -104,6 +105,7 @@
    "args": {
     "blocks": [
      {
+      "block_id": "task-fold:toolu_014RM24vF5EeUNHQ57579Vma",
       "output": {
        "elements": [
         {

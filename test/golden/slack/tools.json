@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command, read 1 file",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ ls",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
+     "title": "Ran 1 shell command, read 1 file",
+     "type": "task_card"
     },
     {
      "text": "The notes.txt file contains two entries: \"alpha\" and \"beta\".",
@@ -31,7 +43,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ ls",
+     "id": "fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
+     "status": "complete",
+     "title": "Ran 1 shell command, read 1 file"
+    }
+   ]
   ],
   "message_texts": [
    "The notes.txt file contains two entries: \"alpha\" and \"beta\"."
@@ -191,37 +210,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command, read 1 file",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "The notes.txt file contains two entries: \"alpha\" and \"beta\".",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "The notes.txt file contains two entries: \"alpha\" and \"beta\".",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 10,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command, read 1 file",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ ls",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
+      "title": "Ran 1 shell command, read 1 file",
+      "type": "task_card"
      },
      {
       "text": "The notes.txt file contains two entries: \"alpha\" and \"beta\".",

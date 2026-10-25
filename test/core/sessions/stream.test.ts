@@ -144,12 +144,15 @@ test("a tool first turn and its cards read as the recorded turn", async (t) => {
     .flatMap((call) => (call.args.chunks ?? []) as JsonObject[])
     .filter((chunk) => chunk.type === "task_update");
   assert.ok(cards.length > 0 && cards.every((card) => card.title));
-  // Once the body has ended the run of calls is one line of counts, in the terminal's words.
-  const [blocks, ...more] = h.slack.messageBlocks();
-  assert.equal(more.length, 0);
-  const elements = blocks?.[0]?.elements as JsonObject[];
-  assert.equal(elements[0]?.text, "Ran 1 shell command, read 1 file");
-  assert.deepEqual(h.slack.messageCards(), [[]]);
+  // Once the body has ended the run of calls is the card of counts the stream already shows,
+  // in the terminal's words, that lists its shell command (#29): no edit rewrites it.
+  assert.equal(h.slack.messageBlocks().length, 1);
+  assert.deepEqual(
+    h.slack
+      .messageCards()
+      .map((cards) => cards.map((card) => [card.title, card.status, !!card.details])),
+    [[["Ran 1 shell command, read 1 file", "complete", true]]],
+  );
 });
 
 test("a reply whose turn left a task running rests with no footer, and its report grows it", async (t) => {
@@ -399,10 +402,10 @@ test("an error that cuts a turn ends the stream with the cross", async (t) => {
   // the call that was running is closed, and counted like any call that ended
   const [blocks, ...more] = h.slack.messageBlocks();
   assert.equal(more.length, 0);
-  const lines = (blocks ?? [])
-    .filter((block) => block.type === "context")
-    .map((block) => (block.elements as JsonObject[])[0]?.text);
-  assert.equal(lines[0], "Ran 1 shell command");
+  const titles = (blocks ?? [])
+    .filter((block) => block.type === "task_card")
+    .map((block) => block.title);
+  assert.equal(titles[0], "Ran 1 shell command");
   assert.equal(h.slack.pushes(), 1);
 });
 

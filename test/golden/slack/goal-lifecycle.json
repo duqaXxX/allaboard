@@ -8,65 +8,125 @@
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 2 shell commands",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ echo 1 > a1.txt && cat a1.txt\n$ echo 2 > a2.txt && cat a2.txt",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+     "title": "Ran 2 shell commands",
+     "type": "task_card"
     },
     {
      "text": "`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.",
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ echo 3 > a3.txt && cat a3.txt",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "Hello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.",
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 17 shell commands",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ echo 11 > a11.txt && cat a11.txt\n$ echo 12 > a12.txt && cat a12.txt\n$ echo 13 > a13.txt && cat a13.txt\n$ echo 14 > a14.txt && cat a14.txt\n$ echo 15 > a15.txt && cat a15.txt\n$ echo 16 > a16.txt && cat a16.txt\n$ echo 17 > a17.txt && cat a17.txt\n$ echo 18 > a18.txt && cat a18.txt\n$ echo 19 > a19.txt && cat a19.txt\n$ echo 20 > a20.txt && cat a20.txt",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+     "title": "Ran 17 shell commands",
+     "type": "task_card"
     },
     {
      "text": "All 20 files are written. Checking the folder once to confirm each file holds its own number.",
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01XAexZvMygkUXzSNFPijXpm",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01XAexZvMygkUXzSNFPijXpm",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "The goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.",
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 3 shell commands",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ echo 1 > b1.txt && cat b1.txt\n$ echo 2 > b2.txt && cat b2.txt\n$ echo 3 > b3.txt && cat b3.txt",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+     "title": "Ran 3 shell commands",
+     "type": "task_card"
     },
     {
      "text": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
@@ -87,7 +147,38 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ echo 1 > a1.txt && cat a1.txt\n$ echo 2 > a2.txt && cat a2.txt",
+     "id": "fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+     "status": "complete",
+     "title": "Ran 2 shell commands"
+    },
+    {
+     "details": "$ echo 3 > a3.txt && cat a3.txt",
+     "id": "fold:toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    },
+    {
+     "details": "$ echo 11 > a11.txt && cat a11.txt\n$ echo 12 > a12.txt && cat a12.txt\n$ echo 13 > a13.txt && cat a13.txt\n$ echo 14 > a14.txt && cat a14.txt\n$ echo 15 > a15.txt && cat a15.txt\n$ echo 16 > a16.txt && cat a16.txt\n$ echo 17 > a17.txt && cat a17.txt\n$ echo 18 > a18.txt && cat a18.txt\n$ echo 19 > a19.txt && cat a19.txt\n$ echo 20 > a20.txt && cat a20.txt",
+     "id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+     "status": "complete",
+     "title": "Ran 17 shell commands"
+    },
+    {
+     "details": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+     "id": "fold:toolu_01XAexZvMygkUXzSNFPijXpm",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    },
+    {
+     "details": "$ echo 1 > b1.txt && cat b1.txt\n$ echo 2 > b2.txt && cat b2.txt\n$ echo 3 > b3.txt && cat b3.txt",
+     "id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+     "status": "complete",
+     "title": "Ran 3 shell commands"
+    }
+   ]
   ],
   "message_texts": [
    "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nGoal set: create `a1.txt` through `a20.txt` in the current folder, one per Bash call, each containing its own number. Starting with `a1.txt`.\n\n`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.\n\nHello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.\n\nAll 20 files are written. Checking the folder once to confirm each file holds its own number.\n\nThe goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.\n\nGoal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number"
@@ -1902,145 +1993,125 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 2 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ echo 1 > a1.txt && cat a1.txt\n$ echo 2 > a2.txt && cat a2.txt",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01XhBFtCRFzS2AzFWp47mgYp",
+      "title": "Ran 2 shell commands",
+      "type": "task_card"
      },
      {
       "text": "`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.",
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ echo 3 > a3.txt && cat a3.txt",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01Dj3dHJKfMT7DEEFG1Kj9zr",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "Hello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.",
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 17 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ echo 11 > a11.txt && cat a11.txt\n$ echo 12 > a12.txt && cat a12.txt\n$ echo 13 > a13.txt && cat a13.txt\n$ echo 14 > a14.txt && cat a14.txt\n$ echo 15 > a15.txt && cat a15.txt\n$ echo 16 > a16.txt && cat a16.txt\n$ echo 17 > a17.txt && cat a17.txt\n$ echo 18 > a18.txt && cat a18.txt\n$ echo 19 > a19.txt && cat a19.txt\n$ echo 20 > a20.txt && cat a20.txt",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01UPdcxkSWXd7V3KFzfQdhZa",
+      "title": "Ran 17 shell commands",
+      "type": "task_card"
      },
      {
       "text": "All 20 files are written. Checking the folder once to confirm each file holds its own number.",
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01XAexZvMygkUXzSNFPijXpm",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ for i in $(seq 1 20); do printf 'a%s.txt=%s\\n' \"$i\" \"$(cat a$i.txt)\"; done",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01XAexZvMygkUXzSNFPijXpm",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "The goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.",
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 3 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 120,
-   "args": {
-    "blocks": [
-     {
-      "text": "Goal set: the files a1.txt to a20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nGoal set: create `a1.txt` through `a20.txt` in the current folder, one per Bash call, each containing its own number. Starting with `a1.txt`.",
-      "type": "markdown"
-     },
-     {
-      "elements": [
-       {
-        "text": "Ran 2 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "`a1.txt` and `a2.txt` are done. Continuing with `a3.txt` through `a6.txt`.",
-      "type": "markdown"
-     },
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "Hello.\n\nThe goal is still open: `a1.txt` to `a3.txt` exist, and `a4.txt` to `a20.txt` do not. Creating `a4.txt` now.",
-      "type": "markdown"
-     },
-     {
-      "elements": [
-       {
-        "text": "Ran 17 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "All 20 files are written. Checking the folder once to confirm each file holds its own number.",
-      "type": "markdown"
-     },
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "The goal is met. `a1.txt` through `a20.txt` now exist in `/home/dev/project`, each created by its own Bash call and each containing its own number. A final check printed every file's contents, and each matches its name.\n\nGoal set: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number\n\nNew goal: `b1.txt` through `b20.txt`, one per Bash call, each holding its own number. Starting with `b1.txt`.",
-      "type": "markdown"
-     },
-     {
-      "elements": [
-       {
-        "text": "Ran 3 shell commands",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ echo 1 > b1.txt && cat b1.txt\n$ echo 2 > b2.txt && cat b2.txt\n$ echo 3 > b3.txt && cat b3.txt",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01DZgPK2qxkEDhRE2F5EN5yL",
+      "title": "Ran 3 shell commands",
+      "type": "task_card"
      },
      {
       "text": "Goal cleared: the files b1.txt to b20.txt exist in the current folder, created one per Bash call, each holding its own number",

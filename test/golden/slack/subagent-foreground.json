@@ -4,6 +4,7 @@
   "message_blocks": [
    [
     {
+     "block_id": "task-fold:toolu_01JmXiUhDKZ3KxHbHsCr33WE",
      "status": "complete",
      "task_id": "fold:toolu_01JmXiUhDKZ3KxHbHsCr33WE",
      "title": "Agent: Run ls command and report · 1 call",
@@ -332,6 +333,7 @@
    "args": {
     "blocks": [
      {
+      "block_id": "task-fold:toolu_01JmXiUhDKZ3KxHbHsCr33WE",
       "status": "complete",
       "task_id": "fold:toolu_01JmXiUhDKZ3KxHbHsCr33WE",
       "title": "Agent: Run ls command and report · 1 call",

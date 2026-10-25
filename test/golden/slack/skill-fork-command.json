@@ -4,6 +4,7 @@
   "message_blocks": [
    [
     {
+     "block_id": "task-task-ac1ab5ef6df9df287",
      "status": "complete",
      "task_id": "task-ac1ab5ef6df9df287",
      "title": "/list-files",
@@ -105,6 +106,7 @@
    "args": {
     "blocks": [
      {
+      "block_id": "task-task-ac1ab5ef6df9df287",
       "status": "complete",
       "task_id": "task-ac1ab5ef6df9df287",
       "title": "/list-files",

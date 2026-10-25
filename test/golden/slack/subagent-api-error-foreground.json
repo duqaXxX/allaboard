@@ -4,6 +4,7 @@
   "message_blocks": [
    [
     {
+     "block_id": "task-fold:toolu_synthetic161",
      "output": {
       "elements": [
        {
@@ -137,6 +138,7 @@
    "args": {
     "blocks": [
      {
+      "block_id": "task-fold:toolu_synthetic161",
       "output": {
        "elements": [
         {

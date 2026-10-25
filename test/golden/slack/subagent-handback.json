@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 15",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
@@ -35,7 +47,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 15",
+     "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background\n\nBoth tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done."
@@ -849,41 +868,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
-      "type": "markdown"
-     },
-     {
-      "text": "Both tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done.",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "Both tasks are started in the background: the subagent that runs echo subagent-ok and the command sleep 15. Neither has finished yet.",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 57,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 15",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",

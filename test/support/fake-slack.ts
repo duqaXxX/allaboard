@@ -40,6 +40,11 @@ export const AGENT = { name: NAME, words: WORDS };
 export const OWNER = "U000ALICE";
 export const STRANGER = "U000BOB";
 export const TEAM = "T000TEAM";
+/**
+ * The `block_id` Slack stores a streamed card under, read back with `conversations.replies` from a
+ * stopped stream (measured 2026-10-25, web-api 8.2.0): stated here apart from the code it checks.
+ */
+export const streamedCardBlockId = (taskId: string): string => `task-${taskId}`;
 export const OTHER_TEAM = "T000OTHER";
 export const CHANNEL = "C000CHAN";
 export const OTHER_CHANNEL = "C000CHN2";

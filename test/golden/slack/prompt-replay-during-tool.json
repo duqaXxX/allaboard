@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 20",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background",
@@ -48,7 +60,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 20",
+     "id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background\n\nSTARTED\n\nREPORTED\n\nKIWI"
@@ -195,13 +214,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 20",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background",
@@ -236,13 +267,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 20",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background",

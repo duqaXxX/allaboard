@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "ToolSearch, Monitor, ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 12; echo done",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+     "title": "ToolSearch, Monitor, ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",
@@ -48,7 +60,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 12; echo done",
+     "id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+     "status": "complete",
+     "title": "ToolSearch, Monitor, ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok\n\nThe Monitor reported \"tick one\"; I'm waiting for \"tick two\" before stopping it with TaskStop.\n\nI was told the Monitor printed \"tick two\", so I stopped it with TaskStop and it is now shut down.\n\nI was told the background `sleep 12; echo done` command finished with exit code 0.\n\nI was told the subagent that ran `sleep 20` finished and replied \"ok\"."
@@ -538,13 +557,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "ToolSearch, Monitor, ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 12; echo done",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "title": "ToolSearch, Monitor, ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",
@@ -579,13 +610,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "ToolSearch, Monitor, ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 12; echo done",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "title": "ToolSearch, Monitor, ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",

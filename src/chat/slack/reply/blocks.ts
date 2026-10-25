@@ -19,9 +19,13 @@ import { markdownBlocks } from "./markdown.ts";
 // (measured 2026-10-06, slack-sdk 3.44.1: 50 containers of 10,000 characters taken, nothing ever
 // refused). A message written by update therefore counts a container as its block only: at most
 // BLOCKS_LIMIT containers of MESSAGE_LIMIT characters, 495,000, which is what was measured in the
-// shape of a call with no card (45 of 11,000, taken).
+// shape of a call with no card (45 of 11,000, taken). Nor does it count a task card's details:
+// 45 cards of 2,899 characters each were taken and read back whole (measured 2026-10-25,
+// web-api 8.2.0), so an ended run's card keeps its commands at no cost to that cap.
 export const MESSAGE_LIMIT = 11_000;
 export const BLOCKS_LIMIT = 45;
+// The longest `block_id` Slack takes (Block Kit reference).
+const BLOCK_ID_LIMIT = 255;
 export const FALLBACK_LIMIT = 3_000;
 // What a message's `text` says: the banner of a notification, short, since a `chat.update` whose
 // `text` is long fails `msg_too_long` (measured 2026-09-28).
@@ -95,8 +99,11 @@ export interface DividerBlock {
 
 export interface TaskCardBlock {
   type: "task_card";
-  /** Set on the list of what still runs alone: the card Slack keeps open across an edit. */
-  block_id?: string;
+  /**
+   * Fixed for a card's life, which keeps it open across an edit: `cardBlockId`, or
+   * `RUNNING_LIST_ID`; undefined only past Slack's cap on its length.
+   */
+  block_id: string | undefined;
   task_id: string;
   title: string;
   status: TaskStatus;
@@ -357,7 +364,9 @@ export function cardFields(update: TaskUpdate): CardFields {
     if (view.summary) fields.output = take(view.summary, CARD_TEXT_LIMIT);
   } else if (output && (update.status === "error" || output === STOPPED)) {
     fields.output = take(output, CARD_TEXT_LIMIT);
-  } else if (update.status === "in_progress" && update.details) {
+  } else if (update.details && (update.status === "in_progress" || !update.task)) {
+    // A run's card lists its commands once ended too, its title holding only the counts; a
+    // task's line under it is what still runs, which an ended card no longer says.
     fields.details = take(update.details, CARD_TEXT_LIMIT);
   }
   return fields;
@@ -450,6 +459,18 @@ export function richText(text: string): RichText {
 }
 
 /**
+ * The block id of a tool's card: the one Slack stores a streamed card under, so the card keeps it
+ * from its stream through every edit of its message. Slack's desktop app closes a card the owner
+ * opened when an edit gives it another block id, as an edit with none does; with a fixed one it
+ * stays open (measured 2026-10-25; on iOS a card opens in a sheet that an edit leaves open).
+ */
+export function cardBlockId(id: string): string | undefined {
+  const blockId = `task-${id}`;
+  // Slack refuses a block_id past 255 characters, which an agent's ids are not bound by.
+  return blockId.length <= BLOCK_ID_LIMIT ? blockId : undefined;
+}
+
+/**
  * The `task_card` block of a tool, for a message that is no longer a stream (recorded shape:
  * `details` and `output` are rich text).
  */
@@ -457,6 +478,7 @@ export function cardBlock(update: TaskUpdate): TaskCardBlock {
   const fields = cardFields(update);
   const block: TaskCardBlock = {
     type: "task_card",
+    block_id: cardBlockId(update.id),
     task_id: update.id,
     title: fields.title,
     status: fields.status,

@@ -78,7 +78,8 @@ export interface TaskUpdate {
   /**
    * Null on every line the core hands to a sink. A provider that shows a run of calls as
    * counts passes its lines through the core's `Fold`, which sets this on the lines it makes:
-   * what replaces the line once the reply's body has ended; empty removes it.
+   * what replaces the line once the reply's body has ended; empty removes it. A run's line that
+   * lists commands (`details`) keeps null: it stays, to be opened on them.
    */
   readonly folded: string | null;
   /**

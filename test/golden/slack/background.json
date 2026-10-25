@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 5; echo done",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background",
@@ -35,7 +47,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 5; echo done",
+     "id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background\n\nstarted\n\nThe background command completed successfully after running for 5 seconds. The sleep period elapsed without any issues, and the echo command executed afterward. The output file contains \"done\", confirming that the entire command sequence ran as expected."
@@ -457,41 +476,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background",
-      "type": "markdown"
-     },
-     {
-      "text": "started\n\nThe background command completed successfully after running for 5 seconds. The sleep period elapsed without any issues, and the echo command executed afterward. The output file contains \"done\", confirming that the entire command sequence ran as expected.",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "started",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 29,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 5; echo done",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background",
