@@ -75,7 +75,7 @@ test("a thread with replies is linked by its last reply, its query escaped for m
       elements: [
         {
           type: "mrkdwn",
-          text: `✅ Done: <${link.replace("&", "&amp;")}|Fix the login page>`,
+          text: `✅ Done: <${link.replaceAll("&", "&amp;")}|Fix the login page>`,
         },
       ],
     },
