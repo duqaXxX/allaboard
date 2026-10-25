@@ -2191,15 +2191,62 @@ export class ReplySink implements Sink {
     await this.clock.sleep(STREAM_SECONDS, signal);
     const release = await this.lock.acquire(signal);
     try {
-      if (!message.streaming) return;
-      if ((await this.stop(message, null, null)) === "failed") {
-        return; // Slack ends it at 5 minutes: the next append finds it over
-      }
-      // The message is rewritten from the model now, with no stream to wait for.
-      this.restamp(this.steady.time());
-      await this.sync();
+      await this.stopMidReply(message);
     } finally {
       release();
+    }
+  }
+
+  /**
+   * Stop `message`'s stream before its reply ends and go on by update. The lock is held. The
+   * stop notifies (accepted); the updates after it never do.
+   */
+  private async stopMidReply(message: Message): Promise<void> {
+    if (!message.streaming) return;
+    if ((await this.stop(message, null, null)) === "failed") {
+      return; // Slack ends it at 5 minutes: the next append finds it over
+    }
+    // The message is rewritten from the model now, with no stream to wait for.
+    this.restamp(this.steady.time());
+    await this.sync();
+  }
+
+  /**
+   * A request is about to be posted below this reply (the thread calls this before any post of
+   * one, through `ThreadPlaces.beforeRequest`): Slack for iOS hides
+   * the text of a stream that is still open once a message lands under it (measured 2026-10-25,
+   * issue #25). What the renderer gave the sink is written, then the stream stops, before this
+   * resolves; the reply goes on as after STREAM_SECONDS. Never rejects.
+   */
+  async beforeRequest(): Promise<void> {
+    // Only a stream open now, or a first one owed, is live text above the request. A reply at
+    // rest keeps its debounce, its retry and its place; one already ending stops its own stream.
+    const last = this.messages.at(-1);
+    const owed =
+      last === undefined
+        ? this.hasContent() && !this.restRequested
+        : last.streaming || (last.ts === null && last.mode === "stream");
+    if (this.closedOut || !owed) return;
+    this.pending?.cancel();
+    this.pending = null;
+    try {
+      const release = await this.lock.acquire();
+      try {
+        // The text still waiting for its debounce goes first; it may start the stream, or move
+        // the reply on to a new message, so the stream to stop is the last one after it.
+        let ok = await this.sync();
+        const current = this.messages.at(-1);
+        if (current !== undefined) {
+          const streaming = current.streaming;
+          await this.stopMidReply(current);
+          ok = ok && (!streaming || !current.streaming);
+        }
+        if (!ok && (this.landedValue === true || this.resting)) this.retryLater();
+      } finally {
+        release();
+      }
+    } catch (error) {
+      this.logger.warning(`could not stop a reply's stream before a request: ${describe(error)}`);
     }
   }
 

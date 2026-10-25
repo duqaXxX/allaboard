@@ -751,6 +751,9 @@ export class SlackThread implements ThreadChat {
         blocks = shellBlocks(requestId, request);
         break;
     }
+    // Slack for iOS hides the text of a stream still open once a message lands below it (#25):
+    // every reply of the thread ends its live write before any request is posted.
+    await (this.places ?? this.lease.peek())?.beforeRequest();
     let ts: unknown;
     try {
       const posted = await this.slack.chat.postMessage({

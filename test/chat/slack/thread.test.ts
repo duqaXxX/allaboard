@@ -321,6 +321,25 @@ for (const request of [
   });
 }
 
+// #25: Slack for iOS hides a stream still open once a message lands below it.
+for (const [kind, request] of [
+  ["approval", PERMISSION],
+  ["question", QUESTION],
+  ["shell", { type: "shell", requestId: "shell-1", command: "git status", folder: "/work/web" }],
+] as const satisfies readonly (readonly [string, OwnerRequest])[]) {
+  test(`a reply's stream stops before the ${kind} request is posted`, async () => {
+    const { slack, thread } = made();
+    const reply = thread.openReply(() => {});
+    await reply.text("Working on it.");
+    await new Promise((resolve) => setImmediate(resolve));
+    await thread.ask("request-1", request, "Asked");
+    const calls = slack.apiCalls.map((call) => call.method);
+    const stop = calls.indexOf("chat.stopStream");
+    assert.ok(stop >= 0, calls.join(", "));
+    assert.ok(stop < calls.indexOf("chat.postMessage"), calls.join(", "));
+  });
+}
+
 test("a message posted outside the session sets the thread status again", async () => {
   const { slack, clock, thread } = made();
   thread.showActivity("Working…", "is working…");
