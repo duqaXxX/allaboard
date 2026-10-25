@@ -498,11 +498,6 @@ export interface ReplySinkOptions {
    */
   readonly onWrite?: () => void;
   /**
-   * Called once, when the first footer of this reply is written: the session has ended
-   * everything. Synchronous, never awaited here.
-   */
-  readonly onFooter?: () => void;
-  /**
    * Where the thread's messages sit, shared by every reply of the thread; a reply with a
    * message of another reply below it ends where it is. Absent, the reply knows of no other.
    */
@@ -541,9 +536,6 @@ export class ReplySink implements Sink {
   private readonly steady: Clock;
   private readonly onOpenReply: ((old: string | null, fresh: string | null) => void) | null;
   private readonly onWrite: (() => void) | null;
-  private readonly onFooter: (() => void) | null;
-  // Whether `onFooter` was called: once per reply, for its first footer.
-  private footerTold = false;
   private readonly places: ThreadPlaces;
   private readonly logger: Logger;
   private readonly debounceSeconds: number;
@@ -641,7 +633,6 @@ export class ReplySink implements Sink {
     this.places = options.places ?? new ThreadPlaces();
     this.places.join(this);
     this.onWrite = options.onWrite ?? null;
-    this.onFooter = options.onFooter ?? null;
     this.logger = options.logger ?? defaultLogger;
     this.debounceSeconds = options.debounceSeconds ?? DEBOUNCE_SECONDS;
     this.finalRetrySeconds = options.finalRetrySeconds ?? FINAL_RETRY_SECONDS;
@@ -937,10 +928,6 @@ export class ReplySink implements Sink {
     this.pending = null;
     const ok = await cancellable(this.flush(), signal);
     if (!ok) this.retryLater();
-    else if (!this.footerTold) {
-      this.footerTold = true;
-      this.onFooter?.();
-    }
     return ok;
   }
 

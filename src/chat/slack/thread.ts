@@ -42,6 +42,7 @@ import {
   type RunningList,
   type SessionIndex,
   type SessionStatus,
+  type StatusOptions,
   type ThreadChat,
   type ThreadRef,
 } from "../seam.ts";
@@ -64,7 +65,7 @@ import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { positionOf, ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
-import { REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
+import { REACTIONS, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks, shellBlocks } from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 import type { RootEditor } from "./tag.ts";
@@ -153,11 +154,26 @@ export interface SlackChatOptions {
   /** Whether the token can pin, which tags need and titles do not (`module.canTag`). */
   readonly canTag?: boolean;
   /**
-   * Moves the channel's line to the bottom once a reply's footer is written, and when the agent
-   * first asks the owner in a turn (`channel-line`), so the channel shows as unread. Absent in a
-   * test of the threads alone.
+   * Moves the channel's line to the bottom when the session's work ends (a `notify` status), and
+   * when the agent asks the owner for an approval or an answer (`channel-line`), so the channel
+   * shows as unread. Absent in a test of the threads alone.
    */
   readonly line?: ChannelLine;
+  /**
+   * The channel's line mentions the owner, out of sight, when it tells him of an approval, a
+   * question or the end of the work (`SLACK_MENTION_OWNER`). With Slack's "Thread replies"
+   * notifications off, only those lines push (measured 2026-10-25, iOS).
+   */
+  readonly mentionOwner?: boolean;
+}
+
+/**
+ * Whether `request` is the agent's, which waits on the owner wherever he is: the setup form, a
+ * `!!` command's confirmation and the same-folder hold answer what he has just written in the
+ * thread, and he is there to answer them.
+ */
+function waitsOnOwner(request: OwnerRequest): boolean {
+  return request.type === "permission" || request.type === "question";
 }
 
 /** The emoji of each root reaction (`REACTIONS`), as a character. */
@@ -506,8 +522,6 @@ export class SlackThread implements ThreadChat {
   private loopTs: string | null = null;
   /** The loop card's writes, one after the other. */
   private loopWrites: Promise<void> = Promise.resolve();
-  // Whether the channel's line has named this thread as waiting since its last turn ended.
-  private waitNamed = false;
 
   /**
    * `written` stands for this object's own status line where something else holds it: the
@@ -555,17 +569,6 @@ export class SlackThread implements ThreadChat {
       ...(this.options.steady !== undefined && { steady: this.options.steady }),
       onOpenReply: onOpenMessage,
       onWrite: () => this.line.wrote(),
-      ...(this.options.line !== undefined && {
-        // Only for work that ended well: a footer is drawn on a stop, an error or a shutdown too,
-        // and the line says the work is done. Any footer ends a turn, and so its one waiting line:
-        // a background task keeps the root from ✅ across turns.
-        onFooter: () => {
-          this.waitNamed = false;
-          if (this.reaction.wanted === Status.DONE) {
-            void this.options.line?.show(this.channel, this.threadTs, "done");
-          }
-        },
-      }),
       places,
       ...(this.options.debounceSeconds !== undefined && {
         debounceSeconds: this.options.debounceSeconds,
@@ -589,14 +592,20 @@ export class SlackThread implements ThreadChat {
     this.places?.showRunning(list);
   }
 
-  showStatus(status: RootStatus, signal?: AbortSignal): Promise<boolean> {
-    // A turn that ends with no footer (a lost process) ends its waiting line too.
-    if (status === "done" || status === "error") this.waitNamed = false;
-    return this.reaction.show(REACTIONS[status], signal);
+  showStatus(status: RootStatus, options: StatusOptions = {}): Promise<boolean> {
+    if (options.notify && (status === "done" || status === "error")) {
+      const kind = status === "done" ? "done" : "failed";
+      void this.options.line?.show(this.channel, this.threadTs, kind, this.mention());
+    }
+    return this.reaction.show(REACTIONS[status], options.signal);
+  }
+
+  /** The owner's id, for the messages he is told of, when he asked for mentions. */
+  private mention(): string | undefined {
+    return this.options.mentionOwner ? this.options.identity.ownerUserId : undefined;
   }
 
   clearStatus(): Promise<void> {
-    this.waitNamed = false;
     return this.reaction.clear();
   }
 
@@ -779,16 +788,13 @@ export class SlackThread implements ThreadChat {
   }
 
   /**
-   * Moves the channel's line to name this thread once the agent's first approval or question of
-   * a turn is posted: a later one, once the owner answered the first, posts no second line
-   * (#72). The setup form, a `!!` command's confirmation and the same-folder hold answer what
-   * the owner has just written in the thread, who is there to answer them.
+   * Moves the channel's line to name this thread as waiting once each of the agent's approvals
+   * and questions is posted, mentioning the owner when he asked for it: the line is what tells
+   * him of the request. The others name nothing (`waitsOnOwner`).
    */
   private nameWaiting(request: OwnerRequest): void {
-    if (request.type !== "permission" && request.type !== "question") return;
-    if (this.waitNamed || this.options.line === undefined) return;
-    this.waitNamed = true;
-    void this.options.line.show(this.channel, this.threadTs, "waiting");
+    if (!waitsOnOwner(request)) return;
+    void this.options.line?.show(this.channel, this.threadTs, "waiting", this.mention());
   }
 
   async withdraw(request: MessageId): Promise<boolean> {

@@ -6,6 +6,7 @@ import type { JsonObject } from "../../support/fixtures.ts";
 
 const CHANNEL = "C000PROJECT";
 const BOT = "U000BOT";
+const OWNER = "U000ALICE";
 const ROOT = "1792626266.636909";
 const LINK = "https://example.slack.com/archives/C000PROJECT/p1792626266636909";
 
@@ -312,4 +313,42 @@ test("a long title is cut between characters, never inside one", () => {
   const label = lineLabel({ text: "🚀".repeat(100) });
   assert.equal(Array.from(label).length, 80);
   assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(label), "no lone surrogate");
+});
+
+// #20: with Slack's "Thread replies" notifications off, a mention in `text` pushes beside a
+// markdown block and shows nowhere; beside a context block alone it stays silent (measured
+// 2026-10-25, iOS).
+test("a line that tells the owner of the work's end mentions him in its text alone", async () => {
+  const fake = slack();
+  fake.responses["chat.update"] = { ok: true };
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  await lines.show(CHANNEL, ROOT, "failed", OWNER);
+  const [posted] = fake.callsTo("chat.postMessage");
+  assert.equal(posted?.text, `Failed: Fix the login page <@${OWNER}>`);
+  assert.deepEqual(posted?.blocks, [
+    { type: "markdown", text: `❌ Failed: [Fix the login page](${LINK})` },
+  ]);
+  // A title keeps the line's form: an edit pushes nothing, and the next start finds it the same.
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  const updated = fake.callsTo("chat.update").at(-1);
+  assert.equal(updated?.text, `Failed: Login fix <@${OWNER}>`);
+  assert.deepEqual(updated?.blocks, [
+    { type: "markdown", text: `❌ Failed: [Login fix](${LINK})` },
+  ]);
+});
+
+test("a root's mention sequence notifies nobody from the line, in its text or its blocks", async () => {
+  for (const mention of [undefined, OWNER]) {
+    const fake = slack();
+    fake.responses["conversations.replies"] = {
+      ok: true,
+      messages: [{ ts: ROOT, user: OWNER, text: "&lt;!here&gt; ask <@U000BOB>" }],
+    };
+    await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT, "done", mention);
+    const [posted] = fake.callsTo("chat.postMessage");
+    const text = String(posted?.text);
+    assert.ok(text.startsWith("Done: &lt;!here&gt; ask &lt;@U000BOB&gt;"), text);
+    const blocks = JSON.stringify(posted?.blocks);
+    assert.ok(!blocks.includes("<!here") && !blocks.includes("<@U000BOB"), blocks);
+  }
 });

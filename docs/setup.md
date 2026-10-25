@@ -215,11 +215,12 @@ same treatment.
      inside their own Slack thread, and Slack notifies you on a new message in a thread you
      started, whatever this setting is. It governs only the bot's top-level messages (the answer
      to a word typed in the channel, with `!resume`'s list, the upgrade notice, and the
-     `✅ Done:` or `✋ Waiting:` line that names the thread whose work was done, or that started
-     waiting for you, last): with
+     `✅ Done:`, `❌ Failed:` or `✋ Waiting:` line that names the thread whose work ended, or that
+     started waiting for you, last): with
      **Just mentions** those stay silent, since the bot writes no `@channel` mention anywhere;
      with **All new posts** they ring too. A word typed inside a thread is answered for you alone
-     and never rings.
+     and never rings. To be notified only when a session needs you, see
+     [Fewer notifications](#fewer-notifications).
 
 The bot sees private channels it was invited to, and nothing else.
 
@@ -254,6 +255,8 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
      token's check shows the workspace and the bot; a user token must belong to the bot's
      workspace, and it gives your member ID, so that question is skipped.
    - your member ID, when you skipped the user token. Only its shape is checked.
+   - whether the messages that need you mention you (`SLACK_MENTION_OWNER`, `on` or `off`, Enter
+     for off; see [Fewer notifications](#fewer-notifications)).
    - the folder your projects live under (`ALLOWED_ROOT`), by the rule the daemon applies when it
      starts.
    - two questions about Claude Code: how long a command may run, in hours
@@ -327,6 +330,7 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
 | `ALLABOARD_AGENT` | optional: the agent allaboard drives; `claude` when absent, the only one this release has |
 | `ALLABOARD_CHAT` | optional: the chat allaboard is driven from; `slack` when absent, the only one this release has |
 | `ALLABOARD_SHELL` | optional: `on` or `off`, whether `!!<command>` runs your shell commands; `on` when absent |
+| `SLACK_MENTION_OWNER` | optional: `on` or `off`, whether the messages that need you mention you, out of sight; `off` when absent; see [Fewer notifications](#fewer-notifications) |
 | `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
 | `CLAUDE_CONFIG_DIR` | optional: Claude Code's own variable, the folder of a login of its own, for an instance that drives a second account; see [Part 6](#an-instance-with-its-own-claude-code-login) |
 
@@ -1429,8 +1433,36 @@ setting is:
 - Nothing rings while Claude writes.
 
 The channel's own setting (Part 1) governs only the bot's top-level messages (the answer to `!bind`, `!status`, `!resume`'s
-own list, the upgrade notice, the `✅ Done:` and `✋ Waiting:` line): with **Just mentions** those stay silent, since the bot writes no
-`@channel` mention anywhere; with **All new posts** they ring too.
+own list, the upgrade notice, the `✅ Done:`, `❌ Failed:` and `✋ Waiting:` line): with **Just mentions** those stay silent, unless
+`SLACK_MENTION_OWNER` is on (below); with **All new posts** they ring too.
+
+#### Fewer notifications
+
+With three settings, Slack pushes only when a session needs you:
+
+1. In `.env`, `SLACK_MENTION_OWNER=on`, then restart allaboard.
+2. In Slack, **Preferences → Notifications**, under **Also notify you about**, turn off
+   **Thread replies**. The setting is for the whole workspace: replies in other people's threads
+   you follow stop ringing too.
+3. Each project channel on **Just mentions** (Part 1).
+
+Then a push comes:
+
+- when a prompt's work ends, done or failed: the channel's `✅ Done:` or `❌ Failed:` line;
+- for each approval request and each question of Claude's: the channel's `✋ Waiting:` line;
+- when a restart or a stop of allaboard cuts a session's work short, with its `❌ Failed:` line,
+  and when a crash did, at the next start.
+
+Nothing else in a thread rings: not the replies, the setup form, a `!!` command's confirmation, a
+same-folder question, `!stop` or `Stopped.`, which answer what you have just written. Each of
+those lines mentions you in its `text` alone, so no `@` shows in the channel or in the push, whose
+banner names the thread: `Waiting: <thread>`, `Done: <thread>`. Any value of
+`SLACK_MENTION_OWNER` other than `on` or `off`, in any case, stops the start with
+`SLACK_MENTION_OWNER must be on or off; it is "<value>"`.
+
+Leave `SLACK_MENTION_OWNER` off while **Thread replies** is on: every reply already rings then,
+and the line at the end of the work would ring once more. Measured on iOS only (2026-10-25); Slack
+desktop was not tried.
 
 The measurements behind this (what was tried, on what Slack plan and app, and on what date) are
 in [features.md](features.md#notifications), not restated here.

@@ -5,8 +5,19 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `SLACK_MENTION_OWNER=on` mentions you, out of sight, in the channel's line when a session
+  waits for your approval or answer and when its work ends (#20). With Slack's **Thread replies** notifications off and the channel on **Just mentions**, those
+  are the only pushes: one when a prompt's work is done or failed, one per approval or question,
+  none for the setup form, `!stop` or the replies themselves. Off when absent, since with
+  **Thread replies** on the line would push beside the replies.
+
 ### Fixed
 
+- The channel's line repeated its thread's root in its `text`, where a mention sequence the root
+  held as text (`<!here>`, `<@…>`) became a real one. It is now escaped there as in the line's
+  blocks.
 - On Slack for iOS, a reply still being written lost its text on screen when any request (an
   approval, a question, a `!!` command's confirmation) was posted below it, until the reply ended
   (#25). The reply's stream now stops before the request is posted and the reply goes on by edit,
@@ -20,9 +31,15 @@ All notable changes to this project are documented here. The format follows
 
 - The channel's line also names a thread whose agent asks the owner for an approval or an
   answer, as `✋ Waiting:` with a link to the thread, so the channel shows as unread while the
-  thread is blocked on the owner. It is posted once a turn; the setup form, a `!!` command's
-  confirmation and the same-folder hold post none. The last line posted, waiting or done,
+  thread is blocked on the owner. It is posted for each approval and question; the setup form, a
+  `!!` command's confirmation and the same-folder hold post none. The last line posted, waiting or done,
   replaces the one before.
+- The channel's line follows the end of a session's work, which the core decides in one place
+  (`ThreadSession.setStatus`): a change of the root's status from working or waiting to done or
+  error. A failed session now gets a `❌ Failed:` line; a session you stopped with `!stop`, or
+  whose hold you cancelled, gets none, since you have just acted in it; a restart or a stop of
+  allaboard that cuts work short gets a `❌ Failed:` line, and a crash that did gets one at the
+  next start, unless its `❌` was shown before the crash.
 
 ## [0.10.0] - 2026-10-25
 

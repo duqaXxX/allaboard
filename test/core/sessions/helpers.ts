@@ -9,6 +9,7 @@ import { join } from "node:path";
 import type { TestContext } from "node:test";
 import type { AgentSession, PromptContent } from "../../../src/agent/seam.ts";
 import type { Reply, RunningList } from "../../../src/chat/seam.ts";
+import type { ChannelLine, LineKind } from "../../../src/chat/slack/channel-line.ts";
 import type { TurnRenderer } from "../../../src/core/reply/renderer.ts";
 import type { Approvals } from "../../../src/core/requests.ts";
 import { logger, ThreadSession } from "../../../src/core/sessions/session.ts";
@@ -480,4 +481,18 @@ export function messageTitles(cards: readonly { title?: unknown }[]): string[] {
   return cards
     .map((card) => String(card.title))
     .filter((title) => title.startsWith("Message from "));
+}
+
+/** A line that records what it was asked to show: the thread's root, the kind, the mention. */
+export function recordingLine(): {
+  readonly line: ChannelLine;
+  readonly shown: [string, LineKind, string | undefined][];
+} {
+  const shown: [string, LineKind, string | undefined][] = [];
+  const line = {
+    show: async (_channel: string, root: string, kind: LineKind, mention?: string) =>
+      void shown.push([root, kind, mention]),
+    retitle: async () => {},
+  };
+  return { line: line as unknown as ChannelLine, shown };
 }

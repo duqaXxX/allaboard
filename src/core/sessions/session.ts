@@ -97,6 +97,7 @@ import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import { DENY, type Decision, toAnswer } from "../requests.ts";
 import { type Choice, DEFAULT } from "../setup.ts";
 import { runShell, shellHead } from "../shell.ts";
+import { endsWork } from "../status.ts";
 import * as texts from "../texts.ts";
 import {
   FAILURE_LIMIT,
@@ -185,6 +186,16 @@ interface Step {
   readonly calls: number;
 }
 
+/** How a status is changed (`Session.setStatus`). */
+interface StatusChange {
+  /** Aborts the chat's change, which may be left half made. */
+  readonly signal?: AbortSignal;
+  /** An answer never reached the chat: `state.json` keeps the status crash repair needs. */
+  readonly unlanded?: boolean;
+  /** The owner's own act made the change (`!stop`, a hold he cancelled): he is not told of it. */
+  readonly byOwner?: boolean;
+}
+
 /** The signal for a `finally`: none once it has aborted, since an aborted signal stays aborted. */
 function live(signal: AbortSignal | undefined): AbortSignal | undefined {
   return signal?.aborted ? undefined : signal;
@@ -228,7 +239,7 @@ export class ThreadSession {
   private stopTail: Event | null = null;
   /** Stops the owner's shell command while it runs (`!stop`); null when none runs. */
   private shellStop: AbortController | null = null;
-  // True from `reactError` until new work starts (`submit`, `startTurn`), so a standing ❌ is
+  // True from an ❌ (`setStatus`) until new work starts (`submit`, `startTurn`), so a standing ❌ is
   // never mistaken for idle-and-done. What the chat shows cannot serve this alone: it only
   // changes once the chat has answered, which a quick turn can easily outrun.
   private errorStanding = false;
@@ -478,7 +489,7 @@ export class ThreadSession {
   // Whether this stop has said, in a message, which background tasks it waits for: only where
   // the thread's activity line cannot (`showRestartWait`).
   private toldWaiting = false;
-  // The status asked of the chat last (`noteStatus`): a stop that begins while it is `working`
+  // The status asked of the chat last (`setStatus`): a stop that begins while it is `working`
   // shows the root as restarting (`rootStatus`).
   private lastStatus: SessionStatus | null = null;
   // Set when a stop begins while this session has a turn running. The signal names no sender,
@@ -818,15 +829,12 @@ export class ThreadSession {
   private async reactAfterHold(): Promise<void> {
     const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored === null || stored.sessionId === null) {
-      this.recordStatus(() =>
-        this.deps.state.setStatusPending(this.channelId, this.threadId, null),
-      );
-      this.lastStatus = null;
-      if (this.reacts) await this.thread.clearStatus();
+      await this.setStatus(null);
       return;
     }
-    if (this.errorStanding) this.reactError();
-    else if (this.idle) await this.reactDoneIfIdle();
+    // A status he was told of already, or one that ends with his own click: he is not told.
+    if (this.errorStanding) this.react("error", { byOwner: true });
+    else if (this.idle) await this.reactDoneIfIdle(undefined, { byOwner: true });
     else this.reactWaitingOrWorking();
   }
 
@@ -1400,7 +1408,7 @@ export class ThreadSession {
     // A shell command of the owner's that runs is stopped like a turn, and the rest still stops.
     const shell = this.shellStop !== null;
     this.shellStop?.abort();
-    if (shell) this.react("done");
+    if (shell) this.react("done", { byOwner: true });
     const client = this.client;
     if (client === null) return shell ? true : held ? null : false;
     const tasks = this.background ? this.runningTaskIds() : [];
@@ -1424,7 +1432,7 @@ export class ThreadSession {
     // agent open a turn of its own to react 1-2 s later and carry on; closing its
     // process ends them all for good, and the owner's next message resumes the session.
     if (!this.busy && (await this.endWithProcess(client, tasks))) {
-      this.react("done");
+      this.react("done", { byOwner: true });
       return true;
     }
     // A denial `denyAll` triggers below resolves `askOwner`'s own wait, whose `finally`
@@ -1450,9 +1458,10 @@ export class ThreadSession {
         logger.warning(`could not stop a task in ${this.where}: ${errorName(error)}`);
       }
     }
-    // A stop the owner gave is not an error. `react` clears `errorStanding`, so a later idle
-    // sweep shows the same ✅ and `noteStatus` drops the persisted ⏳.
-    this.react("done");
+    // A stop the owner gave is not an error, and he is not told of it: he has just given it.
+    // `react` clears `errorStanding`, so a later idle sweep shows the same ✅ and `setStatus`
+    // drops the persisted ⏳.
+    this.react("done", { byOwner: true });
     return true;
   }
 
@@ -1518,12 +1527,13 @@ export class ThreadSession {
       this.unreported.clear();
       for (const expiry of this.expiring) expiry.cancel();
       this.notificationWaits = false;
+      // The end these draw is the owner's `!stop`: he is not told of it.
       if (this.injectedExpected) {
         this.expiry?.cancel();
-        await this.reportNotComing();
+        await this.reportNotComing(undefined, { byOwner: true });
       } else {
         await this.sweepClosedOut(undefined, { unreported: true });
-        await this.reactDoneIfIdle();
+        await this.reactDoneIfIdle(undefined, { byOwner: true });
       }
     } finally {
       this.interrupting = false;
@@ -1832,16 +1842,14 @@ export class ThreadSession {
         }
       }
       if ((onlySkipped || endedWell) && !lost) {
-        this.noteStatus("done");
-        if (this.reacts) await this.thread.showStatus("done");
+        await this.setStatus("done");
       } else if (cutShort || lost) {
         // Awaited, not `react`. Before `doneClosing`/`onClosed`, not after: those let the
         // manager evict this session and hand the same root to a freshly built one right away,
         // whose own first status strips every other one: this ❌ must already be on the root
         // before that race can even start. An answer that never reached the chat keeps the
         // persisted status (below), so the next start's repair still says so.
-        if (!lost) this.noteStatus("error");
-        if (this.reacts) await this.thread.showStatus("error");
+        await this.setStatus("error", { unlanded: lost });
       } else if (this.reacts) {
         // a session reads idle as soon as its turn ends, while its reader may
         // still be between the two calls that move ⏳ to ✅, and `cancelTasks` above stops it
@@ -2843,7 +2851,10 @@ export class ThreadSession {
    * The report turn a task notification made the session expect will not come: say the end
    * lines it would have carried where they belong, and end the replies that waited on it.
    */
-  private async reportNotComing(signal?: AbortSignal): Promise<void> {
+  private async reportNotComing(
+    signal?: AbortSignal,
+    change: Omit<StatusChange, "signal"> = {},
+  ): Promise<void> {
     this.injectedExpected = false;
     this.reportGivenUp = true;
     const held = this.held;
@@ -2889,7 +2900,7 @@ export class ThreadSession {
         // one reply, the first of the tasks it covers that is the last thing in the thread.
         // A standalone update was posted for `held`: something sits under the replies it left.
         await this.sweepClosedOut(live(signal), { unreported: held.length === 0 });
-        await this.reactDoneIfIdle(live(signal));
+        await this.reactDoneIfIdle(live(signal), change);
       } finally {
         // (sync) Whatever the sweep did: a notification that arrived during its own writes is
         // waiting on a timer this task alone can arm, since nothing awaits between here and its
@@ -2908,14 +2919,32 @@ export class ThreadSession {
   /**
    * Show `state` on the thread's root, asked for at once and never awaited: a status must
    * never delay a turn, and the chat makes the changes in the order asked and swallows their
-   * failures. `errorStanding` follows the state asked for last, set here synchronously, since
-   * what the chat shows changes only once it has answered.
+   * failures.
    */
-  private react(state: SessionStatus): void {
-    this.errorStanding = state === "error";
-    this.noteStatus(state);
+  private react(state: SessionStatus, change: StatusChange = {}): void {
+    const shown = this.setStatus(state, change);
     this.showThreadStatus();
-    if (this.reacts) this.thread.showStatus(this.rootStatus(state)).catch(() => {});
+    shown.catch(() => {});
+  }
+
+  /**
+   * The one place the session's status changes: the status asked of the chat last
+   * (`lastStatus`), whether an error stands (`errorStanding`, set here synchronously, since what
+   * the chat shows changes only once it has answered), the root's status in `state.json` for
+   * crash repair, and what the root shows; null leaves the root with none. Resolves once the
+   * chat has answered. `unlanded`: an answer never reached the chat, and `state.json` keeps the
+   * ⏳ or ✋ it holds beside the ❌ (`recordUnlanded`). A change that ends the session's work
+   * (`endsWork`) tells the owner, unless his own act made it.
+   */
+  private setStatus(state: SessionStatus | null, change: StatusChange = {}): Promise<unknown> {
+    const notify = !change.byOwner && endsWork(this.lastStatus, state);
+    this.lastStatus = state;
+    this.errorStanding = state === "error";
+    if (change.unlanded) this.recordUnlanded();
+    else this.recordPending(state);
+    if (!this.reacts) return Promise.resolve();
+    if (state === null) return this.thread.clearStatus();
+    return this.thread.showStatus(this.rootStatus(state), { signal: change.signal, notify });
   }
 
   /**
@@ -2932,11 +2961,9 @@ export class ThreadSession {
   /**
    * Crash repair: the root's status while it is ⏳ or ✋, cleared once ✅ or ❌ is
    * requested; that one is kept as the thread's ended status, which the session index shows.
-   * Called from `react` and from the two other places that ask the chat for a status directly
-   * (`close`'s ❌, `reactDoneIfIdle`'s ✅).
+   * Both cleared for a root left with no status.
    */
-  private noteStatus(state: SessionStatus): void {
-    this.lastStatus = state;
+  private recordPending(state: SessionStatus | null): void {
     const pending = state === "working" || state === "waiting";
     this.recordStatus(() =>
       this.deps.state.setStatusPending(
@@ -2968,7 +2995,7 @@ export class ThreadSession {
    * ❌ is shown while the persisted ⏳ or ✋ stays for crash repair (an answer never reached the
    * chat): kept as the ended status, which is what the session index shows.
    */
-  private noteCrossOverStatus(): void {
+  private recordUnlanded(): void {
     const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored !== null) {
       this.recordStatus(() =>
@@ -3003,12 +3030,14 @@ export class ThreadSession {
    * some unrelated task's own sweep decides the session reads idle again. The footer is read
    * and drawn beside it (`showFooterIfEnded`).
    */
-  private async reactDoneIfIdle(signal?: AbortSignal): Promise<void> {
+  private async reactDoneIfIdle(
+    signal?: AbortSignal,
+    change: Omit<StatusChange, "signal"> = {},
+  ): Promise<void> {
     this.showThreadStatus();
     let done: Promise<unknown> = Promise.resolve();
     if (this.sessionEnded() && !this.errorStanding) {
-      this.noteStatus("done");
-      if (this.reacts) done = this.thread.showStatus("done", signal);
+      done = this.setStatus("done", { ...change, signal });
     } else {
       logger.info(`no done reaction in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
     }
@@ -3169,9 +3198,7 @@ export class ThreadSession {
     } else {
       // ❌ shown, but `state.json` keeps ⏳ or ✋: the answer never reached the chat. Its reply
       // takes no footer (`Reply.showFooter`).
-      this.errorStanding = true;
-      this.noteCrossOverStatus();
-      if (this.reacts) this.thread.showStatus("error").catch(() => {});
+      this.setStatus("error", { unlanded: true }).catch(() => {});
       // It no longer holds the session's end back: a later reply may have ended meanwhile.
       await this.showFooterIfEnded();
     }

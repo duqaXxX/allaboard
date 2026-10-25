@@ -44,7 +44,7 @@ function ask(questions: readonly SetupQuestion[], variable: string): SetupQuesti
   return questions.find((q) => q.variable === variable) as SetupQuestion;
 }
 
-test("the questions are the three tokens and the member ID, in the order the screen shows", () => {
+test("the questions are the three tokens, the member ID and the mentions, in the order the screen shows", () => {
   const { questions } = slackSetup(DEFAULT_INSTANCE, clients({}).probe);
   assert.deepEqual(
     questions.map((q) => [q.variable, q.secret, q.optional]),
@@ -53,8 +53,16 @@ test("the questions are the three tokens and the member ID, in the order the scr
       ["SLACK_APP_TOKEN", true, false],
       ["SLACK_USER_TOKEN", true, true],
       ["SLACK_OWNER_USER_ID", false, false],
+      ["SLACK_MENTION_OWNER", false, true],
     ],
   );
+});
+
+test("the mentions are on or off, in any case, and nothing else", async () => {
+  const { questions } = slackSetup(DEFAULT_INSTANCE, clients({}).probe);
+  const mentions = ask(questions, "SLACK_MENTION_OWNER");
+  for (const written of ["on", "OFF", "On"]) assert.deepEqual(await mentions.check(written), {});
+  assert.deepEqual(await mentions.check("yes"), { refusal: "Answer on or off." });
 });
 
 test("a token of the wrong kind is refused before Slack is called", async () => {

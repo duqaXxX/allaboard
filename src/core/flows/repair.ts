@@ -12,6 +12,7 @@ import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { ThreadsState } from "../port/threads.ts";
 import type { RequestKind } from "../state.ts";
+import { endsWork } from "../status.ts";
 import * as texts from "../texts.ts";
 
 export const logger = getLogger("allaboard.core.flows.repair");
@@ -73,9 +74,15 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
         const { status } = thread;
         const ended = endedWord(status);
         // Shown through a thread object of its own: its first status also strips every other
-        // stray status from the root, more than removing the one name the state recorded.
+        // stray status from the root, more than removing the one name the state recorded. The
+        // crash ended the work the root still shows: the owner is told of it, unless the ❌ was
+        // asked for already (an answer that never reached the chat keeps the pending status
+        // beside it, and was told then).
+        const told = thread.ended ?? status;
         const shown =
-          ended === null || !chat.capabilities.reactions || (await chatThread.showStatus("error"));
+          ended === null ||
+          !chat.capabilities.reactions ||
+          (await chatThread.showStatus(ended, { notify: endsWork(told, ended) }));
         // Not shown: the word stays for the next start, and the ended one says meanwhile, to
         // whoever lists the sessions, that this one does not run.
         safe(() => state.setStatusPending(channelId, threadId, shown ? null : status, ended));

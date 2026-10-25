@@ -18,9 +18,11 @@
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import * as texts from "../../../src/core/texts.ts";
+import { THREAD } from "../../support/fake-slack.ts";
 import { NAMES } from "../../support/names.ts";
 import {
   type Harness,
+  type HarnessOptions,
   harnessFor,
   type Item,
   isResult,
@@ -28,7 +30,7 @@ import {
   recordOf,
   sdkMessages,
 } from "../../support/sessions.ts";
-import { inside, messageTitles } from "./helpers.ts";
+import { inside, messageTitles, recordingLine } from "./helpers.ts";
 
 const NAME = "subagent-handback";
 const AGENT_ENDED = '✓ Agent "Run echo subagent-ok" finished';
@@ -68,8 +70,12 @@ function cut(): Recording {
 }
 
 /** The harness once `turn` has run and its reply stays open for the tasks it started. */
-async function started(t: TestContext, turn: Item[]): Promise<Harness> {
-  const h = harnessFor(t)({ turns: [turn] });
+async function started(
+  t: TestContext,
+  turn: Item[],
+  options: HarnessOptions = {},
+): Promise<Harness> {
+  const h = harnessFor(t, options)({ turns: [turn] });
   await (await h.session().submit("start both")).done.wait();
   return h;
 }
@@ -108,10 +114,12 @@ test("the recording is the one the cut expects", () => {
 
 test("a hand-back is reported in the reply that started the subagent, and the turn that does nothing opens none", async (t) => {
   const { turn, agentEnds, report, nothing, shell } = cut();
-  const h = await started(t, turn);
+  const { line, shown } = recordingLine();
+  const h = await started(t, turn, { line });
   h.clients[0]?.inject([...agentEnds, ...report, ...nothing]);
   await settle(h);
   noExtraMessage(h);
+  assert.deepEqual(shown, []); // the shell still runs: the work has not ended
   const body = h.bodies()[0] ?? "";
   assert.ok(body.indexOf(AGENT_ENDED) < body.indexOf(HANDED_BACK) && body.includes(AGENT_ENDED));
   assert.deepEqual(messageTitles(h.cards()), [MESSAGE_FROM]);
@@ -124,6 +132,8 @@ test("a hand-back is reported in the reply that started the subagent, and the tu
   assert.ok(whole.indexOf(HANDED_BACK) < whole.indexOf(SHELL_ENDED));
   assert.ok(whole.indexOf(SHELL_ENDED) < whole.indexOf(SHELL_REPORTED));
   assert.equal(h.reactions().at(-1), "white_check_mark");
+  // The owner is told once, when everything has ended, the turn that did nothing included.
+  assert.deepEqual(shown, [[THREAD, "done", undefined]]);
 });
 
 // The subagent can end while the turn that started it still runs (seen live the same day, with

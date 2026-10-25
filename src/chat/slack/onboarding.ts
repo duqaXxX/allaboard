@@ -61,6 +61,15 @@ export function creationLink(manifestJson: string): string {
 
 const MEMBER_ID = /^[UW][A-Z0-9]{7,}$/;
 
+/** The variable that has the messages the owner is told of mention him (`module.mentionSwitch`). */
+export const MENTION_VARIABLE = "SLACK_MENTION_OWNER";
+
+/** What `written` says of the mentions: on, off, in any case, or null for neither. */
+export function mentionsOn(written: string): boolean | null {
+  const value = written.toLowerCase();
+  return value === "on" || value === "off" ? value === "on" : null;
+}
+
 /** What Slack's refusal code means for the owner pasting a token. */
 function refusalOf(variable: TokenVariable, code: string): string {
   switch (code) {
@@ -169,6 +178,16 @@ export function slackSetup(
           },
   };
 
+  const mentions: SetupQuestion = {
+    variable: MENTION_VARIABLE,
+    message:
+      "Mention you in the messages that need you, for Slack's Thread replies notifications off (on/off, Enter for off):",
+    secret: false,
+    optional: true,
+    check: async (written): Promise<Check> =>
+      mentionsOn(written) === null ? { refusal: "Answer on or off." } : {},
+  };
+
   return {
     intro: [
       "1. Create the Slack app. Open this link, pick your workspace and confirm:",
@@ -178,6 +197,6 @@ export function slackSetup(
         : []),
       "   Then install the app to the workspace (Install App in the sidebar).",
     ],
-    questions: [bot, app, user, owner],
+    questions: [bot, app, user, owner, mentions],
   };
 }

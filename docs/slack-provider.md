@@ -437,19 +437,33 @@ the next start's repair still finds the reply.
 A reply in a thread leaves its channel as read in the sidebar: Slack marks a channel unread only
 for a top-level message of someone else's, and a reply, a mention or a reaction in a thread, an
 edit and the owner's own messages all leave it as read (measured on a dev app on 2026-10-22).
-Once a session's work is done and ended well (its reply's first footer is written,
-`ReplySink.showFooterFormatted`, while its root's status is ✅; a footer drawn on a stop, an
-error or a shutdown moves nothing), `channel-line.ChannelLine` posts one line at the top level,
-`✅ Done:` and a link to the thread named by its root's first line (`channel-line.lineLabel`): the
-session's title once the root shows one, else the owner's first words. The link is the permalink
+Once a session's work ends, `channel-line.ChannelLine` posts one line at the top level, `✅ Done:`
+or `❌ Failed:` and a link to the thread named by its root's first line (`channel-line.lineLabel`): the
+session's title once the root shows one, else the owner's first words. The work ends when the
+core asks `SlackThread.showStatus` for done or error with `notify` (`seam.StatusOptions`): a change
+from working or waiting, never one the owner's own act made (`!stop`, a hold he cancelled), and
+once per end however many ways the session reaches it (`status.endsWork`). A close that cuts work
+short (a restart, a stop of the daemon) is such an end. The crash repair at a start asks the same
+for a root a crash left working or waiting, unless its ❌ was asked for before the crash. The link is the permalink
 of the thread's last reply, which Slack opens the thread on, or of its root while it has none (or once
 Slack no longer has that reply): the rule of the session index's Open, through the same
 `home.threadFacts`. When the agent asks
 the owner for an approval or an answer, the thread gets the same line with `✋ Waiting:`, posted
-from `SlackThread.ask` once the request is in the thread, once a turn: a second request after the
-owner answered the first posts nothing until the turn's footer (or its ✅ or ❌) ends the turn.
-The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
-what the owner has just written in the thread. An answer leaves the line as it is. Whichever its
+from `SlackThread.ask` once each request is in the thread. The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
+what the owner has just written in the thread.
+
+With `SLACK_MENTION_OWNER=on` (`SlackChatOptions.mentionOwner`), the channel's line is what tells
+the owner: the `✋ Waiting:`, `✅ Done:` and `❌ Failed:` lines mention him in their `text` alone,
+where neither the channel nor the push's banner shows it, and are then a markdown block in place
+of the small grey context block. The request in the thread carries no mention. Measured on
+2026-10-25 on iOS, phone locked, channel on **Just mentions**, the owner's **Thread replies**
+notifications off, one run each: a post with a markdown block and the mention in `text` alone
+pushed, its banner showing the block's words; one whose only block is a context block did not
+push; with **Thread replies** on, the mention added no second push. The same day, a question
+request (a section and buttons) with the mention in its `text` did not push, posted 4 seconds
+after the owner's click on the setup's Start; a `✅ Done:` line did. Slack desktop was not tried.
+The line's `text` escapes the root's words (`escape.mrkdwnEscape`),
+since a mention sequence there notifies. An answer leaves the line as it is. Whichever its
 word and its thread, each new line replaces the last: `ChannelLine` deletes the line it posted
 before, so the channel holds one such line at most, shows bold and opens at the bottom. The line
 is found again by its message metadata (`channel-line.LINE_EVENT`): the one this run posted is
