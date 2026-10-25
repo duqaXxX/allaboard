@@ -163,6 +163,21 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   fails leaves the stream open, text given meanwhile goes on to it, and the next pass tries again, which a try after `FINAL_RETRY_SECONDS` starts when nothing else changes.
   A reply that only finished, with no `rest` and no landed end, is not at rest: its end follows
   at once and may fail.
+- **A request is posted first.** `SlackThread.ask` calls `ThreadPlaces.beforeRequest` before it
+  posts any request (an approval, a question, a `!!` command's confirmation, the setup form, the
+  same-folder hold). It awaits `ReplySink.beforeRequest` on every reply of the thread whose end
+  has not landed, with the places' lock free. The setup form and the hold are posted before the
+  session's first turn, so normally no reply is open and the call does nothing. A sink acts only
+  when its last message is a stream that is open, or a first stream is owed; it then cancels the
+  debounce, writes what the renderer has given it, stops the stream (`ReplySink.stopMidReply`,
+  the same move as `expire`) and only then returns, so the stop lands before the request's
+  `chat.postMessage`. A reply at rest, or already ending, is left alone, its own debounce and
+  retry kept. Slack for iOS hides the text of a stream that is still open once a message lands
+  below it (measured: "Stream text under a later message on iOS"), and shows it again when the
+  stream stops. The reply then goes on as after the 280 seconds: by `chat.update`, and its end
+  posts the ending as a new message. The stop is a notification of its own: a request under a
+  streaming reply costs two pushes when the owner is away from the thread (the stop, the request)
+  where it cost one, plus the ending; one when he is watching.
 - **280 seconds pass first.** `ReplySink.expire` stops the stream (Slack pushes on the stop, the
   first notification) and the same message keeps growing with `chat.update`, which never notifies
   (measured: "Update after stop is silent"). Each update writes the whole message from the

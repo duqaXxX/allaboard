@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- On Slack for iOS, a reply still being written lost its text on screen when any request (an
+  approval, a question, a `!!` command's confirmation) was posted below it, until the reply ended
+  (#25). The reply's stream now stops before the request is posted and the reply goes on by edit,
+  as after 280 seconds. The stop notifies when you are away from the thread, so a request under a
+  streaming reply costs one push more.
+
 ### Changed
 
 - The channel's line also names a thread whose agent asks the owner for an approval or an

@@ -39,6 +39,8 @@ export interface Placed {
   settle(): Promise<boolean>;
   /** Takes off its message, now, a list it no longer holds; false when that write failed. */
   unlist(): Promise<boolean>;
+  /** A request is about to be posted below it: its stream stops first. Never rejects. */
+  beforeRequest(): Promise<void>;
 }
 
 export class ThreadPlaces {
@@ -87,6 +89,16 @@ export class ThreadPlaces {
   /** Whether any reply is registered. */
   get held(): boolean {
     return this.replies.size > 0;
+  }
+
+  /**
+   * A request is about to be posted in the thread: every reply whose end has not landed ends its
+   * live write first (`ReplySink.beforeRequest`). The replies are snapshotted and awaited with the
+   * places' lock free: a sink takes its own lock first, and this lock after it.
+   */
+  async beforeRequest(): Promise<void> {
+    const open = [...this.replies].filter((reply) => !this.done.has(reply));
+    await Promise.all(open.map((reply) => reply.beforeRequest()));
   }
 
   /** The owner wrote a message of this thread at `ts`. */

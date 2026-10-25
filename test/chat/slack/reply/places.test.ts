@@ -12,6 +12,8 @@ interface Reply extends Placed {
   settled: number;
   /** How many times it was told to take the list off now. */
   unlisted: number;
+  /** How many times a request was announced to it. */
+  requests: number;
 }
 
 function reply(ts: string | null): Reply {
@@ -26,6 +28,10 @@ function reply(ts: string | null): Reply {
       return true;
     },
     unlisted: 0,
+    requests: 0,
+    beforeRequest: async () => {
+      made.requests += 1;
+    },
     unlist: async () => {
       made.unlisted += 1;
       return true;
@@ -59,6 +65,16 @@ describe("positionOf", () => {
 });
 
 describe("ThreadPlaces", () => {
+  test("a request is announced to every reply whose end has not landed", async () => {
+    const places = new ThreadPlaces();
+    const open = joined(places, "1760000000.000001");
+    const ended = joined(places, "1760000000.000002");
+    places.ended(ended);
+    await places.beforeRequest();
+    assert.equal(open.requests, 1);
+    assert.equal(ended.requests, 0);
+  });
+
   test("a reply with no message is neither last nor overtaken", () => {
     const places = new ThreadPlaces();
     const bare = joined(places, null);

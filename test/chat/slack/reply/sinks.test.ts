@@ -623,6 +623,113 @@ test("the stream stops at 280 seconds and the message grows by update", async ()
   assert.equal(slack.pushes(), 1); // an update never pushes
 });
 
+// A request posted below a streaming reply: Slack for iOS hides the stream's text until it stops
+// (measured 2026-10-25, issue #25), so the stream stops first and the message goes on by update.
+
+test("before a request the pending text is written, the stream stops, and the reply goes on by update", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock, debounceSeconds: 5 });
+  await sink.text("First words.");
+  await settled();
+  await sink.text(" Pending words.");
+  await soon(sink.beforeRequest());
+  assert.equal(only(slack.callsTo("chat.stopStream")).ts, slack.streamTs[0]);
+  assert.equal(methods(slack).at(-1), "chat.stopStream");
+  assert.match(JSON.stringify(allChunks(slack)), /Pending words\./); // sent before the stop
+  assert.ok(
+    methods(slack).indexOf("chat.stopStream") > methods(slack).lastIndexOf("chat.appendStream"),
+  );
+  await sink.text(" After the answer.");
+  await settled();
+  await passed(10);
+  assert.equal(slack.streamTs.length, 1);
+  const update = last(slack.callsTo("chat.update"));
+  assert.equal(update.ts, slack.streamTs[0]);
+  assert.match(JSON.stringify(update.blocks), /After the answer\./);
+  assert.equal(slack.pushes(), 1); // the stop pushes; the update never does
+  await clock.advance(STREAM_SECONDS + 1); // the stopped stream's deadline does nothing more
+  assert.equal(slack.callsTo("chat.stopStream").length, 1);
+});
+
+test("before a request, a reply with no open stream is left alone", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await soon(sink.beforeRequest()); // nothing started
+  assert.deepEqual(methods(slack), []);
+  await sink.text("Words.");
+  await sink.finish([]);
+  await sink.closeOut(); // the stream is stopped by the end
+  const written = methods(slack).length;
+  await soon(sink.beforeRequest());
+  assert.equal(methods(slack).length, written);
+});
+
+test("before a request, a stop that fails is logged and the call still resolves", async () => {
+  const slack = new FakeSlack();
+  const logger = new Recorded();
+  const sink = reply(slack, { logger });
+  await sink.text("Words.");
+  await settled();
+  slack.responses["chat.stopStream"] = [rejected("internal_error")];
+  await soon(sink.beforeRequest());
+  assert.ok(logger.lines.some((line) => line.message.includes("could not stop a reply's stream")));
+});
+
+test("after a stop before a request the reply's end posts its ending as after an expiry", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("First words.\n\n");
+  await sink.task(tool("t1", "Bash", "complete"));
+  await settled();
+  await sink.beforeRequest();
+  await sink.text("The answer.");
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.equal(slack.callsTo("chat.stopStream").length, 1);
+  assert.equal(only(slack.callsTo("chat.postMessage")).text, "The answer.");
+});
+
+test("before a request, a reply at rest keeps its debounce and its retry", async () => {
+  // A reply at rest with a change pending and a failing edit: another reply's request must not
+  // drop the retry the debounce would have scheduled.
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock, debounceSeconds: 5, finalRetrySeconds: 10 });
+  await sink.text("Started it.");
+  await passed(5);
+  await settled();
+  await sink.finish([]);
+  sink.rest();
+  await passed(5);
+  await settled();
+  assert.equal(slack.callsTo("chat.stopStream").length, 1);
+  await sink.text(" The report.");
+  slack.responses["chat.update"] = [rejected("internal_error"), { ok: true }];
+  const before = slack.callsTo("chat.update").length;
+  await soon(sink.beforeRequest());
+  assert.equal(slack.callsTo("chat.update").length, before); // not written by the request's call
+  await passed(5); // the debounce still fires, fails once, and the retry follows
+  await settled();
+  await passed(11);
+  await settled();
+  assert.equal(slack.messageTexts()[0], "Started it. The report.");
+});
+
+test("before a request, a reply that is already ending makes no call", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("Words.");
+  await settled();
+  const ending = sink.closeOut();
+  await soon(sink.beforeRequest());
+  await ending;
+  assert.deepEqual(methods(slack), ["chat.startStream", "chat.stopStream"]); // the end's stop alone
+  const written = slack.apiCalls.length;
+  await soon(sink.beforeRequest()); // and once it has landed
+  assert.equal(slack.apiCalls.length, written);
+});
+
 // A shell command that runs: the card's title carries how long it has run, from 30
 // seconds on, refreshed every RUNNING_REFRESH_SECONDS while the stream lives.
 

@@ -291,6 +291,22 @@ test("a reply that outlives the stream ends with its last words, the footer unde
   assert.equal(h.slack.pushes(), 3); // the approval request, the 280 s stop, the ending
 });
 
+test("a request is posted only after the reply's stream stopped", async (t) => {
+  // Slack for iOS hides the text of a stream still open once a message lands under it (#25).
+  const ask = canUseToolCall("Bash", { command: "ls" });
+  const h = harness(t, [{ turns: [withAsk(ask)] }]);
+  const turn = await h.session().submit("list the files");
+  await h.until(() => pending(h.approvals).length > 0);
+  const calls = h.slack.apiCalls.map((call) => call.method);
+  const stop = calls.indexOf("chat.stopStream");
+  const request = calls.indexOf("chat.postMessage");
+  assert.ok(stop >= 0 && request > stop, `stop before the request's post: ${calls.join(", ")}`);
+  assert.equal(openStreams(h).length, 0);
+  approve(h);
+  await turn.done.wait();
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1); // the end posts, no second stop
+});
+
 // `!stop` ends like any other end, and a restart with queued messages says so once.
 
 test("stop ends the stream, shows the checkmark, and the footer follows", async (t) => {
@@ -326,13 +342,13 @@ test("a restart with queued messages ends the running reply with one note", asyn
   await session.dropQueued({ error: true });
   approve(h);
   await first.done.wait();
-  const [reply, ...more] = h.slack.streamTexts();
-  assert.equal(more.length, 0);
+  // The request stopped the stream (#25): the note lands in the message by update or in the ending.
   const note = "2 messages were not sent because allaboard restarted: send them again.";
-  assert.ok(reply?.includes(note));
-  assert.ok(reply?.includes('"second question"') && reply.includes('"third question"'));
+  const reply = JSON.stringify([...h.slack.messages.values()].map((message) => message.blocks));
+  assert.ok(reply.includes(note));
+  assert.ok(/second question/.test(reply) && /third question/.test(reply));
   assert.equal(h.slack.streamTs.length, 1); // the dropped messages get no reply of their own
-  assert.equal(h.slack.pushes(), 2); // the approval request, and this one end
+  assert.equal(h.slack.pushes(), 3); // the approval request, the stop before it, and the ending
   // the reply that says it is the thread's latest: the footer is under it
   await h.idle();
   assert.equal(footers(h).at(-1), true);
