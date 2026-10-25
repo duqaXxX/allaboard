@@ -426,11 +426,17 @@ Once a session's work is done and ended well (its reply's first footer is writte
 `ReplySink.showFooterFormatted`, while its root's status is ✅; a footer drawn on a stop, an
 error or a shutdown moves nothing), `channel-line.ChannelLine` posts one line at the top level,
 `✅ Done:` and a link to the thread named by its root's first line (`channel-line.lineLabel`): the
-session's title once the root shows one, else the owner's first words. It then
-deletes the line it posted before, so the channel holds one such line at most, shows bold and
-opens at the bottom. The line is found again by its message metadata (`channel-line.LINE_EVENT`):
-the one this run posted is remembered per channel, and after a start the channel's latest
-`channel-line.HISTORY_LIMIT` messages are read for any an earlier run left. The changes of one
+session's title once the root shows one, else the owner's first words. When the agent asks
+the owner for an approval or an answer, the thread gets the same line with `✋ Waiting:`, posted
+from `SlackThread.ask` once the request is in the thread, once a turn: a second request after the
+owner answered the first posts nothing until the turn's footer (or its ✅ or ❌) ends the turn.
+The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
+what the owner has just written in the thread. An answer leaves the line as it is. Whichever its
+word and its thread, each new line replaces the last: `ChannelLine` deletes the line it posted
+before, so the channel holds one such line at most, shows bold and opens at the bottom. The line
+is found again by its message metadata (`channel-line.LINE_EVENT`): the one this run posted is
+remembered per channel, and after a start the channel's latest `channel-line.HISTORY_LIMIT`
+messages are read for any an earlier run left. The changes of one
 channel run one at a time, an old line a delete failed for is deleted at the next change, and a
 failure is logged and changes nothing else. The root may get its title after the line read it
 (the line and the title are both asked at a turn's end, and the agent may write the title a

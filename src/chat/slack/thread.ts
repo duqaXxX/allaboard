@@ -153,8 +153,9 @@ export interface SlackChatOptions {
   /** Whether the token can pin, which tags need and titles do not (`module.canTag`). */
   readonly canTag?: boolean;
   /**
-   * Moves the channel's line to the bottom once a reply's footer is written (`channel-line`), so
-   * the channel shows as unread. Absent in a test of the threads alone.
+   * Moves the channel's line to the bottom once a reply's footer is written, and when the agent
+   * first asks the owner in a turn (`channel-line`), so the channel shows as unread. Absent in a
+   * test of the threads alone.
    */
   readonly line?: ChannelLine;
 }
@@ -505,6 +506,8 @@ export class SlackThread implements ThreadChat {
   private loopTs: string | null = null;
   /** The loop card's writes, one after the other. */
   private loopWrites: Promise<void> = Promise.resolve();
+  // Whether the channel's line has named this thread as waiting since its last turn ended.
+  private waitNamed = false;
 
   /**
    * `written` stands for this object's own status line where something else holds it: the
@@ -554,10 +557,12 @@ export class SlackThread implements ThreadChat {
       onWrite: () => this.line.wrote(),
       ...(this.options.line !== undefined && {
         // Only for work that ended well: a footer is drawn on a stop, an error or a shutdown too,
-        // and the line says the work is done.
+        // and the line says the work is done. Any footer ends a turn, and so its one waiting line:
+        // a background task keeps the root from ✅ across turns.
         onFooter: () => {
+          this.waitNamed = false;
           if (this.reaction.wanted === Status.DONE) {
-            void this.options.line?.show(this.channel, this.threadTs);
+            void this.options.line?.show(this.channel, this.threadTs, "done");
           }
         },
       }),
@@ -585,10 +590,13 @@ export class SlackThread implements ThreadChat {
   }
 
   showStatus(status: RootStatus, signal?: AbortSignal): Promise<boolean> {
+    // A turn that ends with no footer (a lost process) ends its waiting line too.
+    if (status === "done" || status === "error") this.waitNamed = false;
     return this.reaction.show(REACTIONS[status], signal);
   }
 
   clearStatus(): Promise<void> {
+    this.waitNamed = false;
     return this.reaction.clear();
   }
 
@@ -763,7 +771,21 @@ export class SlackThread implements ThreadChat {
     // The message is the only handle on its buttons: one Slack did not name cannot be removed.
     if (typeof ts !== "string" || ts === "") throw new ChatError("no_ts");
     this.postedOwn(ts);
+    this.nameWaiting(request);
     return ts;
+  }
+
+  /**
+   * Moves the channel's line to name this thread once the agent's first approval or question of
+   * a turn is posted: a later one, once the owner answered the first, posts no second line
+   * (#72). The setup form, a `!!` command's confirmation and the same-folder hold answer what
+   * the owner has just written in the thread, who is there to answer them.
+   */
+  private nameWaiting(request: OwnerRequest): void {
+    if (request.type !== "permission" && request.type !== "question") return;
+    if (this.waitNamed || this.options.line === undefined) return;
+    this.waitNamed = true;
+    void this.options.line.show(this.channel, this.threadTs, "waiting");
   }
 
   async withdraw(request: MessageId): Promise<boolean> {

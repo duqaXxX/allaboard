@@ -32,7 +32,7 @@ const line = (ts: string, user = BOT, event = LINE_EVENT) => ({
 // bold; a thread reply, a mention or a reaction in a thread and an edit did not.
 test("a done thread's line is posted at the bottom, linking the thread by its title", async () => {
   const fake = slack();
-  await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT);
+  await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT, "done");
   const [posted] = fake.callsTo("chat.postMessage");
   assert.equal(posted?.channel, CHANNEL);
   assert.equal(posted?.thread_ts, undefined); // top level: what makes the channel unread
@@ -46,6 +46,30 @@ test("a done thread's line is posted at the bottom, linking the thread by its ti
   assert.deepEqual(posted?.metadata, { event_type: LINE_EVENT, event_payload: {} });
 });
 
+// #72: a thread blocked on the owner, with the mark its root shows (✋); the line it replaces goes,
+// and a title written later keeps the word.
+test("a waiting thread's line replaces the last one and keeps its word through a title", async () => {
+  const fake = slack();
+  fake.responses["chat.update"] = { ok: true };
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  await lines.show(CHANNEL, ROOT, "done");
+  await lines.show(CHANNEL, ROOT, "waiting");
+  const posted = fake.callsTo("chat.postMessage").at(-1);
+  assert.equal(posted?.text, "Waiting: Fix the login page");
+  assert.deepEqual(posted?.blocks, [
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `✋ Waiting: <${LINK}|Fix the login page>` }],
+    },
+  ]);
+  assert.deepEqual(
+    fake.callsTo("chat.delete").map((call) => call.ts),
+    [fake.postedTs[0]],
+  );
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  assert.equal(fake.callsTo("chat.update").at(-1)?.text, "Waiting: Login fix");
+});
+
 // #43: the line read the root before the session's title reached it, and kept the owner's words.
 test("a line posted before the thread's title names the thread by it once the root shows it", async () => {
   const fake = slack();
@@ -57,7 +81,7 @@ test("a line posted before the thread's title names the thread by it once the ro
   const lines = new ChannelLine(fake, { botUserId: BOT });
   // Asked at once, as at a turn's end: the footer's line first, the title a moment later.
   await Promise.all([
-    lines.show(CHANNEL, ROOT),
+    lines.show(CHANNEL, ROOT, "done"),
     lines.retitle(CHANNEL, ROOT, "*Fix the login page*"),
   ]);
   assert.equal(
@@ -85,7 +109,7 @@ test("a title the line already shows, of another thread, or with no line, edits 
   };
   const lines = new ChannelLine(fake, { botUserId: BOT });
   await lines.retitle(CHANNEL, ROOT, "*Fix `parse_args` in cli.py*");
-  await lines.show(CHANNEL, ROOT);
+  await lines.show(CHANNEL, ROOT, "done");
   // The root's text names the thread as the line read it, its tag and marks aside.
   await lines.retitle(CHANNEL, ROOT, "`[web]` *Fix `parse_args` in cli.py*");
   await lines.retitle(CHANNEL, ROOT, "*Fix `parse_args` in cli.py*");
@@ -102,7 +126,7 @@ test("a renamed line is renamed again by a later title, and a refused edit is on
     botUserId: BOT,
     logger: { warning: (text: string) => said.push(text) } as never,
   });
-  await lines.show(CHANNEL, ROOT);
+  await lines.show(CHANNEL, ROOT, "done");
   await lines.retitle(CHANNEL, ROOT, "*Login page fix*");
   await lines.retitle(CHANNEL, ROOT, "*Login fix*");
   // Refused: the line still says what it said, and the same words asked again edit it.
@@ -123,7 +147,7 @@ test("a line deleted by hand is not edited again", async () => {
     botUserId: BOT,
     logger: { warning: (text: string) => said.push(text) } as never,
   });
-  await lines.show(CHANNEL, ROOT);
+  await lines.show(CHANNEL, ROOT, "done");
   await lines.retitle(CHANNEL, ROOT, "*Login page fix*");
   await lines.retitle(CHANNEL, ROOT, "*Login fix*");
   assert.equal(fake.callsTo("chat.update").length, 1);
@@ -133,8 +157,8 @@ test("a line deleted by hand is not edited again", async () => {
 test("the next line replaces the one before, which goes only once the new one is there", async () => {
   const fake = slack();
   const lines = new ChannelLine(fake, { botUserId: BOT });
-  await lines.show(CHANNEL, ROOT);
-  await lines.show(CHANNEL, ROOT);
+  await lines.show(CHANNEL, ROOT, "done");
+  await lines.show(CHANNEL, ROOT, "done");
   const [first, second] = fake.callsTo("chat.postMessage").map((_, i) => fake.createdTs[i]);
   assert.deepEqual(fake.callsTo("chat.delete"), [{ channel: CHANNEL, ts: first }]);
   assert.ok(second !== undefined && second !== first);
@@ -150,7 +174,7 @@ test("after a start, every line an earlier run left is deleted, and nothing else
     line("1792626240.000001", BOT, "other_event"),
     { ts: "1792626230.000001", user: BOT, text: "a reply's message" },
   ]);
-  await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT);
+  await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT, "done");
   assert.deepEqual(
     fake.callsTo("chat.delete").map((call) => call.ts),
     ["1792626300.000001", "1792626200.000001"],
@@ -168,8 +192,8 @@ test("a failure is logged, never thrown, and the channel's next line still comes
     botUserId: BOT,
     logger: { warning: (text: string) => said.push(text) } as never,
   });
-  await lines.show(CHANNEL, ROOT);
-  await lines.show(CHANNEL, ROOT);
+  await lines.show(CHANNEL, ROOT, "done");
+  await lines.show(CHANNEL, ROOT, "done");
   assert.equal(said.length, 1);
   assert.ok(said[0]?.includes("channel_not_found"), said[0]);
   assert.equal(fake.callsTo("chat.postMessage").length, 1);
@@ -182,7 +206,7 @@ test("an old line already gone is no failure", async () => {
   await new ChannelLine(fake, {
     botUserId: BOT,
     logger: { warning: (text: string) => said.push(text) } as never,
-  }).show(CHANNEL, ROOT);
+  }).show(CHANNEL, ROOT, "done");
   assert.deepEqual(said, []);
 });
 
@@ -200,9 +224,9 @@ test("an old line a delete failed for is deleted at the next change", async () =
   const fake = slack();
   fake.responses["chat.delete"] = [rejected("ratelimited"), { ok: true }];
   const lines = new ChannelLine(fake, { botUserId: BOT, logger: { warning: () => {} } as never });
-  await lines.show(CHANNEL, ROOT);
-  await lines.show(CHANNEL, ROOT);
-  await lines.show(CHANNEL, ROOT);
+  await lines.show(CHANNEL, ROOT, "done");
+  await lines.show(CHANNEL, ROOT, "done");
+  await lines.show(CHANNEL, ROOT, "done");
   const [first, second] = fake.createdTs;
   assert.deepEqual(
     fake.callsTo("chat.delete").map((call) => call.ts),
@@ -214,9 +238,9 @@ test("lines asked for at once in one channel leave one line", async () => {
   const fake = slack();
   const lines = new ChannelLine(fake, { botUserId: BOT });
   await Promise.all([
-    lines.show(CHANNEL, ROOT),
-    lines.show(CHANNEL, ROOT),
-    lines.show(CHANNEL, ROOT),
+    lines.show(CHANNEL, ROOT, "done"),
+    lines.show(CHANNEL, ROOT, "done"),
+    lines.show(CHANNEL, ROOT, "done"),
   ]);
   const posted = fake.createdTs;
   assert.equal(posted.length, 3);
