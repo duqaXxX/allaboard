@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.12.0] - 2026-10-26
+
 ### Fixed
 
 - A run of shell commands lost the list of its commands when the reply ended: its card gave way
@@ -22,16 +24,19 @@ All notable changes to this project are documented here. The format follows
   and a later event of another thread replaced the line of a thread still waiting for you, so
   the channel no longer said it waited (#88). The line now starts with `Status:` and, while a
   thread waits for your answer to an approval or a question, names the one that has waited
-  longest and counts the others (`Status: ✋ Waiting: A · +1`), whatever the event; the push still
-  names the event. With none waiting it counts the threads at work
-  (`Status: ⏳ Working: 2 threads`) or names the one that ended last. Between its posts it follows the threads' status in
-  `state.json`, by edits that push nothing. The line mentions nobody.
+  longest and counts the others (`Status: ✋ Waiting: A · +1`), whatever the event. With none
+  waiting it counts the threads at work (`Status: ⏳ Working: 2 threads`) or names the one that
+  ended last. Between its posts it follows the threads' status in `state.json`, by edits that
+  push nothing. A thread is named by 40 characters. A line whose thread is deleted goes when
+  nothing waits; after a restart the line is taken over and kept up.
+
+### Changed
+
 - With `SLACK_MENTION_OWNER=on` you are told from the thread, and a tap on the push opens the
-  thread (#88): each approval and question mentions you, and the end of the work edits the
-  reply's last message to mention you, out of sight. A request's heading is rich text, beside
-  which the mention pushes; beside the section heading it did not.
-  A thread is named by 40 characters. A line whose thread is deleted goes when nothing waits;
-  after a restart the line is taken over and kept up.
+  thread (#88): each approval and question mentions you, out of sight, and the end of the work
+  edits the reply's last message to mention you. The channel's line mentions nobody and is
+  always the small grey line (#83). A request's heading is rich text, beside which the mention
+  pushes; beside the section heading it did not.
 
 ## [0.11.0] - 2026-10-25
 
