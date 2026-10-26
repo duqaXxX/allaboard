@@ -113,6 +113,7 @@ export interface TaskCardBlock {
 
 export interface ContainerBlock {
   type: "container";
+  block_id?: string;
   title: PlainTextObject;
   rich_text_title?: RichText;
   subtitle?: PlainTextObject;
@@ -230,20 +231,24 @@ export function previewBlocks(body: string): MarkdownBlock[] {
  * until the owner opens it. A call with no card is titled with its line, in code style as a tool
  * line is (`asCode`), and says the preview's sentence under it; under a card, which is the
  * call's line, the title is the sentence alone. The body sits in the message itself, so it opens
- * after a restart too.
+ * after a restart too. With `id`, each container keeps the block id `<id>-<n>` for the message's
+ * whole life: Slack gives a container with none a new one at every edit, and its desktop and iOS
+ * apps close a container the owner opened when its block id changes; with a fixed one it stays
+ * open (measured 2026-10-26).
  */
 export function previewContainers(
   title: string,
   body: string,
-  options: { subtitle?: string; language?: string; asCode?: boolean } = {},
+  options: { subtitle?: string; language?: string; asCode?: boolean; id?: string } = {},
 ): ContainerBlock[] {
-  const { subtitle = "", language = "diff", asCode = false } = options;
+  const { subtitle = "", language = "diff", asCode = false, id } = options;
   const shown = take(title, CONTAINER_TITLE_LIMIT);
   return split(body)
     .filter((chunk) => chunk !== "")
-    .map((chunk) => {
+    .map((chunk, n) => {
       const block: ContainerBlock = {
         type: "container",
+        ...blockIdOf(id === undefined ? undefined : `${id}-${n + 1}`),
         title: { type: "plain_text", text: shown },
         width: "full",
         is_collapsible: true,
@@ -458,6 +463,12 @@ export function richText(text: string): RichText {
   };
 }
 
+/** `{ block_id }` when `id` is within Slack's limit, nothing otherwise. */
+function blockIdOf(id: string | undefined): { block_id?: string } {
+  // Slack refuses a block_id past 255 characters, which an agent's ids are not bound by.
+  return id !== undefined && id.length <= BLOCK_ID_LIMIT ? { block_id: id } : {};
+}
+
 /**
  * The block id of a tool's card: the one Slack stores a streamed card under, so the card keeps it
  * from its stream through every edit of its message. Slack's desktop app closes a card the owner
@@ -509,8 +520,8 @@ function runningRows(line: RunningLine, now: number): string {
  * The card of the list of what still runs: one `task_card` that keeps its `block_id` for its whole
  * life, since Slack leaves a card with a fixed id open across an edit. Measured 2026-10-12 on
  * Slack desktop: the card stays open across `chat.update` when the text above it changes, when a
- * line of its `details` is added or removed and when its title changes; a collapsible `container`
- * does not stay open, and a `task_card` inside a `container` is refused; a message with two
+ * line of its `details` is added or removed and when its title changes; a `task_card` inside a
+ * `container` is refused; a message with two
  * blocks that share one `task_id` is refused (`invalid_blocks`), which `FakeSlack` does not check
  * and `test/chat/slack/reply/sinks.test.ts` does. Not measured: whether the card's `details`
  * count toward the 12,000 characters of a message written by `chat.update`. Past

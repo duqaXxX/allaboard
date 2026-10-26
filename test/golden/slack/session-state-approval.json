@@ -4,6 +4,7 @@
   "message_blocks": [
    [
     {
+     "block_id": "preview-toolu_01AjEWFfmc2WpgadcvgwEfyn-1-1",
      "child_blocks": [
       {
        "elements": [
@@ -86,6 +87,7 @@
      {
       "blocks": [
        {
+        "block_id": "preview-toolu_01AjEWFfmc2WpgadcvgwEfyn-1-1",
         "child_blocks": [
          {
           "elements": [
@@ -170,6 +172,7 @@
    "args": {
     "blocks": [
      {
+      "block_id": "preview-toolu_01AjEWFfmc2WpgadcvgwEfyn-1-1",
       "child_blocks": [
        {
         "elements": [

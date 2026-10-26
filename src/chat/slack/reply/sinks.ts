@@ -322,14 +322,16 @@ export function pieceBlocks(tool: Tool, index: number): Block[] {
   const body = tool.piece(index);
   if (view.plain) return [contextBlock(body)];
   if (!pieceCollapsed(tool)) return previewBlocks(body);
+  const id = `preview-${tool.update.id}-${index}`;
   if (tool.cardless) {
     return previewContainers(view.title, body, {
       subtitle: view.summary,
       language: view.language,
       asCode: true,
+      id,
     });
   }
-  return previewContainers(view.summary, body);
+  return previewContainers(view.summary, body, { id });
 }
 
 /**
