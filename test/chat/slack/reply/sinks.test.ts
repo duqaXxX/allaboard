@@ -3442,6 +3442,42 @@ test("a card keeps the block id its stream gave it through every edit of its mes
   assert.ok(ids.every((id) => id === streamedCardBlockId("a")));
 });
 
+test("a preview keeps one block id from its stream through every edit of its message", async () => {
+  // A container with no block_id gets a new one from Slack at every chat.update, and Slack's
+  // desktop and iOS apps close it then; with a fixed one it stays open (measured 2026-10-26).
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  const view = preview("Update(a.txt)", "Added 1 line", "+🟩 1 x", "diff");
+  await sink.task(tool("e", "Edit", "complete", { preview: view }));
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await sink.text("More.");
+  await settled();
+  await sink.text(" And more.");
+  await settled();
+  const streamed = list(only(list(only(slack.callsTo("chat.startStream")).chunks)).blocks);
+  const edits = slack.callsTo("chat.update").map((call) => containersOf(list(call.blocks)));
+  assert.ok(edits.length >= 2);
+  const ids = [streamed, ...edits].map((blocks) => only(containersOf(blocks)).block_id);
+  assert.equal(typeof ids[0], "string");
+  assert.ok(ids.every((id) => id === ids[0]));
+});
+
+test("each container of a long diff has a block id of its own", () => {
+  const body = Array.from({ length: 399 }, (_, i) => `+🟩 ${i + 1} ${"x".repeat(90)}`).join("\n");
+  const ids = previewContainers("Added 399 lines", body, { id: "e" }).map((b) => b.block_id);
+  assert.ok(ids.length > 1);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(ids.every((id) => typeof id === "string"));
+});
+
+test("a preview whose id is past slacks limit has no block id", () => {
+  // Slack refuses a block_id past 255 characters, which an agent's ids are not bound by.
+  const block = only(previewContainers("Added 1 line", "+x", { id: "e".repeat(300) }));
+  assert.ok(!("block_id" in block));
+});
+
 test("a reply with no run of calls gets no update at its end", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);

@@ -383,8 +383,11 @@ divider, in the thread's last reply once it rests.
 - A card of a subagent's words (`TaskUpdate.message`) shows its output, its body, also once
   complete (`blocks.cardFields`); a call's card keeps its result to itself.
 - Slack keeps a `task_card` with a fixed `block_id` open across `chat.update` (measured
-  2026-10-12, Slack desktop; the client version was not recorded). A collapsible `container` does
-  not, and a `task_card` inside one is refused. Every card of a call or a run keeps one
+  2026-10-12, Slack desktop; the client version was not recorded), and a `task_card` inside a
+  `container` is refused. A preview's `container` keeps one as well, `preview-<call id>-<piece>-<n>`
+  (`blocks.previewContainers`), from its stream through every edit: one with no `block_id` gets a
+  new one from Slack at each edit and closes on desktop and iOS, one with a fixed id stays open
+  (measured 2026-10-26). Every card of a call or a run keeps one
   too, `task-<task_id>` (`blocks.cardBlockId`), which is the id Slack stores a streamed card under: a
   card the owner opened stays open from its stream through every edit of its message, where an
   edit with no `block_id` closed it on desktop (measured 2026-10-25; on iOS a card opens in a

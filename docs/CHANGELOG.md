@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- An Edit or Write preview you had opened closed again each time its reply was edited, on Slack's
+  desktop and iOS apps (#27). Each preview's container now keeps one block id for the life of its
+  message, and stays open.
+
 ## [0.12.0] - 2026-10-26
 
 ### Fixed
