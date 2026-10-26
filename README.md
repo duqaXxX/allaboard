@@ -61,7 +61,7 @@ first, then allaboard restarts on the new version.
   account controls the machine. A free workspace allows 10 apps, one per instance.
 - Projects in a folder macOS protects, such as `~/Documents` or `~/Desktop`, need Full Disk
   Access for the daemon.
-- Status: version 0.11.0, an early release. [docs/features.md](docs/features.md) lists what is
+- Status: version 0.12.0, an early release. [docs/features.md](docs/features.md) lists what is
   tested and what is still checked by hand, and [docs/limits.md](docs/limits.md) what the
   terminal does and Slack does not.
 
