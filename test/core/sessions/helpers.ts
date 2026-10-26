@@ -493,6 +493,8 @@ export function recordingLine(): {
     show: async (_channel: string, root: string, kind: LineKind, mention?: string) =>
       void shown.push([root, kind, mention]),
     retitle: async () => {},
+    withdrawn: async () => {},
+    restate: async () => {},
   };
   return { line: line as unknown as ChannelLine, shown };
 }

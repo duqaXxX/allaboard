@@ -1449,7 +1449,9 @@ With three settings, Slack pushes only when a session needs you:
 Then a push comes:
 
 - when a prompt's work ends, done or failed: the channel's `✅ Done:` or `❌ Failed:` line;
-- for each approval request and each question of Claude's: the channel's `✋ Waiting:` line;
+- for each approval request and each question of Claude's: the channel's `✋ Waiting:` line.
+  Between those posts the line follows what the thread's root shows (`⏳ Working:` once you
+  answered and the work goes on, for one), by edits that ring nothing;
 - when a restart or a stop of allaboard cuts a session's work short, with its `❌ Failed:` line,
   and when a crash did, at the next start.
 

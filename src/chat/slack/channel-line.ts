@@ -60,14 +60,18 @@ export function lineLabel(root: Message | undefined): string {
   return chars.length > LABEL_LIMIT ? `${chars.slice(0, LABEL_LIMIT - 1).join("")}…` : words;
 }
 
-/** What the line says of the thread it names: its work is done or failed, or it waits for the owner. */
-export type LineKind = "done" | "failed" | "waiting";
+/**
+ * What the line says of the thread it names: its work is done or failed, it waits for the owner,
+ * or it goes on: the root's status.
+ */
+export type LineKind = "done" | "failed" | "waiting" | "working";
 
 // Each kind's word, and its mark: the one the root's reaction shows for the same state.
 const WORDS: Readonly<Record<LineKind, readonly [string, string]>> = {
   done: ["✅", "Done"],
   failed: ["❌", "Failed"],
   waiting: ["✋", "Waiting"],
+  working: ["⏳", "Working"],
 };
 
 /**
@@ -108,8 +112,10 @@ function lineContent(kind: LineKind, label: string, permalink: string, mention?:
 interface Named {
   readonly ts: string;
   readonly root: string;
-  readonly kind: LineKind;
-  readonly permalink: string;
+  kind: LineKind;
+  // The message of the thread the link opens, and its permalink.
+  opened: string;
+  permalink: string;
   readonly mention: string | undefined;
   label: string;
 }
@@ -139,11 +145,62 @@ export class ChannelLine {
 
   /**
    * Move the channel's line to the bottom, naming the thread whose root is `rootTs` as `kind`,
-   * mentioning the user `mention` out of sight when given. Never rejects: a failure is logged by
-   * its code and the reply goes on.
+   * mentioning the user `mention` out of sight when given, its link opening the thread on the
+   * message `opened`, or on its last reply. Never rejects: a failure is logged by its code and the
+   * reply goes on.
    */
-  show(channel: string, rootTs: string, kind: LineKind, mention?: string): Promise<void> {
-    return this.#queue(channel, () => this.#show(channel, rootTs, kind, mention), "move");
+  show(
+    channel: string,
+    rootTs: string,
+    kind: LineKind,
+    mention?: string,
+    opened?: string,
+  ): Promise<void> {
+    return this.#queue(channel, () => this.#show(channel, rootTs, kind, mention, opened), "move");
+  }
+
+  /**
+   * Links the thread's root instead when the line this run posted opens the message `messageTs`
+   * of the thread `rootTs`, which was just deleted: Slack answers a deleted message's link with
+   * "unable to open this link". Its word stays. Queued behind the line's moves. Never rejects.
+   */
+  withdrawn(channel: string, rootTs: string, messageTs: string): Promise<void> {
+    return this.#queue(channel, () => this.#withdrawn(channel, rootTs, messageTs), "relink");
+  }
+
+  async #withdrawn(channel: string, rootTs: string, messageTs: string): Promise<void> {
+    const named = this.#posted.get(channel);
+    if (named === undefined || named.root !== rootTs || named.opened !== messageTs) return;
+    await this.#rewrite(channel, named, named.kind);
+  }
+
+  /**
+   * Says `kind` of the thread whose root is `rootTs` when the line this run posted names it with
+   * another word, by an edit, which pushes nothing: the line follows the root's status between
+   * the posts that tell the owner. Any word but waiting links the root, since the request a
+   * waiting line opens is gone once answered. Queued behind the line's moves. Never rejects.
+   */
+  restate(channel: string, rootTs: string, kind: LineKind): Promise<void> {
+    return this.#queue(channel, () => this.#restate(channel, rootTs, kind), "restate");
+  }
+
+  async #restate(channel: string, rootTs: string, kind: LineKind): Promise<void> {
+    const named = this.#posted.get(channel);
+    if (named === undefined || named.root !== rootTs || named.kind === kind) return;
+    if (kind === "waiting") {
+      if (await this.#edit(channel, named, named.label, named.permalink, kind)) named.kind = kind;
+      return;
+    }
+    await this.#rewrite(channel, named, kind);
+  }
+
+  /** Edits the line `named` to say `kind`, linked by its thread's root. */
+  async #rewrite(channel: string, named: Named, kind: LineKind): Promise<void> {
+    const permalink = await this.#permalink(channel, named.root, named.root);
+    if (!(await this.#edit(channel, named, named.label, permalink, kind))) return;
+    named.kind = kind;
+    named.opened = named.root;
+    named.permalink = permalink;
   }
 
   /** Runs `work` after the channel's change in flight; a failure is logged as one to `verb`. */
@@ -173,6 +230,20 @@ export class ChannelLine {
     const named = this.#posted.get(channel);
     const label = lineLabel({ text });
     if (named === undefined || named.root !== rootTs || named.label === label) return;
+    if (await this.#edit(channel, named, label, named.permalink)) named.label = label;
+  }
+
+  /**
+   * Rewrites the line `named` to name its thread by `label` at `permalink`, as `kind` when given;
+   * false when it is gone.
+   */
+  async #edit(
+    channel: string,
+    named: Named,
+    label: string,
+    permalink: string,
+    kind: LineKind = named.kind,
+  ): Promise<boolean> {
     try {
       // With no `metadata` the edit keeps the line's own, which finds it after a start ("the
       // message's previous metadata will be retained", docs.slack.dev chat.update, read
@@ -181,26 +252,32 @@ export class ChannelLine {
         channel,
         ts: named.ts,
         // An edit pushes nothing (measured 2026-09-27): the mention keeps the line's form.
-        ...lineContent(named.kind, label, named.permalink, named.mention),
+        ...lineContent(kind, label, permalink, named.mention),
       });
     } catch (error) {
       // Deleted by hand: the next line is posted as usual.
       if (gone(error)) {
         this.#posted.delete(channel);
-        return;
+        return false;
       }
       throw error;
     }
-    named.label = label;
+    return true;
   }
 
-  async #show(channel: string, rootTs: string, kind: LineKind, mention?: string): Promise<void> {
+  async #show(
+    channel: string,
+    rootTs: string,
+    kind: LineKind,
+    mention: string | undefined,
+    message: string | undefined,
+  ): Promise<void> {
     const replies = await this.#slack.conversations.replies({ channel, ts: rootTs, limit: 1 });
     const root = replies.messages?.[0] as Message | undefined;
     const label = lineLabel(root);
-    // The thread's last reply, which Slack opens the thread on, as the Home tab's Open does; its
-    // root while it has none.
-    const opened = (root !== undefined ? threadFacts(root).latestTs : null) ?? rootTs;
+    // Else the thread's last reply, which Slack opens the thread on, as the Home tab's Open does;
+    // its root while it has none.
+    const opened = message ?? (root !== undefined ? threadFacts(root).latestTs : null) ?? rootTs;
     const link = await this.#permalink(channel, opened, rootTs);
     const posted = await this.#slack.chat.postMessage({
       channel,
@@ -215,7 +292,7 @@ export class ChannelLine {
       ...(this.#left.get(channel) ?? []),
       ...(known !== undefined ? [known.ts] : await this.#earlier(channel, ts)),
     ];
-    this.#posted.set(channel, { ts, root: rootTs, kind, permalink: link, mention, label });
+    this.#posted.set(channel, { ts, root: rootTs, kind, opened, permalink: link, mention, label });
     // Deleted only once the new line is there: the channel never goes without one.
     const left: string[] = [];
     for (const line of new Set(old)) {

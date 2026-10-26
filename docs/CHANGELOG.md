@@ -14,6 +14,13 @@ All notable changes to this project are documented here. The format follows
 - On Slack's desktop app, a card of a reply you had opened closed again each time the reply was
   written by edit (its footer, or past 280 seconds). Every card of a call or a run now
   keeps one block id, `task-<task_id>`, the one Slack gives a streamed card, so it stays open.
+- Once you answered an approval or a question, the channel's `✋ Waiting:` line still linked the
+  request, which the daemon had deleted, and Slack opened a dialog, "We're unable to open this
+  link", in its place (#84). The line now links the request itself, and the thread's root once
+  that request is deleted.
+- The channel's line kept saying `✋ Waiting:` after you answered, while the work went on (#84).
+  Between the posts that tell you, the line now follows what the thread's root shows
+  (`⏳ Working:`, `✋ Waiting:`, `✅ Done:` after your own `!stop`), by edits that push nothing.
 
 ## [0.11.0] - 2026-10-25
 
