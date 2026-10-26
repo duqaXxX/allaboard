@@ -97,6 +97,23 @@ function codeChunks(text: string, limit: number): string[] {
   return chunk !== "" || chunks.length === 0 ? [...chunks, chunk] : chunks;
 }
 
+/**
+ * A request's heading as rich text, shown as written: `template`'s `*…*` spans bold, its fields
+ * filled from `values`. The owner's mention in the request's `text` pushes beside a rich text
+ * heading and never did beside a section one (measured 2026-10-26, iOS, "Thread replies" off).
+ */
+function richHeading(template: string, values: Readonly<Record<string, string>> = {}): Block {
+  const elements = template
+    .split(/(\*[^*]+\*)/)
+    .filter((part) => part !== "")
+    .map((part) => {
+      const bold = part.length > 2 && part.startsWith("*") && part.endsWith("*");
+      const text = texts.fill(bold ? part.slice(1, -1) : part, values);
+      return bold ? { type: "text", text, style: { bold: true } } : { type: "text", text };
+    });
+  return { type: "rich_text", elements: [{ type: "rich_text_section", elements }] };
+}
+
 function code(chunk: string): Block {
   return {
     type: "section",
@@ -113,14 +130,13 @@ export function approvalBlocks(
   request: PermissionRequest,
   names: Names,
 ): Block[] {
+  // A title is the agent's own words, shown with no markup of ours.
   const heading = request.title
-    ? shownAsWritten(request.title)
-    : texts.fill(named(slackTexts.APPROVAL_PROMPT, names), {
-        tool: shownAsWritten(request.toolName),
+    ? richHeading("{title}", { title: head(request.title, SECTION_LIMIT) })
+    : richHeading(named(slackTexts.APPROVAL_PROMPT, names), {
+        tool: head(request.toolName, SECTION_LIMIT),
       });
-  const blocks: Block[] = [
-    { type: "section", text: { type: "mrkdwn", text: head(heading, SECTION_LIMIT) } },
-  ];
+  const blocks: Block[] = [heading];
   if (request.description) {
     blocks.push(context(head(shownAsWritten(request.description), SECTION_LIMIT)));
   }
@@ -203,16 +219,20 @@ export function questionBlocks(
   questions: readonly Question[],
   names: Names,
 ): Block[] {
-  const headers = questions.map((q) => `*${shownAsWritten(q.header || q.text)}*`).join(" · ");
   const count =
     questions.length === 1
       ? named(slackTexts.QUESTIONS_ONE, names)
       : texts.fill(named(slackTexts.QUESTIONS_MANY, names), { count: questions.length });
+  // Each header bold, by a field of its own (letters: `texts.fill` takes no digit), so the words
+  // are shown as the agent wrote them.
+  const field = (i: number) => `header_${String.fromCharCode(97 + i)}`;
+  const values = Object.fromEntries(
+    // An element with no words is refused: a question with neither shows the ellipsis.
+    questions.map((q, i) => [field(i), head(q.header || q.text || "…", SECTION_LIMIT)]),
+  );
+  const headers = questions.map((_, i) => `*{${field(i)}}*`).join(" · ");
   return [
-    {
-      type: "section",
-      text: { type: "mrkdwn", text: head(`${count}: ${headers}`, SECTION_LIMIT) },
-    },
+    richHeading(`${count}: ${headers}`, values),
     {
       type: "actions",
       elements: [

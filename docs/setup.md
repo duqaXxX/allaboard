@@ -1433,8 +1433,8 @@ setting is:
 - Nothing rings while Claude writes.
 
 The channel's own setting (Part 1) governs only the bot's top-level messages (the answer to `!bind`, `!status`, `!resume`'s
-own list, the upgrade notice, the `✅ Done:`, `❌ Failed:` and `✋ Waiting:` line): with **Just mentions** those stay silent, unless
-`SLACK_MENTION_OWNER` is on (below); with **All new posts** they ring too.
+own list, the upgrade notice, the channel's `Status:` line): with **Just mentions** those stay silent; with **All new posts**
+they ring too. The `Status:` line mentions nobody: what needs you is told in its thread (below).
 
 #### Fewer notifications
 
@@ -1446,25 +1446,31 @@ With three settings, Slack pushes only when a session needs you:
    you follow stop ringing too.
 3. Each project channel on **Just mentions** (Part 1).
 
-Then a push comes:
+Then a push comes from the thread, and a tap on it opens the thread:
 
-- when a prompt's work ends, done or failed: the channel's `✅ Done:` or `❌ Failed:` line;
-- for each approval request and each question of Claude's: the channel's `✋ Waiting:` line.
-  Between those posts the line follows what the thread's root shows (`⏳ Working:` once you
-  answered and the work goes on, for one), by edits that ring nothing;
-- when a restart or a stop of allaboard cuts a session's work short, with its `❌ Failed:` line,
-  and when a crash did, at the next start.
+- when a prompt's work ends, done or failed: the reply's last message is edited to mention you;
+- for each approval request and each question of Claude's: the request mentions you;
+- when a restart or a stop of allaboard cuts a session's work short, and when a crash did, at the
+  next start: the reply's last message, or a `❌ Failed` line of its own when there is none.
 
 Nothing else in a thread rings: not the replies, the setup form, a `!!` command's confirmation, a
-same-folder question, `!stop` or `Stopped.`, which answer what you have just written. Each of
-those lines mentions you in its `text` alone, so no `@` shows in the channel or in the push, whose
-banner names the thread: `Waiting: <thread>`, `Done: <thread>`. Any value of
+same-folder question, `!stop` or `Stopped.`, which answer what you have just written. The mention
+is in the message's `text` alone, so no `@` shows in the thread or in the push, whose banner shows
+the message's words. Slack holds a phone's pushes while you are active on Slack desktop ("as soon
+as you're inactive on desktop, or after an additional delay", Guide to Slack notifications, read
+2026-10-26).
+
+The channel's `Status:` line makes the channel unread and mentions nobody. While a thread waits
+for you it names the one that has waited longest and counts the others,
+`Status: ✋ Waiting: A · +1`, whatever the event; otherwise it counts the threads at work,
+`Status: ⏳ Working: 2 threads`, or names the thread that ended last, by edits that ring nothing.
+
+Any value of
 `SLACK_MENTION_OWNER` other than `on` or `off`, in any case, stops the start with
 `SLACK_MENTION_OWNER must be on or off; it is "<value>"`.
 
-Leave `SLACK_MENTION_OWNER` off while **Thread replies** is on: every reply already rings then,
-and the line at the end of the work would ring once more. Measured on iOS only (2026-10-25); Slack
-desktop was not tried.
+Leave `SLACK_MENTION_OWNER` off while **Thread replies** is on: every reply already rings then.
+Measured on iOS only (2026-10-25 and 2026-10-26); Slack desktop was not tried.
 
 The measurements behind this (what was tried, on what Slack plan and app, and on what date) are
 in [features.md](features.md#notifications), not restated here.

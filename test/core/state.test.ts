@@ -948,7 +948,7 @@ test("threads lists every thread of every channel", () => {
   ]);
 });
 
-test("the observer hears what the session index shows and nothing else", () => {
+test("the observer hears what the session index and the line show, and nothing else", () => {
   const dir = scratch();
   const store = new StateStore(join(dir, "state.json"));
   const heard: (readonly ThreadRef[])[] = [];
@@ -969,9 +969,9 @@ test("the observer hears what the session index shows and nothing else", () => {
   for (const changed of heard.slice(3))
     assert.deepEqual(changed, [{ channel: CHANNEL, thread: THREAD_TS }]);
 
-  // What no row of the index shows: a reply's bookkeeping, a request, bypass, effort, a rebind.
+  // What neither the index nor the channel's line shows: a reply's bookkeeping, bypass, effort,
+  // a rebind.
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "1790549807.000001");
-  store.addRequest(CHANNEL, THREAD_TS, "1790549807.000002", "question");
   store.setBypass(CHANNEL, THREAD_TS, true);
   store.setEffort(CHANNEL, THREAD_TS, "low");
   store.bind(CHANNEL, join(dir, "elsewhere"));
@@ -999,6 +999,26 @@ test("the observer hears a prune that removed something", () => {
     1,
   );
   assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD_TS }]]);
+});
+
+// #88: whether a thread asks the owner (an approval or a question open) changes with its
+// requests, and the channel's line reads it; the status is written before the request is.
+test("a request is announced when it changes whether the thread asks the owner", () => {
+  const dir = scratch();
+  const store = new StateStore(join(dir, "state.json"));
+  store.bind(CHANNEL, join(dir, "project"));
+  store.openThread(CHANNEL, THREAD_TS, SESSION);
+  const heard: (readonly ThreadRef[])[] = [];
+  store.onSessionsChange = (changed) => heard.push(changed);
+  // The owner's own form: whether the thread asks him does not change.
+  store.addRequest(CHANNEL, THREAD_TS, "1700000000.000001", "setup");
+  assert.deepEqual(heard, []);
+  store.addRequest(CHANNEL, THREAD_TS, "1700000001.000001", "question");
+  store.addRequest(CHANNEL, THREAD_TS, "1700000002.000001", "approval"); // asks already
+  store.removeRequest(CHANNEL, THREAD_TS, "1700000001.000001");
+  store.removeRequest(CHANNEL, THREAD_TS, "1700000002.000001");
+  const ref = { channel: CHANNEL, thread: THREAD_TS };
+  assert.deepEqual(heard, [[ref], [ref]]);
 });
 
 test("remove channel forgets the channel and its threads and says which", () => {

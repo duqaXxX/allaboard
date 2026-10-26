@@ -459,23 +459,47 @@ from `SlackThread.ask` once each request is in the thread, its link the permalin
 A request is deleted once it is answered or stale, and Slack answers the link of a deleted
 message with a dialog, "We're unable to open this link". When `SlackThread.withdraw` deletes the
 request a line links, `ChannelLine.withdrawn` edits that line to link the thread's root, its word
-unchanged. Between the posts that tell the owner, the line follows the root's status: each
-`SlackThread.showStatus` that tells him nothing reaches `ChannelLine.restate`, which edits the line
-naming that thread to the status's word (`⏳ Working:` once he answered and the work goes on,
-`✋ Waiting:` while another request is open, `✅ Done:` after his own `!stop`), linked by the
-root but while waiting. The mention stays, and an edit pushes nothing. The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
+unchanged.
+
+The line starts with `Status:`. While a thread of the channel waits for the owner's answer to
+the agent (its root waits with an approval or a question open, `channel-line.lineThread` through
+`asksOwner`; a root waiting on the setup form, a `!!` command's confirmation or the same-folder
+hold is taken for working), the line names the one that has waited longest and counts the others
+(`Status: ✋ Waiting: A · +2`), whatever the event that posted it: the push's `text` names the
+event itself (`Status: Done: B · +1`), and a thread that waits is never hidden by another's end.
+Only a wait names a thread among several, since only a wait asks something of the owner: with
+none waiting and threads at work, the line counts them and names none
+(`Status: ⏳ Working: 2 threads`); with none at work either, it names the thread whose work ended last, linked. A root Slack no longer has
+(`thread_not_found`, or the tombstone left over the replies of a deleted root) is left out; one
+Slack did not answer for this time is still counted. Between the posts that tell the owner the
+line follows `state.json`, the source of the session index: each change
+`StateStore.onSessionsChange` announces (a status, an end, an open request, a removed thread)
+reaches `SlackChat.index`, which hands it to the Home tab and to `ChannelLine.refresh`, and each
+changed thread's root is read again. The line is then edited, never posted, to the waiting thread
+or to its own thread's word (`channel-line.rootKind`: `⏳ Working:` once the owner answered and
+the work goes on, `✅ Done:` after his own `!stop`), linked by the root but while it waits on the
+request it opens; a change that leaves it as it was writes nothing. When its own thread leaves
+`state.json` (deleted, or pruned) and nothing waits, the line is deleted. Each line carries the
+thread it names, its word and its mention in its metadata's payload (ids, no content), so after a
+start the first refresh takes over the line an earlier run left and brings it to the threads'
+status; a line with no such payload stays as it is until the next post. The mention stays, and an
+edit pushes nothing. The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
 what the owner has just written in the thread.
 
-With `SLACK_MENTION_OWNER=on` (`SlackChatOptions.mentionOwner`), the channel's line is what tells
-the owner: the `✋ Waiting:`, `✅ Done:` and `❌ Failed:` lines mention him in their `text` alone,
-where neither the channel nor the push's banner shows it, and are then a markdown block in place
-of the small grey context block. The request in the thread carries no mention. Measured on
-2026-10-25 on iOS, phone locked, channel on **Just mentions**, the owner's **Thread replies**
-notifications off, one run each: a post with a markdown block and the mention in `text` alone
-pushed, its banner showing the block's words; one whose only block is a context block did not
-push; with **Thread replies** on, the mention added no second push. The same day, a question
-request (a section and buttons) with the mention in its `text` did not push, posted 4 seconds
-after the owner's click on the setup's Start; a `✅ Done:` line did. Slack desktop was not tried.
+The line mentions nobody. With `SLACK_MENTION_OWNER=on` (`SlackChatOptions.mentionOwner`) the
+thread tells the owner, since a push from the thread opens the thread and one from the channel
+opens the channel. `SlackThread.ask` puts his mention in the `text` alone of each request that
+waits on him, an approval or a question, whose heading is then a rich text block; at the end of
+the work `SlackThread.showStatus` (done or error, with `notify`) has `ThreadPlaces.tell` ask the
+newest reply (`ReplySink.tell`) to write its last message again, the same blocks, with the mention
+added to its `text`, once; with no reply to carry it, a line of its own (the root's mark and word,
+rich text) is posted in the thread. Measured on 2026-10-26 on iOS, phone locked, Slack desktop
+closed, channel on **Just mentions**, the owner's **Thread replies** notifications off, one run
+each: an invisible `text` mention pushed beside a rich text block, a streamed message, and a
+request whose heading was rich text, never beside a section heading or a context block alone; an
+edit that adds the mention pushed, at once after a stream's stop and 2 minutes after it; a tap
+opened the thread; a `text` with no blocks would remove the message's blocks (chat.update
+reference, read 2026-10-26). Slack holds a phone's pushes while the owner is active on desktop.
 The line's `text` escapes the root's words (`escape.mrkdwnEscape`),
 since a mention sequence there notifies. An answer leaves the line as it is. Whichever its
 word and its thread, each new line replaces the last: `ChannelLine` deletes the line it posted

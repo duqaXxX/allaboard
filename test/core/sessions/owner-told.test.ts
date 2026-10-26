@@ -31,12 +31,17 @@ test("a prompt's work that ends tells the owner once, a later sweep or close doe
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
   await h.until(() => h.reactions().at(-1) === Status.DONE);
-  assert.deepEqual(shown, [[THREAD, "done", OWNER]]);
+  assert.deepEqual(shown, [[THREAD, "done"]]);
   // Done again, as a report's or a landed reply's own sweep asks for it: no second word.
   await (session as unknown as { reactDoneIfIdle(): Promise<void> }).reactDoneIfIdle();
   await session.close();
   await h.idle();
-  assert.deepEqual(shown, [[THREAD, "done", OWNER]]);
+  assert.deepEqual(shown, [[THREAD, "done"]]);
+  // Told in the thread, once: the mention in one write's `text` (#88).
+  const told = [...h.slack.callsTo("chat.update"), ...h.slack.callsTo("chat.postMessage")].filter(
+    (call) => String(call.text).includes(`<@${OWNER}>`),
+  );
+  assert.equal(told.length, 1);
 });
 
 test("each prompt's work tells the owner of its own end", async (t) => {
@@ -47,10 +52,10 @@ test("each prompt's work tells the owner of its own end", async (t) => {
   await h.until(() => shown.length === 1);
   await (await session.submit("two")).done.wait();
   await h.until(() => shown.length === 2);
-  // Without `mentionOwner` the line moves all the same, mentioning nobody.
+  // Without `mentionOwner` the line moves all the same.
   assert.deepEqual(shown, [
-    [THREAD, "done", undefined],
-    [THREAD, "done", undefined],
+    [THREAD, "done"],
+    [THREAD, "done"],
   ]);
 });
 
@@ -62,11 +67,11 @@ test("an answered approval tells the owner of the work's end, not of the answer"
   const session = h.session();
   const turn = await session.submit("list the files");
   await h.until(() => pending(h.approvals).length > 0);
-  assert.deepEqual(shown, [[THREAD, "waiting", undefined]]); // the request's own line
+  assert.deepEqual(shown, [[THREAD, "waiting"]]); // the request's own line
   approve(h);
   await turn.done.wait();
   await h.until(() => shown.length === 2);
-  assert.deepEqual(shown.at(-1), [THREAD, "done", undefined]);
+  assert.deepEqual(shown.at(-1), [THREAD, "done"]);
 });
 
 test("a failed turn tells the owner it failed", async (t) => {
@@ -81,7 +86,7 @@ test("a failed turn tells the owner it failed", async (t) => {
   };
   await (await session.submit("hi")).done.wait();
   await h.until(() => shown.length === 1);
-  assert.deepEqual(shown, [[THREAD, "failed", undefined]]);
+  assert.deepEqual(shown, [[THREAD, "failed"]]);
 });
 
 test("!stop tells the owner nothing: he has just given it", async (t) => {
@@ -95,7 +100,7 @@ test("!stop tells the owner nothing: he has just given it", async (t) => {
   await submitted.done.wait();
   await h.idle();
   assert.equal(h.reactions().at(-1), Status.DONE);
-  assert.deepEqual(shown, [[THREAD, "waiting", undefined]]); // the approval's line alone
+  assert.deepEqual(shown, [[THREAD, "waiting"]]); // the approval's line alone
 });
 
 test("a hold the owner cancels restores the status he was told of, telling him nothing", async (t) => {
@@ -109,13 +114,13 @@ test("a hold the owner cancels restores the status he was told of, telling him n
   await h.until(() => inside(session).client === null);
   await h.until(() => h.reactions().at(-1) === Status.ERROR);
   await h.idle();
-  assert.deepEqual(shown, [[THREAD, "failed", undefined]]);
+  assert.deepEqual(shown, [[THREAD, "failed"]]);
   session.holdStart();
   await h.idle();
   await session.holdEnd({ continued: false });
   await h.until(() => h.reactions().at(-1) === Status.ERROR);
   await h.idle();
-  assert.deepEqual(shown, [[THREAD, "failed", undefined]]);
+  assert.deepEqual(shown, [[THREAD, "failed"]]);
 });
 
 // The stop of work left running in the background closes the agent's process, whose tasks end

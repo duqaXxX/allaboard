@@ -16,6 +16,7 @@ import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { AgentBackend, Question } from "../../agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "../../clock.ts";
 import {
+  asksOwner,
   Cancelled,
   type CorePort,
   type Listings,
@@ -51,7 +52,7 @@ import { type BuiltApp, buildApp } from "./app/app.ts";
 import type { ChannelGuard } from "./app/guards.ts";
 import { threadKey } from "./app/order.ts";
 import { SlackChannel } from "./channel.ts";
-import type { ChannelLine, LineKind } from "./channel-line.ts";
+import type { ChannelLine } from "./channel-line.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
 import type { ThreadDeletion } from "./delete.ts";
 import { formatFooter, slackTime } from "./footer.ts";
@@ -65,7 +66,7 @@ import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { positionOf, ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
-import { REACTIONS, StatusReaction, ThreadStatus } from "./reply/status.ts";
+import { REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks, shellBlocks } from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 import type { RootEditor } from "./tag.ts";
@@ -168,12 +169,12 @@ export interface SlackChatOptions {
 }
 
 /**
- * Whether `request` is the agent's, which waits on the owner wherever he is: the setup form, a
- * `!!` command's confirmation and the same-folder hold answer what he has just written in the
- * thread, and he is there to answer them.
+ * Whether `request` is the agent's, which waits on the owner wherever he is (`asksOwner`, by the
+ * kind `state.json` keeps of it): the setup form, a `!!` command's confirmation and the
+ * same-folder hold answer what he has just written in the thread, and he is there to answer them.
  */
 function waitsOnOwner(request: OwnerRequest): boolean {
-  return request.type === "permission" || request.type === "question";
+  return asksOwner(request.type === "permission" ? "approval" : request.type);
 }
 
 /** The emoji of each root reaction (`REACTIONS`), as a character. */
@@ -182,15 +183,6 @@ const STATUS_MARKS: Readonly<Record<SessionStatus, string>> = {
   waiting: "✋",
   done: "✅",
   error: "❌",
-};
-
-/** What the channel's line says of each root status: a stop's wait is work still going on. */
-const LINE_KINDS: Readonly<Record<RootStatus, LineKind>> = {
-  working: "working",
-  restarting: "working",
-  waiting: "waiting",
-  done: "done",
-  error: "failed",
 };
 
 // The most of a run's words the loop card shows; a markdown block holds 12,000 characters in all.
@@ -216,7 +208,10 @@ export class SlackChat implements ChatProvider {
    * across the connections of two daemons.
    */
   readonly identities: readonly string[];
-  /** Present when the provider holds the Home tab (`SlackApp.home`). */
+  /**
+   * Present when the provider holds the Home tab (`SlackApp.home`) or the channels' line
+   * (`SlackChatOptions.line`): both show the sessions' status.
+   */
   readonly index?: SessionIndex;
   /** Present when the owner's user token is configured (`SlackChatOptions.roots`, `canTag`). */
   readonly tagThread?: (ref: ThreadRef, tag: string | null) => Promise<void>;
@@ -251,7 +246,17 @@ export class SlackChat implements ChatProvider {
       ...(options.app !== undefined ? [options.app.appKey] : []),
     ];
     const home = options.app?.home;
-    if (home !== undefined) this.index = { refresh: (changed) => home.request(changed) };
+    const line = options.line;
+    if (home !== undefined || line !== undefined) {
+      this.index = {
+        refresh: (changed) => {
+          // Read once: both take the same refs.
+          const refs = changed === undefined ? undefined : [...changed];
+          home?.request(refs);
+          void line?.refresh(refs);
+        },
+      };
+    }
     const roots = options.roots;
     // The root may have changed even when a later step failed: the Home reads it again.
     const rereading = async <T>(ref: ThreadRef, edit: () => Promise<T>): Promise<T> => {
@@ -602,14 +607,52 @@ export class SlackThread implements ThreadChat {
   }
 
   showStatus(status: RootStatus, options: StatusOptions = {}): Promise<boolean> {
-    const kind = LINE_KINDS[status];
-    if (options.notify && (kind === "done" || kind === "failed")) {
-      void this.options.line?.show(this.channel, this.threadTs, kind, this.mention());
-    } else {
-      // Between the posts that tell the owner, a line naming this thread says what its root does.
-      void this.options.line?.restate(this.channel, this.threadTs, kind);
+    // Between these posts, the line follows the root's status in `state.json` (`ChannelLine.refresh`).
+    if (options.notify && (status === "done" || status === "error")) {
+      const kind = status === "done" ? "done" : "failed";
+      void this.options.line?.show(this.channel, this.threadTs, kind);
+      const mention = this.mention();
+      if (mention !== undefined) void this.tellEnd(kind, mention);
     }
     return this.reaction.show(REACTIONS[status], options.signal);
+  }
+
+  /**
+   * Tells the owner `mention`, from the thread, that the session's work ended: a push from a
+   * message of the thread opens the thread, where one from the channel opens the channel
+   * (measured 2026-10-25 and 2026-10-26, iOS). On the newest reply's last message, out of sight
+   * (`ThreadPlaces.tell`); with no reply to carry it (a crash found at a start, a turn that showed
+   * nothing), a line of its own, the root's mark and word, whose words are rich text: an
+   * invisible `text` mention pushed beside a rich text block and never beside a section (measured
+   * 2026-10-26). Never rejects: a failure is logged by its code.
+   */
+  private async tellEnd(kind: "done" | "failed", mention: string): Promise<void> {
+    try {
+      if (await (this.places ?? this.lease.peek())?.tell(mention)) return;
+      const [emoji, word] = kind === "done" ? [Status.DONE, "Done"] : [Status.ERROR, "Failed"];
+      const posted = await this.slack.chat.postMessage({
+        channel: this.channel,
+        thread_ts: this.threadTs,
+        text: `${word} <@${mention}>`,
+        blocks: [
+          {
+            type: "rich_text",
+            elements: [
+              {
+                type: "rich_text_section",
+                elements: [
+                  { type: "emoji", name: emoji },
+                  { type: "text", text: ` ${word}` },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      this.postedOwn(posted.ts);
+    } catch (error) {
+      logger.warning(`could not tell the owner of the end in ${this.channel}: ${describe(error)}`);
+    }
   }
 
   /** The owner's id, for the messages he is told of, when he asked for mentions. */
@@ -753,6 +796,9 @@ export class SlackThread implements ThreadChat {
   }
 
   async ask(requestId: string, request: OwnerRequest, title: string): Promise<MessageId> {
+    // Only a wait on the agent's approval or question tells the owner; the rest answers what he
+    // has just written, and he is there.
+    const mention = waitsOnOwner(request) ? this.mention() : undefined;
     let blocks: readonly object[];
     switch (request.type) {
       case "question":
@@ -780,7 +826,9 @@ export class SlackThread implements ThreadChat {
       const posted = await this.slack.chat.postMessage({
         channel: this.channel,
         thread_ts: this.threadTs,
-        text: title,
+        // The owner's mention, out of sight, pushes his phone and opens the thread on a tap, beside
+        // the request's rich text heading (measured 2026-10-26, iOS, "Thread replies" off).
+        text: mention !== undefined ? `${title} <@${mention}>` : title,
         // Built to Block Kit's reference by the modules that make them: opaque to the library's types.
         blocks: blocks as unknown as KnownBlock[],
         unfurl_links: false,
@@ -801,12 +849,12 @@ export class SlackThread implements ThreadChat {
 
   /**
    * Moves the channel's line to name this thread as waiting once each of the agent's approvals
-   * and questions is posted, mentioning the owner when he asked for it and linking the request
-   * `ts`: the line is what tells him of the request. The others name nothing (`waitsOnOwner`).
+   * and questions is posted, linking the request `ts`: the line makes the channel unread, the
+   * request's own mention tells the owner. The others name nothing (`waitsOnOwner`).
    */
   private nameWaiting(request: OwnerRequest, ts: string): void {
     if (!waitsOnOwner(request)) return;
-    void this.options.line?.show(this.channel, this.threadTs, "waiting", this.mention(), ts);
+    void this.options.line?.show(this.channel, this.threadTs, "waiting", ts);
   }
 
   async withdraw(request: MessageId): Promise<boolean> {

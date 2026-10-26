@@ -41,6 +41,11 @@ export interface Placed {
   unlist(): Promise<boolean>;
   /** A request is about to be posted below it: its stream stops first. Never rejects. */
   beforeRequest(): Promise<void>;
+  /**
+   * Mentions the user out of sight on its last message of its own; false when it has none or its
+   * end failed.
+   */
+  tell(mention: string): Promise<boolean>;
 }
 
 export class ThreadPlaces {
@@ -89,6 +94,19 @@ export class ThreadPlaces {
   /** Whether any reply is registered. */
   get held(): boolean {
     return this.replies.size > 0;
+  }
+
+  /**
+   * Tells the user `mention` that the session's work ended, on the reply whose last message is the
+   * thread's newest of the replies' (`Placed.tell`). False when no reply has a message.
+   */
+  async tell(mention: string): Promise<boolean> {
+    let newest: Placed | null = null;
+    for (const reply of this.replies) {
+      const at = reply.lastAt;
+      if (at !== null && (newest === null || at > (newest.lastAt ?? 0))) newest = reply;
+    }
+    return newest === null ? false : await newest.tell(mention);
   }
 
   /**

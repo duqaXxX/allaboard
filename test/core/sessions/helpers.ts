@@ -486,15 +486,14 @@ export function messageTitles(cards: readonly { title?: unknown }[]): string[] {
 /** A line that records what it was asked to show: the thread's root, the kind, the mention. */
 export function recordingLine(): {
   readonly line: ChannelLine;
-  readonly shown: [string, LineKind, string | undefined][];
+  readonly shown: [string, LineKind][];
 } {
-  const shown: [string, LineKind, string | undefined][] = [];
+  const shown: [string, LineKind][] = [];
   const line = {
-    show: async (_channel: string, root: string, kind: LineKind, mention?: string) =>
-      void shown.push([root, kind, mention]),
+    show: async (_channel: string, root: string, kind: LineKind) => void shown.push([root, kind]),
     retitle: async () => {},
     withdrawn: async () => {},
-    restate: async () => {},
+    refresh: async () => {},
   };
   return { line: line as unknown as ChannelLine, shown };
 }

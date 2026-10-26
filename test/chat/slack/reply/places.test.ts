@@ -14,6 +14,8 @@ interface Reply extends Placed {
   unlisted: number;
   /** How many times a request was announced to it. */
   requests: number;
+  /** Whom it was asked to mention, in order. */
+  told: string[];
 }
 
 function reply(ts: string | null): Reply {
@@ -35,6 +37,11 @@ function reply(ts: string | null): Reply {
     unlist: async () => {
       made.unlisted += 1;
       return true;
+    },
+    told: [],
+    tell: async (mention) => {
+      made.told.push(mention);
+      return made.lastAt !== null;
     },
   };
   return made;
@@ -302,4 +309,16 @@ describe("ThreadPlaces", () => {
     assert.equal(upper.settled, 1);
     assert.equal(lower.settled, 1);
   });
+});
+
+// #88: the end of the work is told on the thread's newest reply.
+test("the owner is told on the reply whose last message is the thread's newest", async () => {
+  const places = new ThreadPlaces();
+  assert.equal(await places.tell("U000ALICE"), false); // no reply yet
+  const older = joined(places, "1792626300.000100");
+  const newer = joined(places, "1792626400.000100");
+  joined(places, null); // no message: nothing to carry it
+  assert.equal(await places.tell("U000ALICE"), true);
+  assert.deepEqual(newer.told, ["U000ALICE"]);
+  assert.deepEqual(older.told, []);
 });

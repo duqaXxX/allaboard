@@ -185,45 +185,31 @@ test("a write of a reply sets the thread status again", async () => {
 function recordingLine(): {
   line: ChannelLine;
   shown: [string, string, LineKind][];
-  mentions: (string | undefined)[];
   opened: (string | undefined)[];
   retitled: [string, string, string][];
   withdrawn: [string, string, string][];
-  restated: [string, string, LineKind][];
 } {
   const shown: [string, string, LineKind][] = [];
-  const mentions: (string | undefined)[] = [];
   const opened: (string | undefined)[] = [];
   const retitled: [string, string, string][] = [];
   const withdrawn: [string, string, string][] = [];
-  const restated: [string, string, LineKind][] = [];
   const line = {
-    show: async (
-      channel: string,
-      root: string,
-      kind: LineKind,
-      mention?: string,
-      message?: string,
-    ) => {
+    show: async (channel: string, root: string, kind: LineKind, message?: string) => {
       shown.push([channel, root, kind]);
-      mentions.push(mention);
       opened.push(message);
     },
     retitle: async (channel: string, root: string, text: string) =>
       void retitled.push([channel, root, text]),
     withdrawn: async (channel: string, root: string, message: string) =>
       void withdrawn.push([channel, root, message]),
-    restate: async (channel: string, root: string, kind: LineKind) =>
-      void restated.push([channel, root, kind]),
+    refresh: async () => {},
   };
   return {
     line: line as unknown as ChannelLine,
     shown,
-    mentions,
     opened,
     retitled,
     withdrawn,
-    restated,
   };
 }
 
@@ -279,7 +265,7 @@ for (const [status, kind] of [
   ["error", "failed"],
 ] as const) {
   test(`the end of the work moves the channel's line, its footer does not [${status}]`, async () => {
-    const { line, shown, mentions } = recordingLine();
+    const { line, shown } = recordingLine();
     const { thread } = made({ line });
     const reply = thread.openReply(() => {});
     await reply.text("hello");
@@ -293,54 +279,117 @@ for (const [status, kind] of [
     assert.deepEqual(shown, []);
     await thread.showStatus(status, { notify: true });
     assert.deepEqual(shown, [[CHANNEL, THREAD, kind]]);
-    assert.deepEqual(mentions, [undefined]); // no mentions asked for
   });
 }
 
-// #84: between the posts that tell the owner, the line says what the root does.
-test("a status that tells the owner nothing restates the channel's line by its word", async () => {
-  const { line, shown, restated } = recordingLine();
+// #88: between the posts that tell the owner, the line follows `state.json` (`refresh`), never
+// a status the thread is shown.
+test("a status that tells the owner nothing moves no line", async () => {
+  const { line, shown } = recordingLine();
   const { thread } = made({ line });
   for (const status of ["working", "waiting", "restarting", "done", "error"] as const) {
     await thread.showStatus(status);
   }
-  await thread.showStatus("done", { notify: true }); // told: a new line, no edit
-  assert.deepEqual(
-    restated.map(([, , kind]) => kind),
-    ["working", "waiting", "working", "done", "failed"],
-  );
-  assert.ok(restated.every(([channel, root]) => channel === CHANNEL && root === THREAD));
-  assert.deepEqual(shown, [[CHANNEL, THREAD, "done"]]);
+  assert.deepEqual(shown, []);
 });
 
-test("the end of the work mentions the owner on the channel's line when asked", async () => {
-  const { line, shown, mentions } = recordingLine();
-  const { thread } = made({ line, mentionOwner: true });
-  await thread.showStatus("working", { notify: true }); // no end: never a line
-  await thread.showStatus("done", { notify: true });
-  await thread.showStatus("error", { notify: true });
-  assert.deepEqual(shown, [
-    [CHANNEL, THREAD, "done"],
-    [CHANNEL, THREAD, "failed"],
-  ]);
-  assert.deepEqual(mentions, [OWNER, OWNER]);
-});
+/** Lets the writes started and not awaited (`void`) run to their end. */
+async function drained(): Promise<void> {
+  for (let i = 0; i < 50; i += 1) await new Promise((done) => setImmediate(done));
+}
 
-// #20: with Slack's "Thread replies" notifications off, a mention is what pushes. The channel's
-// line carries it (measured 2026-10-25, iOS, beside a markdown block); the request never does.
-test("each of the agent's requests moves the channel's line, mentioning the owner when asked", async () => {
+// #88: a push from the thread opens the thread, one from the channel the channel (measured
+// 2026-10-26, iOS): the thread tells the owner, by an edit of the reply's last message that adds
+// his mention to its `text` alone, the same blocks written again.
+test("the end of the work mentions the owner on the reply's last message when asked", async () => {
   for (const mentionOwner of [true, false]) {
-    const { line, shown, mentions } = recordingLine();
+    const { line, shown } = recordingLine();
+    const { slack, thread } = made({ line, mentionOwner });
+    const reply = thread.openReply(() => {});
+    await reply.text("hello");
+    await reply.finish([]);
+    await reply.closeOut();
+    const before = slack.callsTo("chat.update").length;
+    const blocks = (slack.callsTo("chat.update").at(-1) ?? slack.callsTo("chat.stopStream").at(-1))
+      ?.blocks;
+    await thread.showStatus("working", { notify: true }); // no end: nothing told
+    await thread.showStatus("done", { notify: true });
+    await drained();
+    assert.deepEqual(shown, [[CHANNEL, THREAD, "done"]]);
+    const told = slack.callsTo("chat.update").slice(before);
+    if (!mentionOwner) {
+      assert.deepEqual(told, []);
+      continue;
+    }
+    assert.equal(told.length, 1);
+    assert.ok(String(told[0]?.text).endsWith(`<@${OWNER}>`), String(told[0]?.text));
+    if (blocks !== undefined) assert.ok(JSON.stringify(told[0]?.blocks).includes("hello"));
+    assert.equal(slack.callsTo("chat.postMessage").filter((c) => c.thread_ts).length, 0);
+    // Told once: the next edit of the message writes its words alone.
+    const sink = reply as unknown as ReplySink;
+    assert.equal(await sink.showFooterFormatted("main · ctx 6%"), true);
+    assert.ok(!String(slack.callsTo("chat.update").at(-1)?.text).includes("<@"));
+  }
+});
+
+test("an end told before the reply's own end is carried by the reply's end, once", async () => {
+  const { slack, thread } = made({ mentionOwner: true });
+  const reply = thread.openReply(() => {});
+  await reply.text("hello");
+  await reply.finish([]);
+  await thread.showStatus("done", { notify: true }); // the stream is still open
+  await drained();
+  await reply.closeOut();
+  await drained();
+  const told = [...slack.callsTo("chat.update"), ...slack.callsTo("chat.postMessage")].filter(
+    (call) => String(call.text).includes(`<@${OWNER}>`),
+  );
+  assert.equal(told.length, 1);
+  assert.equal(told[0]?.ts, slack.createdTs[0]); // the reply's own message, not a line of its own
+});
+
+test("with no reply to carry it, the end is told by a line of its own in the thread", async () => {
+  const { slack, thread } = made({ mentionOwner: true });
+  await thread.showStatus("error", { notify: true });
+  await drained();
+  const posted = slack.callsTo("chat.postMessage").at(-1);
+  assert.equal(posted?.thread_ts, THREAD);
+  assert.equal(posted?.text, `Failed <@${OWNER}>`);
+  // Rich text: an invisible mention pushed beside it, never beside a section (2026-10-26).
+  assert.deepEqual(posted?.blocks, [
+    {
+      type: "rich_text",
+      elements: [
+        {
+          type: "rich_text_section",
+          elements: [
+            { type: "emoji", name: "x" },
+            { type: "text", text: " Failed" },
+          ],
+        },
+      ],
+    },
+  ]);
+});
+
+// #88: a request's own mention tells the owner, beside its rich text heading (measured
+// 2026-10-26); the channel's line mentions nobody.
+test("each of the agent's requests mentions the owner when asked, and moves the channel's line", async () => {
+  for (const mentionOwner of [true, false]) {
+    const { line, shown } = recordingLine();
     const { slack, thread } = made({ line, mentionOwner });
     await thread.showStatus("waiting"); // the core's status: the request is not posted yet
     assert.deepEqual(shown, []);
     await thread.ask("approval-1", PERMISSION, "Bash: ls");
     await thread.ask("approval-2", QUESTION, "AskUserQuestion"); // the same turn, once answered
     assert.deepEqual(shown, Array(2).fill([CHANNEL, THREAD, "waiting"]));
-    assert.deepEqual(mentions, Array(2).fill(mentionOwner ? OWNER : undefined));
-    for (const posted of slack.callsTo("chat.postMessage")) {
-      assert.ok(!JSON.stringify(posted).includes(`<@${OWNER}>`)); // the line tells him, not this
-    }
+    const texts = slack.callsTo("chat.postMessage").map((posted) => String(posted.text));
+    assert.deepEqual(
+      texts,
+      mentionOwner
+        ? [`Bash: ls <@${OWNER}>`, `AskUserQuestion <@${OWNER}>`]
+        : ["Bash: ls", "AskUserQuestion"],
+    );
   }
 });
 
@@ -373,12 +422,13 @@ for (const request of [
     link: "the other thread",
   },
 ] as const satisfies readonly OwnerRequest[]) {
-  test(`a request the owner set off names nothing in the channel's line [${request.type}]`, async () => {
+  test(`a request the owner set off names nothing, in the channel's line or to him [${request.type}]`, async () => {
     const { line, shown } = recordingLine();
-    const { thread } = made({ line });
+    const { slack, thread } = made({ line, mentionOwner: true });
     await thread.ask(request.requestId, request, "Asked");
     await thread.showStatus("waiting");
     assert.deepEqual(shown, []);
+    assert.equal(slack.callsTo("chat.postMessage")[0]?.text, "Asked"); // and mentions nobody
     await thread.ask("approval-1", PERMISSION, "Bash: ls"); // the agent's own still counts
     assert.deepEqual(shown, [[CHANNEL, THREAD, "waiting"]]);
   });

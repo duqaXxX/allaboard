@@ -10,6 +10,7 @@ import { beforeEach, test } from "node:test";
 import type { Receiver } from "@slack/bolt";
 import { ChatError, type ChatInbound } from "../../../src/chat/seam.ts";
 import { ChannelGuard } from "../../../src/chat/slack/app/guards.ts";
+import type { ChannelLine } from "../../../src/chat/slack/channel-line.ts";
 import type { ThreadDeletion } from "../../../src/chat/slack/delete.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
 import { RootEditor } from "../../../src/chat/slack/tag.ts";
@@ -241,6 +242,19 @@ test("the session index asks the Home tab to publish the sessions that changed",
   index.refresh([ref]);
   index.refresh();
   assert.deepEqual(asked, [[ref], undefined]);
+});
+
+// #88: the channels' line shows the sessions' status too, from the same announcements.
+test("the session index tells the channels' line of the sessions that changed", async () => {
+  const refreshed: unknown[] = [];
+  const line = { refresh: async (changed?: unknown) => void refreshed.push(changed) };
+  const { chat } = madeChat({ line: line as unknown as ChannelLine });
+  const index = chat.index;
+  assert.ok(index);
+  const ref = { channel: CHANNEL, thread: THREAD };
+  index.refresh([ref]);
+  index.refresh();
+  assert.deepEqual(refreshed, [[ref], undefined]);
 });
 
 test("with the owner's token the provider declares threadTags, has tagThread, and refreshes the Home", async (t) => {

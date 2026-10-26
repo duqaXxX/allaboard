@@ -404,7 +404,7 @@ reaches an agent or a chat.
    through `cleanup.Cleanups`, which the chat reaches as `CorePort.cleanup` (see "Cleaning `state.json`").
 8. It sets `StateStore.onSessionsChange` and, for a chat that has a session index
    (`ChatProvider.index`), asks for the first one (for Slack `Home.request`, see "The session
-   index").
+   index", and `ChannelLine.refresh`, which takes over each channel's line an earlier run left).
 9. It starts the chat (`ChatProvider.start`, given the `Inbound`). Slack opens the Socket Mode
    connection there (`SlackChat.start`, which builds the Bolt app with `app.buildApp`). Once
    connected, the daemon posts the version 1 to version 2 upgrade notice to each channel that still
