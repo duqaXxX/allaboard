@@ -123,6 +123,8 @@ export { DirectoryUnavailable, SessionClosed, SessionGone } from "./sessions/err
 export { Cancelled, cancellable, Mutex, Semaphore, Task } from "./sessions/tasks.ts";
 export type { Choice } from "./setup.ts";
 export { choiceOf, DEFAULT, effortLevels } from "./setup.ts";
+export type { RequestKind } from "./state.ts";
+export { asksOwner } from "./state.ts";
 export type { Names } from "./texts.ts";
 export * as texts from "./texts.ts";
 export { fill, Named, NESTED, named } from "./texts.ts";

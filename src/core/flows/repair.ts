@@ -11,7 +11,7 @@ import type { ChatProvider, MessageId, SessionStatus, ThreadChat } from "../../c
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { ThreadsState } from "../port/threads.ts";
-import type { RequestKind } from "../state.ts";
+import { asksOwner } from "../state.ts";
 import { endsWork } from "../status.ts";
 import * as texts from "../texts.ts";
 
@@ -62,7 +62,7 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
       // One stopped line per thread: the first request rewritten says it, the others go.
       let lined = hadReply;
       for (const messageId of thread.requests) {
-        const asksForLine = !lined && isTurnRequest(thread.requestKinds[messageId]);
+        const asksForLine = !lined && asksOwner(thread.requestKinds[messageId]);
         const outcome = await settleRequest(chatThread, messageId, asksForLine);
         if (outcome === "kept") left(channelId, threadId, "a request");
         else {
@@ -94,16 +94,6 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
       );
     }
   }
-}
-
-/**
- * Only a question or an approval stands for a turn the owner's message started; the setup form,
- * the hold and a shell command's confirmation wait before that message is sent (a command the
- * crash left unconfirmed never runs), and an entry with no kind (a file written before the
- * kinds) is taken for neither.
- */
-function isTurnRequest(kind: RequestKind | undefined): boolean {
-  return kind === "question" || kind === "approval";
 }
 
 /**

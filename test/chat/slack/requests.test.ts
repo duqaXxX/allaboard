@@ -139,16 +139,33 @@ test("approval blocks carry the id and the input", () => {
   assert.ok(text.includes("Claude wants to run ls") && text.includes("ls -la"));
 });
 
+/** A rich text heading's words, each with whether it is bold. */
+function richWords(block: Json): [string, boolean][] {
+  assert.equal(block?.type, "rich_text");
+  return block.elements[0].elements.map((e: Json) => [e.text, e.style?.bold === true]);
+}
+
+// #88: the owner's mention in a request's `text` pushes beside a rich text heading and never did
+// beside a section one (measured 2026-10-26).
 test("the heading names the tool, shown as written, when the agent wrote no title", () => {
   const [heading] = approvalBlocks("abc", permission({ toolName: "<b>" }));
-  assert.equal(heading?.text.text, "Claude Code asks to use *&lt;b&gt;*");
+  assert.deepEqual(richWords(heading as Json), [
+    ["Claude Code asks to use ", false],
+    ["<b>", true],
+  ]);
+});
+
+test("an agent's title is the heading, as written, with no markup of ours", () => {
+  const [heading] = approvalBlocks("abc", permission({ title: "Run *ls* in <here>" }));
+  assert.deepEqual(richWords(heading as Json), [["Run *ls* in <here>", false]]);
 });
 
 test("the channel shows one line with answer and skip", () => {
   const questions = recordedQuestions("ask-can-use-tool");
   const blocks = questionBlocks("abc", questions);
   assert.equal(blocks.length, 2);
-  assert.ok(questions.every((q) => blocks[0]?.text.text.includes(q.header)));
+  const words = richWords(blocks[0] as Json);
+  assert.ok(questions.every((q) => words.some(([text, bold]) => bold && text === q.header)));
   assert.deepEqual(actionIds(blocks), [QUESTION_OPEN, QUESTION_SKIP]);
   assert.deepEqual(actionIds(blocks), ["question_open", "question_skip"]);
   assert.ok(blocks[1]?.elements.every((e: Json) => e.value === "abc"));
@@ -677,7 +694,10 @@ test("question headers are shown as written", () => {
   const blocks = questionBlocks("abc", [
     question({ question: "q", header: "<http://x|ok>", options: [] }),
   ]);
-  assert.ok((blocks[0] as Json).text.text.includes("&lt;http://x|ok&gt;"));
+  assert.deepEqual(richWords(blocks[0] as Json), [
+    ["Claude Code has a question: ", false],
+    ["<http://x|ok>", true],
+  ]);
 });
 
 // --- Other as the last option, Notes after a choice ---
@@ -957,8 +977,16 @@ test("an ExitPlanMode approval shows the plan alone in the generic code blocks",
   const blocks = approvalBlocks("abc", permission({ toolName: "ExitPlanMode", input: PLAN_INPUT }));
   assert.deepEqual(blocks, [
     {
-      type: "section",
-      text: { type: "mrkdwn", text: "Claude Code asks to use *ExitPlanMode*" },
+      type: "rich_text",
+      elements: [
+        {
+          type: "rich_text_section",
+          elements: [
+            { type: "text", text: "Claude Code asks to use " },
+            { type: "text", text: "ExitPlanMode", style: { bold: true } },
+          ],
+        },
+      ],
     },
     {
       type: "section",
@@ -978,7 +1006,7 @@ test("a plan with a link, mentions and a fence shows as literal text", () => {
   const blocks = approvalBlocks("abc", permission({ toolName: "ExitPlanMode", input: { plan } }));
   const shown = blocks.filter((b) => b.type === "section").map((b) => b.text.text as string);
   assert.equal(
-    shown[1],
+    shown[0],
     "```\n[x](http://evil.example) &lt;!here&gt; &lt;@U000ALICE&gt;\n`\u200b`\u200b`\u200b\nrm -rf\n`\u200b`\u200b`\u200b\n&lt;!-- c --&gt;\n```",
   );
 });

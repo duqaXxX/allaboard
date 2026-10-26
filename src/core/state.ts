@@ -43,6 +43,15 @@ export type SessionsChange = (changed: readonly ThreadRef[]) => void;
  */
 export type RequestKind = "question" | "approval" | "setup" | "hold" | "shell";
 
+/**
+ * Whether a request of `kind` waits for the owner's answer to a turn's question or approval, the
+ * one wait he is told of: the setup form, the hold and a shell command's confirmation answer what
+ * he has just written, and an entry with no kind (a file written before the kinds) is neither.
+ */
+export function asksOwner(kind: RequestKind | undefined): boolean {
+  return kind === "question" || kind === "approval";
+}
+
 const REQUEST_KINDS: ReadonlySet<unknown> = new Set<RequestKind>([
   "question",
   "approval",
@@ -296,12 +305,22 @@ function parseChannels(raw: Raw): Map<string, ChannelRecord> {
 }
 
 /**
- * What the session index (the Home tab) shows of `threads`: a write that leaves this
- * unchanged is not announced to `StateStore.onSessionsChange`.
+ * What the session index (the Home tab) and the channels' line show of `threads`: a write that
+ * leaves this unchanged is not announced to `StateStore.onSessionsChange`.
  */
 function shown(threads: ReadonlyMap<string, ThreadState>): Map<string, string> {
   return new Map(
-    [...threads].map(([ts, t]) => [ts, JSON.stringify([t.sessionId, t.status, t.ended])]),
+    // Whether the thread asks the owner (`asksOwner`) too, which the channel's line shows: the
+    // root's status is written before the request it waits on.
+    [...threads].map(([ts, t]) => [
+      ts,
+      JSON.stringify([
+        t.sessionId,
+        t.status,
+        t.ended,
+        Object.values(t.requestKinds).some(asksOwner),
+      ]),
+    ]),
   );
 }
 

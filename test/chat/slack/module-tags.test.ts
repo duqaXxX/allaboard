@@ -93,9 +93,10 @@ test("with the owner's token the provider tags a root through the owner's client
   };
   await chat.tagThread?.({ channel: "C000CHAN", thread: ts }, "devops");
   // The bot only reads; the edit and the pin are the owner's (the first message is the owner's).
+  // The channel's line, told the thread changed, looks once for a line an earlier run left.
   assert.deepEqual(
     slack.apiCalls.map((call) => call.method),
-    ["auth.test", "conversations.replies"],
+    ["auth.test", "conversations.replies", "conversations.history"],
   );
   assert.deepEqual(
     owner.apiCalls.map((call) => call.method),

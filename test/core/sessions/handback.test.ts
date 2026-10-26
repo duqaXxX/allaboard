@@ -133,7 +133,7 @@ test("a hand-back is reported in the reply that started the subagent, and the tu
   assert.ok(whole.indexOf(SHELL_ENDED) < whole.indexOf(SHELL_REPORTED));
   assert.equal(h.reactions().at(-1), "white_check_mark");
   // The owner is told once, when everything has ended, the turn that did nothing included.
-  assert.deepEqual(shown, [[THREAD, "done", undefined]]);
+  assert.deepEqual(shown, [[THREAD, "done"]]);
 });
 
 // The subagent can end while the turn that started it still runs (seen live the same day, with

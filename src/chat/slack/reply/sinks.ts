@@ -568,6 +568,9 @@ export class ReplySink implements Sink {
    * end. It stays on this reply for good.
    */
   private footer: string | null = null;
+  // The owner to mention, out of sight, in the `text` of the next write of the reply's last
+  // message (`tell`): cleared once that write is made.
+  private telling: string | null = null;
   /** The list of what still runs the thread's places last handed this reply; read once it rests. */
   private assigned: RunningList | null = null;
   /** Whether closeOut has run; a second call is a no-op. */
@@ -929,6 +932,29 @@ export class ReplySink implements Sink {
     const ok = await cancellable(this.flush(), signal);
     if (!ok) this.retryLater();
     return ok;
+  }
+
+  /**
+   * Tells the user `mention` that the session's work ended: his mention, in the `text` alone of
+   * the reply's last message, which shows it nowhere, rewritten with the blocks it shows. An edit
+   * that adds a mention to a reply in his thread pushes his phone, at once after a stream's stop
+   * and minutes after it alike, and a tap opens the thread (measured 2026-10-26, iOS, "Thread
+   * replies" off); a `text` with no blocks would remove them (chat.update reference, read
+   * 2026-10-26). The message is the reply's last of its own, above a closing message that holds
+   * the footer alone. Written now when the reply's end has landed, else with the end's own write
+   * while that is still to come. False when the reply has no message to carry it, or when its end
+   * failed: no write follows, and the thread tells him on a line of its own.
+   */
+  async tell(mention: string): Promise<boolean> {
+    if (this.messages.findLast((message) => message.ts !== null) === undefined) return false;
+    if (this.landedValue === false) return false;
+    this.telling = mention;
+    if (this.landedValue === null) return true; // the end's write carries it
+    this.pending?.cancel();
+    this.pending = null;
+    const ok = await this.flush();
+    if (!ok) this.retryLater();
+    return true;
   }
 
   /**
@@ -1776,14 +1802,23 @@ export class ReplySink implements Sink {
       }
       blocks = fresh;
       this.wrote = true;
+      const telling = this.tells(message) ? this.telling : null;
+      const banner = this.banner(this.span(message.start, end));
       await this.slack.chat.update({
         channel: this.channel,
         ts,
-        text: this.banner(this.span(message.start, end)),
+        text: telling === null ? banner : `${banner} <@${telling}>`,
         blocks,
       });
+      // Told once: a later edit of the message writes its words alone.
+      if (telling !== null && this.telling === telling) this.telling = null;
     } catch (error) {
       const code = describe(error);
+      if (this.tells(message) && REFUSED_CONTENT.has(code)) {
+        // The same blocks again would be refused again: the mention is not tried any more.
+        this.telling = null;
+        this.logger.warning(`could not mention the owner on a reply: ${code}`);
+      }
       const [text, elements, cards] = blocksSizes(blocks);
       this.logger.warning(
         `chat.update failed (${describeRefusal(error)}) with text ${text}, ` +
@@ -1846,6 +1881,11 @@ export class ReplySink implements Sink {
     return true;
   }
 
+  /** Whether `message` is the reply's last, owed the owner's mention (`tell`). */
+  private tells(message: Message): boolean {
+    return this.telling !== null && message === this.messages.at(-1) && !message.streaming;
+  }
+
   /** Whether the message already shows `blocks`. */
   private current(
     message: Message,
@@ -1853,6 +1893,7 @@ export class ReplySink implements Sink {
     footer: readonly Block[],
     end: Cursor | null,
   ): boolean {
+    if (this.tells(message)) return false; // the same blocks, written again with the mention
     if (message.exact) {
       return isDeepStrictEqual(message.footer, footer) && this.streamShows(message, end);
     }

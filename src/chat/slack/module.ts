@@ -22,7 +22,7 @@ import type { Fetch } from "./app/answers.ts";
 import { socketReceiver } from "./app/app.ts";
 import { ChannelGuard, type Identity } from "./app/guards.ts";
 import { prepareUploads } from "./attachments.ts";
-import { ChannelLine } from "./channel-line.ts";
+import { ChannelLine, lineThread } from "./channel-line.ts";
 import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
 import { MENTION_VARIABLE, mentionsOn, type ProbeClient, slackSetup } from "./onboarding.ts";
@@ -304,7 +304,17 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     steady: context.steady,
     agent: () => context.core().agent,
     ...(roots !== null && { roots, canTag: canTag(owner) }),
-    line: new ChannelLine(slack, { botUserId: identity.botUserId }),
+    line: new ChannelLine(slack, {
+      botUserId: identity.botUserId,
+      // Read when the line changes, after the core exists.
+      threads: {
+        channels: () => context.core().state.channels(),
+        of: (channel) =>
+          [...(context.core().state.channel(channel)?.threads ?? [])].map(([thread, t]) =>
+            lineThread(thread, t),
+          ),
+      },
+    }),
     mentionOwner,
     app: {
       core: () => context.core(),
