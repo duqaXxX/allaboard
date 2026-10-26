@@ -107,6 +107,123 @@ test("a waiting thread's line replaces the last one and keeps its word through a
   assert.equal(fake.callsTo("chat.update").at(-1)?.text, "Waiting: Login fix");
 });
 
+// #84: a request is deleted once it is answered, and Slack then answers its link with "unable to
+// open this link" (seen 2026-10-25, desktop) while the line still names it.
+test("a waiting line links its request, and the thread's root once that request is gone", async () => {
+  const fake = slack();
+  const request = "1792626400.000300";
+  const requestLink = `https://example.slack.com/archives/C000PROJECT/p1792626400000300?thread_ts=${ROOT}&cid=${CHANNEL}`;
+  fake.responses["conversations.replies"] = {
+    ok: true,
+    messages: [
+      { ts: ROOT, user: OWNER, text: "Fix the login page", latest_reply: "1792626300.000200" },
+    ],
+  };
+  fake.responses["chat.getPermalink"] = [
+    { ok: true, channel: CHANNEL, permalink: requestLink },
+    { ok: true, channel: CHANNEL, permalink: LINK },
+  ];
+  fake.responses["chat.update"] = { ok: true };
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  await lines.show(CHANNEL, ROOT, "waiting", OWNER, request);
+  assert.deepEqual(fake.callsTo("chat.postMessage")[0]?.blocks, [
+    { type: "markdown", text: `✋ Waiting: [Fix the login page](${requestLink})` },
+  ]);
+  // Another message of the thread, or another thread's, leaves the line as it is.
+  await lines.withdrawn(CHANNEL, ROOT, "1792626300.000200");
+  await lines.withdrawn(CHANNEL, "1792626999.000001", request);
+  assert.deepEqual(fake.callsTo("chat.update"), []);
+  await lines.withdrawn(CHANNEL, ROOT, request);
+  assert.deepEqual(
+    fake.callsTo("chat.getPermalink").map((call) => call.message_ts),
+    [request, ROOT],
+  );
+  const [updated, ...more] = fake.callsTo("chat.update");
+  assert.deepEqual(more, []);
+  assert.equal(updated?.ts, fake.createdTs[0]);
+  // An edit pushes nothing (measured 2026-09-27): the word and the mention stay; the root's
+  // status changes the word (`restate`).
+  assert.equal(updated?.text, `Waiting: Fix the login page <@${OWNER}>`);
+  assert.deepEqual(updated?.blocks, [
+    { type: "markdown", text: `✋ Waiting: [Fix the login page](${LINK})` },
+  ]);
+  // On its root now: the same message deleted again edits nothing, and a title keeps the root.
+  await lines.withdrawn(CHANNEL, ROOT, request);
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  assert.deepEqual(fake.callsTo("chat.update").at(-1)?.blocks, [
+    { type: "markdown", text: `✋ Waiting: [Login fix](${LINK})` },
+  ]);
+  assert.equal(fake.callsTo("chat.update").length, 2);
+});
+
+// A turn that fails with an approval open: the failed line opens that approval, the thread's
+// last reply, and the approval is deleted after.
+test("an ended line whose reply is deleted keeps its word, linked by the root", async () => {
+  const fake = slack();
+  const request = "1792626400.000300";
+  fake.responses["conversations.replies"] = {
+    ok: true,
+    messages: [{ ts: ROOT, user: OWNER, text: "Fix the login page", latest_reply: request }],
+  };
+  fake.responses["chat.update"] = { ok: true };
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  await lines.show(CHANNEL, ROOT, "failed");
+  await lines.withdrawn(CHANNEL, ROOT, request);
+  assert.equal(fake.callsTo("chat.update").at(-1)?.text, "Failed: Fix the login page");
+  assert.equal(fake.callsTo("chat.getPermalink").at(-1)?.message_ts, ROOT);
+});
+
+// #84: once the owner answered, the line said Waiting while the work went on (seen 2026-10-26).
+test("a line follows its thread's root status by edits, linked by the root but while waiting", async () => {
+  const fake = slack();
+  const request = "1792626400.000300";
+  const requestLink = `${LINK}?thread_ts=${ROOT}`;
+  fake.responses["chat.getPermalink"] = [
+    { ok: true, channel: CHANNEL, permalink: requestLink },
+    { ok: true, channel: CHANNEL, permalink: LINK },
+  ];
+  fake.responses["chat.update"] = { ok: true };
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  await lines.show(CHANNEL, ROOT, "waiting", OWNER, request);
+  // The same word, or another thread's status, edits nothing.
+  await lines.restate(CHANNEL, ROOT, "waiting");
+  await lines.restate(CHANNEL, "1792626999.000001", "working");
+  await lines.restate("C000OTHER", ROOT, "working");
+  assert.deepEqual(fake.callsTo("chat.update"), []);
+  await lines.restate(CHANNEL, ROOT, "working");
+  const updated = fake.callsTo("chat.update").at(-1);
+  assert.equal(updated?.ts, fake.createdTs[0]);
+  assert.equal(updated?.text, `Working: Fix the login page <@${OWNER}>`);
+  assert.deepEqual(updated?.blocks, [
+    { type: "markdown", text: `⏳ Working: [Fix the login page](${LINK})` },
+  ]);
+  // Waiting again (another request still open), then done by the owner's own stop: no post.
+  await lines.restate(CHANNEL, ROOT, "waiting");
+  await lines.restate(CHANNEL, ROOT, "done");
+  assert.deepEqual(
+    fake.callsTo("chat.update").map((call) => call.text),
+    [
+      `Working: Fix the login page <@${OWNER}>`,
+      `Waiting: Fix the login page <@${OWNER}>`,
+      `Done: Fix the login page <@${OWNER}>`,
+    ],
+  );
+  assert.equal(fake.callsTo("chat.postMessage").length, 1);
+  // A title keeps the word the status gave.
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  assert.equal(fake.callsTo("chat.update").at(-1)?.text, `Done: Login fix <@${OWNER}>`);
+});
+
+test("a deleted request a later line no longer names leaves that line as it is", async () => {
+  const fake = slack();
+  const request = "1792626400.000300";
+  const lines = new ChannelLine(fake, { botUserId: BOT });
+  await lines.show(CHANNEL, ROOT, "waiting", undefined, request);
+  await lines.show(CHANNEL, ROOT, "done");
+  await lines.withdrawn(CHANNEL, ROOT, request);
+  assert.deepEqual(fake.callsTo("chat.update"), []);
+});
+
 // #43: the line read the root before the session's title reached it, and kept the owner's words.
 test("a line posted before the thread's title names the thread by it once the root shows it", async () => {
   const fake = slack();

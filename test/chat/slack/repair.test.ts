@@ -558,6 +558,8 @@ test("a root left waiting or working tells the owner its work failed", async () 
   const shown: [string, LineKind][] = [];
   const line = {
     show: async (_c: string, root: string, kind: LineKind) => void shown.push([root, kind]),
+    restate: async () => {},
+    withdrawn: async () => {},
   };
   await repairCrash(slack, state, new UpdateLimiter(), line as unknown as ChannelLine);
   assert.deepEqual(shown, [[THREAD, "failed"]]);
@@ -570,7 +572,11 @@ test("a root whose ❌ was shown before the crash is repaired without telling th
   const { state, slack } = makeState();
   state.setStatusPending(CHANNEL, THREAD, "working", "error");
   const shown: LineKind[] = [];
-  const line = { show: async (_c: string, _r: string, kind: LineKind) => void shown.push(kind) };
+  const line = {
+    show: async (_c: string, _r: string, kind: LineKind) => void shown.push(kind),
+    restate: async () => {},
+    withdrawn: async () => {},
+  };
   await repairCrash(slack, state, new UpdateLimiter(), line as unknown as ChannelLine);
   assert.deepEqual(
     slack.callsTo("reactions.add").map((call) => call.name),

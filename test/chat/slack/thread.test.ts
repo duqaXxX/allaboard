@@ -186,20 +186,45 @@ function recordingLine(): {
   line: ChannelLine;
   shown: [string, string, LineKind][];
   mentions: (string | undefined)[];
+  opened: (string | undefined)[];
   retitled: [string, string, string][];
+  withdrawn: [string, string, string][];
+  restated: [string, string, LineKind][];
 } {
   const shown: [string, string, LineKind][] = [];
   const mentions: (string | undefined)[] = [];
+  const opened: (string | undefined)[] = [];
   const retitled: [string, string, string][] = [];
+  const withdrawn: [string, string, string][] = [];
+  const restated: [string, string, LineKind][] = [];
   const line = {
-    show: async (channel: string, root: string, kind: LineKind, mention?: string) => {
+    show: async (
+      channel: string,
+      root: string,
+      kind: LineKind,
+      mention?: string,
+      message?: string,
+    ) => {
       shown.push([channel, root, kind]);
       mentions.push(mention);
+      opened.push(message);
     },
     retitle: async (channel: string, root: string, text: string) =>
       void retitled.push([channel, root, text]),
+    withdrawn: async (channel: string, root: string, message: string) =>
+      void withdrawn.push([channel, root, message]),
+    restate: async (channel: string, root: string, kind: LineKind) =>
+      void restated.push([channel, root, kind]),
   };
-  return { line: line as unknown as ChannelLine, shown, mentions, retitled };
+  return {
+    line: line as unknown as ChannelLine,
+    shown,
+    mentions,
+    opened,
+    retitled,
+    withdrawn,
+    restated,
+  };
 }
 
 /** A provider with a root editor whose title edit `edit` stands for. */
@@ -272,6 +297,22 @@ for (const [status, kind] of [
   });
 }
 
+// #84: between the posts that tell the owner, the line says what the root does.
+test("a status that tells the owner nothing restates the channel's line by its word", async () => {
+  const { line, shown, restated } = recordingLine();
+  const { thread } = made({ line });
+  for (const status of ["working", "waiting", "restarting", "done", "error"] as const) {
+    await thread.showStatus(status);
+  }
+  await thread.showStatus("done", { notify: true }); // told: a new line, no edit
+  assert.deepEqual(
+    restated.map(([, , kind]) => kind),
+    ["working", "waiting", "working", "done", "failed"],
+  );
+  assert.ok(restated.every(([channel, root]) => channel === CHANNEL && root === THREAD));
+  assert.deepEqual(shown, [[CHANNEL, THREAD, "done"]]);
+});
+
 test("the end of the work mentions the owner on the channel's line when asked", async () => {
   const { line, shown, mentions } = recordingLine();
   const { thread } = made({ line, mentionOwner: true });
@@ -301,6 +342,17 @@ test("each of the agent's requests moves the channel's line, mentioning the owne
       assert.ok(!JSON.stringify(posted).includes(`<@${OWNER}>`)); // the line tells him, not this
     }
   }
+});
+
+// #84: the line opens the request it names, and is told when that message is deleted.
+test("a request's line links that request, and hears of its delete", async () => {
+  const { line, opened, withdrawn } = recordingLine();
+  const { slack, thread } = made({ line });
+  const ts = await thread.ask("approval-1", PERMISSION, "Bash: ls");
+  assert.deepEqual(opened, [ts]);
+  slack.responses["chat.delete"] = { ok: true };
+  await thread.withdraw(ts);
+  assert.deepEqual(withdrawn, [[CHANNEL, THREAD, ts]]);
 });
 
 // #72: these answer what the owner has just written in the thread, so he is there.

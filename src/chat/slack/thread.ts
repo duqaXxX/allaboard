@@ -51,7 +51,7 @@ import { type BuiltApp, buildApp } from "./app/app.ts";
 import type { ChannelGuard } from "./app/guards.ts";
 import { threadKey } from "./app/order.ts";
 import { SlackChannel } from "./channel.ts";
-import type { ChannelLine } from "./channel-line.ts";
+import type { ChannelLine, LineKind } from "./channel-line.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
 import type { ThreadDeletion } from "./delete.ts";
 import { formatFooter, slackTime } from "./footer.ts";
@@ -182,6 +182,15 @@ const STATUS_MARKS: Readonly<Record<SessionStatus, string>> = {
   waiting: "✋",
   done: "✅",
   error: "❌",
+};
+
+/** What the channel's line says of each root status: a stop's wait is work still going on. */
+const LINE_KINDS: Readonly<Record<RootStatus, LineKind>> = {
+  working: "working",
+  restarting: "working",
+  waiting: "waiting",
+  done: "done",
+  error: "failed",
 };
 
 // The most of a run's words the loop card shows; a markdown block holds 12,000 characters in all.
@@ -593,9 +602,12 @@ export class SlackThread implements ThreadChat {
   }
 
   showStatus(status: RootStatus, options: StatusOptions = {}): Promise<boolean> {
-    if (options.notify && (status === "done" || status === "error")) {
-      const kind = status === "done" ? "done" : "failed";
+    const kind = LINE_KINDS[status];
+    if (options.notify && (kind === "done" || kind === "failed")) {
       void this.options.line?.show(this.channel, this.threadTs, kind, this.mention());
+    } else {
+      // Between the posts that tell the owner, a line naming this thread says what its root does.
+      void this.options.line?.restate(this.channel, this.threadTs, kind);
     }
     return this.reaction.show(REACTIONS[status], options.signal);
   }
@@ -783,24 +795,27 @@ export class SlackThread implements ThreadChat {
     // The message is the only handle on its buttons: one Slack did not name cannot be removed.
     if (typeof ts !== "string" || ts === "") throw new ChatError("no_ts");
     this.postedOwn(ts);
-    this.nameWaiting(request);
+    this.nameWaiting(request, ts);
     return ts;
   }
 
   /**
    * Moves the channel's line to name this thread as waiting once each of the agent's approvals
-   * and questions is posted, mentioning the owner when he asked for it: the line is what tells
-   * him of the request. The others name nothing (`waitsOnOwner`).
+   * and questions is posted, mentioning the owner when he asked for it and linking the request
+   * `ts`: the line is what tells him of the request. The others name nothing (`waitsOnOwner`).
    */
-  private nameWaiting(request: OwnerRequest): void {
+  private nameWaiting(request: OwnerRequest, ts: string): void {
     if (!waitsOnOwner(request)) return;
-    void this.options.line?.show(this.channel, this.threadTs, "waiting", this.mention());
+    void this.options.line?.show(this.channel, this.threadTs, "waiting", this.mention(), ts);
   }
 
   async withdraw(request: MessageId): Promise<boolean> {
     // (sync) Noted before the first await: a rewrite waiting for the budget sees it.
     this.noteWithdrawn(request);
-    return await deleteRequest(this.slack, { channel: this.channel, ts: request });
+    const deleted = await deleteRequest(this.slack, { channel: this.channel, ts: request });
+    // A line that links the request would open a message Slack no longer has.
+    if (deleted) void this.options.line?.withdrawn(this.channel, this.threadTs, request);
+    return deleted;
   }
 
   async keepAnswers(

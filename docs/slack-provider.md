@@ -455,7 +455,15 @@ of the thread's last reply, which Slack opens the thread on, or of its root whil
 Slack no longer has that reply): the rule of the session index's Open, through the same
 `home.threadFacts`. When the agent asks
 the owner for an approval or an answer, the thread gets the same line with `✋ Waiting:`, posted
-from `SlackThread.ask` once each request is in the thread. The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
+from `SlackThread.ask` once each request is in the thread, its link the permalink of that request.
+A request is deleted once it is answered or stale, and Slack answers the link of a deleted
+message with a dialog, "We're unable to open this link". When `SlackThread.withdraw` deletes the
+request a line links, `ChannelLine.withdrawn` edits that line to link the thread's root, its word
+unchanged. Between the posts that tell the owner, the line follows the root's status: each
+`SlackThread.showStatus` that tells him nothing reaches `ChannelLine.restate`, which edits the line
+naming that thread to the status's word (`⏳ Working:` once he answered and the work goes on,
+`✋ Waiting:` while another request is open, `✅ Done:` after his own `!stop`), linked by the
+root but while waiting. The mention stays, and an edit pushes nothing. The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
 what the owner has just written in the thread.
 
 With `SLACK_MENTION_OWNER=on` (`SlackChatOptions.mentionOwner`), the channel's line is what tells
