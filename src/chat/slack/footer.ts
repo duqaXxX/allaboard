@@ -24,6 +24,7 @@ function short(field: FooterField): string {
     case "effort":
       return `*effort* ${valueWithDetail(field)}`;
     case "branch":
+    case "account":
       return mrkdwnEscape(value);
     case "tokens":
       return `${value} *tok*`;
@@ -59,7 +60,8 @@ function workPart(work: NonNullable<FooterFields["work"]>): string {
 
 /**
  * One line: the work's duration and end time, bypass, model and effort, the channel's folder,
- * then branch, changes, tokens, context and limits (the owner's order).
+ * then branch, changes, tokens, context, limits and the account (the owner's order); the account's
+ * plan is left to `!status`.
  */
 export function formatFooter(data: FooterFields, now: number): string {
   const fields = footerFields(data, now);

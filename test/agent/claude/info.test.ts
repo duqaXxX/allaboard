@@ -131,9 +131,46 @@ test("a server info that names no mode gives none", () => {
   assert.equal(agentInfo({ current_permission_mode: "" }).permissionMode, null);
 });
 
+// The account: `SDKControlInitializeResponse.account`, an `AccountInfo` (`sdk.d.ts` 0.3.310), its
+// fields as Claude Code 2.1.310 filled them on 2026-10-27; the content is synthetic.
+
+const ACCOUNT = {
+  email: "alice@example.com",
+  organization: "Example Org",
+  subscriptionType: "Claude Max",
+  apiProvider: "firstParty",
+};
+
+test("the server info names the account by its email, with its plan", () => {
+  assert.deepEqual(agentInfo({ ...SERVER_INFO, account: ACCOUNT }).account, {
+    name: "alice@example.com",
+    plan: "Claude Max",
+  });
+});
+
+test("an account with no plan keeps its email", () => {
+  const { subscriptionType: _, ...without } = ACCOUNT;
+  assert.deepEqual(agentInfo({ account: without }).account, {
+    name: "alice@example.com",
+    plan: null,
+  });
+});
+
+test("an account with no email, as behind a cloud provider, gives none", () => {
+  assert.equal(agentInfo({ account: { apiProvider: "bedrock" } }).account, null);
+  assert.equal(agentInfo({ account: { ...ACCOUNT, email: "" } }).account, null);
+  assert.equal(agentInfo({ account: "alice@example.com" }).account, null);
+  assert.equal(agentInfo(SERVER_INFO).account, null);
+});
+
 test("what is no server info gives no model, no command and no mode", () => {
   for (const info of [null, undefined, {}, "info", [], { models: "opus", commands: {} }]) {
-    assert.deepEqual(agentInfo(info), { models: [], commands: [], permissionMode: null });
+    assert.deepEqual(agentInfo(info), {
+      models: [],
+      commands: [],
+      permissionMode: null,
+      account: null,
+    });
   }
 });
 

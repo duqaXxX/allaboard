@@ -35,7 +35,8 @@
      "elements": [
       {
        "text": "footer",
-       "type": "mrkdwn"
+       "type": "mrkdwn",
+       "verbatim": true
       }
      ],
      "type": "context"
@@ -241,7 +242,8 @@
       "elements": [
        {
         "text": "footer",
-        "type": "mrkdwn"
+        "type": "mrkdwn",
+        "verbatim": true
        }
       ],
       "type": "context"

@@ -112,6 +112,10 @@ export interface FooterFields {
   readonly contextPercent: number | null;
   readonly sessionLimit: UsageLimit | null;
   readonly weekLimit: UsageLimit | null;
+  /** What names the account the agent is logged in to (an email); null when not known. */
+  readonly account: string | null;
+  /** The account's plan, which `!status` shows beside it; null when not known. */
+  readonly accountPlan: string | null;
   /**
    * The work the footer closes, from the prompt that began it to the moment the session ended
    * everything, background reports included; `doneAt` is epoch milliseconds. Null when not known

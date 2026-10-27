@@ -1147,8 +1147,11 @@ after a model switch, the id of the latest `model_changed` until a turn that wen
 or the usage names that id, `ThreadSession.modelSwitched`; a switch inside a turn waits for the next one), the effort level, the name of the folder this thread was opened in,
 the git branch and the uncommitted changes of the folder the session works in, the session's tokens
 from the turn's `turn_ended` event (the `modelUsage` of the `result` record, summed by
-`footer.sessionTokens`), the context percentage from the same `contextUsage`, and the 5-hour and
-weekly limits with the time to each reset. The folder the session works in is the `cwd` of the
+`footer.sessionTokens`), the context percentage from the same `contextUsage`, the 5-hour and
+weekly limits with the time to each reset, and last the account the agent is logged in to
+(`AgentInfo.account`, for Claude the email of the initialize answer's `account`, read at each
+connect and kept in memory only). `!status` shows the account's plan beside it; the footer does
+not. The folder the session works in is the `cwd` of the
 latest hook input, which follows a `cd` and a worktree (`ThreadSession.workingDirectory`, set by the
 event `folder_changed`): the back end registers a `Stop` hook, and a `PostToolUse` hook after every
 tool, so a turn stopped or failed before its `Stop` still moves it. Until a hook reports it, and

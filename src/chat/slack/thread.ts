@@ -60,7 +60,7 @@ import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
 import { endReply } from "./repair.ts";
-import { contextBlock, noticeText, split } from "./reply/blocks.ts";
+import { contextBlock, footerBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
@@ -739,7 +739,7 @@ export class SlackThread implements ThreadChat {
     // The footer an ordinary reply shows, of the latest run: it is rewritten with the card.
     if (card.footer !== null) {
       const line = formatFooter(card.footer, this.clock.time() * 1000);
-      if (line !== "") blocks.push({ type: "divider" }, contextBlock(noticeText(line)));
+      if (line !== "") blocks.push({ type: "divider" }, footerBlock(noticeText(line)));
     }
     try {
       if (this.loopTs === null) {

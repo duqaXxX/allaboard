@@ -40,14 +40,18 @@ export type FooterKey =
   | "tokens"
   | "context"
   | "session_limit"
-  | "week_limit";
+  | "week_limit"
+  | "account";
 
 /** One of the footer's values: `!status` shows `label: value`, a provider's footer its own mark. */
 export interface FooterField {
   readonly key: FooterKey;
   readonly label: string;
   readonly value: string;
-  /** What a provider draws beside the value (the level a default effort ran at); absent for none. */
+  /**
+   * What a provider draws beside the value (the level a default effort ran at, the account's
+   * plan); absent for none.
+   */
   readonly detail?: string;
 }
 
@@ -411,6 +415,14 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
   }
   if (data.weekLimit) {
     fields.push({ key: "week_limit", label: "7d limit", value: formatLimit(data.weekLimit, now) });
+  }
+  if (data.account) {
+    fields.push({
+      key: "account",
+      label: "Account",
+      value: data.account,
+      detail: data.accountPlan ?? undefined,
+    });
   }
   return fields;
 }

@@ -43,6 +43,7 @@
  */
 import { basename } from "node:path";
 import type {
+  AgentAccount,
   AgentSession,
   AgentState,
   CommandInfo,
@@ -414,6 +415,9 @@ export class ThreadSession {
   commands: CommandInfo[] = [];
   /** The agent's own model list, for the setup. */
   models: ModelInfo[] = [];
+  // The account the agent reported at its last connect, for the footer and `!status`: a login
+  // changed meanwhile shows from the next connect.
+  private account: AgentAccount | null = null;
   // A prompt was ever queued on this object; with no stored session id it tells a thread that
   // never ran a turn from one whose first turn is still starting.
   private submitted = false;
@@ -1065,6 +1069,7 @@ export class ThreadSession {
         const offered = this.deps.agent.capabilities;
         this.commands = offered.commands ? [...info.commands] : [];
         this.models = offered.models ? [...info.models] : [];
+        this.account = info.account;
         const modes = this.deps.agent.capabilities.permissionModes;
         this.nativeMode = info.permissionMode || modes.default;
         // Read once: a Start writing the switch meanwhile must not make the client's mode and
@@ -4136,6 +4141,8 @@ export class ThreadSession {
       contextPercent: context.percentage,
       sessionLimit: usage?.session ?? null,
       weekLimit: usage?.week ?? null,
+      account: this.account?.name ?? null,
+      accountPlan: this.account?.plan ?? null,
       work: null,
     };
   }

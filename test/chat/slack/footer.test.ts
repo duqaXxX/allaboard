@@ -25,6 +25,8 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     contextPercent: null,
     sessionLimit: null,
     weekLimit: null,
+    account: null,
+    accountPlan: null,
     work: null,
     ...known,
   };
@@ -45,6 +47,16 @@ test("full footer", () => {
     formatFooter(data, NOW),
     "⚡ bypass · claude-opus-5-5 · main · 12.3k *tok* · *ctx* 6% · *5h* 3% ↻ 2h · *7d* 25%",
   );
+});
+
+test("the account ends the footer, without its plan", () => {
+  const data = fields({
+    model: "claude-opus-5-5",
+    weekLimit: { percent: 25, resetsAt: null },
+    account: "alice@example.com",
+    accountPlan: "Claude Max",
+  });
+  assert.equal(formatFooter(data, NOW), "claude-opus-5-5 · *7d* 25% · alice@example.com");
 });
 
 test("minimal footer hides what it does not know", () => {

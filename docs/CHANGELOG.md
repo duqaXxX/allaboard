@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- The footer ends with the email of the Claude account the session runs on, and `!status` shows
+  it with the account's plan (`Account: alice@example.com (Claude Max)`), so an instance with a
+  login of its own (`CLAUDE_CONFIG_DIR`) says which one it uses. Read when a session connects:
+  after a `/login` to another account, a session already open shows the new one from its next
+  connect. Slack draws the footer as written, so the email is not a link.
+
 ### Fixed
 
 - An Edit or Write preview you had opened closed again each time its reply was edited, on Slack's

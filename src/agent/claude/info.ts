@@ -9,7 +9,14 @@
  */
 import type { SDKSessionInfo } from "@anthropic-ai/claude-agent-sdk";
 import { isRecord, records } from "../../values.ts";
-import type { AgentInfo, CommandInfo, ContextUsage, ListedSession, ModelInfo } from "../seam.ts";
+import type {
+  AgentAccount,
+  AgentInfo,
+  CommandInfo,
+  ContextUsage,
+  ListedSession,
+  ModelInfo,
+} from "../seam.ts";
 import { number, string, type WireRecord, words } from "./wire.ts";
 
 function strings(value: unknown): string[] {
@@ -43,17 +50,26 @@ function commandOf(entry: WireRecord): CommandInfo | null {
   };
 }
 
+// The login's email names the account; the plan is `subscriptionType` (`Claude Max`, measured on
+// Claude Code 2.1.310 on 2026-10-27). An agent behind a cloud provider reports no email.
+function accountOf(value: unknown): AgentAccount | null {
+  if (!isRecord(value)) return null;
+  const name = words(value.email);
+  return name === null ? null : { name, plan: words(value.subscriptionType) };
+}
+
 function known<T>(entries: readonly (T | null)[]): T[] {
   return entries.filter((entry): entry is T => entry !== null);
 }
 
-/** The answer to the initialize request as the models, commands and mode the core reads. */
+/** The answer to the initialize request as the models, commands, mode and account the core reads. */
 export function agentInfo(info: unknown): AgentInfo {
   const answer = isRecord(info) ? info : {};
   return {
     models: known(records(answer.models).map(modelOf)),
     commands: known(records(answer.commands).map(commandOf)),
     permissionMode: words(answer.current_permission_mode),
+    account: accountOf(answer.account),
   };
 }
 

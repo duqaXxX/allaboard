@@ -100,6 +100,8 @@ test("a reply is one message: text and task lines in order, what runs, then the 
     contextPercent: 12,
     sessionLimit: null,
     weekLimit: null,
+    account: null,
+    accountPlan: null,
     work: null,
   });
   provider
@@ -162,6 +164,8 @@ test("the footer goes under the reply it is drawn on, and a footer drawn before 
     contextPercent: null,
     sessionLimit: null,
     weekLimit: null,
+    account: null,
+    accountPlan: null,
     work: null,
   };
   const upper = thread.openReply(() => {});

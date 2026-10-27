@@ -50,6 +50,8 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     contextPercent: null,
     sessionLimit: null,
     weekLimit: null,
+    account: null,
+    accountPlan: null,
     work: null,
     ...known,
   };
@@ -296,6 +298,21 @@ test("git is bounded by one time limit for all its calls", async () => {
   const started = Date.now();
   assert.deepEqual(await gitState(join(tmp, "folder"), () => never, 50), [null, null]);
   assert.ok(Date.now() - started < 2_000);
+});
+
+test("status fields write the account with its plan, last", () => {
+  const data = fields({
+    model: "claude-opus-5-5",
+    account: "alice@example.com",
+    accountPlan: "Claude Max",
+  });
+  assert.deepEqual(formatStatusFields(data, NOW), [
+    "Model: `claude-opus-5-5`",
+    "Account: `alice@example.com (Claude Max)`",
+  ]);
+  assert.deepEqual(formatStatusFields(fields({ account: "alice@example.com" }), NOW), [
+    "Account: `alice@example.com`",
+  ]);
 });
 
 test("status fields write a default effort with the level it ran at", () => {

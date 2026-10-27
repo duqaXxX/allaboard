@@ -89,7 +89,7 @@ export interface MarkdownBlock {
 
 export interface ContextBlock {
   type: "context";
-  elements: { type: "mrkdwn"; text: string }[];
+  elements: { type: "mrkdwn"; text: string; verbatim?: boolean }[];
   block_id?: string;
 }
 
@@ -166,6 +166,15 @@ export type CardHeld = { details?: string; output?: string; title?: number };
 
 export function contextBlock(text: string): ContextBlock {
   return { type: "context", elements: [{ type: "mrkdwn", text }] };
+}
+
+/**
+ * The footer's line as a context block that Slack does not link: by default Slack turns the
+ * account's email into a `mailto:` link when the message is posted (measured 2026-10-27, desktop),
+ * and `verbatim` keeps the line as written while still drawing its marks and its `<!date>`.
+ */
+export function footerBlock(line: string): ContextBlock {
+  return { type: "context", elements: [{ type: "mrkdwn", text: line, verbatim: true }] };
 }
 
 // The `block_id` of a line about the work, with the place of its text in the reply: a context

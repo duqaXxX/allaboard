@@ -258,6 +258,8 @@ const FOOTER: FooterFields = {
   contextPercent: null,
   sessionLimit: null,
   weekLimit: null,
+  account: null,
+  accountPlan: null,
   work: null,
 };
 
