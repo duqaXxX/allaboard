@@ -1,0 +1,386 @@
+[
+  {
+    "key": {
+      "projectKey": "-home-dev-project",
+      "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b"
+    },
+    "entries": [
+      {
+        "parentUuid": "f843b987-b4c0-40ec-9106-75c36e62fe03",
+        "isSidechain": false,
+        "message": {
+          "model": "claude-haiku-5-5",
+          "id": "msg_000000000000000000000001",
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "HERON"
+            }
+          ],
+          "container": null,
+          "stop_reason": "end_turn",
+          "stop_sequence": null,
+          "stop_details": null,
+          "usage": {
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 28287,
+            "cache_read_input_tokens": 11190,
+            "output_tokens": 5,
+            "output_tokens_details": {
+              "thinking_tokens": 0
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 28287,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 5,
+                "cache_read_input_tokens": 11190,
+                "cache_creation_input_tokens": 28287,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 28287
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "input_transformations": [],
+          "diagnostics": null,
+          "context_management": null
+        },
+        "serverClassifierRequest": "b6ce4cec-084e-4391-baa5-372cf821f293",
+        "apiBlockIndex": 0,
+        "requestId": "req_000000000000000000000001",
+        "requestRef": "6df9f4c7-f334-44ea-a0f7-5a6830740ecc",
+        "requestedModel": "claude-haiku-5-5",
+        "type": "assistant",
+        "uuid": "6443b1a8-2e38-43ba-af26-9c170877dc52",
+        "timestamp": "2026-10-27T19:11:30.919Z",
+        "advisorModel": "claude-opus-5-5",
+        "effort": "medium",
+        "perTurnEffort": "medium",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      }
+    ]
+  },
+  {
+    "key": {
+      "projectKey": "-home-dev-project",
+      "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b"
+    },
+    "entries": [
+      {
+        "parentUuid": "85ab86ac-72f2-4cba-bf76-233d3bcd0c27",
+        "isSidechain": false,
+        "promptId": "77ffa4c0-225a-4502-960e-0b24fbf6369b",
+        "type": "user",
+        "message": {
+          "role": "user",
+          "content": "Stop hook feedback:\nPROBE-REASON-7731: reply with the single word OSPREY"
+        },
+        "isMeta": true,
+        "uuid": "e31ae7a0-4a39-4726-8c1e-4de0861f6e5a",
+        "timestamp": "2026-10-27T19:11:31.178Z",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      },
+      {
+        "parentUuid": "e31ae7a0-4a39-4726-8c1e-4de0861f6e5a",
+        "isSidechain": false,
+        "attachment": {
+          "type": "hook_blocking_error",
+          "hookName": "Stop",
+          "toolUseID": "f7524451-6fa7-4207-8d4f-2bdb9bd2b0ad",
+          "hookEvent": "Stop",
+          "blockingError": {
+            "blockingError": "PROBE-REASON-7731: reply with the single word OSPREY",
+            "command": "/home/dev/project/stop-hook.sh"
+          }
+        },
+        "type": "attachment",
+        "uuid": "00b23570-64c5-4f7b-9fa9-62a439509e36",
+        "timestamp": "2026-10-27T19:11:31.178Z",
+        "rendered": [
+          {
+            "content": "<system-reminder>\nStop hook blocking error from command: \"/home/dev/project/stop-hook.sh\": PROBE-REASON-7731: reply with the single word OSPREY\n</system-reminder>"
+          }
+        ],
+        "renderedRole": "system",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      },
+      {
+        "parentUuid": "00b23570-64c5-4f7b-9fa9-62a439509e36",
+        "isSidechain": false,
+        "type": "system",
+        "subtype": "stop_hook_summary",
+        "hookCount": 4,
+        "hookInfos": [
+          {
+            "command": "/home/dev/project/stop-hook.sh"
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py"
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py",
+            "durationMs": 48
+          },
+          {
+            "command": "callback"
+          }
+        ],
+        "hookErrors": [
+          "PROBE-REASON-7731: reply with the single word OSPREY"
+        ],
+        "hookAdditionalContext": [],
+        "preventedContinuation": false,
+        "stopReason": "",
+        "hasOutput": true,
+        "level": "suggestion",
+        "timestamp": "2026-10-27T19:11:31.179Z",
+        "uuid": "1e3b754b-f734-40e9-87db-c1c963720c7b",
+        "toolUseID": "f7524451-6fa7-4207-8d4f-2bdb9bd2b0ad",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      }
+    ]
+  },
+  {
+    "key": {
+      "projectKey": "-home-dev-project",
+      "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b"
+    },
+    "entries": [
+      {
+        "parentUuid": "1e3b754b-f734-40e9-87db-c1c963720c7b",
+        "isSidechain": false,
+        "message": {
+          "model": "claude-haiku-5-5",
+          "id": "msg_000000000000000000000001",
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "The hook asks for a different word.",
+              "signature": "c2lnbmF0dXJl"
+            }
+          ],
+          "container": null,
+          "stop_reason": "end_turn",
+          "stop_sequence": null,
+          "stop_details": null,
+          "usage": {
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 15967,
+            "cache_read_input_tokens": 23646,
+            "output_tokens": 68,
+            "output_tokens_details": {
+              "thinking_tokens": 61
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 15967,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 68,
+                "cache_read_input_tokens": 23646,
+                "cache_creation_input_tokens": 15967,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 15967
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "input_transformations": [],
+          "diagnostics": {
+            "cache_miss_reason": {
+              "type": "messages_changed",
+              "cache_missed_input_tokens": 25030
+            }
+          },
+          "context_management": null
+        },
+        "thinkingDurationMs": 396,
+        "thinkingDisplay": "updates",
+        "serverClassifierRequest": "41a1cb56-9967-4479-9bcf-1bb3b3a238a5",
+        "apiBlockIndex": 0,
+        "requestId": "req_000000000000000000000001",
+        "requestRef": "314ec277-a383-49d0-a217-9e36c90bef26",
+        "requestedModel": "claude-haiku-5-5",
+        "type": "assistant",
+        "uuid": "6b2c7364-8365-4aca-90c8-ded721b894eb",
+        "timestamp": "2026-10-27T19:11:32.808Z",
+        "advisorModel": "claude-opus-5-5",
+        "effort": "medium",
+        "perTurnEffort": "medium",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      },
+      {
+        "parentUuid": "6b2c7364-8365-4aca-90c8-ded721b894eb",
+        "isSidechain": false,
+        "message": {
+          "model": "claude-haiku-5-5",
+          "id": "msg_000000000000000000000001",
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "OSPREY"
+            }
+          ],
+          "container": null,
+          "stop_reason": "end_turn",
+          "stop_sequence": null,
+          "stop_details": null,
+          "usage": {
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 15967,
+            "cache_read_input_tokens": 23646,
+            "output_tokens": 68,
+            "output_tokens_details": {
+              "thinking_tokens": 61
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 15967,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 68,
+                "cache_read_input_tokens": 23646,
+                "cache_creation_input_tokens": 15967,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 15967
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "input_transformations": [],
+          "diagnostics": {
+            "cache_miss_reason": {
+              "type": "messages_changed",
+              "cache_missed_input_tokens": 25030
+            }
+          },
+          "context_management": null
+        },
+        "serverClassifierRequest": "41a1cb56-9967-4479-9bcf-1bb3b3a238a5",
+        "apiBlockIndex": 1,
+        "requestId": "req_000000000000000000000001",
+        "requestRef": "314ec277-a383-49d0-a217-9e36c90bef26",
+        "requestedModel": "claude-haiku-5-5",
+        "type": "assistant",
+        "uuid": "19551ca3-c2a8-44ca-b927-3ed35f039aee",
+        "timestamp": "2026-10-27T19:11:32.810Z",
+        "advisorModel": "claude-opus-5-5",
+        "effort": "medium",
+        "perTurnEffort": "medium",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      },
+      {
+        "parentUuid": "6f3206fc-f2b5-401e-a57a-bd4d757dc734",
+        "isSidechain": false,
+        "type": "system",
+        "subtype": "stop_hook_summary",
+        "hookCount": 4,
+        "hookInfos": [
+          {
+            "command": "/home/dev/project/stop-hook.sh",
+            "durationMs": 16
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py"
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py",
+            "durationMs": 58
+          },
+          {
+            "command": "callback"
+          }
+        ],
+        "hookErrors": [],
+        "hookAdditionalContext": [],
+        "preventedContinuation": false,
+        "stopReason": "",
+        "hasOutput": true,
+        "level": "suggestion",
+        "timestamp": "2026-10-27T19:11:32.891Z",
+        "uuid": "5c2271c8-9568-4ce6-8dff-aaa04b39585d",
+        "toolUseID": "7cecf76a-793d-4952-a8f4-fe8fdea3b526",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "7c5334b8-ee1b-4528-87e3-c4e325868c8b",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      }
+    ]
+  }
+]

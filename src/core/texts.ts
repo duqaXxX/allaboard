@@ -362,6 +362,11 @@ export const COMPACTED_PLAIN = "Compacted the conversation.";
 export const GOAL_NOT_MET = "◯ Goal not yet met… continuing";
 export const GOAL_ACHIEVED = "✔ Goal achieved";
 export const GOAL_ACHIEVED_COUNTS = "✔ Goal achieved ({counts})";
+// The stop hooks that refused to end a turn, in the terminal's words: `Ran 3 stop hooks`, the
+// count in bold, then a line for each refusal (captured 2026-10-27 on Claude Code 2.1.311; the
+// same words in the CLI 2.1.310 the SDK bundles).
+export const STOP_HOOKS_RAN = "Ran **{n}** stop {hooks}";
+export const STOP_HOOK_ERROR = "⎿ Stop hook error: {error}";
 // Under `Stopped.`: a stop ends the turn, not the goal, which the next message resumes.
 export const GOAL_STILL_ACTIVE = "◎ Goal still active: {condition}";
 export const GOAL_STILL_ACTIVE_CLEAR = "◎ Goal still active: {condition} · `!{clear}` drops it";

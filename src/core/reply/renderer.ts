@@ -89,6 +89,17 @@ export function formatDuration(seconds: number): string {
 }
 
 /**
+ * The terminal's account of stop hooks that refused to end a turn: `Ran 3 stop hooks`, then
+ * `⎿ Stop hook error: <words>` for each refusal.
+ */
+export function stopHookLines(hooks: number, errors: readonly string[]): string {
+  return [
+    texts.fill(texts.STOP_HOOKS_RAN, { n: hooks, hooks: hooks === 1 ? "hook" : "hooks" }),
+    ...errors.map((error) => texts.fill(texts.STOP_HOOK_ERROR, { error })),
+  ].join("\n");
+}
+
+/**
  * The line of an achieved goal, as the terminal prints it: `✔ Goal achieved (37s · 2 turns ·
  * 3.4k tokens)`, with the counts the agent gave.
  */
@@ -323,6 +334,12 @@ export class TurnRenderer {
         }
         break;
       }
+      case "stop_hook_blocked":
+        // A line of the reply as a launch line is, not an aside: an aside is drawn on one line
+        // with no markdown, and these are two lines with a bold count.
+        await this.#writeLaunches();
+        await this.#line(stopHookLines(event.hooks, event.errors));
+        break;
       case "turn_ended":
         this.result = event;
         if (!this.#wroteText && event.finalText) {
