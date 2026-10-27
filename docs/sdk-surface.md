@@ -322,14 +322,17 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SessionStoreEntry.attachment` | `iterations` | key | goals.ts: goalChange | measured | P33 |
 | `SessionStoreEntry.attachment` | `durationMs` | key | goals.ts: goalChange | measured | P33 |
 | `SessionStoreEntry.attachment` | `tokens` | key | goals.ts: goalChange | measured | P33 |
-| `SessionStoreEntry.type` | `"system"` | value | goals.ts: stopHookBlock | measured | none |
-| `SessionStoreEntry` | `subtype` | key | goals.ts: stopHookBlock | measured | none |
-| `SessionStoreEntry.subtype` | `"stop_hook_summary"` | value | goals.ts: stopHookBlock | measured | none |
-| `SessionStoreEntry` | `hookCount` | key | goals.ts: stopHookBlock | measured | none |
-| `SessionStoreEntry` | `hookErrors` | key | goals.ts: stopHookBlock | measured | none |
-| `SessionStoreEntry` | `hookInfos` | key | goals.ts: stopHookBlock | measured | none |
-| `SessionStoreEntry.hookInfos[]` | `command` | key | goals.ts: stopHookBlock | measured | none |
-| `SessionStoreEntry.hookInfos[].command` | `"callback"` | value | goals.ts: stopHookBlock | measured | none |
+| `SessionStoreEntry.type` | `"system"` | value | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry` | `subtype` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry.subtype` | `"stop_hook_summary"` | value | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry` | `hookCount` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry` | `hookErrors` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry` | `hookInfos` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry` | `hookAdditionalContext` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry` | `preventedContinuation` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry` | `stopReason` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry.hookInfos[]` | `command` | key | goals.ts: stopHookSummary | measured | P42 |
+| `SessionStoreEntry.hookInfos[].command` | `"callback"` | value | goals.ts: stopHookSummary | measured | P42 |
 | `command_lifecycle` | `command_uuid` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
 | `command_lifecycle` | `state` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
 | `command_lifecycle` | `type` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
@@ -424,6 +427,7 @@ union, none of which any recording carries.
 - `stream_event:message_delta`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`
 - `system:api_retry`: `SDKAPIRetryMessage`
 - `system:background_tasks_changed`: `SDKBackgroundTasksChangedMessage`
+- `system:notification`: `SDKNotificationMessage`
 - `system:thinking_tokens`: `SDKThinkingTokensMessage`
 - `tool_progress`: `SDKToolProgressMessage`
 
@@ -441,7 +445,6 @@ union, none of which any recording carries.
 - `SDKLocalCommandOutputMessage`
 - `SDKMemoryRecallMessage`
 - `SDKMirrorErrorMessage`
-- `SDKNotificationMessage`
 - `SDKPermissionDeniedMessage`
 - `SDKPluginInstallMessage`
 - `SDKPromptSuggestionMessage`

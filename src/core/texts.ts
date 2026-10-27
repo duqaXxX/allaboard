@@ -362,14 +362,16 @@ export const COMPACTED_PLAIN = "Compacted the conversation.";
 export const GOAL_NOT_MET = "◯ Goal not yet met… continuing";
 export const GOAL_ACHIEVED = "✔ Goal achieved";
 export const GOAL_ACHIEVED_COUNTS = "✔ Goal achieved ({counts})";
-// The stop hooks that refused to end a turn, in the terminal's words: `Ran 3 stop hooks`, the
-// count in bold, then a line for each refusal (captured 2026-10-27 on Claude Code 2.1.311; the
-// same words in the CLI 2.1.310 the SDK bundles).
+// What the stop hooks said at a turn's end, in the terminal's words: `Ran 3 stop hooks`, the count
+// in bold, then why one stopped the session, each refusal and each added context, in that order
+// (captured 2026-10-27 on Claude Code 2.1.311; the same words in the CLI 2.1.310 the SDK bundles).
 export const STOP_HOOKS_RAN = "Ran **{n}** stop {hooks}";
+export const STOP_HOOK_STOPPED = "⎿ {reason}";
 export const STOP_HOOK_ERROR = "⎿ Stop hook error: {error}";
-// Each further line of a refusal, under the first as the terminal indents it: spaces that do not
-// break, so that the chat neither drops them nor reads a `- ` or a `#` after them as markup.
-export const STOP_HOOK_ERROR_MORE = "\u00a0\u00a0\u00a0{line}";
+export const STOP_HOOK_FEEDBACK = "⎿ Stop hook feedback: {context}";
+// Each further line of what a hook said, under the first as the terminal indents it: spaces that
+// do not break, so that the chat neither drops them nor reads a `- ` or a `#` after them as markup.
+export const STOP_HOOK_MORE = "\u00a0\u00a0\u00a0{line}";
 // Under `Stopped.`: a stop ends the turn, not the goal, which the next message resumes.
 export const GOAL_STILL_ACTIVE = "◎ Goal still active: {condition}";
 export const GOAL_STILL_ACTIVE_CLEAR = "◎ Goal still active: {condition} · `!{clear}` drops it";

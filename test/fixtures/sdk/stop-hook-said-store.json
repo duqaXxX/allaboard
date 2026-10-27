@@ -1,0 +1,196 @@
+[
+  {
+    "key": {
+      "projectKey": "-home-dev-project",
+      "sessionId": "f9032933-923b-418a-b9f9-4625d96c69c9"
+    },
+    "entries": [
+      {
+        "parentUuid": "81cd0183-c459-49e9-b156-7b83580ac35c",
+        "isSidechain": false,
+        "attachment": {
+          "type": "hook_additional_context",
+          "content": [
+            "PROBE-REASON-7731 context line one\nline two"
+          ],
+          "hookName": "Stop",
+          "toolUseID": "43ce16f1-38d5-4e18-86b6-87ee6162d3af",
+          "hookEvent": "Stop"
+        },
+        "type": "attachment",
+        "uuid": "b892e5f5-5e1d-4a59-9831-7f7739384d73",
+        "timestamp": "2026-10-27T22:10:50.127Z",
+        "rendered": [
+          {
+            "content": "<system-reminder>\nStop hook additional context: PROBE-REASON-7731 context line one\nline two\n</system-reminder>"
+          }
+        ],
+        "renderedRole": "system",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "f9032933-923b-418a-b9f9-4625d96c69c9",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      },
+      {
+        "parentUuid": "b892e5f5-5e1d-4a59-9831-7f7739384d73",
+        "isSidechain": false,
+        "type": "system",
+        "subtype": "stop_hook_summary",
+        "hookCount": 4,
+        "hookInfos": [
+          {
+            "command": "/home/dev/project/stop-hook.sh",
+            "durationMs": 243
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py"
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py",
+            "durationMs": 64
+          },
+          {
+            "command": "callback"
+          }
+        ],
+        "hookErrors": [],
+        "hookAdditionalContext": [
+          "PROBE-REASON-7731 context line one\nline two"
+        ],
+        "preventedContinuation": false,
+        "stopReason": "",
+        "hasOutput": true,
+        "level": "suggestion",
+        "timestamp": "2026-10-27T22:10:50.127Z",
+        "uuid": "287d5a67-5994-4f1c-9d68-86bb6b4fc0b0",
+        "toolUseID": "43ce16f1-38d5-4e18-86b6-87ee6162d3af",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "f9032933-923b-418a-b9f9-4625d96c69c9",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      }
+    ]
+  },
+  {
+    "key": {
+      "projectKey": "-home-dev-project",
+      "sessionId": "f9032933-923b-418a-b9f9-4625d96c69c9"
+    },
+    "entries": [
+      {
+        "parentUuid": "6847d752-e6ea-4582-8c7a-51e3edf523a0",
+        "isSidechain": false,
+        "type": "system",
+        "subtype": "stop_hook_summary",
+        "hookCount": 4,
+        "hookInfos": [
+          {
+            "command": "/home/dev/project/stop-hook.sh",
+            "durationMs": 20
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py"
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py",
+            "durationMs": 58
+          },
+          {
+            "command": "callback"
+          }
+        ],
+        "hookErrors": [],
+        "hookAdditionalContext": [],
+        "preventedContinuation": false,
+        "stopReason": "",
+        "hasOutput": true,
+        "level": "suggestion",
+        "timestamp": "2026-10-27T22:10:52.260Z",
+        "uuid": "cf85cada-40aa-4b29-97c0-1f9bebeff7c1",
+        "toolUseID": "9d539bc6-c7e3-47dc-89a5-e164721ee78c",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "f9032933-923b-418a-b9f9-4625d96c69c9",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      }
+    ]
+  },
+  {
+    "key": {
+      "projectKey": "-home-dev-project",
+      "sessionId": "d8f8e4de-4f7b-46a7-822a-64df0dc52080"
+    },
+    "entries": [
+      {
+        "parentUuid": "ba02b6da-af05-45b9-8d99-056caec20e35",
+        "isSidechain": false,
+        "attachment": {
+          "type": "hook_stopped_continuation",
+          "message": "PROBE-REASON-7731 stopped by the hook",
+          "hookName": "Stop",
+          "toolUseID": "95145562-600c-4196-99c0-46c22f34b2c0",
+          "hookEvent": "Stop"
+        },
+        "type": "attachment",
+        "uuid": "003d7401-152c-406b-b367-44dc1abb60fa",
+        "timestamp": "2026-10-27T22:10:55.735Z",
+        "rendered": [
+          {
+            "content": "<system-reminder>\nStop hook stopped continuation: PROBE-REASON-7731 stopped by the hook\n</system-reminder>"
+          }
+        ],
+        "renderedRole": "system",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "d8f8e4de-4f7b-46a7-822a-64df0dc52080",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      },
+      {
+        "parentUuid": "9eb1b4af-cb32-4beb-9806-866f9e06d2da",
+        "isSidechain": false,
+        "type": "system",
+        "subtype": "stop_hook_summary",
+        "hookCount": 4,
+        "hookInfos": [
+          {
+            "command": "/home/dev/project/stop-hook.sh",
+            "durationMs": 162
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py"
+          },
+          {
+            "command": "python3 /home/dev/hooks/stop.py",
+            "durationMs": 53
+          },
+          {
+            "command": "callback"
+          }
+        ],
+        "hookErrors": [],
+        "hookAdditionalContext": [],
+        "preventedContinuation": true,
+        "stopReason": "PROBE-REASON-7731 stopped by the hook",
+        "hasOutput": true,
+        "level": "suggestion",
+        "timestamp": "2026-10-27T22:10:55.735Z",
+        "uuid": "fd40af27-0ae8-4a8c-a9bd-63735bbb79b5",
+        "toolUseID": "95145562-600c-4196-99c0-46c22f34b2c0",
+        "userType": "external",
+        "entrypoint": "sdk-ts",
+        "cwd": "/home/dev/project",
+        "sessionId": "d8f8e4de-4f7b-46a7-822a-64df0dc52080",
+        "version": "2.1.310",
+        "gitBranch": "HEAD"
+      }
+    ]
+  }
+]

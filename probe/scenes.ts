@@ -117,6 +117,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "session tag": ["P31"],
   "generated title": ["P32"],
   "folder trust": ["P34"],
+  "stop hooks": ["P42"],
   "settings mode": ["P37"],
   "logged out": ["P39"],
   "api error": ["P40"],
@@ -1895,6 +1896,54 @@ export function judgeTrust(trusted: readonly string[], untrusted: readonly strin
 }
 
 /**
+ * P42: a session in a folder of its own whose project Stop hook says, at the turn's three ends, a
+ * refusal, an added context, then a stop with its reason; each but the stop sends the turn on. The
+ * turn is one Haiku turn of three short answers.
+ */
+async function stopHooks(s: Stage): Promise<Seen> {
+  const cwd = join(s.workdir, "stop-hooks");
+  await mkdir(join(cwd, ".claude"), { recursive: true });
+  const count = join(cwd, "stops");
+  const said = [
+    '{"decision":"block","reason":"say OSPREY"}',
+    '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"say EGRET"}}',
+    '{"continue":false,"stopReason":"enough birds"}',
+  ];
+  const hook = join(cwd, "stop-hook.sh");
+  await writeFile(
+    hook,
+    [
+      "#!/bin/sh",
+      `n=$(cat '${count}' 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > '${count}'`,
+      ...said.map((output, at) => `[ "$n" = ${at + 1} ] && printf '%s' '${output}'`),
+      "exit 0",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  await writeFile(
+    join(cwd, ".claude", "settings.json"),
+    JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: hook }] }] } }),
+  );
+  const live = await s.open(cwd, { settingsSources: ["project"] });
+  const turn = await live.turn("Reply with the single word HERON and nothing else.");
+  const ran = ofType(turn.events, "stop_hooks_ran");
+  const ended = turn.events.findIndex((event) => event.type === "turn_ended");
+  const last = turn.events.findLastIndex((event) => event.type === "stop_hooks_ran");
+  const shape = ran.map((event) => [event.hooks, event.stopReason, event.errors, event.context]);
+  const expected = [
+    [1, null, ["say OSPREY"], []],
+    [1, null, [], ["say EGRET"]],
+    [1, "enough birds", [], []],
+  ];
+  const holds = JSON.stringify(shape) === JSON.stringify(expected) && last < ended;
+  const detail = holds
+    ? ""
+    : `the stop hooks said: ${s.scrubbed(JSON.stringify(shape), 400)}, before the end: ${last < ended}`;
+  return { P42: observation(ran.length > 0, holds, detail) };
+}
+
+/**
  * Two sessions with no login, so no token is spent, against one record of trust in the place the
  * daemon reads it (`recordPath`): the folder it trusts, and the one it names as not trusted.
  */
@@ -2496,6 +2545,7 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
       Object.assign(seen, await attempt("session tag", s, () => sessionTag(s.root)));
       Object.assign(seen, await attempt("generated title", s, () => generatedTitle(s)));
       Object.assign(seen, await attempt("folder trust", s, () => folderTrust(s)));
+      Object.assign(seen, await attempt("stop hooks", s, () => stopHooks(s)));
       Object.assign(seen, await attempt("settings mode", s, () => settingsMode(s)));
       Object.assign(seen, await attempt("logged out", s, () => loggedOut(s)));
       Object.assign(seen, await attempt("api error", s, () => apiError(s)));

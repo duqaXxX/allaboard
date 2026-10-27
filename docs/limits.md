@@ -43,7 +43,6 @@ The first rows are about how a session runs, the others about commands.
 |---|---|---|---|---|---|
 | A session open in the terminal and in a thread at once | One terminal per session, which reads every message of it | A terminal left open reads nothing written from Slack, and a message written there branches the session: close it and run `claude --resume <id>` again first. `/resume <id>` inside it does not reload a session started from Slack. Background work still running on one side splits the session when the other writes. allaboard waits for a terminal's running turn, asks once before writing beside an open terminal, and shows what the terminal wrote (measured 2026-10-27, SDK 0.3.310 beside Claude Code 2.1.311; [setup.md](setup.md)) | by hand: needs a terminal | [#101](https://github.com/duqaXxX/allaboard/issues/101) |  |
 | A command left running in the background | Runs until it ends | Stopped after 30 minutes, or after the time Claude asked for, 2 hours at most; Claude is told and can start it again. `BASH_DEFAULT_TIMEOUT_MS` in `.env` replaces the 30 minutes, and the 2 hours when it is longer, up to 24.8 days ([setup.md](setup.md)) | `L1` | none |  |
-| A stop hook that adds context to the turn, or stops the session with `continue: false` | `Ran N stop hooks`, with the added context or the reason for stopping under it | Not shown: the reply shows the stop hooks only when one refuses to end the turn (`Stop hook error: <reason>`) | by hand: needs a terminal | none | `StopHookInput` |
 | How long Claude Code waits for a command in the foreground | 2 minutes by default | The same, unless `BASH_DEFAULT_TIMEOUT_MS` is set: its value replaces the 2 minutes too | `L1` | none |  |
 | Publishing a page as an artifact | The `Artifact` tool | Not offered: the Agent SDK turns it off, and its documentation names no way to turn it on (read 2026-10-20) | `L3` | none |  |
 | A model set by the program that drives Claude Code, then `/model` to the model your settings name | No program sets the model: you change it by typing the model command | After the SDK's `setModel`, a `/model` to the model your settings name (`model` in a settings file the session reads) is acknowledged and ignored: the command answers `Set model to <name>` and requests keep running on the model `setModel` set. A `/model` to any other model works, and so does one when no settings file names a model (measured 2026-10-16, SDK 0.3.301, Claude Code 2.1.301). allaboard does not call `setModel`: the setup's model is set by typing `/model <model>` into the session, so no override is left and your own `/model` works as in the terminal. The thread shows nothing of that command, but the session holds it: the model sees it (measured 2026-10-16 on Claude Code 2.1.301, SDK 0.3.301) and it enters the session's transcript, so a terminal `--resume` of the session lists `/model <model>` and `Set model to <name>`. `!stop` while it runs ends the setup and the session, and the message is not sent. A probe claim checks the SDK's behaviour on each release | `P27` | none |  |
@@ -96,11 +95,6 @@ sessions of the SDK was stopped after 30 minutes in the one without the variable
 end in the one with `BASH_DEFAULT_TIMEOUT_MS=14400000`. That a subagent does not wait for the subagents it started
 is Claude Code's own statement ([sub-agents](https://code.claude.com/docs/en/sub-agents)), and
 was not run.
-
-The row on stop hooks was measured on 2026-10-27 with Haiku 5.5: a project Stop hook that refused
-once, in the terminal (Claude Code 2.1.311) and in a session started with allaboard's options
-(TypeScript SDK 0.3.310, Claude Code 2.1.310). What the terminal draws for the added context and
-for `continue: false` was read in the code of Claude Code 2.1.310, and was not run.
 
 The rows on a task started in the background and on a turn Claude Code opens by itself were
 measured on 2026-10-15 with Claude Code 2.1.300 and the TypeScript SDK 0.3.300, in one session

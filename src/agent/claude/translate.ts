@@ -657,6 +657,9 @@ export const UNREAD_KINDS: readonly string[] = [
   "system:api_retry",
   // The list of background tasks: the task records say the same, one task at a time.
   "system:background_tasks_changed",
+  // The terminal's toast that points to its own detail (`Stop hook error occurred · ctrl+o to
+  // see`, recorded 2026-10-27): the reply says that detail, from the session store.
+  "system:notification",
   "system:thinking_tokens",
   // A subagent's heartbeat while its call runs.
   "tool_progress",

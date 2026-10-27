@@ -468,6 +468,20 @@ export const CLAIMS: readonly Claim[] = [
       "waiting on its own background work`, then its end line and its words card",
   ),
   claim(
+    "P42",
+    "gesture",
+    "what a project's stop hooks say reaches the session store as `stop_hook_summary` entries, each " +
+      "read before the turn's end and counted without the daemon's own callback: a refusal " +
+      "(`hookErrors`), then an added context (`hookAdditionalContext`), then a stop with its reason " +
+      "(`preventedContinuation`, `stopReason`)",
+    "src/agent/claude/goals.ts#stopHookSummary",
+    'in a bound folder, add a project Stop hook that prints `{"decision":"block","reason":"say ' +
+      'OSPREY"}` once, send a prompt: the reply shows `Ran 1 stop hook` and `⎿ Stop hook error: ' +
+      "say OSPREY` between its two answers. If it fails, read `docs/sdk-surface.md` for the rows " +
+      "under `SessionStoreEntry` that name `stopHookSummary`, and look for the `stop_hook_summary` " +
+      "entries in a transcript",
+  ),
+  claim(
     "L1",
     "limit",
     "the Bash tool of a session started as the daemon starts it, with no `BASH_DEFAULT_TIMEOUT_MS`, " +
