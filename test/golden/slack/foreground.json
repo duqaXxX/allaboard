@@ -4,13 +4,25 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01CCT7tcqS5bwexewvv2iUAL",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ python3 -c 'import time; time.sleep(12)'",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01CCT7tcqS5bwexewvv2iUAL",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "done",
@@ -32,7 +44,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ python3 -c 'import time; time.sleep(12)'",
+     "id": "fold:toolu_01CCT7tcqS5bwexewvv2iUAL",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "done"
@@ -104,37 +123,25 @@
    "args": {
     "blocks": [
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "done",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "done",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 5,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01CCT7tcqS5bwexewvv2iUAL",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ python3 -c 'import time; time.sleep(12)'",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01CCT7tcqS5bwexewvv2iUAL",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "done",

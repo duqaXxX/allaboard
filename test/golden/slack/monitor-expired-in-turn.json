@@ -10,7 +10,7 @@
        {
         "elements": [
          {
-          "text": "$ sleep 50\n$ sleep 55",
+          "text": "$ sleep 50\n$ sleep 55\n$ python3 -c 'import time; time.sleep(30)'",
           "type": "text"
          }
         ],
@@ -50,7 +50,7 @@
   "message_cards": [
    [
     {
-     "details": "$ sleep 50\n$ sleep 55",
+     "details": "$ sleep 50\n$ sleep 55\n$ python3 -c 'import time; time.sleep(30)'",
      "id": "fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
      "status": "complete",
      "title": "ToolSearch, Monitor, ran 3 shell commands"
@@ -234,7 +234,6 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "details": "\n$ sleep 50\n$ sleep 55",
       "id": "fold:toolu_01RaUAB82gbhqjdGpSCziXUi",
       "status": "complete",
       "title": "ToolSearch, Monitor, ran 3 shell commands",
@@ -404,7 +403,7 @@
         {
          "elements": [
           {
-           "text": "$ sleep 50\n$ sleep 55",
+           "text": "$ sleep 50\n$ sleep 55\n$ python3 -c 'import time; time.sleep(30)'",
            "type": "text"
           }
          ],

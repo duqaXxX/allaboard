@@ -166,7 +166,7 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ python3 -c 'import time; time.sleep(30)'",
       "folded": null,
       "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
       "message": false,
@@ -183,7 +183,7 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ python3 -c 'import time; time.sleep(30)'",
       "folded": null,
       "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
       "message": false,
@@ -603,7 +603,7 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ python3 -c 'import time; time.sleep(30)'",
      "folded": null,
      "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
      "message": false,
@@ -620,7 +620,7 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ python3 -c 'import time; time.sleep(30)'",
      "folded": null,
      "id": "toolu_013jH6Smdz4mo3LjBdwnEusR",
      "message": false,

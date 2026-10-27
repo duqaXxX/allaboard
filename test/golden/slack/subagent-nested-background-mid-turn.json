@@ -16,13 +16,25 @@
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ python3 -c \"import time; time.sleep(40)\"",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "The 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully.",
@@ -44,7 +56,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ python3 -c \"import time; time.sleep(40)\"",
+     "id": "fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "I'll launch the Agent to run the background command now.\n\n**Agent**(Run background sleep command)\n⎿ Running in background\n\nLaunched.\n\nNow running the 40-second Python sleep command:\n\nThe 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully."
@@ -576,49 +595,25 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "The 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully.",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "I'll launch the Agent to run the background command now.",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 37,
-   "args": {
-    "blocks": [
-     {
-      "text": "I'll launch the Agent to run the background command now.",
-      "type": "markdown"
-     },
-     {
-      "text": "**Agent**(Run background sleep command)\n⎿ Running in background",
-      "type": "markdown"
-     },
-     {
-      "text": "Launched.\n\nNow running the 40-second Python sleep command:",
-      "type": "markdown"
-     },
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ python3 -c \"import time; time.sleep(40)\"",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "The 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully.",

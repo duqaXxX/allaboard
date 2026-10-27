@@ -119,7 +119,7 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 15",
       "folded": null,
       "id": "toolu_01Qh2cMVNiKoB1HDHms6ridr",
       "message": false,
@@ -251,7 +251,7 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 15",
      "folded": null,
      "id": "toolu_01Qh2cMVNiKoB1HDHms6ridr",
      "message": false,

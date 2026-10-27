@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { after, beforeEach, test } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 import type { WebAPICallResult } from "@slack/web-api";
+import type { SessionEvent } from "../../../../src/agent/seam.ts";
 import type {
   Preview,
   RunningLine,
@@ -925,6 +926,114 @@ function kept(slack: FakeSlack): Json[] {
   assert.ok(first !== undefined);
   return first.blocks.map((b) => b.type ?? null);
 }
+
+test("a command that runs across the stop keeps the text before it and its own line (#97)", async () => {
+  // The shape of a long turn in production: a quick command, words, a foreground command that
+  // outlives the stream (the agent starts a task for it, `prompt-replay-after-tools.jsonl`,
+  // CLI 2.1.286), its end, the answer.
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock, debounceSeconds: DEBOUNCE_SECONDS });
+  const renderer = new TurnRenderer(
+    sink,
+    NAMES,
+    null,
+    true,
+    () => false,
+    (id) => id,
+    () => false,
+    () => clock.time(),
+  );
+  const message = async (...events: SessionEvent[]): Promise<void> => {
+    await renderer.feed({ type: "message_started", parentCallId: null });
+    for (const event of events) await renderer.feed(event);
+    await renderer.feed({ type: "message_ended", parentCallId: null });
+  };
+  const words = (text: string): SessionEvent[] => [
+    { type: "text_started" },
+    { type: "text_delta", text },
+  ];
+  const start = (callId: string, command: string): SessionEvent => ({
+    type: "call_started",
+    callId,
+    toolName: "Bash",
+    input: { command, description: command, run_in_background: false },
+    parentCallId: null,
+  });
+  const end = (callId: string): SessionEvent => ({
+    type: "call_ended",
+    callId,
+    isError: false,
+    output: "(Bash completed with no output)",
+    fileChange: null,
+    model: null,
+    parentCallId: null,
+  });
+  await message(start("c1", "cat notes"));
+  await renderer.feed(end("c1"));
+  await clock.advance(5);
+  await message(...words("Reading works."), start("c2", "sleep 300"));
+  await renderer.feed({
+    type: "task_started",
+    taskId: "t2",
+    kind: "command",
+    taskType: "local_bash",
+    description: "sleep 300",
+    callId: "c2",
+    agentType: null,
+    background: false,
+    parentTaskId: null,
+  });
+  await clock.advance(DEBOUNCE_SECONDS + 1);
+  await settled();
+  // While it runs, the stream shows the command on a card of its own.
+  const running = allChunks(slack).filter((c) => c.type === "task_update" && c.id === "fold:c2");
+  assert.deepEqual(
+    running.map((c) => c.status),
+    ["in_progress"],
+  );
+  for (let i = 0; i < 10; i += 1) {
+    await clock.advance(30);
+    await settled();
+  }
+  assert.ok(methods(slack).includes("chat.stopStream"));
+  await clock.advance(20);
+  await renderer.feed({
+    type: "task_ended",
+    taskId: "t2",
+    status: "completed",
+    summary: "sleep 300",
+    durationMs: null,
+    callId: "c2",
+    report: null,
+    reportSent: false,
+    foldNamed: false,
+  });
+  await renderer.feed(end("c2"));
+  await message(...words("All done."));
+  await renderer.close();
+  assert.equal(await renderer.closeOut(), true);
+  // The first message keeps what came before the answer, in order: the first command, the words,
+  // the second command with its own line; the answer is the second message.
+  const [first, second] = [...slack.messages.values()];
+  assert.ok(first !== undefined && second !== undefined);
+  assert.deepEqual(
+    list(first.blocks as Json).map((b) => b.type),
+    ["task_card", "markdown", "task_card"],
+  );
+  assert.deepEqual(
+    list(first.blocks as Json).map((b) => b.task_id ?? b.text),
+    ["fold:c1", "Reading works.", "fold:c2"],
+  );
+  assert.equal(
+    get(first.blocks as Json, 2, "details", "elements", 0, "elements", 0, "text"),
+    "$ sleep 300",
+  );
+  assert.deepEqual(
+    list(second.blocks as Json).map((b) => b.text),
+    ["All done."],
+  );
+});
 
 test("the end after the switch posts the ending; the footer follows it by an edit", async () => {
   const slack = new FakeSlack();

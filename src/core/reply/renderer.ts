@@ -293,7 +293,10 @@ export class TurnRenderer {
         const entry = this.lineless(event.taskId)
           ? undefined
           : this.#lines.get(this.#lineOfTask.get(event.taskId) ?? "");
-        if (entry !== undefined) {
+        // A timed call's details are its command line, which its run's card lists: never replaced
+        // by progress (no recording has a progress for a foreground command, `sdk.d.ts` 0.3.310
+        // names one only for agents and MCP tasks).
+        if (entry !== undefined && !(entry.startedAt !== null && !entry.task)) {
           await this.#set({ ...entry, details: oneLine(event.description, OUTPUT_LIMIT) });
         }
         break;
@@ -929,7 +932,9 @@ export class TurnRenderer {
     await this.#set({
       ...entry,
       status: final,
-      details: null,
+      // The command line of a timed call that is still a call's card is the card's content, which
+      // a run lists once it has ended (`core/reply/fold`); any other details were progress.
+      details: entry.startedAt !== null && !entry.task ? entry.details : null,
       output: stopped ?? (summary ? oneLine(summary, OUTPUT_LIMIT) : null),
     });
   }

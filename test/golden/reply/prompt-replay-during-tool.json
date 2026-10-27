@@ -119,7 +119,7 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 15",
       "folded": null,
       "id": "toolu_01JTnajtU3fJhEjrcoTjZxN8",
       "message": false,
@@ -136,7 +136,7 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 15",
       "folded": null,
       "id": "toolu_01JTnajtU3fJhEjrcoTjZxN8",
       "message": false,
@@ -255,7 +255,7 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 15",
      "folded": null,
      "id": "toolu_01JTnajtU3fJhEjrcoTjZxN8",
      "message": false,
@@ -272,7 +272,7 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 15",
      "folded": null,
      "id": "toolu_01JTnajtU3fJhEjrcoTjZxN8",
      "message": false,
