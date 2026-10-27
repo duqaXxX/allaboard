@@ -367,6 +367,9 @@ export const GOAL_ACHIEVED_COUNTS = "✔ Goal achieved ({counts})";
 // same words in the CLI 2.1.310 the SDK bundles).
 export const STOP_HOOKS_RAN = "Ran **{n}** stop {hooks}";
 export const STOP_HOOK_ERROR = "⎿ Stop hook error: {error}";
+// Each further line of a refusal, under the first as the terminal indents it: spaces that do not
+// break, so that the chat neither drops them nor reads a `- ` or a `#` after them as markup.
+export const STOP_HOOK_ERROR_MORE = "\u00a0\u00a0\u00a0{line}";
 // Under `Stopped.`: a stop ends the turn, not the goal, which the next message resumes.
 export const GOAL_STILL_ACTIVE = "◎ Goal still active: {condition}";
 export const GOAL_STILL_ACTIVE_CLEAR = "◎ Goal still active: {condition} · `!{clear}` drops it";
