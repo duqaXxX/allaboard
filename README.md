@@ -25,8 +25,9 @@ glance: what is working, what is waiting for you, what is done.
 
 ### Sessions that stay
 
-Come back to a thread days later and carry on. A session you started in the terminal continues
-in Slack with `!resume`.
+Come back to a thread days later and carry on, or take the session to the terminal on your Mac
+with `!terminal` and back: one session on both sides, and the thread shows what you did there. A
+session you started in the terminal continues in Slack with `!resume`.
 
 ### Watch Claude work
 

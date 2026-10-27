@@ -917,6 +917,17 @@ file you upload is taken the same way: Slack shows it with the same player and t
 
 ### Continuing a session in the terminal
 
+A thread's session and the terminal share one session id, so you can move between them and back
+as often as you like:
+
+1. In the thread, `!status` gives the command that opens the session in the terminal. During a
+   turn, `!terminal` gives it too, and takes the running turn with it.
+2. In the terminal, run it and work there. When you are done, type `/exit`.
+3. Back in the thread, write as usual. What you did in the terminal shows first, then the reply,
+   which knows it.
+
+A session you started in the terminal comes to Slack the other way, with `!resume` in the channel.
+
 Claude Code leaves a session created through the Agent SDK out of the terminal's session picker
 and out of `claude --continue`; it resumes one only by its id
 ([sessions reference](https://code.claude.com/docs/en/sessions)). Every session started from
@@ -926,22 +937,23 @@ Slack is such a session. `!status`, typed in the session's thread, shows the com
 Terminal: `cd <folder> && claude --resume <session id>`
 ```
 
-The terminal continues the thread's own session, on the same id: what it does is in the session
-when you come back to the thread. Write from one side at a time. Two processes on one session
-do not see each other's messages, and the second to write splits the conversation; a later
-resume continues one side only (measured 2026-10-27, Claude Code 2.1.311). Opening the session
-in the terminal and closing it without writing changes nothing.
+Write from one side at a time. Two processes on one session do not see each other's messages,
+and the second to write splits the conversation; a later resume continues one side only
+(measured 2026-10-27, Claude Code 2.1.311). Opening the session in the terminal and closing it
+without writing changes nothing.
 
 Before a message you send in the thread reaches the session, allaboard asks Claude Code which
 processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_CONFIG_DIR`):
 
 - A terminal running a turn: your message waits, under `⏳ This session is running a turn in a
-  terminal. Your message waits here until that turn ends.` with a **Cancel** button, and goes on
-  when the turn ends.
+  terminal. Your message waits here until that turn ends.` with a **Cancel** button. When the
+  turn ends the notice reads `The terminal's turn ended.`, and the message goes on, after the
+  question below if the terminal is still open.
 - A terminal open and idle: allaboard asks once per terminal, `⚠️ This session is also open in a
   terminal. If you send this here, that terminal will not see it: before writing there, close it
   and run <command> again.`, with **Send here** and **Cancel**. The question becomes `Sent here.`
-  or `Not sent.`
+  or `Not sent.` A `!stop` sent while either is shown removes it, and `Not sent.` shows to you
+  alone.
 - The turns the terminal wrote since the thread's last message come first, one message each:
   `🖥 In the terminal:`, your prompt after `›`, then Claude's last reply of that turn. A turn
   `!terminal` moved, which the terminal went on with by itself, comes first as
@@ -952,14 +964,22 @@ A terminal left open does not read what you write in Slack: close it and run the
 before writing there. `/resume <session id>` inside it does not reload a session started from
 Slack, which the picker does not list.
 
-`!terminal`, sent in the thread, moves the session to the terminal and answers with the command.
-A turn running in the thread is cut there without an interrupt and continues in the terminal by
-itself: the command adds `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`, the command that was running
-stops and Claude runs it again there (its card in the thread shows it stopped), and the reply
-ends with `Moved to the terminal, which continues this turn.` Background work running in the thread stops with it, so `!terminal` first
-asks `⚠️ Moving to the terminal stops what still runs here: <tasks>.` with **Stop them and move**
-and **Cancel**. While a turn or background work runs, `!status` says under the command that
-writing in the terminal now splits the session.
+`!terminal`, sent in the thread, moves the session to the terminal and answers with the command:
+
+- During a turn, the turn is cut there without an interrupt and continues in the terminal by
+  itself: the command adds `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`, the command that was running
+  stops and Claude runs it again there (its card in the thread shows it stopped), and the reply
+  ends with `Moved to the terminal, which continues this turn.`
+- With no turn running, the thread's process is closed and the answer is `Continue in the
+  terminal with:` and the plain command.
+- Background work running in the thread stops with the process, so `!terminal` first asks
+  `⚠️ Moving to the terminal stops what still runs here: <tasks>.` with **Stop them and move**
+  and **Cancel** (`Not moved.`). Opened in the terminal, the session then says
+  `Background shell command didn't finish before the previous session ended`: Claude Code's own
+  line, since a background command does not move from one process to another.
+
+While a turn or background work runs, `!status` says under the command that writing in the
+terminal now splits the session.
 
 The line shows as soon as the thread has a session id, which Claude Code reports when the first
 turn starts. It is left out when the thread's folder is missing, unreadable or not trusted, with
