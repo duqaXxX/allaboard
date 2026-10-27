@@ -43,6 +43,7 @@ The first rows are about how a session runs, the others about commands.
 |---|---|---|---|---|---|
 | A session open in the terminal and in a thread at once | One terminal per session, which reads every message of it | A terminal left open reads nothing written from Slack, and a message written there branches the session: close it and run `claude --resume <id>` again first. `/resume <id>` inside it does not reload a session started from Slack. Background work still running on one side splits the session when the other writes. allaboard waits for a terminal's running turn, asks once before writing beside an open terminal, and shows what the terminal wrote (measured 2026-10-27, SDK 0.3.310 beside Claude Code 2.1.311; [setup.md](setup.md)) | by hand: needs a terminal | [#101](https://github.com/duqaXxX/allaboard/issues/101) |  |
 | A command left running in the background | Runs until it ends | Stopped after 30 minutes, or after the time Claude asked for, 2 hours at most; Claude is told and can start it again. `BASH_DEFAULT_TIMEOUT_MS` in `.env` replaces the 30 minutes, and the 2 hours when it is longer, up to 24.8 days ([setup.md](setup.md)) | `L1` | none |  |
+| A mod made with `/plugin-authoring` | A pane beside the chat, a band above the prompt, a status line entry or a toast shows in the terminal at once | The command runs and Claude writes the mod, but a pane, a band, a status line entry or a toast shows only in the terminal; a slash command or a hook it makes works in a thread too | by hand: needs a mod built and the terminal open beside the thread | none |  |
 | How long Claude Code waits for a command in the foreground | 2 minutes by default | The same, unless `BASH_DEFAULT_TIMEOUT_MS` is set: its value replaces the 2 minutes too | `L1` | none |  |
 | Publishing a page as an artifact | The `Artifact` tool | Not offered: the Agent SDK turns it off, and its documentation names no way to turn it on (read 2026-10-20) | `L3` | none |  |
 | A model set by the program that drives Claude Code, then `/model` to the model your settings name | No program sets the model: you change it by typing the model command | After the SDK's `setModel`, a `/model` to the model your settings name (`model` in a settings file the session reads) is acknowledged and ignored: the command answers `Set model to <name>` and requests keep running on the model `setModel` set. A `/model` to any other model works, and so does one when no settings file names a model (measured 2026-10-16, SDK 0.3.301, Claude Code 2.1.301). allaboard does not call `setModel`: the setup's model is set by typing `/model <model>` into the session, so no override is left and your own `/model` works as in the terminal. The thread shows nothing of that command, but the session holds it: the model sees it (measured 2026-10-16 on Claude Code 2.1.301, SDK 0.3.301) and it enters the session's transcript, so a terminal `--resume` of the session lists `/model <model>` and `Set model to <name>`. `!stop` while it runs ends the setup and the session, and the message is not sent. A probe claim checks the SDK's behaviour on each release | `P27` | none |  |
@@ -96,6 +97,11 @@ end in the one with `BASH_DEFAULT_TIMEOUT_MS=14400000`. That a subagent does not
 is Claude Code's own statement ([sub-agents](https://code.claude.com/docs/en/sub-agents)), and
 was not run.
 
+The row on `/plugin-authoring` was run from a thread on 2026-10-27 with Claude Code 2.1.312: the
+command loaded the skill, and Claude listed the kinds of mod it makes and asked which to build.
+That a pane, a band, a status line entry and a toast belong to the terminal's own screen is what
+that list names; no mod was built.
+
 The rows on a task started in the background and on a turn Claude Code opens by itself were
 measured on 2026-10-15 with Claude Code 2.1.300 and the TypeScript SDK 0.3.300, in one session
 started with allaboard's options (`replay-user-messages` included) and Haiku 5.5: a Monitor whose
@@ -112,7 +118,7 @@ P25). The terminal's lines are those of a session run side by side with the daem
 The rows on commands were measured on 2026-10-09 with Claude Code 2.1.292 and again on
 2026-10-10 with 2.1.294, and sent
 again by the release probe on every new SDK (see [CONTRIBUTING.md](../CONTRIBUTING.md)); the
-pinned SDK bundles Claude Code 2.1.310. Claude
+pinned SDK bundles Claude Code 2.1.312. Claude
 Code's commands reference lists 119 built-in commands; a session started through the SDK is
 offered 50 of them. Twenty-two of the others were each sent as allaboard sends a command:
 the nineteen of the table, `/status`, `/help` and `/chrome`. Each got the answer quoted above,
@@ -120,14 +126,15 @@ at no cost in tokens. All twenty-two were sent again through the TypeScript SDK 
 Code 2.1.296) on 2026-10-12, with the same answer, and the nineteen of the table through 0.3.300
 (Claude Code 2.1.300) on 2026-10-14, 0.3.301 (Claude Code 2.1.301) on 2026-10-15, 0.3.302
 (Claude Code 2.1.302) on 2026-10-18, 0.3.303 (Claude Code 2.1.303) on 2026-10-19, 0.3.304
-(Claude Code 2.1.304) on 2026-10-20, 0.3.309 (Claude Code 2.1.309) on 2026-10-24 and 0.3.310
-(Claude Code 2.1.310) on 2026-10-24.
+(Claude Code 2.1.304) on 2026-10-20, 0.3.309 (Claude Code 2.1.309) on 2026-10-24, 0.3.310
+(Claude Code 2.1.310) on 2026-10-24 and 0.3.312 (Claude Code 2.1.312) on 2026-10-27.
 Computer use was absent from the session's servers although it was switched on for the folder,
 on the Python SDK 0.2.164 (Claude Code 2.1.292, 2026-10-09) and again on the TypeScript SDK
 0.3.296 (Claude Code 2.1.296, 2026-10-12), 0.3.300 (Claude Code 2.1.300, 2026-10-14), 0.3.301
 (Claude Code 2.1.301, 2026-10-15), 0.3.302 (Claude Code 2.1.302, 2026-10-18), 0.3.303
 (Claude Code 2.1.303, 2026-10-19), 0.3.304 (Claude Code 2.1.304, 2026-10-20), 0.3.309
-(Claude Code 2.1.309, 2026-10-24) and 0.3.310 (Claude Code 2.1.310, 2026-10-24). The
+(Claude Code 2.1.309, 2026-10-24), 0.3.310 (Claude Code 2.1.310, 2026-10-24) and 0.3.312
+(Claude Code 2.1.312, 2026-10-27). The
 same session started with `--chrome` listed
 Claude in Chrome as connected, which is a different server.
 

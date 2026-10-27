@@ -25,6 +25,8 @@
       "rate_limit_info.unifiedWindows.seven_day.status:string": "2.1.310"
     },
     "result/error_during_execution": {
+      "modelUsage.*.cacheCreationEphemeral1hInputTokens:number": "2.1.312",
+      "modelUsage.*.cacheCreationEphemeral5mInputTokens:number": "2.1.312",
       "model_usage_since_last_result.*.cacheCreationInputTokens:number": "2.1.309",
       "model_usage_since_last_result.*.cacheReadInputTokens:number": "2.1.309",
       "model_usage_since_last_result.*.canonicalModel:string": "2.1.309",
@@ -45,6 +47,10 @@
       "user_message_uuids:array": "2.1.304"
     },
     "result/success": {
+      "modelUsage.*.cacheCreationEphemeral1hInputTokens:number": "2.1.312",
+      "modelUsage.*.cacheCreationEphemeral5mInputTokens:number": "2.1.312",
+      "model_usage_since_last_result.*.cacheCreationEphemeral1hInputTokens:number": "2.1.312",
+      "model_usage_since_last_result.*.cacheCreationEphemeral5mInputTokens:number": "2.1.312",
       "model_usage_since_last_result.*.cacheCreationInputTokens:number": "2.1.309",
       "model_usage_since_last_result.*.cacheReadInputTokens:number": "2.1.309",
       "model_usage_since_last_result.*.canonicalModel:string": "2.1.309",
@@ -69,6 +75,11 @@
       "event.usage.server_tool_use.web_search_requests:number": "2.1.304",
       "event.usage.server_tool_use:object": "2.1.304"
     },
+    "stream_event/message_stop": {
+      "abandoned_blocks.api_message_id:string": "2.1.312",
+      "abandoned_blocks.from_block_index:number": "2.1.312",
+      "abandoned_blocks:object": "2.1.312"
+    },
     "system/init": {
       "additional_directories:array": "2.1.304",
       "original_cwd:string": "2.1.304",
@@ -92,7 +103,8 @@
       "tool_use_result.file.dimensions:object": "2.1.304",
       "tool_use_result.file.originalSize:number": "2.1.304",
       "tool_use_result.file.type:string": "2.1.304",
-      "tool_use_result.revivedAgentId:string": "2.1.304"
+      "tool_use_result.revivedAgentId:string": "2.1.304",
+      "tool_use_result.toolsUsedLine:string": "2.1.312"
     }
   },
   "tools": {}

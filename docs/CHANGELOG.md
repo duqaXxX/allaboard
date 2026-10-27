@@ -29,6 +29,19 @@ All notable changes to this project are documented here. The format follows
   after a `/login` to another account, a session already open shows the new one from its next
   connect. Slack draws the footer as written, so the email is not a link.
 
+### Changed
+
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.312, which bundles Claude Code 2.1.312. The
+  release probe certified it on 2026-10-27: the SDK surface table holds and so do the 49 claims.
+  Its stream carries ten paths the fixtures do not hold, none of which the source reads, and all
+  are accepted on 2.1.312: the 5-minute and 1-hour cache writes in a result's `modelUsage` and
+  `model_usage_since_last_result`; `abandoned_blocks` on the `message_stop` of a turn you stop,
+  which names the first block of the message Claude Code drops, after every block it streamed
+  (measured 2026-10-27); and `tool_use_result.toolsUsedLine` on a subagent's report, a line for
+  the model. The release still offers `/plugin-authoring`, which the recorded `server-info.json`
+  does not list. It works from a thread; a mod that is a pane, a band, a status line entry or a
+  toast shows only in the terminal, which `docs/limits.md` now says.
+
 ### Fixed
 
 - An Edit or Write preview you had opened closed again each time its reply was edited, on Slack's

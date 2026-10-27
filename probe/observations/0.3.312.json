@@ -1,0 +1,116 @@
+{
+  "cli": "2.1.312",
+  "date": "2026-10-27",
+  "claims": {
+    "P1": {
+      "versionReported": true
+    },
+    "P2": {},
+    "P3": {},
+    "P4": {},
+    "P5": {},
+    "P6": {},
+    "P7": {},
+    "P8": {},
+    "P9": {},
+    "P10": {},
+    "P11": {},
+    "P12": {},
+    "P13": {},
+    "P14": {},
+    "P15": {},
+    "P16": {
+      "effortAfterPlainResume": "medium"
+    },
+    "P17": {
+      "effortLevels": [
+        "high",
+        "low",
+        "max",
+        "medium",
+        "xhigh"
+      ],
+      "modelFields": [
+        "description",
+        "displayName",
+        "resolvedModel",
+        "supportedEffortLevels",
+        "supportsAdaptiveThinking",
+        "supportsAutoMode",
+        "supportsEffort",
+        "supportsFastMode",
+        "supportsThinkingOff",
+        "value"
+      ]
+    },
+    "P18": {},
+    "P19": {},
+    "P20": {},
+    "P21": {
+      "tokensReported": true
+    },
+    "P22": {},
+    "P23": {},
+    "P24": {
+      "servers": [
+        "control disabled"
+      ]
+    },
+    "P25": {},
+    "P26": {},
+    "P27": {},
+    "P28": {},
+    "P29": {},
+    "P30": {},
+    "P31": {},
+    "P32": {},
+    "P33": {},
+    "P34": {},
+    "P35": {},
+    "P36": {},
+    "P37": {},
+    "P39": {},
+    "P40": {
+      "category": "model_not_found"
+    },
+    "P41": {
+      "auto": [
+        {
+          "form": "note",
+          "handback": "send",
+          "reportText": true,
+          "running": 1
+        },
+        {
+          "form": "note",
+          "handback": "send",
+          "reportText": true,
+          "running": 0
+        }
+      ],
+      "bypass": [
+        {
+          "form": "words",
+          "handback": null,
+          "reportText": false,
+          "running": 1
+        },
+        {
+          "form": "words",
+          "handback": null,
+          "reportText": false,
+          "running": 0
+        }
+      ]
+    },
+    "P42": {},
+    "L1": {},
+    "L2": {},
+    "L3": {},
+    "L4": {},
+    "L5": {},
+    "L6": {},
+    "L8": {},
+    "L9": {}
+  }
+}
