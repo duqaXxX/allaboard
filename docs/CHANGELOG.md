@@ -15,8 +15,8 @@ All notable changes to this project are documented here. The format follows
   **Send here** and **Cancel**; the turns the terminal wrote come first, one message each, and
   the session is started again so that it reads them. `!terminal` moves the session to the
   terminal and gives the command; a running turn goes on there by itself
-  (`CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`), and background work it would stop is confirmed
-  first. While a turn or background work runs, `!status` warns that writing in the terminal now
+  (`CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`), its last reply shown in the thread when you come
+  back, and background work it would stop is confirmed first. While a turn or background work runs, `!status` warns that writing in the terminal now
   splits the session.
 
 - The footer ends with the email of the Claude account the session runs on, and `!status` shows

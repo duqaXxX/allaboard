@@ -120,6 +120,7 @@ export class SessionManager {
     let goal = this.goals.get(key) ?? null;
     let saved: SavedMessage | null = null;
     let allowed: string[] = [];
+    let moved = false;
     if (session?.closed) {
       // Discarded as soon as closing has started, not once it finishes: a message must never
       // reach an object mid-teardown (every operation on it rejects with SessionClosed). The
@@ -130,6 +131,7 @@ export class SessionManager {
       goal = session.goal;
       saved = session.saved;
       allowed = [...session.terminalsAllowed];
+      moved = session.movedMidTurn;
       session = null;
     }
     if (session === null) {
@@ -141,6 +143,7 @@ export class SessionManager {
       built.goal = goal;
       built.saved = saved;
       for (const id of allowed) built.terminalsAllowed.add(id);
+      built.movedMidTurn = moved;
       this.goals.delete(key);
       built.startsBlocked = this.startsBlocked;
       built.onClosed = () => this.evictIfCurrent(key, built);

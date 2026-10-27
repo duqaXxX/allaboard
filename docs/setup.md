@@ -943,8 +943,10 @@ processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_
   and run <command> again.`, with **Send here** and **Cancel**. The question becomes `Sent here.`
   or `Not sent.`
 - The turns the terminal wrote since the thread's last message come first, one message each:
-  `🖥 In the terminal:`, your prompt after `›`, then Claude's last reply of that turn. The
-  session's process is then started again, so that it reads them.
+  `🖥 In the terminal:`, your prompt after `›`, then Claude's last reply of that turn. A turn
+  `!terminal` moved, which the terminal went on with by itself, comes first as
+  `🖥 In the terminal, the turn went on:` with its last reply. The session's process is then
+  started again, so that it reads them.
 
 A terminal left open does not read what you write in Slack: close it and run the command again
 before writing there. `/resume <session id>` inside it does not reload a session started from
@@ -953,8 +955,8 @@ Slack, which the picker does not list.
 `!terminal`, sent in the thread, moves the session to the terminal and answers with the command.
 A turn running in the thread is cut there without an interrupt and continues in the terminal by
 itself: the command adds `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`, the command that was running
-stops and Claude runs it again there, and the reply ends with `Moved to the terminal, which
-continues this turn.` Background work running in the thread stops with it, so `!terminal` first
+stops and Claude runs it again there (its card in the thread shows it stopped), and the reply
+ends with `Moved to the terminal, which continues this turn.` Background work running in the thread stops with it, so `!terminal` first
 asks `⚠️ Moving to the terminal stops what still runs here: <tasks>.` with **Stop them and move**
 and **Cancel**. While a turn or background work runs, `!status` says under the command that
 writing in the terminal now splits the session.

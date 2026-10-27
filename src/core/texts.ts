@@ -497,6 +497,8 @@ export const TERMINAL_WAIT =
 // A turn the owner ran in the terminal, shown in the thread before the reply to his next message.
 export const TERMINAL_TURN = "🖥 In the terminal:\n› {prompt}\n\n{reply}";
 export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n› {prompt}";
+// A turn moved with `!terminal`, which the terminal went on with by itself.
+export const TERMINAL_TURN_WENT_ON = "🖥 In the terminal, the turn went on:\n\n{reply}";
 export const SHELL_OUTSIDE_SESSION = "`!!` runs a shell command inside a session's thread.";
 export const SHELL_FIRST_PROMPT =
   "Send this session its first prompt before a shell command: it starts with its setup.";
