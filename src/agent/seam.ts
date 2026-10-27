@@ -586,13 +586,17 @@ export type SessionEvent =
    */
   | { readonly type: "goal_changed"; readonly goal: GoalChange }
   /**
-   * The owner's stop hooks refused to let the turn end: `hooks` of them ran, and `errors` holds
-   * what each refusing one said (never empty). The agent goes on working in the same turn.
+   * The owner's stop hooks said something at the end of a turn: `hooks` of them ran. `stopReason`
+   * is why one stopped the session (null when none did, or gave no reason), `errors` what each
+   * that refused to end the turn said, `context` what each added for the agent. A refusal or added
+   * context sends the agent on working in the same turn. Said only when one of the three is there.
    */
   | {
-      readonly type: "stop_hook_blocked";
+      readonly type: "stop_hooks_ran";
       readonly hooks: number;
+      readonly stopReason: string | null;
       readonly errors: readonly string[];
+      readonly context: readonly string[];
     }
   /**
    * The jobs the agent has scheduled as of now, whole: the list replaces the one before, and an

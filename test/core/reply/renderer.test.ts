@@ -968,17 +968,24 @@ test("a goal the next prompt resumes says each failed check and its achievement"
   assert.ok(cleared?.startsWith("Goal cleared: "));
 });
 
-// A refusal of the owner's stop hooks comes from the session store between the text the turn
-// wrote before it and the text after (`stop-hook-block-store.json`, 2026-10-27).
+// A refusal of the owner's stop hooks, on a recorded turn (`stop-hook-block.jsonl`, SDK 0.3.310,
+// 2026-10-27): its summary comes from the session store between the answer the turn wrote before it
+// and the one after (`stop-hook-block-store.json`, measured the same day in three runs).
 test("stop hooks that refused to end a turn are said in the terminal's words, where the turn is", async () => {
-  const events = recordedEvents("tools");
-  const end = events.findIndex((event) => event.type === "turn_ended");
-  const blocked: SessionEvent = { type: "stop_hook_blocked", hooks: 3, errors: ["say OSPREY"] };
-  const [sink] = await render([...events.slice(0, end), blocked, ...events.slice(end)]);
-  const reply = sink.texts.join("");
-  assert.ok(
-    reply.endsWith("Ran **3** stop hooks\n⎿ Stop hook error: say OSPREY"),
-    reply.slice(-80),
+  const events = recordedEvents("stop-hook-block");
+  const first = events.findIndex((event) => event.type === "message_ended") + 1;
+  const blocked: SessionEvent = {
+    type: "stop_hooks_ran",
+    hooks: 1,
+    stopReason: null,
+    errors: ["say OSPREY"],
+    context: [],
+  };
+  const [sink] = await render([...events.slice(0, first), blocked, ...events.slice(first)]);
+  // The synthetic `Stop hook feedback` record of the stream writes nothing: the words come once.
+  assert.equal(
+    sink.texts.join(""),
+    "HERON\n\nRan **1** stop hook\n⎿ Stop hook error: say OSPREY\n\nOSPREY",
   );
   // An aside is drawn on one line with no markdown: the count's bold and the second line need a
   // line of the reply.
@@ -988,13 +995,39 @@ test("stop hooks that refused to end a turn are said in the terminal's words, wh
   );
 });
 
+const said = (over: Partial<EventOf<"stop_hooks_ran">>): EventOf<"stop_hooks_ran"> => ({
+  type: "stop_hooks_ran",
+  hooks: 1,
+  stopReason: null,
+  errors: [],
+  context: [],
+  ...over,
+});
+const same = (text: string): string => text;
+
 test("the stop hooks' lines name each refusal and count one hook alone", () => {
-  const same = (text: string): string => text;
-  assert.equal(stopHookLines(1, ["a"], same), "Ran **1** stop hook\n⎿ Stop hook error: a");
   assert.equal(
-    stopHookLines(2, ["a", "b"], same),
+    stopHookLines(said({ errors: ["a"] }), same),
+    "Ran **1** stop hook\n⎿ Stop hook error: a",
+  );
+  assert.equal(
+    stopHookLines(said({ hooks: 2, errors: ["a", "b"] }), same),
     "Ran **2** stop hooks\n⎿ Stop hook error: a\n⎿ Stop hook error: b",
   );
+});
+
+test("the stop hooks' lines say why the session stopped, then the refusals, then the contexts", () => {
+  assert.equal(
+    stopHookLines(said({ stopReason: "done for today", errors: ["e"], context: ["c"] }), same),
+    [
+      "Ran **1** stop hook",
+      "⎿ done for today",
+      "⎿ Stop hook error: e",
+      "⎿ Stop hook feedback: c",
+    ].join("\n"),
+  );
+  // A stop with no reason is the count alone, as the terminal draws it.
+  assert.equal(stopHookLines(said({}), same), "Ran **1** stop hook");
 });
 
 // The words of the project's own docs check, which refused a turn on 2026-10-27: lines a hook wraps
@@ -1004,7 +1037,7 @@ test("every line of a refusal stays under the first, shown as the hook wrote it"
   const marked = (text: string): string => `[${text}]`;
   const indent = "\u00a0".repeat(3);
   assert.equal(
-    stopHookLines(1, [reason], marked),
+    stopHookLines(said({ errors: [reason] }), marked),
     [
       "Ran **1** stop hook",
       "⎿ Stop hook error: [Docs check: this change]",
@@ -1012,6 +1045,10 @@ test("every line of a refusal stays under the first, shown as the hook wrote it"
       "",
       `${indent}[- CONTRIBUTING.md: src/agent/seam.ts]`,
     ].join("\n"),
+  );
+  assert.equal(
+    stopHookLines(said({ context: ["one\ntwo"] }), marked),
+    `Ran **1** stop hook\n⎿ Stop hook feedback: [one]\n${indent}[two]`,
   );
 });
 

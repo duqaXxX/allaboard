@@ -89,25 +89,26 @@ export function formatDuration(seconds: number): string {
 }
 
 /**
- * The terminal's account of stop hooks that refused to end a turn: `Ran 3 stop hooks`, then
- * `⎿ Stop hook error: <words>` for each refusal, every line of its words under the first and shown
- * as the hook wrote them (`asWritten`, the chat's own). A blank line of the words stays blank.
+ * The terminal's account of what the stop hooks said at a turn's end: `Ran 3 stop hooks`, then
+ * why one stopped the session, `⎿ Stop hook error: <words>` for each refusal and
+ * `⎿ Stop hook feedback: <words>` for each added context. Every line of the words goes under the
+ * first and is shown as the hook wrote it (`asWritten`, the chat's own); a blank line stays blank.
  */
 export function stopHookLines(
-  hooks: number,
-  errors: readonly string[],
+  said: EventOf<"stop_hooks_ran">,
   asWritten: (text: string) => string,
 ): string {
-  const refusal = (error: string): string[] =>
-    splitLines(error).map((line, at) => {
-      if (at === 0) return texts.fill(texts.STOP_HOOK_ERROR, { error: asWritten(line) });
-      return line.trim() === ""
-        ? ""
-        : texts.fill(texts.STOP_HOOK_ERROR_MORE, { line: asWritten(line) });
+  const lines = (template: string, field: string, words: string): string[] =>
+    splitLines(words).map((line, at) => {
+      if (at === 0) return texts.fill(template, { [field]: asWritten(line) });
+      return line.trim() === "" ? "" : texts.fill(texts.STOP_HOOK_MORE, { line: asWritten(line) });
     });
+  const { hooks, stopReason, errors, context } = said;
   return [
     texts.fill(texts.STOP_HOOKS_RAN, { n: hooks, hooks: hooks === 1 ? "hook" : "hooks" }),
-    ...errors.flatMap(refusal),
+    ...(stopReason === null ? [] : lines(texts.STOP_HOOK_STOPPED, "reason", stopReason)),
+    ...errors.flatMap((error) => lines(texts.STOP_HOOK_ERROR, "error", error)),
+    ...context.flatMap((words) => lines(texts.STOP_HOOK_FEEDBACK, "context", words)),
   ].join("\n");
 }
 
@@ -350,11 +351,11 @@ export class TurnRenderer {
         }
         break;
       }
-      case "stop_hook_blocked":
+      case "stop_hooks_ran":
         // A line of the reply as a launch line is, not an aside: an aside is drawn on one line
-        // with no markdown, and these are two lines with a bold count.
+        // with no markdown, and these are several lines with a bold count.
         await this.#writeLaunches();
-        await this.#line(stopHookLines(event.hooks, event.errors, this.#asWritten));
+        await this.#line(stopHookLines(event, this.#asWritten));
         break;
       case "turn_ended":
         this.result = event;

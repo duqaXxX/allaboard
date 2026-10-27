@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { goalChange, goalStore, stopHookBlock } from "../../../src/agent/claude/goals.ts";
+import { goalChange, goalStore, stopHookSummary } from "../../../src/agent/claude/goals.ts";
 import type { SessionEvent } from "../../../src/agent/seam.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 
@@ -69,13 +69,66 @@ const BLOCK_ENTRIES = (
   sdkJson("stop-hook-block-store") as Array<{ entries: JsonObject[] }>
 ).flatMap((append) => append.entries);
 const REFUSAL = "PROBE-REASON-7731: reply with the single word OSPREY";
+const REFUSED = {
+  type: "stop_hooks_ran",
+  hooks: 3,
+  stopReason: null,
+  errors: [REFUSAL],
+  context: [],
+};
 
 test("only the stop_hook_summary of a refusal is an event, counted without the daemon's callback", () => {
   const summaries = BLOCK_ENTRIES.filter((entry) => entry.subtype === "stop_hook_summary");
   assert.equal(summaries.length, 2);
   assert.deepEqual(
-    BLOCK_ENTRIES.map(stopHookBlock).filter((event) => event !== null),
-    [{ type: "stop_hook_blocked", hooks: 3, errors: [REFUSAL] }],
+    BLOCK_ENTRIES.map(stopHookSummary).filter((event) => event !== null),
+    [REFUSED],
+  );
+});
+
+// The two other things a stop hook says, each from a run of its own (`stop-hook-said-store.json`,
+// SDK 0.3.310, 2026-10-27): a context added for the agent, whose turn goes on and ends on a
+// summary that says nothing, and the session stopped with a reason.
+const SAID_ENTRIES = (sdkJson("stop-hook-said-store") as Array<{ entries: JsonObject[] }>).flatMap(
+  (append) => append.entries,
+);
+
+test("an added context and a stop with its reason are events, a summary that says nothing is not", () => {
+  assert.equal(SAID_ENTRIES.filter((entry) => entry.subtype === "stop_hook_summary").length, 3);
+  assert.deepEqual(
+    SAID_ENTRIES.map(stopHookSummary).filter((event) => event !== null),
+    [
+      {
+        type: "stop_hooks_ran",
+        hooks: 3,
+        stopReason: null,
+        errors: [],
+        context: ["PROBE-REASON-7731 context line one\nline two"],
+      },
+      {
+        type: "stop_hooks_ran",
+        hooks: 3,
+        stopReason: "PROBE-REASON-7731 stopped by the hook",
+        errors: [],
+        context: [],
+      },
+    ],
+  );
+});
+
+test("a stop with no reason is an event with none, as the terminal still counts the hooks", () => {
+  const summary = { type: "system", subtype: "stop_hook_summary", hookCount: 1, stopReason: "" };
+  assert.deepEqual(stopHookSummary({ ...summary, preventedContinuation: true }), {
+    type: "stop_hooks_ran",
+    hooks: 1,
+    stopReason: null,
+    errors: [],
+    context: [],
+  });
+  // A reason with nothing stopped is not drawn by the terminal either.
+  assert.equal(
+    stopHookSummary({ ...summary, stopReason: "x", preventedContinuation: false }),
+    null,
   );
 });
 
@@ -83,11 +136,11 @@ test("a goal's failed check writes no event of the stop hooks", () => {
   // The summary a goal's check leaves has no error (measured 2026-10-27 on real transcripts):
   // its line is the goal's own.
   const summary = { type: "system", subtype: "stop_hook_summary", hookCount: 1, hookErrors: [] };
-  assert.equal(stopHookBlock(summary), null);
-  assert.equal(stopHookBlock({ ...summary, hookErrors: ["no"], hookCount: "1" }), null);
+  assert.equal(stopHookSummary(summary), null);
+  assert.equal(stopHookSummary({ ...summary, hookErrors: ["no"], hookCount: "1" }), null);
 });
 
-test("the store delivers a refusal of the stop hooks", async () => {
+test("the store delivers what the stop hooks said", async () => {
   const delivered: SessionEvent[] = [];
   const sessionStore = goalStore((event) => delivered.push(event));
   const key = {
@@ -96,7 +149,7 @@ test("the store delivers a refusal of the stop hooks", async () => {
   };
   await sessionStore.append(key, BLOCK_ENTRIES as never);
   assert.deepEqual(
-    delivered.filter((event) => event.type === "stop_hook_blocked"),
-    [{ type: "stop_hook_blocked", hooks: 3, errors: [REFUSAL] }],
+    delivered.filter((event) => event.type === "stop_hooks_ran"),
+    [REFUSED],
   );
 });

@@ -1,0 +1,98 @@
+{
+ "recording": "stop-hook-block",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "H",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ERON",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nOSP",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "REY",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "H",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ERON",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nOSP",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "REY",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}
