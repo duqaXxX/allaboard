@@ -167,7 +167,7 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   at once and may fail.
 - **A request is posted first.** `SlackThread.ask` calls `ThreadPlaces.beforeRequest` before it
   posts any request (an approval, a question, a `!!` command's confirmation, the setup form, the
-  same-folder hold). It awaits `ReplySink.beforeRequest` on every reply of the thread whose end
+  same-folder hold, a question about a terminal that holds the session). It awaits `ReplySink.beforeRequest` on every reply of the thread whose end
   has not landed, with the places' lock free. The setup form and the hold are posted before the
   session's first turn, so normally no reply is open and the call does nothing. A sink acts only
   when its last message is a stream that is open, or a first stream is owed; it then cancels the
@@ -469,8 +469,8 @@ unchanged.
 
 The line starts with `Status:`. While a thread of the channel waits for the owner's answer to
 the agent (its root waits with an approval or a question open, `channel-line.lineThread` through
-`asksOwner`; a root waiting on the setup form, a `!!` command's confirmation or the same-folder
-hold is taken for working), the line names the one that has waited longest and counts the others
+`asksOwner`; a root waiting on the setup form, a `!!` command's confirmation, the same-folder
+hold or a question about a terminal is taken for working), the line names the one that has waited longest and counts the others
 (`Status: ✋ Waiting: A · +2`), whatever the event that posted it: the push's `text` names the
 event itself (`Status: Done: B · +1`), and a thread that waits is never hidden by another's end.
 Only a wait names a thread among several, since only a wait asks something of the owner: with
@@ -489,8 +489,8 @@ request it opens; a change that leaves it as it was writes nothing. When its own
 thread it names, its word and its mention in its metadata's payload (ids, no content), so after a
 start the first refresh takes over the line an earlier run left and brings it to the threads'
 status; a line with no such payload stays as it is until the next post. The mention stays, and an
-edit pushes nothing. The setup form, a `!!` command's confirmation and the same-folder hold post no line: they answer
-what the owner has just written in the thread.
+edit pushes nothing. The setup form, a `!!` command's confirmation, the same-folder hold and a question about a
+terminal post no line: they answer what the owner has just written in the thread.
 
 The line mentions nobody. With `SLACK_MENTION_OWNER=on` (`SlackChatOptions.mentionOwner`) the
 thread tells the owner, since a push from the thread opens the thread and one from the channel
