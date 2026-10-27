@@ -22,7 +22,7 @@ import type { Choice } from "./setup.ts";
 export type HoldAnswer = true | Choice;
 
 /** Which question holds the message: an answer is checked to be of its request's kind. */
-export type HoldKind = "hold" | "setup" | "shell";
+export type HoldKind = "hold" | "setup" | "shell" | "terminal";
 
 /** One question waiting for the owner. */
 export interface Pending {
@@ -135,6 +135,8 @@ export class Holds {
       if (pending.channelId !== channelId || pending.threadId !== threadId) continue;
       if (!pending.decided) {
         pending.decided = true;
+        // withdrawn, not answered: whoever waits removes nothing and rewrites nothing
+        pending.cancelled = true;
         entry.settle(null);
         this.entries.delete(holdId);
         return pending;

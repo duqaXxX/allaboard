@@ -77,11 +77,11 @@ test("the terminal line names the folder of the file, and is today's without one
   });
   assert.equal(
     own.words.terminal,
-    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(config)} claude --resume {session} --fork-session`,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(config)} claude --resume {session}`,
   );
   delete process.env.CLAUDE_CONFIG_DIR;
   const plain = claudeAgent({ home }).build({ variables: {}, clock: systemClock });
-  assert.equal(plain.words.terminal, "cd {directory} && claude --resume {session} --fork-session");
+  assert.equal(plain.words.terminal, "cd {directory} && claude --resume {session}");
 });
 
 test(

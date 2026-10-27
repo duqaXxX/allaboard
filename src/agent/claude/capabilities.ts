@@ -41,4 +41,8 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   scheduledJobs: true,
   // `shell.ts`: the terminal's bash-mode records, sent as a prompt.
   shellCommands: true,
+  // `holders.ts`: `claude agents --json`, and `ps` for which holder is the daemon's own.
+  sessionHolders: true,
+  // `turns.ts`, and the conversation's entries a session store receives (`goals.ts`).
+  foreignTurns: true,
 });

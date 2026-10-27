@@ -1,0 +1,72 @@
+[
+  {
+    "parentUuid": null,
+    "isSidechain": false,
+    "promptId": "8698d218-d131-4383-8279-95d25d44974d",
+    "type": "user",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Reply only OK."
+        }
+      ]
+    },
+    "uuid": "9fb40aa2-3df3-44eb-bce2-f79a3b6efa41",
+    "timestamp": "2026-10-27T03:13:07.514Z",
+    "permissionMode": "default",
+    "promptSource": "sdk",
+    "turnOrigin": "sdk",
+    "turnPosition": {
+      "promptIndex": 0,
+      "turnIndex": 1
+    },
+    "userType": "external",
+    "entrypoint": "sdk-ts",
+    "cwd": "/work/demo",
+    "sessionId": "c5a185a5-2a58-49aa-ab67-a8f72144d1e6",
+    "version": "2.1.310",
+    "gitBranch": "main"
+  },
+  {
+    "parentUuid": "d5b78fc0-29bf-4c50-8c80-1159afdea899",
+    "isSidechain": false,
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "OK"
+        }
+      ],
+      "container": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {},
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "apiBlockIndex": 0,
+    "requestId": "req_synthetic",
+    "requestRef": "9081ed20-6a78-431d-a87d-390bbe5d34a0",
+    "requestedModel": "claude-haiku-5-5",
+    "type": "assistant",
+    "uuid": "e69310a2-1864-49e8-926d-2212b993553c",
+    "timestamp": "2026-10-27T03:13:09.081Z",
+    "advisorModel": "claude-opus-5-5",
+    "effort": "medium",
+    "perTurnEffort": "medium",
+    "userType": "external",
+    "entrypoint": "sdk-ts",
+    "cwd": "/work/demo",
+    "sessionId": "c5a185a5-2a58-49aa-ab67-a8f72144d1e6",
+    "version": "2.1.310",
+    "gitBranch": "main"
+  }
+]

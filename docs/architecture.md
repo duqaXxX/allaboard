@@ -1212,12 +1212,13 @@ claude.ai subscription. A field that cannot be read is left out.
 tasks; bypass and the folder are left out, since its Mode and Directory lines show them. When the
 session works in another folder than the one it was opened in, a `Working in:` line names it before
 the values. Once the thread has a session id, a `Terminal:` line under `Session:` gives
-`cd <folder> && claude --resume <id> --fork-session` (`directory.terminalLine`): a session created
-through the SDK stays out of the terminal's picker, and a fork made in the terminal is listed
-(`docs/setup.md`, "Continuing a session in the terminal"). For a back end with a login folder of
+`cd <folder> && claude --resume <id>` (`directory.terminalLine`), which continues the same session
+in the terminal: a session created through the SDK stays out of the terminal's picker
+(`docs/setup.md`, "Continuing a session in the terminal"). While a turn or background work runs,
+warnings follow it (`ThreadSession.terminalWarnings`). For a back end with a login folder of
 its own (`CLAUDE_CONFIG_DIR`) the command carries `CLAUDE_CONFIG_DIR=<folder>` before `claude`,
 since `AgentBackend.words` is built from the folder the back end resolved. The folder is the
-thread's own, quoted for the shell, so the fork is listed where `!resume` in the channel looks; the id is stored from the
+thread's own, quoted for the shell; the id is stored from the
 first turn's `session_started` event, so the line shows during that turn too. A command holding a
 backtick is written as escaped text, since a code span cannot hold one, and the line is left out
 when the folder cannot be used (`DirectoryUnavailable`). It starts the thread's agent process when
@@ -2089,6 +2090,9 @@ observations. Where `!open` relies on git's behaviour, its measurements are in t
 | npm replaces a package folder in steps | `npm install -g` over an installed version renames the folder aside, creates the new one and fills it for about 2.4 seconds, then deletes the old one; a SIGKILLed npm leaves the new folder half written | `npm install -g allaboard@0.2.0` over 0.1.1 in a throwaway prefix, from npmjs; the folder watched | 2026-10-17 | npm 11.17.0, macOS 27.0 |
 | A session across the replacement of its copy | A session started from the SDK of an installed copy ran a 40-second Bash command, then Read, Bash and a background subagent, while the copy was replaced twice; it kept its process on the deleted binary and the stream ended cleanly. A Claude Code that differs under the session is not measured | a session with the daemon's options, copy replaced by `npm install -g` | 2026-10-17 | SDK 0.3.301 on both copies, Claude Code 2.1.301 |
 | Fork listed in the terminal's picker | A session started from Slack and continued in a terminal with `claude --resume <id> --fork-session` gets a session id of its own, and the terminal's picker lists that copy | One session started from Slack | 2026-09-26 | Claude Code 2.1.282 |
+| Two processes on one session | An SDK session kept alive between turns does not see a turn the terminal wrote meanwhile, and a terminal left open does not see a turn written from the SDK; the next message of either hangs off its own last one, a branch, and a later resume continues the newest branch. Opening the session in the terminal and closing it without writing leaves no branch. A background command of the SDK's process that ends after the terminal wrote opens a report turn of its own, a branch too | Eight scripted runs, SDK query with the daemon's options beside the interactive TUI in tmux, Haiku | 2026-10-27 | SDK 0.3.310 (Claude Code 2.1.310), TUI 2.1.311 |
+| Who holds a session | `claude agents --json` lists the SDK's process and the terminal's alike (`kind: interactive`), with `status` `idle` or `busy`, and drops each once it ends; the SDK's process is a child of the process that called `query()` | 38 samples over two rounds of idle, busy and closed, both sides | 2026-10-27 | Claude Code 2.1.310 and 2.1.311 |
+| A cut turn continued in the terminal | An SDK process closed during a turn (`query.close()`, no interrupt), then `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1 claude --resume <id>`: the TUI continues the turn by itself and runs the cut command again; without the variable it waits for a prompt. `/resume <id>` typed inside an open TUI answers `No conversations found to resume.` for a session created through the SDK | Two scripted runs and a control | 2026-10-27 | SDK 0.3.310, TUI 2.1.311 |
 | Thread status with desktop open | The iOS app can show no thread status for a thread that Slack on desktop already has open; with desktop closed, or with the thread opened on iOS first, it shows on both | Five runs read by eye, one per condition; the reference of `assistant.threads.setStatus` does not describe it | 2026-10-04 | slack-sdk 3.44.1 |
 | ExitTimeOut cap | launchd caps a LaunchAgent's `ExitTimeOut` at 60: `launchctl print` shows 60 for any larger value, and a job stopped with `launchctl bootout` was killed within 60 seconds | `launchctl print`, and a job stopped with `bootout` | 2026-09-26 | macOS 27.0 |
 | Status removal after two minutes | Slack removes a thread status two minutes after it was set and clears it when the app replies | `assistant.threads.setStatus` reference, read | 2026-10-02 | none, a documentation read |

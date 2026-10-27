@@ -104,7 +104,7 @@ test("a variable the daemon hands over by lookup alone reaches the session", LIM
   await backend.close();
 });
 
-const DEFAULT_TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
+const DEFAULT_TERMINAL = "cd {directory} && claude --resume {session}";
 
 test("the terminal line is today's for a back end with no config dir of its own", () => {
   const saved = process.env.CLAUDE_CONFIG_DIR;
@@ -120,7 +120,7 @@ test("the terminal line of a login of its own names its config dir", () => {
   const configDir = join(tmp, "login-two");
   assert.equal(
     new ClaudeBackend({ home, configDir }).words.terminal,
-    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(configDir)} claude --resume {session} --fork-session`,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(configDir)} claude --resume {session}`,
   );
 });
 

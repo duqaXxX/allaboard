@@ -133,6 +133,7 @@ export class AskingWorld {
       shellCommands: true,
       stopped: this.stopping.signal,
       now: () => this.clock.time(),
+      clock: this.clock,
     };
     this.flows = asking(deps, new Talk(deps));
     const answers = this.flows.answers;

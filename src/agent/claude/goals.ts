@@ -11,7 +11,7 @@
 
 import type { SessionStore } from "@anthropic-ai/claude-agent-sdk";
 import { isRecord } from "../../values.ts";
-import type { GoalChange, SessionEvent } from "../seam.ts";
+import type { GoalChange, SavedMessage, SessionEvent } from "../seam.ts";
 import { integer, words } from "./wire.ts";
 
 /**
@@ -44,8 +44,21 @@ export function goalChange(entry: unknown): GoalChange | null {
 }
 
 /**
+ * A user or assistant entry of the conversation as the message it saves, or null for any other
+ * entry. Each carries its `uuid` and an ISO `timestamp`, as on disk (read off the entries of
+ * `test/fixtures/sdk/message-store.json`, recorded 2026-10-27, SDK 0.3.310).
+ */
+export function savedMessage(entry: unknown): SavedMessage | null {
+  if (!isRecord(entry) || (entry.type !== "user" && entry.type !== "assistant")) return null;
+  if (typeof entry.uuid !== "string" || typeof entry.timestamp !== "string") return null;
+  const at = Date.parse(entry.timestamp);
+  return Number.isNaN(at) ? null : { id: entry.uuid, at };
+}
+
+/**
  * The store a session is given: it keeps nothing, and hands each goal change of the main
- * transcript to `deliver` (a subagent's transcript has a `subpath`). `load` answers that nothing
+ * transcript to `deliver` (a subagent's transcript has a `subpath`), and the last message of
+ * each batch the session saved (what `turnsAfter` reads after). `load` answers that nothing
  * was stored, and a resume then reads the transcript Claude Code keeps on disk (measured
  * 2026-10-20, SDK 0.3.304; the contract of `load` does not say).
  */
@@ -53,10 +66,13 @@ export function goalStore(deliver: (event: SessionEvent) => void): SessionStore 
   return {
     append: async (key, entries) => {
       if (key.subpath !== undefined) return;
+      let saved: SavedMessage | null = null;
       for (const entry of entries) {
         const goal = goalChange(entry);
         if (goal !== null) deliver({ type: "goal_changed", goal });
+        saved = savedMessage(entry) ?? saved;
       }
+      if (saved !== null) deliver({ type: "message_saved", message: saved });
     },
     load: async () => null,
   };

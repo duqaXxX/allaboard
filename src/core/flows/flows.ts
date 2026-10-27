@@ -16,10 +16,17 @@ export interface Built {
 
 export function buildFlows(deps: FlowDeps): Built {
   const talk = new Talk(deps);
-  const { setup, hold, answers } = asking(deps, talk);
+  const { setup, hold, terminal, answers } = asking(deps, talk);
   const { resume, bind, picks } = lists(deps, talk);
   const allaboard = deps.updates === undefined ? undefined : updating(deps, deps.updates, talk);
-  const flows: OtherFlows = { setup, hold, resume, bind, ...(allaboard ? { allaboard } : {}) };
+  const flows: OtherFlows = {
+    setup,
+    hold,
+    terminal,
+    resume,
+    bind,
+    ...(allaboard ? { allaboard } : {}),
+  };
   const all = messages(deps, talk, flows);
   // A failure after the provider's checks reaches the owner in the channel of the offer; a click
   // on the chat's own page has none, and that page shows the state.

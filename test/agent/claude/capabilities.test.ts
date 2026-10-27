@@ -34,6 +34,8 @@ test("the Claude back end declares what the core adapts to", () => {
     goals: true,
     scheduledJobs: true,
     shellCommands: true,
+    sessionHolders: true,
+    foreignTurns: true,
   });
 });
 

@@ -126,6 +126,51 @@ export interface Capabilities {
    * output, as the agent's terminal adds one (`!!command`). Without it the word is not offered.
    */
   readonly shellCommands: boolean;
+  /**
+   * `AgentBackend.sessionHolders`: the agent lists the processes that hold a session open, its
+   * terminal's included, and says which run a turn. Without it the daemon cannot tell that the
+   * session is open in a terminal, and says nothing about one.
+   */
+  readonly sessionHolders: boolean;
+  /**
+   * `AgentBackend.turnsAfter` and `message_saved`: the session says which messages it wrote, and
+   * the agent reads the turns another process wrote after them. Without it a turn written in a
+   * terminal is not shown in the thread, and a live session is not resumed again to see it.
+   */
+  readonly foreignTurns: boolean;
+}
+
+/** A process that holds a session open, as `AgentBackend.sessionHolders` lists it. */
+export interface SessionHolder {
+  /** Tells this process from the others for as long as it runs. */
+  readonly id: string;
+  /** Whether it is the daemon's own: a session this daemon started. */
+  readonly own: boolean;
+  /** Whether it is running a turn now. */
+  readonly busy: boolean;
+}
+
+/** A message the session wrote: its id in the agent's record, and when it was written. */
+export interface SavedMessage {
+  readonly id: string;
+  /** Epoch milliseconds. */
+  readonly at: number;
+}
+
+/** A turn another process wrote to a session: the owner's prompt and the final reply, if any. */
+export interface ForeignTurn {
+  readonly prompt: string;
+  readonly reply: string | null;
+}
+
+/** What `AgentBackend.turnsAfter` read. */
+export interface ForeignTurns {
+  /** Whether anything was written after the message asked about. */
+  readonly changed: boolean;
+  /** The turns written after it, oldest first; empty when that message is no longer found. */
+  readonly turns: readonly ForeignTurn[];
+  /** The record's last message when anything changed, to read after next time; null otherwise. */
+  readonly last: SavedMessage | null;
 }
 
 /** The agent's own words, which the daemon's texts are filled with. */
@@ -153,6 +198,12 @@ export interface AgentWords {
    * filled in, each quoted for a shell.
    */
   readonly terminal: string;
+  /**
+   * The shell line that continues in a terminal a turn whose process was closed before it ended,
+   * the turn going on by itself there; filled as `terminal` is. Null for an agent whose
+   * terminal does not take a turn up.
+   */
+  readonly terminalContinue: string | null;
   /**
    * The shell line that opens the agent in `{directory}` (quoted for a shell), where it asks
    * whether to trust that folder; null for an agent that keeps no record of trust.
@@ -355,6 +406,12 @@ export interface ScheduledJob {
  * The events of one message arrive in the order the agent produced them.
  */
 export type SessionEvent =
+  /**
+   * The session wrote a message of the conversation to the agent's record: what
+   * `AgentBackend.turnsAfter` takes to find what another process wrote after it. With
+   * `foreignTurns` only.
+   */
+  | { readonly type: "message_saved"; readonly message: SavedMessage }
   /**
    * The agent names its session. It can come again, and the id can change (a cleared conversation).
    * An id is announced only once a `start` that resumes it would succeed: the core stores it as
@@ -781,6 +838,18 @@ export interface AgentBackend {
    * Rejects when the agent cannot read it. Present with `sessionTitles`.
    */
   sessionTitle?(folder: string, session: string): Promise<string | null>;
+  /**
+   * The processes that hold the session `session` open now; null when the agent could not tell.
+   * Asked before each owner message reaches a session, so it must take well under a second.
+   * Present with `sessionHolders`.
+   */
+  sessionHolders?(session: string): Promise<readonly SessionHolder[] | null>;
+  /**
+   * What was written to the session `session` of `folder` after `after`, a message the daemon's
+   * own process saved. Cheap when nothing was: the record is read in full only when it changed.
+   * Rejects when the agent cannot read it. Present with `foreignTurns`.
+   */
+  turnsAfter?(folder: string, session: string, after: SavedMessage): Promise<ForeignTurns>;
   /** How a shell command the owner sends runs and reaches a session. Present with `shellCommands`. */
   readonly shell?: ShellMode;
   /** Ends what the back end keeps running besides its sessions. Safe to call again. */

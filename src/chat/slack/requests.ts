@@ -13,7 +13,7 @@ import type { PermissionRequest, Question, QuestionOption } from "../../agent/se
 import { answerOf, type Names, named, oneLine, proposedPlan, texts } from "../../core/port.ts";
 import { PY_SPACE, strip } from "../../text.ts";
 import { isRecord } from "../../values.ts";
-import type { ShellRequest } from "../seam.ts";
+import type { ShellRequest, TerminalRequest } from "../seam.ts";
 import { shownAsWritten } from "./reply/escape.ts";
 import * as slackTexts from "./texts.ts";
 
@@ -27,6 +27,8 @@ export const APPROVAL_ALLOW = "approval_allow";
 export const APPROVAL_DENY = "approval_deny";
 export const SHELL_RUN = "shell_run";
 export const SHELL_CANCEL = "shell_cancel";
+export const TERMINAL_GO = "terminal_go";
+export const TERMINAL_CANCEL = "terminal_cancel";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
@@ -188,6 +190,36 @@ export function shellBlocks(requestId: string, request: ShellRequest): Block[] {
     ],
   });
   return blocks;
+}
+
+/**
+ * A question about the terminal that holds the session (`TerminalRequest`): its sentence, then
+ * the go button (`Send here`, or `Stop them and move`) and Cancel; a turn the terminal runs is
+ * waited out, so its notice has Cancel alone.
+ */
+export function terminalBlocks(requestId: string, request: TerminalRequest): Block[] {
+  let sentence: string;
+  let go: string | null;
+  if (request.state === "open") {
+    // A code span cannot hold a backtick: such a command is shown as escaped text, as `!status`
+    // shows it.
+    const line = request.command ?? "";
+    const command = line.includes("`") ? shownAsWritten(line) : `\`${line}\``;
+    sentence = texts.fill(texts.TERMINAL_OPEN, { command });
+    go = slackTexts.TERMINAL_SEND_BUTTON;
+  } else if (request.state === "busy") {
+    sentence = texts.TERMINAL_BUSY;
+    go = null;
+  } else {
+    sentence = texts.fill(texts.TERMINAL_MOVE, { running: shownAsWritten(request.running ?? "") });
+    go = slackTexts.TERMINAL_MOVE_BUTTON;
+  }
+  const buttons = [button(TERMINAL_CANCEL, slackTexts.TERMINAL_CANCEL_BUTTON, requestId)];
+  if (go !== null) buttons.unshift(button(TERMINAL_GO, go, requestId, "primary"));
+  return [
+    { type: "section", text: { type: "mrkdwn", text: head(sentence, SECTION_LIMIT) } },
+    { type: "actions", elements: buttons },
+  ];
 }
 
 /**

@@ -85,7 +85,9 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `SDKSessionInfo` | type | info.ts: listedSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `SDKUserMessage` | type | prompt.ts: Content, userMessage; session.ts: QueryFunction, ClaudeSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `SessionStore` | type | goals.ts: goalStore | package | P33 |
+| `@anthropic-ai/claude-agent-sdk` | `SessionMessage` | type | turns.ts: turnsOf | package | none |
 | `@anthropic-ai/claude-agent-sdk` | `getSessionInfo` | function | backend.ts: ClaudeBackend.sessionTitle | reference | none |
+| `@anthropic-ai/claude-agent-sdk` | `getSessionMessages` | function | turns.ts: turnsAfter | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `listSessions` | function | listing.ts: directorySessions | reference | P6 |
 | `@anthropic-ai/claude-agent-sdk` | `query` | function | session.ts: ClaudeSession.constructor | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `tagSession` | function | backend.ts: ClaudeBackend.tagSession | reference | P31 |
@@ -137,6 +139,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Settings` | `effortLevel` | option | session.ts: ClaudeSession.setEffort | package | none |
 | `getSessionInfo` | `dir` | option | backend.ts: ClaudeBackend.sessionTitle | reference | none |
 | `getSessionInfo` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
+| `getSessionMessages` | `dir` | option | turns.ts: turnsAfter | reference | none |
 | `listSessions` | `dir` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `includeWorktrees` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | P29 |
@@ -300,7 +303,15 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `newStart` | key | translate.ts: hunkOf | measured | none |
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `oldStart` | key | translate.ts: hunkOf | measured | none |
 | `SessionKey` | `subpath` | field | goals.ts: goalStore | package | none |
+| `SessionMessage` | `type` | field | turns.ts: turnsOf | package | none |
+| `SessionMessage` | `uuid` | field | turns.ts: turnsAfter | package | none |
+| `SessionMessage` | `message` | field | turns.ts: promptOf | package | none |
+| `SessionMessage.message` | `content` | key | turns.ts: promptOf | measured | none |
 | `SessionStoreEntry` | `type` | field | goals.ts: goalChange | package | P33 |
+| `SessionStoreEntry` | `uuid` | field | goals.ts: savedMessage | package | none |
+| `SessionStoreEntry` | `timestamp` | field | goals.ts: savedMessage | package | none |
+| `SessionStoreEntry.type` | `"user"` | value | goals.ts: savedMessage | measured | none |
+| `SessionStoreEntry.type` | `"assistant"` | value | goals.ts: savedMessage | measured | none |
 | `SessionStoreEntry.type` | `"attachment"` | value | goals.ts: goalChange | measured | P33 |
 | `SessionStoreEntry` | `attachment` | key | goals.ts: goalChange | measured | P33 |
 | `SessionStoreEntry.attachment` | `type` | key | goals.ts: goalChange | measured | P33 |

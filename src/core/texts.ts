@@ -210,6 +210,11 @@ export const TAKEN_INTO_REPLY_MANY = naming(
 export const BECAUSE_RESTARTED = "allaboard restarted";
 export const BECAUSE_SHUTDOWN = "allaboard stopped";
 export const BECAUSE_STOPPED = naming("{agent} stopped");
+export const BECAUSE_MOVED = "the session moved to the terminal";
+// The line a reply ends with when `!terminal` took its turn to the terminal.
+export const MOVED_TO_TERMINAL = "Moved to the terminal, which continues this turn.";
+// The same, for work that had not reached the agent yet: nothing runs there for it.
+export const MOVED_BEFORE_SENT = "Moved to the terminal.";
 export const ENDED_RESTARTING = "allaboard is restarting; send your message again in a moment";
 // Never shown: an idle close always finds nothing running, sent or queued to end with it.
 export const ENDED_IDLE = "allaboard closed this idle session";
@@ -462,6 +467,36 @@ export const SHELL_LINES_LEFT_OUT = "… {count} lines above not shown";
 export const SHELL_OFF = "Shell commands are turned off for this instance (`ALLABOARD_SHELL`).";
 export const SHELL_UNAVAILABLE = naming("{agent} cannot be told of a shell command you run.");
 export const SHELL_TITLE = "Run this command?";
+// The session is open in a terminal on the host (`flows/terminal.ts`). `{command}` is the line
+// that reopens it there, which the chat shows as a command.
+export const TERMINAL_OPEN_TITLE = "This session is also open in a terminal";
+export const TERMINAL_OPEN =
+  "⚠️ This session is also open in a terminal. If you send this here, that terminal will not " +
+  "see it: before writing there, close it and run {command} again.";
+export const TERMINAL_BUSY_TITLE = "This session is running a turn in a terminal";
+export const TERMINAL_BUSY =
+  "⏳ This session is running a turn in a terminal. Your message waits here until that turn ends.";
+export const TERMINAL_MOVE_TITLE = "Move this session to the terminal?";
+export const TERMINAL_MOVE = "⚠️ Moving to the terminal stops what still runs here: {running}.";
+export const TERMINAL_SENT = "Sent here.";
+export const TERMINAL_TURN_ENDED = "The terminal's turn ended.";
+export const TERMINAL_MOVED = "Moved to the terminal.";
+export const TERMINAL_NOT_MOVED = "Not moved.";
+// `!terminal`'s answers. `{command}` is the line to run, shown as a command.
+export const TERMINAL_TOP_LEVEL =
+  "`!terminal` works inside a session's thread, not in the channel.";
+export const TERMINAL_NOT_STARTED = "This session has not started yet: send it a message first.";
+export const TERMINAL_CUT = naming(
+  "Stopped here. The terminal continues this turn by itself: the command that was running is " +
+    "stopped, and {author} runs it again there.\n{command}",
+);
+export const TERMINAL_IDLE = "Continue in the terminal with:\n{command}";
+export const TERMINAL_WAIT =
+  "A turn is running here: wait for its end, or `!stop` it, then continue in the terminal " +
+  "with:\n{command}";
+// A turn the owner ran in the terminal, shown in the thread before the reply to his next message.
+export const TERMINAL_TURN = "🖥 In the terminal:\n› {prompt}\n\n{reply}";
+export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n› {prompt}";
 export const SHELL_OUTSIDE_SESSION = "`!!` runs a shell command inside a session's thread.";
 export const SHELL_FIRST_PROMPT =
   "Send this session its first prompt before a shell command: it starts with its setup.";
@@ -486,6 +521,14 @@ export const STATUS_STATE = naming("Mode: `{mode}`\n{agent}: `{version}`\nNow: {
 // whose picker lists it. `directory` arrives quoted for the shell, and `command` as a code
 // span, or escaped as plain text when it holds a backtick.
 export const STATUS_TERMINAL = "Terminal: {command}";
+// Under it, while a turn or background work runs here: the terminal would branch the session.
+export const STATUS_TERMINAL_TURN =
+  "⚠️ A turn is running here: writing in the terminal before it ends splits the session.";
+export const STATUS_TERMINAL_TURN_MOVE =
+  "⚠️ A turn is running here: writing in the terminal before it ends splits the session. " +
+  "`!terminal` moves it there now.";
+export const STATUS_TERMINAL_BACKGROUND =
+  "⚠️ {counts} still running here: writing in the terminal before it ends splits the session.";
 // The repositories below a session's folder that the agent's record of trust does not cover
 //: the daemon's own git runs in none of them, and only the agent gives that trust,
 // in a terminal. Said after `!bind` and in a thread's `!status`; one line per repository below.
@@ -562,6 +605,8 @@ export const HELP_WORDS: readonly Named[] = [
     "directory, mode and the footer's values",
   "`!stop` in the channel: every running session, its background tasks and its pending " +
     "approvals; inside a thread: only that session",
+  "`!terminal` move this session to a terminal on the host: a running turn goes on there by " +
+    "itself; inside a thread, refused in the channel",
   "`!bind [folder]` the folders {agent} trusts, or bind this channel to one, its path " +
     "relative to the allowed root; in the channel, refused inside a thread",
   "`!bypass on|off` run every tool without asking, until `!bypass off`; it survives a " +
@@ -707,7 +752,10 @@ export const GUIDE_SESSIONS_RESUME =
   "`!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes " +
   "it in the thread of your `!resume` message.";
 export const GUIDE_SESSIONS_TERMINAL =
-  "To continue a session in the terminal, run the `Terminal:` command `!status` shows in its thread.";
+  "To continue a session in the terminal, run the `Terminal:` command `!status` shows in its " +
+  "thread, or send `!terminal` there, which moves a running turn too. Write from one side at a " +
+  "time: a terminal left open does not see what you write here, and is reopened before you " +
+  "write there again.";
 export const GUIDE_FILES = naming(
   "**Files**\n" +
     "`!open`, sent inside a session's thread, offers the files changed in that session and a search " +

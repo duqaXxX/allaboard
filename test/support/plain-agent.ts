@@ -34,6 +34,7 @@ import type {
   Capabilities,
   CommandInfo,
   ContextUsage,
+  ForeignTurns,
   GoalChange,
   ListedSession,
   PermissionAnswer,
@@ -45,8 +46,10 @@ import type {
   QuestionRequest,
   Repository,
   RequestHandler,
+  SavedMessage,
   ScheduledJob,
   SessionEvent,
+  SessionHolder,
   ShellMode,
   ShellRun,
   StartOptions,
@@ -63,6 +66,7 @@ export const PLAIN_WORDS: AgentWords = Object.freeze({
   login: "signin",
   logout: "signout",
   terminal: "cd {directory} && plain --resume {session}",
+  terminalContinue: "cd {directory} && plain --resume {session} --go-on",
   trust: null,
   // `count` is offered too: the session's own list wins over this one.
   notOffered: Object.freeze({
@@ -98,6 +102,8 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   goals: false,
   scheduledJobs: false,
   shellCommands: false,
+  sessionHolders: false,
+  foreignTurns: false,
 });
 
 /** The two commands of the agent, run by a prompt `/echo text` and `/count text`. */
@@ -134,6 +140,7 @@ export type PlainStep =
   | { readonly effort: string | null }
   | { readonly model: string }
   | { readonly goal: GoalChange }
+  | { readonly saved: SavedMessage }
   | { readonly jobs: readonly ScheduledJob[] }
   | { readonly hold: true }
   | { readonly die: true };
@@ -202,6 +209,11 @@ export function modelSwitched(id: string): PlainStep {
  */
 export function goalChanged(goal: GoalChange): PlainStep {
   return { goal };
+}
+
+/** The session says it saved a message (`message_saved`), as a session with `foreignTurns` does. */
+export function saved(id: string, at: number): PlainStep {
+  return { saved: { id, at } };
 }
 
 /**
@@ -559,6 +571,8 @@ export class PlainSession implements AgentSession {
         this.#push({ type: "model_changed", model: step.model });
       } else if ("goal" in step) {
         this.#push({ type: "goal_changed", goal: step.goal });
+      } else if ("saved" in step) {
+        this.#push({ type: "message_saved", message: step.saved });
       } else if ("jobs" in step) {
         this.#push({ type: "scheduled_jobs", jobs: step.jobs });
       } else if ("hold" in step) {
@@ -711,6 +725,11 @@ export interface PlainAgentOptions {
    * command, its end and its output; `timeoutMs` is how long one may run (10 s when absent).
    */
   readonly shell?: { readonly timeoutMs?: number };
+  /**
+   * The agent lists the processes that hold a session (`sessionHolders`, from `holders`) and
+   * reads the turns another one wrote (`foreignTurns`, from `foreign`), both set by the test.
+   */
+  readonly terminal?: true;
 }
 
 /** How the plain agent is told of a shell command: one text, which a test reads back. */
@@ -732,6 +751,14 @@ export class PlainAgent implements AgentBackend {
   readonly starts: StartOptions[] = [];
   readonly #startFailures: Error[] = [];
   closed = false;
+  /** What `sessionHolders` answers, per session id; none listed when absent. */
+  readonly holders = new Map<string, readonly SessionHolder[] | null>();
+  /** What `turnsAfter` answers, per session id; nothing changed when absent. */
+  readonly foreign = new Map<string, ForeignTurns>();
+  /** Every `turnsAfter` asked, as `session after-id`. */
+  readonly foreignAsked: string[] = [];
+  sessionHolders?: (session: string) => Promise<readonly SessionHolder[] | null>;
+  turnsAfter?: (folder: string, session: string, after: SavedMessage) => Promise<ForeignTurns>;
 
   constructor(options: PlainAgentOptions = {}) {
     this.store = options.store ?? new PlainStore();
@@ -743,6 +770,21 @@ export class PlainAgent implements AgentBackend {
         timeoutMs: options.shell.timeoutMs ?? 10_000,
         environment: { PATH: process.env.PATH },
         prompt: plainShellPrompt,
+      };
+    }
+    if (options.terminal) {
+      this.capabilities = Object.freeze({
+        ...this.capabilities,
+        sessionHolders: true,
+        foreignTurns: true,
+      });
+      this.sessionHolders = async (session) =>
+        this.holders.has(session) ? (this.holders.get(session) ?? null) : [];
+      this.turnsAfter = async (_folder, session, after) => {
+        this.foreignAsked.push(`${session} ${after.id}`);
+        const found = this.foreign.get(session) ?? { changed: false, turns: [], last: null };
+        this.foreign.delete(session);
+        return found;
       };
     }
   }

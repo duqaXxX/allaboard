@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A thread's session can move to a terminal on your Mac and back, on the same session id (#10).
+  The `!status` line is now `cd <folder> && claude --resume <session id>`, without
+  `--fork-session`. Before a message you send in the thread reaches the session, allaboard asks
+  Claude Code which processes hold it (`claude agents --json`): a terminal running a turn makes
+  the message wait under a notice with **Cancel**; a terminal left open is named once, with
+  **Send here** and **Cancel**; the turns the terminal wrote come first, one message each, and
+  the session is started again so that it reads them. `!terminal` moves the session to the
+  terminal and gives the command; a running turn goes on there by itself
+  (`CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`), and background work it would stop is confirmed
+  first. While a turn or background work runs, `!status` warns that writing in the terminal now
+  splits the session.
+
 - The footer ends with the email of the Claude account the session runs on, and `!status` shows
   it with the account's plan (`Account: alice@example.com (Claude Max)`), so an instance with a
   login of its own (`CLAUDE_CONFIG_DIR`) says which one it uses. Read when a session connects:

@@ -29,7 +29,7 @@ const FEATURE_NAME_LIMIT = 300;
 // The README is the landing page: a feature's detail goes in docs/setup.md. The limit sits a
 // quarter above the page's length when it was set (677 words, as `str.split` counts them). It is
 // a prompt to ask where new text belongs: raise it when the page needs the words.
-const README_WORD_LIMIT = 955;
+const README_WORD_LIMIT = 970;
 
 const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const LINE_POINTER = /\b[\w./-]+\.(?:ts|py|md|sh|ya?ml|json|toml):\d+/;

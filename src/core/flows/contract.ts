@@ -30,6 +30,21 @@ export interface HoldFlow {
   beforeSending(ref: ThreadRef, session: ThreadSession, other: ThreadSession): Promise<boolean>;
 }
 
+/** A session open in a terminal on the host. */
+export interface TerminalFlow {
+  /**
+   * Before a message reaches `session`: waits out a turn a terminal runs, asks once per terminal
+   * left open whether to send here, and shows the turns written there since. True to send; false
+   * when it is not sent, and the owner was told.
+   */
+  beforeSending(ref: ThreadRef, session: ThreadSession): Promise<boolean>;
+  /**
+   * `!terminal`: moves `session` to a terminal, confirmed first when it would stop background
+   * work, and tells the owner the line to run there.
+   */
+  move(ref: ThreadRef, session: ThreadSession): Promise<void>;
+}
+
 /** The owner's answer to a request: a permission, a question, the hold, the setup. */
 export interface AnswersFlow {
   /** As `ChatInbound.answer`. */
@@ -92,6 +107,7 @@ export interface MessagesFlow {
 export interface OtherFlows {
   readonly setup: SetupFlow;
   readonly hold: HoldFlow;
+  readonly terminal: TerminalFlow;
   readonly resume: ResumeFlow;
   readonly bind: BindFlow;
   /** Absent in a daemon built without a way to update itself: `!allaboard` is then not offered. */

@@ -209,6 +209,16 @@ function shell(requestId: string): OwnerRequest {
   return { type: "shell", requestId, command: "git status --short", folder: "~/work" };
 }
 
+function terminal(requestId: string): OwnerRequest {
+  return {
+    type: "terminal",
+    requestId,
+    state: "open",
+    running: null,
+    command: "cd /work/demo && agent --resume s1",
+  };
+}
+
 /** A request of each type, and the answer its control gives. */
 const REQUESTS: ReadonlyArray<{
   readonly name: string;
@@ -231,6 +241,12 @@ const REQUESTS: ReadonlyArray<{
   },
   { name: "hold", control: "click", request: hold, answer: { type: "hold", send: true } },
   { name: "shell", control: "click", request: shell, answer: { type: "shell", run: true } },
+  {
+    name: "terminal",
+    control: "click",
+    request: terminal,
+    answer: { type: "terminal", go: true },
+  },
   {
     name: "setup",
     control: "form",

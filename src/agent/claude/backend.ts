@@ -14,9 +14,12 @@ import type {
   AgentBackend,
   AgentSession,
   AgentWords,
+  ForeignTurns,
   ListedSession,
   Repository,
   RequestHandler,
+  SavedMessage,
+  SessionHolder,
   ShellMode,
   StartOptions,
   UsageLimits,
@@ -24,17 +27,33 @@ import type {
 import { CAPABILITIES } from "./capabilities.ts";
 import { chromeEnabled } from "./chrome.ts";
 import { GOAL_CLEAR } from "./goals.ts";
+import { type RunOutput, sessionHolders } from "./holders.ts";
 import { aliveSessions, byLastActivity, directorySessions, projectsDir } from "./listing.ts";
 import { ClaudeSession, type QueryFunction } from "./session.ts";
 import { shellMode } from "./shell.ts";
 import { trustedRepository, untrustedRepository, workspaceTrusted } from "./trust.ts";
+import { type GetSessionMessages, turnsAfter } from "./turns.ts";
 import { type BareStart, UsageProbe } from "./usage-probe.ts";
 
 export const NAME = "Claude Code";
 
-/** The shell line that forks a session in a terminal; `environment` is what precedes `claude`. */
+/**
+ * The shell line that continues a session in a terminal, on the same session id;
+ * `environment` is what precedes `claude`.
+ */
 function terminalWith(environment: string): string {
-  return `cd {directory} && ${environment}claude --resume {session} --fork-session`;
+  return `cd {directory} && ${environment}claude --resume {session}`;
+}
+
+/**
+ * The same line for a session whose process was closed during a turn: with
+ * `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1` Claude Code continues "if the previous session ended
+ * mid-turn" (environment variables reference, read 2026-10-27), and the terminal does so by
+ * itself, running again the call that was cut (measured 2026-10-27, Claude Code 2.1.311; without
+ * the variable it waits for a prompt).
+ */
+function continueWith(environment: string): string {
+  return `cd {directory} && ${environment}CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1 claude --resume {session}`;
 }
 
 /**
@@ -83,6 +102,7 @@ export const WORDS: AgentWords = Object.freeze({
   login: "login",
   logout: "logout",
   terminal: terminalWith(""),
+  terminalContinue: continueWith(""),
   trust: trustWith(""),
   notOffered: NOT_OFFERED,
   goalClear: GOAL_CLEAR,
@@ -101,6 +121,7 @@ function wordsFor(configDir: string | undefined): AgentWords {
   return Object.freeze({
     ...WORDS,
     terminal: terminalWith(environment),
+    terminalContinue: continueWith(environment),
     trust: trustWith(environment),
   });
 }
@@ -123,6 +144,10 @@ export interface ClaudeBackendOptions {
   readonly clock?: Clock;
   /** The owner's own variables for Claude Code, which a thread's session is started with. */
   readonly variables?: Readonly<Record<string, string>>;
+  /** Runs `claude agents --json` and `ps` for `sessionHolders`; a test passes a fake. */
+  readonly runOutput?: RunOutput;
+  /** The SDK's `getSessionMessages`; a test passes a fake. */
+  readonly getSessionMessages?: GetSessionMessages;
 }
 
 export class ClaudeBackend implements AgentBackend {
@@ -135,6 +160,8 @@ export class ClaudeBackend implements AgentBackend {
   readonly #configDir: string | undefined;
   readonly #projects: string;
   readonly #probe: UsageProbe;
+  readonly #runOutput: RunOutput | undefined;
+  readonly #getSessionMessages: GetSessionMessages | undefined;
   readonly shell: ShellMode;
 
   constructor(options: ClaudeBackendOptions = {}) {
@@ -146,6 +173,8 @@ export class ClaudeBackend implements AgentBackend {
     this.#projects = projectsDir(this.#configDir, this.#home);
     this.words = wordsFor(this.#configDir);
     this.shell = shellMode(this.#variables);
+    this.#runOutput = options.runOutput;
+    this.#getSessionMessages = options.getSessionMessages;
     const bare = options.bareStart ?? ((folder, requests) => this.startBare(folder, requests));
     this.#probe = new UsageProbe(this.#home, bare, { clock: options.clock });
   }
@@ -252,6 +281,32 @@ export class ClaudeBackend implements AgentBackend {
   async sessionTitle(folder: string, session: string): Promise<string | null> {
     const info = await sdkGetSessionInfo(session, { dir: folder });
     return info?.customTitle?.trim() || null;
+  }
+
+  /**
+   * The processes that hold `session` open, from Claude Code's list of active sessions, read
+   * for this back end's login: the terminal's `claude` on the host, which the service's `PATH`
+   * finds, with `CLAUDE_CONFIG_DIR` when the login has a folder of its own.
+   */
+  sessionHolders(session: string): Promise<SessionHolder[] | null> {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (this.#configDir !== undefined) env.CLAUDE_CONFIG_DIR = this.#configDir;
+    return sessionHolders(session, {
+      command: WORDS.command,
+      env,
+      self: process.pid,
+      ...(this.#runOutput !== undefined && { run: this.#runOutput }),
+    });
+  }
+
+  /** What another process wrote to a session of `folder` after `after` (`turns.turnsAfter`). */
+  turnsAfter(folder: string, session: string, after: SavedMessage): Promise<ForeignTurns> {
+    return turnsAfter(folder, session, after, {
+      projects: this.#projects,
+      ...(this.#getSessionMessages !== undefined && {
+        getSessionMessages: this.#getSessionMessages,
+      }),
+    });
   }
 
   /** Stops the usage probe: its session is closed and no read starts another. */
