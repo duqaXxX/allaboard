@@ -570,3 +570,21 @@ test("the fallback status says the same as the line", async () => {
   assert.deepEqual(calls[0]?.loading_messages, ["1 shell still running"]);
   await status.close();
 });
+
+test("a change cancelled before or during its calls says so in the log (#96)", async () => {
+  // Nothing else tells a cancelled change from one Slack refused: no warning is logged for it.
+  const slack = new FakeSlack();
+  const log = new Lines();
+  const sr = reaction(slack, log);
+  await sr.show(Status.WORKING);
+  const stop = new AbortController();
+  stop.abort();
+  await assert.rejects(sr.show(Status.DONE, stop.signal));
+  assert.match(
+    log.others.join("\n"),
+    /reaction to white_check_mark .* was cancelled before it started/,
+  );
+  await abortWhileAddIsOut(slack, (signal) => sr.show(Status.DONE, signal));
+  assert.match(log.others.join("\n"), /reaction to white_check_mark .* was cancelled midway/);
+  assert.deepEqual(log.warnings, []);
+});

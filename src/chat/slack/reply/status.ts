@@ -133,7 +133,17 @@ export class StatusReaction {
   async show(state: Status, signal?: AbortSignal): Promise<boolean> {
     if (missingScope) return false;
     this.#wanted = state;
-    const release = await this.#lock.acquire(signal);
+    let release: () => void;
+    try {
+      release = await this.#lock.acquire(signal);
+    } catch (error) {
+      // No Slack call was made: the root keeps what it showed. Logged, since nothing else
+      // tells this from a change Slack refused (#96).
+      this.#log.info(
+        `a change of the reaction to ${state} on ${this.#channel}/${this.#rootTs} was cancelled before it started`,
+      );
+      throw error;
+    }
     try {
       if (state === this.#current) return true;
       const previous = this.#current;
@@ -161,6 +171,9 @@ export class StatusReaction {
         // as a fresh instance from here, so the next change strips every other name. Nothing
         // else throws in here: `#add` and `#remove` swallow every Slack failure.
         this.#current = null;
+        this.#log.info(
+          `a change of the reaction to ${state} on ${this.#channel}/${this.#rootTs} was cancelled midway`,
+        );
         throw error;
       }
       this.#current = state;
