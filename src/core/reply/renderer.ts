@@ -90,12 +90,24 @@ export function formatDuration(seconds: number): string {
 
 /**
  * The terminal's account of stop hooks that refused to end a turn: `Ran 3 stop hooks`, then
- * `⎿ Stop hook error: <words>` for each refusal.
+ * `⎿ Stop hook error: <words>` for each refusal, every line of its words under the first and shown
+ * as the hook wrote them (`asWritten`, the chat's own). A blank line of the words stays blank.
  */
-export function stopHookLines(hooks: number, errors: readonly string[]): string {
+export function stopHookLines(
+  hooks: number,
+  errors: readonly string[],
+  asWritten: (text: string) => string,
+): string {
+  const refusal = (error: string): string[] =>
+    splitLines(error).map((line, at) => {
+      if (at === 0) return texts.fill(texts.STOP_HOOK_ERROR, { error: asWritten(line) });
+      return line.trim() === ""
+        ? ""
+        : texts.fill(texts.STOP_HOOK_ERROR_MORE, { line: asWritten(line) });
+    });
   return [
     texts.fill(texts.STOP_HOOKS_RAN, { n: hooks, hooks: hooks === 1 ? "hook" : "hooks" }),
-    ...errors.map((error) => texts.fill(texts.STOP_HOOK_ERROR, { error })),
+    ...errors.flatMap(refusal),
   ].join("\n");
 }
 
@@ -229,6 +241,8 @@ export class TurnRenderer {
   readonly #endedBefore: (taskId: string) => boolean;
   /** Seconds on the clock the chat compares `TaskUpdate.startedAt` with. */
   readonly #now: () => number;
+  /** Text the agent passed on from elsewhere, made to show as written in the reply's Markdown. */
+  readonly #asWritten: (text: string) => string;
   // Calls that continue an agent that has ended: a line of words and no card, kept by id so that a
   // call that fails can still draw the card that says why.
   readonly #resumed = new Map<string, TaskUpdate>();
@@ -242,6 +256,7 @@ export class TurnRenderer {
     modelName: (id: string) => string = (id) => id,
     endedBefore: (taskId: string) => boolean = () => false,
     now: () => number = () => monotonicClock.time(),
+    asWritten: (text: string) => string = (text) => text,
   ) {
     this.#sink = sink;
     this.#names = names;
@@ -251,6 +266,7 @@ export class TurnRenderer {
     this.#modelName = modelName;
     this.#endedBefore = endedBefore;
     this.#now = now;
+    this.#asWritten = asWritten;
   }
 
   /** One event of the session into the reply. An event that shows nothing is left out. */
@@ -338,7 +354,7 @@ export class TurnRenderer {
         // A line of the reply as a launch line is, not an aside: an aside is drawn on one line
         // with no markdown, and these are two lines with a bold count.
         await this.#writeLaunches();
-        await this.#line(stopHookLines(event.hooks, event.errors));
+        await this.#line(stopHookLines(event.hooks, event.errors, this.#asWritten));
         break;
       case "turn_ended":
         this.result = event;

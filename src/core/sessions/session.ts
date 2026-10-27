@@ -3916,6 +3916,7 @@ export class ThreadSession {
       // Started in an earlier reply and ended: a message to it resumes it.
       (taskId) => this.starts.has(taskId) && !this.tasks.has(taskId),
       () => this.deps.clock.time(),
+      (text) => this.deps.chat.escape(text, "reference"),
     );
     this.replyOf.set(renderer, reply);
     return renderer;

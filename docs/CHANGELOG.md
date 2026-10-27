@@ -9,7 +9,7 @@ All notable changes to this project are documented here. The format follows
 
 - A stop hook of yours that refuses to end a turn is now said in the reply, in the terminal's
   words: `Ran 3 stop hooks`, then `⎿ Stop hook error: <reason>` for each refusal, where the turn
-  is (#67).
+  is. A reason of several lines keeps each line under the first, as the hook wrote it (#67).
 - A thread's session can move to a terminal on your Mac and back, on the same session id (#10).
   The `!status` line is now `cd <folder> && claude --resume <session id>`, without
   `--fork-session`. Before a message you send in the thread reaches the session, allaboard asks

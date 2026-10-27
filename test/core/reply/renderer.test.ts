@@ -989,10 +989,29 @@ test("stop hooks that refused to end a turn are said in the terminal's words, wh
 });
 
 test("the stop hooks' lines name each refusal and count one hook alone", () => {
-  assert.equal(stopHookLines(1, ["a"]), "Ran **1** stop hook\n⎿ Stop hook error: a");
+  const same = (text: string): string => text;
+  assert.equal(stopHookLines(1, ["a"], same), "Ran **1** stop hook\n⎿ Stop hook error: a");
   assert.equal(
-    stopHookLines(2, ["a", "b"]),
+    stopHookLines(2, ["a", "b"], same),
     "Ran **2** stop hooks\n⎿ Stop hook error: a\n⎿ Stop hook error: b",
+  );
+});
+
+// The words of the project's own docs check, which refused a turn on 2026-10-27: lines a hook wraps
+// by hand, a blank line, and a list the reply drew as bullets, its lines out of the `⎿` block.
+test("every line of a refusal stays under the first, shown as the hook wrote it", () => {
+  const reason = "Docs check: this change\ntouches *code*.\n\n- CONTRIBUTING.md: src/agent/seam.ts";
+  const marked = (text: string): string => `[${text}]`;
+  const indent = "\u00a0".repeat(3);
+  assert.equal(
+    stopHookLines(1, [reason], marked),
+    [
+      "Ran **1** stop hook",
+      "⎿ Stop hook error: [Docs check: this change]",
+      `${indent}[touches *code*.]`,
+      "",
+      `${indent}[- CONTRIBUTING.md: src/agent/seam.ts]`,
+    ].join("\n"),
   );
 });
 
