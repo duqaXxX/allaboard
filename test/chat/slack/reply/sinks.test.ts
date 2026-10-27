@@ -33,6 +33,7 @@ import {
   cardAddition,
   cardBlock,
   contextBlock,
+  footerBlock,
   lacking,
   MESSAGE_LIMIT,
   noticeText,
@@ -525,7 +526,8 @@ test("the end stops the stream in one push, and the footer follows by a silent e
   assert.deepEqual(methods(slack), ["chat.startStream", "chat.stopStream", "chat.update"]);
   assert.deepEqual(list(only(slack.callsTo("chat.update")).blocks).slice(-2), [
     { type: "divider" },
-    { type: "context", elements: [{ type: "mrkdwn", text: "main · ctx 6%" }] },
+    // verbatim: Slack would turn the account's email into a mailto link.
+    { type: "context", elements: [{ type: "mrkdwn", text: "main · ctx 6%", verbatim: true }] },
   ]);
   assert.equal(slack.pushes(), 1);
 });
@@ -892,7 +894,7 @@ test("an answer that is text alone gets its closing message with the session's f
   assert.equal(await sink.showFooterFormatted("main · ctx 6%"), true);
   const closing = only(slack.callsTo("chat.postMessage"));
   assert.ok(closing.thread_ts === THREAD && closing.unfurl_links === false);
-  assert.deepEqual(closing.blocks, [{ type: "divider" }, contextBlock("main · ctx 6%")]);
+  assert.deepEqual(closing.blocks, [{ type: "divider" }, footerBlock("main · ctx 6%")]);
   // Claude's own words, plain: never a line of the daemon's
   assert.equal(closing.text, "Bold answer, with a link.");
   assert.equal(slack.pushes(), 2); // and the closing message, when the session has ended
@@ -1109,13 +1111,13 @@ test("the ending follows the running list by edits", async () => {
   assert.deepEqual(list(edit.blocks).slice(-3), [
     listCard(SHELL),
     { type: "divider" },
-    contextBlock("footer"),
+    footerBlock("footer"),
   ]);
   places.showRunning(null);
   await settled();
   assert.deepEqual(list(last(slack.callsTo("chat.update")).blocks).slice(-2), [
     { type: "divider" },
-    contextBlock("footer"),
+    footerBlock("footer"),
   ]);
   assert.ok(slack.postedTs.length === 1 && slack.pushes() === 2); // an edit never pushes
 });
@@ -1150,7 +1152,7 @@ test("the closing message text skips the daemon s own lines", async () => {
   await sink.showFooterFormatted("footer");
   const closing = only(slack.callsTo("chat.postMessage"));
   assert.equal(closing.text, "The real answer &amp; more.");
-  assert.deepEqual(closing.blocks, [{ type: "divider" }, contextBlock("footer")]);
+  assert.deepEqual(closing.blocks, [{ type: "divider" }, footerBlock("footer")]);
 });
 
 const ERROR_LINE = "Claude Code reported an error: `the Claude Code process exited`";
@@ -1296,7 +1298,7 @@ test("a daemon line that does not say how the reply ended never moves", async ()
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
   const closing = only(slack.callsTo("chat.postMessage"));
-  assert.deepEqual(closing.blocks, [{ type: "divider" }, contextBlock("footer")]);
+  assert.deepEqual(closing.blocks, [{ type: "divider" }, footerBlock("footer")]);
   assert.ok(
     JSON.stringify(last(slack.callsTo("chat.update")).blocks).includes(texts.COMPACTED_PLAIN),
   );
@@ -1393,7 +1395,7 @@ test("a daemon line stays in the reply when nothing of Claude's is the ending", 
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
   const closing = only(slack.callsTo("chat.postMessage"));
-  assert.deepEqual(closing.blocks, [{ type: "divider" }, contextBlock("footer")]);
+  assert.deepEqual(closing.blocks, [{ type: "divider" }, footerBlock("footer")]);
   assert.deepEqual(footerTexts(slack), [null, "footer"]);
 });
 
@@ -1582,7 +1584,7 @@ test("a reply that stops holding the list drops it at once, a rested one too", a
   assert.deepEqual(list(last(slack.callsTo("chat.update")).blocks).slice(-3), [
     listCard(SHELL),
     { type: "divider" },
-    contextBlock("footer"),
+    footerBlock("footer"),
   ]);
   // A reply written below that rests takes the list; this one is left with no card.
   const below = reply(slack, { places });
@@ -1636,14 +1638,14 @@ test("the closing message follows the running list", async () => {
   await settled();
   const edit = last(slack.callsTo("chat.update"));
   assert.equal(edit.ts, ts);
-  assert.deepEqual(edit.blocks, [listCard(SHELL), { type: "divider" }, contextBlock("footer")]);
+  assert.deepEqual(edit.blocks, [listCard(SHELL), { type: "divider" }, footerBlock("footer")]);
   assert.equal(edit.text, "Done."); // an edit never pushes: the text stays Claude's words
   places.showRunning(null);
   await settled();
   // no list: the footer stays
   assert.deepEqual(last(slack.callsTo("chat.update")).blocks, [
     { type: "divider" },
-    contextBlock("footer"),
+    footerBlock("footer"),
   ]);
   assert.ok(slack.postedTs.length === 1 && slack.callsTo("chat.delete").length === 0);
 });
@@ -3338,7 +3340,7 @@ test("the end folds the run into a line with a silent update", async () => {
   assert.deepEqual(last(slack.callsTo("chat.update")).blocks, [
     ...folded,
     { type: "divider" },
-    context("main · ctx 6%"),
+    footerBlock("main · ctx 6%"),
   ]);
   assert.equal(slack.pushes(), 1); // the stop pushed; an update never does
 });
@@ -3630,7 +3632,7 @@ test("a late preview never opens a message after the footer", async () => {
   const update = last(slack.callsTo("chat.update"));
   assert.equal(update.ts, slack.streamTs[0]);
   const blocks = list(update.blocks);
-  assert.deepEqual(last(blocks), contextBlock("footer")); // the footer stays last
+  assert.deepEqual(last(blocks), footerBlock("footer")); // the footer stays last
   assert.ok(shows(blocks, "w".repeat(MESSAGE_LIMIT - 200))); // what was shown stays
   assert.deepEqual(cardsOf(blocks), { t1: "complete" }); // the card took the update in place
   assert.ok(includesBlock(blocks, CUT_NOTE) && !shows(blocks, marker(0))); // the preview did not fit
@@ -3704,11 +3706,7 @@ test("a late card never opens a message past the blocks limit", async () => {
     Object.keys(cardsOf(blocks)).sort(),
     [...Array.from({ length: BLOCKS_LIMIT }, (_, i) => `t${i}`), LIST_ID].sort(),
   );
-  assert.deepEqual(blocks.slice(-3), [
-    listCard(AGENT),
-    { type: "divider" },
-    contextBlock("footer"),
-  ]);
+  assert.deepEqual(blocks.slice(-3), [listCard(AGENT), { type: "divider" }, footerBlock("footer")]);
 });
 
 // What the last message showed when the end was written stays; late content takes the room left.
@@ -3864,11 +3862,11 @@ test("the running list after the end edits the message that carries the footer",
   assert.deepEqual(list(last(slack.callsTo("chat.update")).blocks).slice(-3), [
     listCard(AGENT),
     { type: "divider" },
-    contextBlock("footer"),
+    footerBlock("footer"),
   ]);
   places.showRunning(null);
   await settled();
-  assert.deepEqual(get(last(slack.callsTo("chat.update")), "blocks", -1), contextBlock("footer"));
+  assert.deepEqual(get(last(slack.callsTo("chat.update")), "blocks", -1), footerBlock("footer"));
   assert.equal(slack.callsTo("chat.postMessage").length, posted);
 });
 
@@ -4164,7 +4162,7 @@ test("a refused update with containers counts them from then on", async () => {
     titles,
     Array.from({ length: 3 }, (_, i) => `Update(f${i}.txt)`),
   );
-  assert.ok(slack.messageBlocks().some((blocks) => includesBlock(blocks, contextBlock("footer"))));
+  assert.ok(slack.messageBlocks().some((blocks) => includesBlock(blocks, footerBlock("footer"))));
   await sink.task(tool("e3", "Edit", "complete", { preview: largeDiff(3) })); // a later diff, in the last message
   await settled();
   const tried = refused.length; // that message was refused once too, and counts from then on
@@ -4834,6 +4832,8 @@ test("the footer's limit counts down from the clock's time in milliseconds", asy
     contextPercent: null,
     sessionLimit: { percent: 3, resetsAt: 36_000_000 + 2 * 3_600_000 + 10 * 60_000 },
     weekLimit: null,
+    account: null,
+    accountPlan: null,
     work: null,
   };
   await sink.finish([]);
@@ -4861,6 +4861,8 @@ test("the footer's fields are formatted into the line drawn under the reply", as
     contextPercent: 6,
     sessionLimit: null,
     weekLimit: null,
+    account: null,
+    accountPlan: null,
     work: null,
   };
   await sink.finish([]);
@@ -5425,7 +5427,7 @@ test("a reply that rests is still registered, and its closing message comes with
   assert.equal(await sink.showFooterFormatted("footer"), true);
   const closing = only(slack.callsTo("chat.postMessage"));
   assert.equal(closing.text, "Started it."); // Claude's own words, as for any closing message
-  assert.deepEqual(closing.blocks, [{ type: "divider" }, contextBlock("footer")]);
+  assert.deepEqual(closing.blocks, [{ type: "divider" }, footerBlock("footer")]);
   assert.equal(slack.pushes(), 2); // the stop of the rest, and the closing message
   assert.ok(!places.holds(sink), "ended, and sealed by the owner's message");
 });
@@ -5459,7 +5461,7 @@ test("a rested reply with an owner message below it and no words since ends by e
   assert.equal(slack.messageTexts()[0], "Started it.\n\nThe task ended.");
   assert.deepEqual(list(last(slack.callsTo("chat.update")).blocks).slice(-2), [
     { type: "divider" },
-    contextBlock("footer"),
+    footerBlock("footer"),
   ]);
 });
 

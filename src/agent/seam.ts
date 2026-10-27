@@ -261,6 +261,16 @@ export interface AgentInfo {
   readonly commands: readonly CommandInfo[];
   /** The mode the session started in, or null when the agent does not say. */
   readonly permissionMode: PermissionMode | null;
+  /** The account the agent is logged in to, or null when the agent does not say. */
+  readonly account: AgentAccount | null;
+}
+
+/** An account of the agent's, as the owner tells his accounts apart. */
+export interface AgentAccount {
+  /** What names the account to its owner (an email). */
+  readonly name: string;
+  /** Its plan, or null when the agent does not say. */
+  readonly plan: string | null;
 }
 
 export interface ListedSession {

@@ -69,6 +69,7 @@ import {
   cardChunk,
   cardFields,
   contextBlock,
+  footerBlock,
   isRunningList,
   MESSAGE_LIMIT,
   PREVIEW_CUT,
@@ -1183,7 +1184,7 @@ export class ReplySink implements Sink {
 
   /** The footer below a divider; empty when there is none. A stream's stop carries only this. */
   private footerBlocks(): Block[] {
-    return this.footer ? [{ type: "divider" }, contextBlock(this.footer)] : [];
+    return this.footer ? [{ type: "divider" }, footerBlock(this.footer)] : [];
   }
 
   /**

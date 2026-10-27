@@ -257,7 +257,10 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   everything, and at a forced end). `ReplySink.showFooter` writes it at once and answers whether
   it landed; a reply keeps the first footer drawn on it. It goes under the reply's last message by a silent edit, or, when the end put its
   closing message off, it is all that message holds, in the post that notifies (see "280 seconds
-  pass first"). A reply whose end did not land takes none. A footer stays on its reply: a later
+  pass first"). Its line is a context block with `verbatim` on (`blocks.footerBlock`): by
+  default Slack turns the account's email into a `mailto:` link when the message is posted
+  (measured on desktop, 2026-10-27), and `verbatim` keeps the text as written while its bold
+  marks and its `<!date>` still draw. A reply whose end did not land takes none. A footer stays on its reply: a later
   end of the session draws its own under a newer reply. A closing message that held only the list
   is deleted with `chat.delete` when the list leaves it; the reply stays ended and no second
   closing message is posted. A footer drawn on such a reply later goes under its last body

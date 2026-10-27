@@ -537,7 +537,8 @@ export class ClaudeSession implements AgentSession {
 
   /**
    * The initialization result holds the models, the commands with their aliases and the mode the
-   * session started in (measured 2026-10-10 on SDK 0.3.296): nothing else is asked.
+   * session started in (measured 2026-10-10 on SDK 0.3.296), and the account it is logged in to
+   * (measured 2026-10-27 on SDK 0.3.310): nothing else is asked.
    */
   async info(): Promise<AgentInfo> {
     return agentInfo(await this.#ask(() => this.#query.initializationResult()));

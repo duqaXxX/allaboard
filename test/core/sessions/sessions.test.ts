@@ -4373,6 +4373,19 @@ test("the footer names the model that answered after a refusal of the session's 
   assert.ok((await session.status()).includes("Model: `Opus 4.8`"));
 });
 
+test("the footer ends on the account the agent reported at connect, and status adds its plan", async (t) => {
+  const account = { email: "alice@example.com", subscriptionType: "Claude Max" };
+  const h = harnessFor(t)({
+    turns: [sdkMessages("tools")],
+    info: infoOf({ commands: [], current_permission_mode: "default", account }),
+  });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.endsWith(" · alice@example.com"), statuses(h).at(-1));
+  assert.ok((await session.status()).includes("Account: `alice@example.com (Claude Max)`"));
+});
+
 const REFUSED_LOCAL: SessionEvent = {
   type: "model_refused",
   text: "A fork fell back.",

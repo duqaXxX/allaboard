@@ -334,7 +334,7 @@ test("a setup holds bypass to what was offered: an agent with no bypass mode get
 test("an agent that lists models and gave none offers no effort, and takes none", async (t) => {
   // The capability says the agent lists models; this session's list came back empty.
   const agent = new FakeAgentBackend([
-    { info: { models: [], commands: [], permissionMode: "default" } },
+    { info: { models: [], commands: [], permissionMode: "default", account: null } },
   ]);
   const world = await AskingWorld.make(t, { agent });
   const { ref, session } = world.thread();
@@ -835,7 +835,7 @@ test("a hold answer with a setup's id is refused, logged, and the setup stays an
 
 test("a setup of an agent with no models is still told from a hold", async (t) => {
   const agent = new FakeAgentBackend([
-    { info: { models: [], commands: [], permissionMode: "default" } },
+    { info: { models: [], commands: [], permissionMode: "default", account: null } },
   ]);
   const world = await AskingWorld.make(t, { agent });
   const { ref, session } = world.thread();

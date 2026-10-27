@@ -173,9 +173,12 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKCompactBoundaryMessage.compact_metadata` | `pre_tokens` | field | translate.ts: compactBoundary | package | none |
 | `SDKControlGetContextUsageResponse` | `model` | field | info.ts: contextUsage | reference | none |
 | `SDKControlGetContextUsageResponse` | `percentage` | field | info.ts: contextUsage | reference | none |
+| `SDKControlInitializeResponse` | `account` | field | info.ts: agentInfo | package | none |
 | `SDKControlInitializeResponse` | `commands` | field | info.ts: agentInfo | reference | none |
 | `SDKControlInitializeResponse` | `current_permission_mode` | field | info.ts: agentInfo | measured | none |
 | `SDKControlInitializeResponse` | `models` | field | info.ts: agentInfo | reference | P17 |
+| `SDKControlInitializeResponse.account` | `email` | field | info.ts: accountOf | package | none |
+| `SDKControlInitializeResponse.account` | `subscriptionType` | field | info.ts: accountOf | package | none |
 | `SDKMessage` | `subtype` | field | translate.ts: kindOf | package | none |
 | `SDKMessage` | `type` | field | translate.ts: kindOf | package | none |
 | `SDKMessageOrigin` | `kind` | field | translate.ts: result, user | reference | none |

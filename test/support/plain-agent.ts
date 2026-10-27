@@ -461,7 +461,7 @@ export class PlainSession implements AgentSession {
   }
 
   async info(): Promise<AgentInfo> {
-    return { models: [], commands: PLAIN_COMMANDS, permissionMode: PLAIN_MODE };
+    return { models: [], commands: PLAIN_COMMANDS, permissionMode: PLAIN_MODE, account: null };
   }
 
   async close(): Promise<void> {
