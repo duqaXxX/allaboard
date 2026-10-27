@@ -586,6 +586,15 @@ export type SessionEvent =
    */
   | { readonly type: "goal_changed"; readonly goal: GoalChange }
   /**
+   * The owner's stop hooks refused to let the turn end: `hooks` of them ran, and `errors` holds
+   * what each refusing one said (never empty). The agent goes on working in the same turn.
+   */
+  | {
+      readonly type: "stop_hook_blocked";
+      readonly hooks: number;
+      readonly errors: readonly string[];
+    }
+  /**
    * The jobs the agent has scheduled as of now, whole: the list replaces the one before, and an
    * empty one says the last job is gone (deleted, fired once, expired). Said when the agent
    * reports its list, not at the moment a job changes.

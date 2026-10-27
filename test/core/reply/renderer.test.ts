@@ -22,6 +22,7 @@ import {
   goalAchievedLine,
   resultSummary,
   type Sink,
+  stopHookLines,
   TurnRenderer,
   taskTitle,
   terminalStatus,
@@ -965,6 +966,34 @@ test("a goal the next prompt resumes says each failed check and its achievement"
   assert.ok(notMet > 0, "the failed check follows the prompt's own answer");
   assert.ok((resumed?.indexOf(achieved) ?? -1) > notMet);
   assert.ok(cleared?.startsWith("Goal cleared: "));
+});
+
+// A refusal of the owner's stop hooks comes from the session store between the text the turn
+// wrote before it and the text after (`stop-hook-block-store.json`, 2026-10-27).
+test("stop hooks that refused to end a turn are said in the terminal's words, where the turn is", async () => {
+  const events = recordedEvents("tools");
+  const end = events.findIndex((event) => event.type === "turn_ended");
+  const blocked: SessionEvent = { type: "stop_hook_blocked", hooks: 3, errors: ["say OSPREY"] };
+  const [sink] = await render([...events.slice(0, end), blocked, ...events.slice(end)]);
+  const reply = sink.texts.join("");
+  assert.ok(
+    reply.endsWith("Ran **3** stop hooks\n⎿ Stop hook error: say OSPREY"),
+    reply.slice(-80),
+  );
+  // An aside is drawn on one line with no markdown: the count's bold and the second line need a
+  // line of the reply.
+  assert.equal(
+    sink.asides.some((text) => text.includes("stop hook")),
+    false,
+  );
+});
+
+test("the stop hooks' lines name each refusal and count one hook alone", () => {
+  assert.equal(stopHookLines(1, ["a"]), "Ran **1** stop hook\n⎿ Stop hook error: a");
+  assert.equal(
+    stopHookLines(2, ["a", "b"]),
+    "Ran **2** stop hooks\n⎿ Stop hook error: a\n⎿ Stop hook error: b",
+  );
 });
 
 test("an achieved goal's line has the counts the agent gave", () => {

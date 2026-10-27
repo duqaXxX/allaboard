@@ -7,6 +7,11 @@
  * `Options.sessionStore` with `sessionStoreFlush: 'eager'` receives the same entries as they are
  * written. `SessionStoreEntry` is declared opaque ("CLI-internal"): the shape below was read off
  * real entries, recorded in `test/fixtures/sdk/goal-lifecycle-store.json`.
+ *
+ * The same store carries the one account of the owner's stop hooks that refused to end a turn,
+ * which the terminal draws from it: the `stop_hook_summary` entry. The stream says only the
+ * refusal's words (a `Stop hook feedback` user record), not how many hooks ran (measured
+ * 2026-10-27, SDK 0.3.310, `test/fixtures/sdk/stop-hook-block-store.json`).
  */
 
 import type { SessionStore } from "@anthropic-ai/claude-agent-sdk";
@@ -44,6 +49,28 @@ export function goalChange(entry: unknown): GoalChange | null {
 }
 
 /**
+ * A `stop_hook_summary` entry whose hooks refused to end the turn, as the event, or null for any
+ * other entry. Claude Code writes one after every Stop with output, a goal's check included, whose
+ * `hookErrors` is empty (measured 2026-10-27 on real transcripts): the terminal draws it only
+ * with errors, and so does this. The count leaves out the daemon's own Stop callback, which a
+ * terminal session does not run and the entry lists as `callback`.
+ */
+export function stopHookBlock(entry: unknown): SessionEvent | null {
+  if (!isRecord(entry) || entry.type !== "system" || entry.subtype !== "stop_hook_summary") {
+    return null;
+  }
+  const errors = Array.isArray(entry.hookErrors)
+    ? entry.hookErrors.map(words).filter((error) => error !== null)
+    : [];
+  const count = integer(entry.hookCount);
+  if (errors.length === 0 || count === null) return null;
+  const callbacks = Array.isArray(entry.hookInfos)
+    ? entry.hookInfos.filter((info) => isRecord(info) && info.command === "callback").length
+    : 0;
+  return { type: "stop_hook_blocked", hooks: Math.max(count - callbacks, 0), errors };
+}
+
+/**
  * A user or assistant entry of the conversation as the message it saves, or null for any other
  * entry. Each carries its `uuid` and an ISO `timestamp`, as on disk (read off the entries of
  * `test/fixtures/sdk/message-store.json`, recorded 2026-10-27, SDK 0.3.310).
@@ -56,11 +83,11 @@ export function savedMessage(entry: unknown): SavedMessage | null {
 }
 
 /**
- * The store a session is given: it keeps nothing, and hands each goal change of the main
- * transcript to `deliver` (a subagent's transcript has a `subpath`), and the last message of
- * each batch the session saved (what `turnsAfter` reads after). `load` answers that nothing
- * was stored, and a resume then reads the transcript Claude Code keeps on disk (measured
- * 2026-10-20, SDK 0.3.304; the contract of `load` does not say).
+ * The store a session is given: it keeps nothing, and hands each goal change and each refusal of
+ * the stop hooks of the main transcript to `deliver` (a subagent's transcript has a `subpath`),
+ * and the last message of each batch the session saved (what `turnsAfter` reads after). `load`
+ * answers that nothing was stored, and a resume then reads the transcript Claude Code keeps on
+ * disk (measured 2026-10-20, SDK 0.3.304; the contract of `load` does not say).
  */
 export function goalStore(deliver: (event: SessionEvent) => void): SessionStore {
   return {
@@ -70,6 +97,8 @@ export function goalStore(deliver: (event: SessionEvent) => void): SessionStore 
       for (const entry of entries) {
         const goal = goalChange(entry);
         if (goal !== null) deliver({ type: "goal_changed", goal });
+        const blocked = stopHookBlock(entry);
+        if (blocked !== null) deliver(blocked);
         saved = savedMessage(entry) ?? saved;
       }
       if (saved !== null) deliver({ type: "message_saved", message: saved });

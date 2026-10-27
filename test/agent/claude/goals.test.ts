@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { goalChange, goalStore } from "../../../src/agent/claude/goals.ts";
+import { goalChange, goalStore, stopHookBlock } from "../../../src/agent/claude/goals.ts";
 import type { SessionEvent } from "../../../src/agent/seam.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 
@@ -60,4 +60,43 @@ test("the store delivers the main transcript's changes, keeps nothing and loads 
   await sessionStore.append(key, ENTRIES as never);
   assert.equal(delivered.length, 5);
   assert.equal(await sessionStore.load(key), null);
+});
+
+// A project Stop hook that refused once, then let the turn end, on the entries a session store
+// received (`stop-hook-block-store.json`, SDK 0.3.310, 2026-10-27): the summary of the refusal
+// and the summary of the Stop that followed. Both list the daemon's own Stop callback.
+const BLOCK_ENTRIES = (
+  sdkJson("stop-hook-block-store") as Array<{ entries: JsonObject[] }>
+).flatMap((append) => append.entries);
+const REFUSAL = "PROBE-REASON-7731: reply with the single word OSPREY";
+
+test("only the stop_hook_summary of a refusal is an event, counted without the daemon's callback", () => {
+  const summaries = BLOCK_ENTRIES.filter((entry) => entry.subtype === "stop_hook_summary");
+  assert.equal(summaries.length, 2);
+  assert.deepEqual(
+    BLOCK_ENTRIES.map(stopHookBlock).filter((event) => event !== null),
+    [{ type: "stop_hook_blocked", hooks: 3, errors: [REFUSAL] }],
+  );
+});
+
+test("a goal's failed check writes no event of the stop hooks", () => {
+  // The summary a goal's check leaves has no error (measured 2026-10-27 on real transcripts):
+  // its line is the goal's own.
+  const summary = { type: "system", subtype: "stop_hook_summary", hookCount: 1, hookErrors: [] };
+  assert.equal(stopHookBlock(summary), null);
+  assert.equal(stopHookBlock({ ...summary, hookErrors: ["no"], hookCount: "1" }), null);
+});
+
+test("the store delivers a refusal of the stop hooks", async () => {
+  const delivered: SessionEvent[] = [];
+  const sessionStore = goalStore((event) => delivered.push(event));
+  const key = {
+    projectKey: "-home-dev-project",
+    sessionId: "68da9311-0000-4000-8000-000000000002",
+  };
+  await sessionStore.append(key, BLOCK_ENTRIES as never);
+  assert.deepEqual(
+    delivered.filter((event) => event.type === "stop_hook_blocked"),
+    [{ type: "stop_hook_blocked", hooks: 3, errors: [REFUSAL] }],
+  );
 });
