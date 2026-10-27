@@ -67,7 +67,13 @@ import type { Limiter } from "./reply/limiter.ts";
 import { positionOf, ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
 import { REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
-import { answeredBlocks, approvalBlocks, questionBlocks, shellBlocks } from "./requests.ts";
+import {
+  answeredBlocks,
+  approvalBlocks,
+  questionBlocks,
+  shellBlocks,
+  terminalBlocks,
+} from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 import type { RootEditor } from "./tag.ts";
 
@@ -174,6 +180,7 @@ export interface SlackChatOptions {
  * same-folder hold answer what he has just written in the thread, and he is there to answer them.
  */
 function waitsOnOwner(request: OwnerRequest): boolean {
+  if (request.type === "terminal") return false; // he has just written, as with a hold
   return asksOwner(request.type === "permission" ? "approval" : request.type);
 }
 
@@ -413,6 +420,9 @@ export class SlackChat implements ChatProvider {
     // escape shows literally inside code. Its only reader is `!status`, which only the owner sees
     // and which never pushes (`ownerOnly`), so a mention in it reaches no one.
     if (markup === "words") return text;
+    // A markdown block stores a mention sequence as one typed would: a zero-width space after
+    // its `<` stops it and shows nothing (`reply/escape.quietMentions`).
+    if (markup === "written") return quietMentions(text, true);
     return markup === "notice" ? mrkdwnEscape(text) : markdownEscape(text);
   }
 
@@ -816,6 +826,9 @@ export class SlackThread implements ThreadChat {
         break;
       case "shell":
         blocks = shellBlocks(requestId, request);
+        break;
+      case "terminal":
+        blocks = terminalBlocks(requestId, request);
         break;
     }
     // Slack for iOS hides the text of a stream still open once a message lands below it (#25):

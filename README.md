@@ -88,6 +88,7 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!bind <folder>` | Binds the channel to a project folder |
 | `!status` | Lists the channel's sessions; in a thread, shows that session's details |
 | `!stop` | Stops every session of the channel; in a thread, that one |
+| `!terminal` | Moves a thread's session to a terminal on your Mac, a running turn with it |
 | `!resume` | Lists the folder's sessions, the terminal's included, with a Resume button each |
 | `!bypass on` / `off` | Switches a session to `bypassPermissions` and back |
 | `!plan` / `!plan off` | Switches a session to plan mode and back |

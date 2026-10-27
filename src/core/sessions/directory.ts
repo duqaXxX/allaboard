@@ -157,6 +157,6 @@ export function untrustedLines(
 }
 
 /** A shell line as a code span, which cannot hold a backtick: such a line is plain text, escaped. */
-function commandShown(command: string, escapeMarkup: (text: string) => string): string {
+export function commandShown(command: string, escapeMarkup: (text: string) => string): string {
   return command.includes("`") ? escapeMarkup(command) : `\`${command}\``;
 }

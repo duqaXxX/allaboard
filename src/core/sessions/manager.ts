@@ -3,7 +3,7 @@
  * release for its delete, and the drain of a stop. How its waits are made is the header of
  * `session.ts`.
  */
-import type { ListedSession, Repository } from "../../agent/seam.ts";
+import type { ListedSession, Repository, SavedMessage } from "../../agent/seam.ts";
 import type { ThreadChat, ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import { bindableFolders } from "../folders.ts";
@@ -118,6 +118,8 @@ export class SessionManager {
     let session = this.sessions.get(key) ?? null;
     let predecessor: Event | null = null;
     let goal = this.goals.get(key) ?? null;
+    let saved: SavedMessage | null = null;
+    let allowed: string[] = [];
     if (session?.closed) {
       // Discarded as soon as closing has started, not once it finishes: a message must never
       // reach an object mid-teardown (every operation on it rejects with SessionClosed). The
@@ -126,6 +128,8 @@ export class SessionManager {
       this.sessions.delete(key);
       predecessor = session.doneClosing;
       goal = session.goal;
+      saved = session.saved;
+      allowed = [...session.terminalsAllowed];
       session = null;
     }
     if (session === null) {
@@ -135,6 +139,8 @@ export class SessionManager {
       });
       built.draining = this.draining;
       built.goal = goal;
+      built.saved = saved;
+      for (const id of allowed) built.terminalsAllowed.add(id);
       this.goals.delete(key);
       built.startsBlocked = this.startsBlocked;
       built.onClosed = () => this.evictIfCurrent(key, built);

@@ -2863,7 +2863,7 @@ test("status gives the command that forks the session in the terminal", async (t
   const lines = (await session.status()).split("\n");
   assert.equal(lines[1], `Session: \`${stored}\``);
   const folder = shellQuote(h.tmpPath);
-  assert.equal(lines[2], `Terminal: \`cd ${folder} && claude --resume ${stored} --fork-session\``);
+  assert.equal(lines[2], `Terminal: \`cd ${folder} && claude --resume ${stored}\``);
   assert.ok(lines[3]?.startsWith("Mode: "));
 });
 
@@ -2882,13 +2882,13 @@ test("status escapes a terminal command that holds a backtick for a reference", 
 });
 
 // The shell line of the Claude back end (`AgentWords.terminal`), written out.
-const TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
+const TERMINAL = "cd {directory} && claude --resume {session}";
 
 test("a terminal command holding a backtick is escaped text not a code span", () => {
   // A code span would end at the folder's backtick and the owner would copy half a command.
   // The escape is the chat's: this one marks what it was handed.
   const line = terminalLine(TERMINAL, "/work/my`proj", "0000-id", (text) => `<${text}>`);
-  assert.equal(line, "Terminal: <cd '/work/my`proj' && claude --resume 0000-id --fork-session>");
+  assert.equal(line, "Terminal: <cd '/work/my`proj' && claude --resume 0000-id>");
 });
 
 test("status leaves the terminal command out of a folder that cannot be used", async (t) => {

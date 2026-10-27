@@ -403,8 +403,11 @@ export interface ThreadChat {
  * is written for it (`ThreadChat.link`). `words` is a third kind that only `ChatProvider.escape`
  * takes: text the owner wrote, drawn inside a reference shown to the owner alone, as written: its
  * formatting, mentions and code live. A chat escapes only what would mis-render there.
+ * `written` is Markdown the owner or the agent wrote, drawn inside a reference others may be
+ * told of (a terminal's turn in its thread): its formatting and code live, its mentions
+ * notifying nobody.
  */
-export type Markup = "notice" | "reference" | "words";
+export type Markup = "notice" | "reference" | "words" | "written";
 
 /** What the controls of a session's setup hold: a model and an effort by value, and bypass. */
 export interface SetupSelection {
@@ -447,13 +450,30 @@ export interface ShellRequest {
   readonly folder: string;
 }
 
+/**
+ * The session is open in a terminal on the host. `open`: the terminal is idle, and the owner's
+ * message is sent here only if confirmed, since that terminal will not see it. `busy`: the
+ * terminal runs a turn, and the message waits for its end (a cancel only). `move`: `!terminal`
+ * would stop what still runs here (`running`, in the core's words), confirmed or cancelled.
+ */
+export interface TerminalRequest {
+  readonly type: "terminal";
+  readonly requestId: string;
+  readonly state: "open" | "busy" | "move";
+  /** What `!terminal` would stop, for `move`; null otherwise. */
+  readonly running: string | null;
+  /** The command that reopens the session in the terminal, for `open`; null otherwise. */
+  readonly command: string | null;
+}
+
 /** What `ThreadChat.ask` puts to the owner. */
 export type OwnerRequest =
   | PermissionRequest
   | QuestionRequest
   | HoldRequest
   | SetupRequest
-  | ShellRequest;
+  | ShellRequest
+  | TerminalRequest;
 
 /** The owner's answer to a request, by the request's type. */
 export type OwnerAnswer =
@@ -473,7 +493,9 @@ export type OwnerAnswer =
   /** The controls as the owner left them; the core checks them against what it offered. */
   | { readonly type: "setup"; readonly selection: SetupSelection }
   /** Whether the shell command runs. */
-  | { readonly type: "shell"; readonly run: boolean };
+  | { readonly type: "shell"; readonly run: boolean }
+  /** Whether to go on (send here, or move to the terminal); false cancels. */
+  | { readonly type: "terminal"; readonly go: boolean };
 
 /** A list a word posts in a channel, each row with a control of its own. */
 export type OwnerList =

@@ -6,6 +6,7 @@
  */
 import type { AgentBackend } from "../../agent/seam.ts";
 import type { ChatProvider, MessageId, ThreadChat, ThreadRef } from "../../chat/seam.ts";
+import type { Clock } from "../../clock.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { Holds } from "../hold.ts";
@@ -52,6 +53,8 @@ export interface FlowDeps {
   readonly stopped: AbortSignal;
   /** Wall-clock seconds. */
   readonly now: () => number;
+  /** The waits of a flow that looks again after a while; the system's when absent. */
+  readonly clock?: Clock;
   /** The update of the daemon; absent when the host gave it no way to update itself (`!allaboard`). */
   readonly updates?: Updates;
 }

@@ -156,6 +156,31 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
         return true;
       }
 
+      case "terminal": {
+        // The question is rewritten by whoever waits on it (`askOwner`'s `ends`), not removed.
+        const held = holds.get(requestId);
+        if (held === null || held.kind !== "terminal") {
+          logRefused("terminal decision", ref, message, {
+            go: given.go,
+            held: held !== null,
+            kind_matches: false,
+          });
+          await talk.tell(ref, texts.HOLD_GONE);
+          return false;
+        }
+        const resolved = holds.resolve(requestId, ref.channel, ref.thread, given.go ? true : null);
+        if (resolved === null) {
+          logRefused("terminal decision", ref, message, {
+            go: given.go,
+            held: true,
+            decided: held.decided,
+          });
+          await talk.tell(ref, texts.HOLD_GONE);
+          return false;
+        }
+        return true;
+      }
+
       case "setup": {
         const pending = holds.get(requestId);
         if (pending === null) {

@@ -10,11 +10,13 @@ import type {
   MessageId,
   SetupRequest,
   ShellRequest,
+  TerminalRequest,
   ThreadRef,
 } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import type { HoldAnswer, HoldKind, Pending } from "../hold.ts";
 import type { ThreadSession } from "../sessions/session.ts";
+import type { RequestKind } from "../state.ts";
 import * as texts from "../texts.ts";
 import { named } from "../texts.ts";
 import { type FlowDeps, isCancelled, logger, type Talk } from "./talk.ts";
@@ -24,10 +26,18 @@ export type Settle = (answer: HoldAnswer, shownAt: MessageId, pending: Pending) 
 
 /** The question to put: what to show, and what to do with the answer. */
 export interface Question {
-  /** Stored beside the message, for the crash repair. */
+  /** Which answer settles it; stored beside the message for the crash repair (`recorded`). */
   readonly kind: HoldKind;
   /** The request, given the id only its answer carries. */
-  readonly request: (requestId: string) => HoldRequest | SetupRequest | ShellRequest;
+  readonly request: (
+    requestId: string,
+  ) => HoldRequest | SetupRequest | ShellRequest | TerminalRequest;
+  /**
+   * The line the question becomes once answered, sent or not, in place of being removed: an
+   * edit, which notifies nobody. The owner is then not told `Not sent.` apart. A question a
+   * `!stop` or a drain removed is not rewritten.
+   */
+  readonly ends?: { readonly sent: string; readonly cancelled: string };
   /** The request in one line. */
   readonly title: string;
   readonly settle?: Settle;
@@ -88,7 +98,7 @@ export async function askOwner(
     // `holdStart`/`holdEnd` and leave the hold itself undiscarded; the message is already
     // live either way, so a failure is logged loudly.
     try {
-      state.addRequest(ref.channel, ref.thread, shownAt, question.kind);
+      state.addRequest(ref.channel, ref.thread, shownAt, recorded(question));
     } catch (error) {
       logger.error(
         `posted a hold in ${ref.channel}/${ref.thread} that state.json could not record: ${errorName(error)}`,
@@ -125,6 +135,45 @@ export async function askOwner(
     if (waiting) await session.holdEnd({ continued: sent });
     holds.discard(holdId); // catches a cancelled wait, and ends an answered hold
   }
+  if (question.ends !== undefined && !pending.cancelled) {
+    await endQuestion(
+      deps,
+      talk,
+      ref,
+      shownAt,
+      sent ? question.ends.sent : question.ends.cancelled,
+    );
+    return answer;
+  }
   if (answer === null) await talk.tell(ref, texts.NOT_SENT);
   return answer;
+}
+
+/** The kind `state.json` records for a question: a terminal's question is withdrawn like a hold. */
+function recorded(question: Question): RequestKind {
+  return question.kind === "terminal" ? "hold" : question.kind;
+}
+
+/** Rewrite an answered question into `line` and forget it for the crash repair; never throws. */
+async function endQuestion(
+  deps: FlowDeps,
+  talk: Talk,
+  ref: ThreadRef,
+  shownAt: MessageId,
+  line: string,
+): Promise<void> {
+  if (talk.stopped) return;
+  try {
+    await talk.thread(ref).rewrite(shownAt, line);
+  } catch (error) {
+    if (isCancelled(error)) throw error;
+    logger.warning(`could not rewrite an answered question in ${ref.channel}: ${errorName(error)}`);
+  }
+  try {
+    deps.state.removeRequest(ref.channel, ref.thread, shownAt);
+  } catch (error) {
+    logger.warning(
+      `could not clear an answered question from state.json in ${ref.channel}: ${errorName(error)}`,
+    );
+  }
 }

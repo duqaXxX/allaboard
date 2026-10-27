@@ -48,6 +48,8 @@ import type {
   AgentState,
   CommandInfo,
   ContextUsage,
+  ForeignTurn,
+  ForeignTurns,
   ModelInfo,
   PermissionAnswer,
   PermissionRequest,
@@ -55,6 +57,7 @@ import type {
   Question,
   QuestionAnswer,
   QuestionRequest,
+  SavedMessage,
   ScheduledJob,
   SessionEvent,
   ShellMode,
@@ -458,6 +461,14 @@ export class ThreadSession {
   // (`SessionManager.session`): a goal set before a restart is not known until its next check,
   // since a resumed agent says nothing of it before then (measured 2026-10-20).
   goal: string | null = null;
+  // The last message this session's own process saved (`message_saved`): what another process,
+  // a terminal, wrote after it is shown in the thread and resumed into (`flows/terminal.ts`).
+  // Memory only, handed on after a close as `goal` is; after a restart nothing is known, and
+  // the session resumes from the record, which holds whatever a terminal wrote.
+  saved: SavedMessage | null = null;
+  // The terminal processes the owner chose to write here beside (`Send here`), by holder id:
+  // he is asked once per terminal.
+  readonly terminalsAllowed = new Set<string>();
   // The jobs the agent last listed (`scheduled_jobs`) and when, on the clock of `deps.clock`.
   // Memory only (invariant 3): a resumed agent lists them again at its first turn's end.
   private jobs: readonly ScheduledJob[] = [];
@@ -1335,6 +1346,61 @@ export class ThreadSession {
     return this.ensureConnected();
   }
 
+  /**
+   * Before the owner's message reaches the session: the turns another process, a terminal,
+   * wrote after the last message this session saved. When something was, the live process,
+   * which never sees it, is closed, so the next connect resumes the record with it (a process
+   * that loaded the session before would branch it, measured 2026-10-27). Not while a turn or
+   * background work runs here, which the close would cut: the turns are still shown. Empty
+   * when the agent cannot tell, or nothing was written.
+   */
+  async takeForeignTurns(): Promise<readonly ForeignTurn[]> {
+    const { agent } = this.deps;
+    const saved = this.saved;
+    const sessionId = this.deps.state.thread(this.channelId, this.threadId)?.sessionId ?? null;
+    if (!agent.capabilities.foreignTurns || agent.turnsAfter === undefined) return [];
+    if (saved === null || sessionId === null || this.busy) return [];
+    let found: ForeignTurns;
+    try {
+      found = await agent.turnsAfter(this.directory, sessionId, saved);
+    } catch (error) {
+      logger.warning(`could not read what a terminal wrote in ${this.where}: ${errorName(error)}`);
+      return [];
+    }
+    if (!found.changed) return [];
+    if (found.last !== null) this.saved = found.last;
+    // Decided under the connect lock, after the read: a turn the agent opened by itself
+    // meanwhile (a report, a loop's run) is never cut, and no start runs beside the close.
+    const release = await this.connectLock.acquire();
+    try {
+      if (this.client !== null && this.idle && !this.injectedExpected && !this.reporting) {
+        await this.dropClientLocked();
+      }
+    } finally {
+      release();
+    }
+    return found.turns;
+  }
+
+  /**
+   * Under the `!status` line that opens the session in the terminal: what writing there now
+   * would split, while a turn or background work runs here (two processes on one session
+   * branch it, measured 2026-10-27).
+   */
+  private terminalWarnings(): string[] {
+    const warnings: string[] = [];
+    if (this.busy) {
+      warnings.push(
+        this.deps.agent.words.terminalContinue === null
+          ? texts.STATUS_TERMINAL_TURN
+          : texts.STATUS_TERMINAL_TURN_MOVE,
+      );
+    }
+    const running = this.runningKindsOf();
+    if (running) warnings.push(texts.fill(texts.STATUS_TERMINAL_BACKGROUND, { counts: running }));
+    return warnings;
+  }
+
   private async dropClient(): Promise<void> {
     const release = await this.connectLock.acquire();
     try {
@@ -1468,6 +1534,86 @@ export class ThreadSession {
     // drops the persisted ⏳.
     this.react("done", { byOwner: true });
     return true;
+  }
+
+  /** What still runs here in the background (`1 shell · 2 agents`), or empty. */
+  get stillRunning(): string {
+    return this.runningKindsOf();
+  }
+
+  /**
+   * `!terminal`: close this session's process so a terminal takes the session up. A turn
+   * running here is cut by the close without an interrupt, so the terminal continues it by
+   * itself (the agent's `words.terminalContinue`); its reply ends with a line saying where it
+   * went, and the messages queued behind it are not sent. Background work ends with the
+   * process, drawn as `!stop` draws it. The session keeps its thread, id, bypass and effort:
+   * the next message resumes it. `cut` when a turn was cut, `idle` otherwise.
+   */
+  async moveToTerminal(): Promise<"cut" | "idle"> {
+    const hold = this.deps.holds.cancel(this.channelId, this.threadId);
+    if (hold !== null) await this.deleteRequest(hold.messageTs);
+    // Work on its way to the agent is work to cut too: a turn taken or queued, a start in
+    // progress, a shell command of the owner's, whose end would start a process again.
+    const sending =
+      this.taken !== null ||
+      !this.queue.empty ||
+      this.pendingSubmits > 0 ||
+      this.shellStop !== null;
+    const client = this.client;
+    if (!this.busy && !sending) {
+      if (client === null) return "idle";
+      const tasks = this.background ? this.runningTaskIds() : [];
+      if (tasks.length > 0 && (await this.endWithProcess(client, tasks))) {
+        this.react("done", { byOwner: true });
+        return "idle";
+      }
+      const release = await this.connectLock.acquire();
+      try {
+        if (this.idle) {
+          await this.dropClientLocked();
+          return "idle";
+        }
+      } finally {
+        release();
+      }
+    }
+    // A turn that started while the idle path waited for the lock is cut too, and said so.
+    const cut = this.busy;
+    this.agentState = null;
+    // (sync) As a stop: no handler's `finally` shows working over the end below.
+    this.interrupting = true;
+    this.shellStop?.abort();
+    const requests = this.requestMessages();
+    try {
+      // The worker waits on the cut turn (or holds the connect lock through a start) and the
+      // reader would draw what the process still says: both go before the process does, which
+      // then ends with the turn unfinished. Cancelled again under the lock, as `close` does: a
+      // start that finished meanwhile left a reader.
+      await this.cancelTasks();
+      const release = await this.connectLock.acquire();
+      try {
+        await this.cancelTasks();
+        await this.dropClientLocked();
+      } finally {
+        release();
+      }
+      // Answered once the process is gone, so no denial reaches the turn the terminal continues.
+      await this.settleRequests(requests);
+      const taken = this.taken;
+      this.taken = null;
+      const unsent = taken === null ? [] : [taken];
+      while (!this.queue.empty) unsent.push(this.queue.getNowait());
+      await this.abandon(cut ? texts.MOVED_TO_TERMINAL : texts.MOVED_BEFORE_SENT, {
+        more: unsent,
+        because: texts.BECAUSE_MOVED,
+      });
+      await this.leaveLoop().catch(() => {});
+    } finally {
+      this.interrupting = false;
+      this.react("done", { byOwner: true });
+      this.idleTimerCheck();
+    }
+    return cut ? "cut" : "idle";
   }
 
   /**
@@ -1681,6 +1827,7 @@ export class ThreadSession {
         terminalLine(this.deps.agent.words.terminal, this.directory, sessionId, (text) =>
           this.deps.chat.escape(text, "reference"),
         ),
+        ...this.terminalWarnings(),
       );
     if (title) {
       head.push(
@@ -2163,6 +2310,8 @@ export class ThreadSession {
         return declared.declaredState ? null : "declaredState";
       case "limits_changed":
         return declared.usageLimits ? null : "usageLimits";
+      case "message_saved":
+        return declared.foreignTurns ? null : "foreignTurns";
       case "model_changed":
         return declared.models ? null : "models";
       case "goal_changed":
@@ -2248,6 +2397,9 @@ export class ThreadSession {
         return;
       case "folder_changed":
         this.workingDirectory = event.folder;
+        return;
+      case "message_saved":
+        this.saved = event.message;
         return;
       case "scheduled_jobs":
         this.jobs = event.jobs;

@@ -27,6 +27,7 @@ import {
   questionView,
   refusedView,
   SHELL_RUN,
+  TERMINAL_GO,
 } from "../requests.ts";
 import { readChoice, readSelection, setupBlocks } from "../setup.ts";
 import * as slackTexts from "../texts.ts";
@@ -127,6 +128,22 @@ export class Requests {
       { channel, thread: threadTs },
       str(action.value),
       { type: "shell", run: action.action_id === SHELL_RUN },
+      text(record(body.message).ts),
+    );
+  };
+
+  /** Send here, Stop them and move, or Cancel: the buttons of a question about the terminal. */
+  onTerminalDecision = async (ack: Ack, body: Payload): Promise<void> => {
+    await ack();
+    const [user, team] = interactionActor(body);
+    const channel = text(record(body.channel).id);
+    const threadTs = clickThread(body);
+    if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
+    const action = firstAction(body);
+    await this.parts.inbound.answer(
+      { channel, thread: threadTs },
+      str(action.value),
+      { type: "terminal", go: action.action_id === TERMINAL_GO },
       text(record(body.message).ts),
     );
   };

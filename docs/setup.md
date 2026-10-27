@@ -840,7 +840,7 @@ That instance then reads the settings of `~/.claude-work`, not those of `~/.clau
 be set there. Its sessions are written there as well, so in a terminal `claude --resume <id>`
 finds them only with the same variable: `CLAUDE_CONFIG_DIR=~/.claude-work claude --resume <id>`.
 The command `!status` prints carries it: `cd <folder> && CLAUDE_CONFIG_DIR=<folder of the login>
-claude --resume <session id> --fork-session`, the login's folder quoted for the shell as the
+claude --resume <session id>`, the login's folder quoted for the shell as the
 project folder is. The default instance, and any instance whose `.env` does not set it, keep using
 `~/.claude`, and its line is the one shown in "Continuing a session in the terminal".
 
@@ -923,26 +923,46 @@ and out of `claude --continue`; it resumes one only by its id
 Slack is such a session. `!status`, typed in the session's thread, shows the command to run:
 
 ```
-Terminal: `cd <folder> && claude --resume <session id> --fork-session`
+Terminal: `cd <folder> && claude --resume <session id>`
 ```
 
-`--fork-session` continues in a copy with a session id of its own. The copy is a terminal
-session, so the picker lists it from then on (row "Fork listed in the terminal's picker" of
-[Measured platform behaviour](architecture.md#measured-platform-behaviour)). The thread stays on the session it had and sees nothing of what the
-copy does afterwards. To bring the copy into Slack, send `!resume` in the channel: it opens in a
-new thread. Slack does not look for the copy by itself: the thread never moves to it, and
-nothing in the thread says that one exists.
+The terminal continues the thread's own session, on the same id: what it does is in the session
+when you come back to the thread. Write from one side at a time. Two processes on one session
+do not see each other's messages, and the second to write splits the conversation; a later
+resume continues one side only (measured 2026-10-27, Claude Code 2.1.311). Opening the session
+in the terminal and closing it without writing changes nothing.
 
-Keep `--fork-session` in the command. Without it the terminal resumes the thread's own session,
-and two processes on one session interleave their messages into one transcript (same
-reference); the next message sent in the thread would do that while the terminal is still open.
+Before a message you send in the thread reaches the session, allaboard asks Claude Code which
+processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_CONFIG_DIR`):
+
+- A terminal running a turn: your message waits, under `⏳ This session is running a turn in a
+  terminal. Your message waits here until that turn ends.` with a **Cancel** button, and goes on
+  when the turn ends.
+- A terminal open and idle: allaboard asks once per terminal, `⚠️ This session is also open in a
+  terminal. If you send this here, that terminal will not see it: before writing there, close it
+  and run <command> again.`, with **Send here** and **Cancel**. The question becomes `Sent here.`
+  or `Not sent.`
+- The turns the terminal wrote since the thread's last message come first, one message each:
+  `🖥 In the terminal:`, your prompt after `›`, then Claude's last reply of that turn. The
+  session's process is then started again, so that it reads them.
+
+A terminal left open does not read what you write in Slack: close it and run the command again
+before writing there. `/resume <session id>` inside it does not reload a session started from
+Slack, which the picker does not list.
+
+`!terminal`, sent in the thread, moves the session to the terminal and answers with the command.
+A turn running in the thread is cut there without an interrupt and continues in the terminal by
+itself: the command adds `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`, the command that was running
+stops and Claude runs it again there, and the reply ends with `Moved to the terminal, which
+continues this turn.` Background work running in the thread stops with it, so `!terminal` first
+asks `⚠️ Moving to the terminal stops what still runs here: <tasks>.` with **Stop them and move**
+and **Cancel**. While a turn or background work runs, `!status` says under the command that
+writing in the terminal now splits the session.
 
 The line shows as soon as the thread has a session id, which Claude Code reports when the first
-turn starts; a fork made while a turn runs copies the conversation as it stands, with a tool call
-still running marked as cut off. It is left out when the thread's folder is missing, unreadable
-or not trusted, with the reason at the end of the status. `claude --resume <session id>` finds
-the session from any folder (Claude Code 2.1.223 or later); the `cd` makes the copy work in the
-thread's folder, which is where the picker and `!resume` in the channel then list it.
+turn starts. It is left out when the thread's folder is missing, unreadable or not trusted, with
+the reason at the end of the status. `claude --resume <session id>` finds the session from any
+folder (Claude Code 2.1.223 or later); the `cd` makes it work in the thread's folder.
 
 ### Tagging a thread
 
@@ -1161,6 +1181,7 @@ a `!` is never a command.
 | `!plan` / `!plan off` | Refused | Switches that session to plan mode and back |
 | `!status` | The channel's directory and its threads that hold a session | That session's details |
 | `!stop` | Stops every running session of the channel | Stops that session |
+| `!terminal` | Refused | Moves that session to a terminal, a running turn with it, and gives the command to run there |
 | `!help [text]` | Lists allaboard's own words | Lists them and the session's commands |
 | `!open` | Refused | Opens a file picker |
 | `!open <path or words>` | Refused | Shares that file into the thread |

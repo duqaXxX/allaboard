@@ -249,6 +249,13 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
           held = session;
         }
       }
+      // A terminal on the host that holds the same session: its turn waited out, the owner asked
+      // once whether to write here beside it, and what it wrote shown before the reply.
+      if (!session.neverRan) {
+        if (!(await others.terminal.beforeSending(ref, session))) return;
+        // a Send here left the waiting mark for the submit below, as a Continue does
+        held = session;
+      }
       // Retried once against a freshly looked-up session: the one this call was handed can
       // still close under it (most likely the idle close, though `touch()` at the lookup
       // already guards the common case) during the read above or the steps below.

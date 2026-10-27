@@ -256,6 +256,13 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
           }
         }
         return;
+      case "terminal":
+        if (session === null) {
+          await talk.inChannel(channel, texts.TERMINAL_TOP_LEVEL);
+        } else {
+          await others.terminal.move(ref, session);
+        }
+        return;
       case "open":
         if (session === null) {
           await talk.inChannel(channel, texts.OPEN_TOP_LEVEL);

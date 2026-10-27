@@ -59,6 +59,7 @@ const OTHER_AGENT = {
     login: "enter",
     logout: "leave",
     terminal: "cd {directory} && other --resume {session}",
+    terminalContinue: null,
     trust: null,
     notOffered: {},
     goalClear: null,

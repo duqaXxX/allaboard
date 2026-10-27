@@ -42,6 +42,11 @@ export interface Stop {
   readonly kind: "stop";
 }
 
+/** `!terminal`: the session moves to a terminal on the host, a running turn with it. */
+export interface Terminal {
+  readonly kind: "terminal";
+}
+
 export interface Resume {
   readonly kind: "resume";
   /** A session id or name; empty lists the sessions. */
@@ -105,6 +110,7 @@ export type Word =
   | Plan
   | Status
   | Stop
+  | Terminal
   | Resume
   | Open
   | Tag
@@ -124,6 +130,7 @@ export const WORD = {
   plan: "plan",
   status: "status",
   stop: "stop",
+  terminal: "terminal",
   resume: "resume",
   open: "open",
   tag: "tag",
@@ -199,6 +206,9 @@ export function parseBang(text: string): Command | null {
       break;
     case "stop":
       if (rest === "") return { kind: "stop" };
+      break;
+    case "terminal":
+      if (rest === "") return { kind: "terminal" };
       break;
     case "resume":
       return { kind: "resume", target: rest };
