@@ -18,6 +18,10 @@ All notable changes to this project are documented here. The format follows
 - An Edit or Write preview you had opened closed again each time its reply was edited, on Slack's
   desktop and iOS apps (#27). Each preview's container now keeps one block id for the life of its
   message, and stays open.
+- A run of shell commands whose command ran long enough to be timed lost that command's line: the
+  card counted it (`Ran 2 shell commands`) but listed only the others, and a run made of that
+  command alone ended as a grey line instead of a card (#97); while the reply was written, the
+  card could list its earlier commands twice. The line now stays when the command ends.
 
 ## [0.12.0] - 2026-10-26
 

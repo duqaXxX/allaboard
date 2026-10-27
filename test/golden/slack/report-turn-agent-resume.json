@@ -29,13 +29,25 @@
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 15",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "REPORTED\nPINEAPPLE\n\nKIWI",
@@ -57,7 +69,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "details": "$ sleep 15",
+     "id": "fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
   ],
   "message_texts": [
    "**Agent**(Test background agent)\n⎿ Running in background\n\nSTARTED\n\nNOTED\n\n⎿ Resuming agent a0d6cae\n\nSENT\n\nREPORTED\nPINEAPPLE\n\nKIWI"
@@ -284,13 +303,25 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 15",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "REPORTED\nPINEAPPLE\n\nKIWI",
@@ -333,13 +364,25 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "block_id": "task-fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ sleep 15",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
      },
      {
       "text": "REPORTED\nPINEAPPLE\n\nKIWI",

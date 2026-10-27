@@ -33,13 +33,25 @@
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "Ran 1 shell command",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "block_id": "task-fold:toolu_01JTnajtU3fJhEjrcoTjZxN8",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ sleep 15",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01JTnajtU3fJhEjrcoTjZxN8",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
     },
     {
      "text": "REPORTED\n\nKIWI",
@@ -65,6 +77,12 @@
     {
      "details": "$ sleep 20",
      "id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    },
+    {
+     "details": "$ sleep 15",
+     "id": "fold:toolu_01JTnajtU3fJhEjrcoTjZxN8",
      "status": "complete",
      "title": "Ran 1 shell command"
     }
@@ -244,37 +262,13 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "REPORTED\n\nKIWI",
-      "type": "markdown"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "STARTED",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
-  },
-  {
-   "after_sink_call": 10,
-   "args": {
-    "blocks": [
-     {
-      "block_id": "task-fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+      "block_id": "task-fold:toolu_01JTnajtU3fJhEjrcoTjZxN8",
       "details": {
        "elements": [
         {
          "elements": [
           {
-           "text": "$ sleep 20",
+           "text": "$ sleep 15",
            "type": "text"
           }
          ],
@@ -284,26 +278,9 @@
        "type": "rich_text"
       },
       "status": "complete",
-      "task_id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
+      "task_id": "fold:toolu_01JTnajtU3fJhEjrcoTjZxN8",
       "title": "Ran 1 shell command",
       "type": "task_card"
-     },
-     {
-      "text": "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background",
-      "type": "markdown"
-     },
-     {
-      "text": "STARTED",
-      "type": "markdown"
-     },
-     {
-      "elements": [
-       {
-        "text": "Ran 1 shell command",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
      },
      {
       "text": "REPORTED\n\nKIWI",

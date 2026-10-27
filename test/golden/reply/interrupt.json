@@ -24,7 +24,7 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ python3 -c 'import time; time.sleep(30)'",
       "folded": null,
       "id": "toolu_014RM24vF5EeUNHQ57579Vma",
       "message": false,
@@ -72,7 +72,7 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ python3 -c 'import time; time.sleep(30)'",
      "folded": null,
      "id": "toolu_014RM24vF5EeUNHQ57579Vma",
      "message": false,

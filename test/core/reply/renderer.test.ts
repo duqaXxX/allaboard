@@ -86,9 +86,24 @@ class RecordingSink implements Sink {
   }
 }
 
-async function render(events: readonly SessionEvent[]): Promise<[RecordingSink, TurnRenderer]> {
+async function render(
+  events: readonly SessionEvent[],
+  now?: () => number,
+): Promise<[RecordingSink, TurnRenderer]> {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer(sink, NAMES);
+  const renderer =
+    now === undefined
+      ? new TurnRenderer(sink, NAMES)
+      : new TurnRenderer(
+          sink,
+          NAMES,
+          null,
+          true,
+          () => false,
+          (id) => id,
+          () => false,
+          now,
+        );
   for (const event of events) await renderer.feed(event);
   await renderer.close();
   await renderer.closeOut();
@@ -173,6 +188,18 @@ test("a long command in the foreground stays a call line", async () => {
   assert.ok(!sink.tasks.some((t) => t.task || t.details === BACKGROUND));
   assert.equal(sink.tasks.at(-1)?.status, "complete");
   assert.deepEqual(renderer.runningTasks, []);
+});
+
+test("a long command in the foreground keeps its command line when its task ends (#97)", async () => {
+  // foreground.jsonl: the task's end comes before the call's result. The command line is what a
+  // run's card lists once the call has ended, so no end of the task may clear it.
+  const events = recordedEvents("foreground");
+  const [call] = topLevelToolIds(events);
+  const [sink] = await render(events, () => 0);
+  const history = sink.tasks.filter((t) => t.id === call);
+  assert.ok(history.length > 0);
+  assert.ok(history.every((t) => t.details !== null && t.details === history[0]?.details));
+  assert.equal(history.at(-1)?.status, "complete");
 });
 
 test("a call whose task outlives its result stays a call line that completes", async () => {
