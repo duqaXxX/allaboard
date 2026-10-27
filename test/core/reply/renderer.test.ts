@@ -1938,3 +1938,26 @@ test("a subagent's words are a card of the daemon's, closed on its title and ope
   // A task's card: not folded among the calls.
   assert.equal(card?.task, true);
 });
+
+test("an ending that stops the calls draws a call still running as stopped (#10)", async () => {
+  // `!terminal` cuts a turn by closing its process: the call that ran is not ended well.
+  const foreground = recordedEvents("foreground");
+  const started = foreground.findIndex((event) => event.type === "call_started");
+  const running = foreground.slice(0, started + 1);
+  for (const callsStopped of [true, false]) {
+    const sink = new RecordingSink();
+    const renderer = new TurnRenderer(sink, NAMES);
+    for (const event of running) await renderer.feed(event);
+    await renderer.feedEnding("Moved to the terminal, which continues this turn.", {
+      callsStopped,
+    });
+    await renderer.close();
+    const closed = sink.finished ?? [];
+    assert.ok(closed.length > 0);
+    assert.equal(
+      closed.every((update) => update.output === STOPPED),
+      callsStopped,
+      `callsStopped ${callsStopped}`,
+    );
+  }
+});

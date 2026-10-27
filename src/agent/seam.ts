@@ -157,9 +157,13 @@ export interface SavedMessage {
   readonly at: number;
 }
 
-/** A turn another process wrote to a session: the owner's prompt and the final reply, if any. */
+/**
+ * A turn another process wrote to a session: the owner's prompt and the final reply, if any. A
+ * null prompt is a turn that began before (one the daemon's process was closed during), which
+ * that process went on with by itself.
+ */
 export interface ForeignTurn {
-  readonly prompt: string;
+  readonly prompt: string | null;
   readonly reply: string | null;
 }
 

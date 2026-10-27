@@ -151,11 +151,16 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
     await talk.tell(ref, text, { stays: true });
   }
 
-  /** One terminal turn as the thread shows it: the owner's prompt, then the final reply. */
-  function turnText(prompt: string, reply: string | null): string {
+  /**
+   * One terminal turn as the thread shows it: the owner's prompt, then the final reply; a turn
+   * the terminal went on with by itself (no prompt), its final reply.
+   */
+  function turnText(prompt: string | null, reply: string | null): string {
+    const written = reply === null ? null : chat.escape(reply, "written");
+    if (prompt === null) return fill(texts.TERMINAL_TURN_WENT_ON, { reply: written ?? "" });
     const shown = { prompt: chat.escape(prompt, "written") };
-    if (reply === null) return fill(texts.TERMINAL_TURN_UNANSWERED, shown);
-    return fill(texts.TERMINAL_TURN, { ...shown, reply: chat.escape(reply, "written") });
+    if (written === null) return fill(texts.TERMINAL_TURN_UNANSWERED, shown);
+    return fill(texts.TERMINAL_TURN, { ...shown, reply: written });
   }
 
   async function beforeSending(ref: ThreadRef, session: ThreadSession): Promise<boolean> {

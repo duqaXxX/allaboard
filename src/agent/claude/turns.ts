@@ -58,23 +58,37 @@ export function promptOf(message: SessionMessage): string | null {
 
 /**
  * The messages after the saved one, as turns: each opened by a prompt the owner typed, with the
- * last text the agent wrote in it. A turn opened by anything else (a notification) is left out.
+ * last text the agent wrote in it. What the agent wrote before any such prompt is the turn the
+ * saved message was part of, going on: a turn the terminal took up by itself after the daemon's
+ * process was closed during it, whose prompt (`Continue from where you left off.`) Claude Code
+ * marks `isMeta`, so `getSessionMessages` leaves it out (measured 2026-10-27, Claude Code
+ * 2.1.311). It comes first, with a null prompt. A turn opened by anything else (a notification)
+ * is left out.
  */
 export function turnsOf(messages: readonly SessionMessage[]): ForeignTurn[] {
-  const turns: { prompt: string | null; reply: string | null }[] = [];
+  const going: { prompt: string | null; reply: string | null; shown: boolean } = {
+    prompt: null,
+    reply: null,
+    shown: true,
+  };
+  const turns = [going];
   for (const message of messages) {
     if (message.type === "user") {
       if (hasToolResult(isRecord(message.message) ? message.message.content : null)) continue;
-      turns.push({ prompt: promptOf(message), reply: null });
-    } else if (message.type === "assistant" && turns.length > 0 && isRecord(message.message)) {
+      const prompt = promptOf(message);
+      turns.push({ prompt, reply: null, shown: prompt !== null });
+    } else if (message.type === "assistant" && isRecord(message.message)) {
       const text = texts(message.message.content, "text");
       const turn = turns.at(-1);
       if (turn !== undefined && text !== null && text.trim() !== "") turn.reply = text;
     }
   }
-  return turns.flatMap((turn) =>
-    turn.prompt === null ? [] : [{ prompt: turn.prompt, reply: turn.reply }],
-  );
+  return turns.flatMap((turn) => {
+    if (!turn.shown) return [];
+    // The turn going on shows only when it wrote something.
+    if (turn === going && turn.reply === null) return [];
+    return [{ prompt: turn.prompt, reply: turn.reply }];
+  });
 }
 
 export interface TurnsOptions {

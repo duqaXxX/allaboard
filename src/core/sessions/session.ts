@@ -469,6 +469,9 @@ export class ThreadSession {
   // The terminal processes the owner chose to write here beside (`Send here`), by holder id:
   // he is asked once per terminal.
   readonly terminalsAllowed = new Set<string>();
+  // `!terminal` cut a turn here: what the terminal wrote before any typed prompt is that turn
+  // going on, and only then is it shown as such (`takeForeignTurns`). Handed on after a close.
+  movedMidTurn = false;
   // The jobs the agent last listed (`scheduled_jobs`) and when, on the clock of `deps.clock`.
   // Memory only (invariant 3): a resumed agent lists them again at its first turn's end.
   private jobs: readonly ScheduledJob[] = [];
@@ -1369,6 +1372,12 @@ export class ThreadSession {
     }
     if (!found.changed) return [];
     if (found.last !== null) this.saved = found.last;
+    // A turn going on with no typed prompt is shown only after a move cut one: anything else
+    // with no prompt before it is this process's own, saved late.
+    const turns = this.movedMidTurn
+      ? found.turns
+      : found.turns.filter((turn) => turn.prompt !== null);
+    this.movedMidTurn = false;
     // Decided under the connect lock, after the read: a turn the agent opened by itself
     // meanwhile (a report, a loop's run) is never cut, and no start runs beside the close.
     const release = await this.connectLock.acquire();
@@ -1379,7 +1388,7 @@ export class ThreadSession {
     } finally {
       release();
     }
-    return found.turns;
+    return turns;
   }
 
   /**
@@ -1606,8 +1615,10 @@ export class ThreadSession {
       await this.abandon(cut ? texts.MOVED_TO_TERMINAL : texts.MOVED_BEFORE_SENT, {
         more: unsent,
         because: texts.BECAUSE_MOVED,
+        callsStopped: true,
       });
       await this.leaveLoop().catch(() => {});
+      if (cut) this.movedMidTurn = true;
     } finally {
       this.interrupting = false;
       this.react("done", { byOwner: true });
@@ -4129,12 +4140,15 @@ export class ThreadSession {
       readonly error?: boolean;
       readonly more?: readonly Turn[];
       readonly because?: string;
+      /** The calls still running are drawn stopped: the owner cut them (`!terminal`). */
+      readonly callsStopped?: boolean;
     } = {},
   ): Promise<boolean> {
     const {
       error = false,
       more = [],
       because = texts.named(texts.BECAUSE_STOPPED, this.names),
+      callsStopped = false,
     } = options;
     // (sync) The turn, the sent prompts and every flag of a turn in progress are taken before
     // the first write: whatever reads the session meanwhile sees it with no turn.
@@ -4195,7 +4209,7 @@ export class ThreadSession {
       }
       if (active !== null) {
         try {
-          if (!whole) await active.renderer.feedEnding(line);
+          if (!whole) await active.renderer.feedEnding(line, { callsStopped });
           if (dropped.length > 0) await active.renderer.feedError(notSent(dropped, because));
           await this.feedEndNotes(active.renderer);
           await this.closeReply(active.renderer, { force: true });

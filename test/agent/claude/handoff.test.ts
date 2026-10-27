@@ -306,3 +306,42 @@ test("the back end runs the list for its login, and continues a cut turn with th
   );
   await backend.close();
 });
+
+test("what the agent wrote before any typed prompt is the turn going on, shown first", () => {
+  // As `getSessionMessages` returned it after `!terminal` cut a turn and the terminal took it
+  // up by itself (Claude Code 2.1.311, 2026-10-27): its `isMeta` prompt is left out.
+  const turns = turnsOf([
+    user("u1", [{ type: "tool_result", tool_use_id: "t1", content: "Exit code 137" }]),
+    assistant("a1", [{ type: "thinking", thinking: "", signature: "s" }]),
+    assistant("a2", [{ type: "text", text: "The command was killed. I'll run it once more." }]),
+    assistant("a3", [{ type: "tool_use", id: "t2", name: "Bash", input: {} }]),
+    user("u2", [{ type: "tool_result", tool_use_id: "t2", content: "" }]),
+    assistant("a4", [{ type: "text", text: "FINISHED" }]),
+    user("u3", "And now?"),
+    assistant("a5", [{ type: "text", text: "Here." }]),
+  ]);
+  assert.deepEqual(turns, [
+    { prompt: null, reply: "FINISHED" },
+    { prompt: "And now?", reply: "Here." },
+  ]);
+  // nothing written before the first prompt: no turn going on
+  assert.deepEqual(
+    turnsOf([user("u4", "Hi"), assistant("a6", [{ type: "text", text: "Hello" }])]),
+    [{ prompt: "Hi", reply: "Hello" }],
+  );
+});
+
+test("a notification's turn right after the turn going on joins neither", () => {
+  const turns = turnsOf([
+    user("u1", [{ type: "tool_result", tool_use_id: "t1", content: "Exit code 137" }]),
+    assistant("a1", [{ type: "text", text: "FINISHED" }]),
+    user("u2", "<task-notification>\n<status>completed</status>"),
+    assistant("a2", [{ type: "text", text: "The background command finished." }]),
+    user("u3", "Typed"),
+    assistant("a3", [{ type: "text", text: "Answered." }]),
+  ]);
+  assert.deepEqual(turns, [
+    { prompt: null, reply: "FINISHED" },
+    { prompt: "Typed", reply: "Answered." },
+  ]);
+});

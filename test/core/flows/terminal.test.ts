@@ -130,9 +130,11 @@ test("a cancelled wait for a terminal's turn sends nothing", async (t) => {
 test("the turns a terminal wrote come first, one message each", async (t) => {
   const { world, agent, ref, session } = await makeWorld(t);
   session.saved = { id: "m1", at: 1 };
+  session.movedMidTurn = true; // `!terminal` cut a turn here
   agent.foreign.set(SESSION, {
     changed: true,
     turns: [
+      { prompt: null, reply: "FINISHED" },
       { prompt: "Rename the helper", reply: "Renamed it." },
       { prompt: "Still there?", reply: null },
     ],
@@ -141,6 +143,7 @@ test("the turns a terminal wrote come first, one message each", async (t) => {
   assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
   assert.deepEqual(agent.foreignAsked, [`${SESSION} m1`]);
   assert.deepEqual(after(world, ref), [
+    fill(texts.TERMINAL_TURN_WENT_ON, { reply: "FINISHED" }),
     fill(texts.TERMINAL_TURN, { prompt: "Rename the helper", reply: "Renamed it." }),
     fill(texts.TERMINAL_TURN_UNANSWERED, { prompt: "Still there?" }),
   ]);
@@ -187,4 +190,23 @@ test("a list that cannot be read keeps a wait going", async (t) => {
   assert.equal(world.open(ref).length, 1, "still waiting");
   assert.equal(await world.answers(waiting.requestId, { type: "terminal", go: false }), true);
   assert.equal(await sent, false);
+});
+
+test("a turn going on is not shown when no move cut one here", async (t) => {
+  // What has no typed prompt before it, with no move, is this session's own, saved late.
+  const { world, agent, ref, session } = await makeWorld(t);
+  session.saved = { id: "m1", at: 1 };
+  agent.foreign.set(SESSION, {
+    changed: true,
+    turns: [
+      { prompt: null, reply: "my own late reply" },
+      { prompt: "Typed there", reply: "Done" },
+    ],
+    last: { id: "m9", at: 9 },
+  });
+  assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
+  assert.deepEqual(after(world, ref), [
+    fill(texts.TERMINAL_TURN, { prompt: "Typed there", reply: "Done" }),
+  ]);
+  assert.equal(session.movedMidTurn, false);
 });

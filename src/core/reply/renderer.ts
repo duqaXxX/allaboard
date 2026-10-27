@@ -129,6 +129,8 @@ export function terminalStatus(status: string): [status: TaskStatus, output: str
 }
 
 export class TurnRenderer {
+  // The turn was cut outside the agent's stream with its calls stopped (`feedEnding`).
+  #callsStopped = false;
   readonly #sink: Sink;
   /** The session's folder, which previews name paths from. */
   readonly #cwd: string | null;
@@ -427,7 +429,8 @@ export class TurnRenderer {
    * closes the same reply again).
    */
   async close(signal?: AbortSignal): Promise<void> {
-    const interrupted = this.result !== null && this.result.ending === "interrupted";
+    const interrupted =
+      this.#callsStopped || (this.result !== null && this.result.ending === "interrupted");
     await this.#handOver();
     await this.#writeLaunches();
     if (
@@ -586,7 +589,9 @@ export class TurnRenderer {
    * The turn was cut short outside the agent's stream (the process died, the session closed):
    * say so in the reply, as the line on how it ended.
    */
-  async feedEnding(text: string): Promise<void> {
+  async feedEnding(text: string, options: { readonly callsStopped?: boolean } = {}): Promise<void> {
+    // A call the end cut is drawn stopped, as an interrupt draws it, not as ended well.
+    if (options.callsStopped) this.#callsStopped = true;
     await this.#text(`\n\n${text}`, { notice: true, ending: true });
   }
 
