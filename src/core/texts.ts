@@ -356,6 +356,8 @@ export const REFUSED_MARK = "⚠️ ";
 export const REFUSED_NO_FALLBACK =
   "{model} refused this request{category}; no other model answered.";
 export const REFUSED_RETRACTED = "↩ Retracted: the {model} attempt above.";
+// A message another of the owner's sessions sent this one, at its place in the reply.
+export const PEER_MESSAGE = "📨 From another session:\n{text}";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";
 // A goal's lines in its reply, in the terminal's words (captured 2026-10-20, Claude Code 2.1.303).
@@ -506,8 +508,6 @@ export const TERMINAL_WAIT =
   "with:\n{command}";
 // A turn the owner ran in the terminal, shown in the thread before the reply to his next message.
 export const TERMINAL_TURN = "🖥 In the terminal:\n› {prompt}\n\n{reply}";
-// A message another of the owner's sessions sent this one, at its place in the reply.
-export const PEER_MESSAGE = "📨 From another session:\n{text}";
 export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n› {prompt}";
 // A turn moved with `!terminal`, which the terminal went on with by itself.
 export const TERMINAL_TURN_WENT_ON = "🖥 In the terminal, the turn went on:\n\n{reply}";
