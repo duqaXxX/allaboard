@@ -102,7 +102,7 @@ test("the plain agent declares what the plan's table lists", () => {
   ] as const) {
     assert.equal(agent.capabilities[capability], false, capability);
   }
-  for (const capability of ["questions", "commands", "sessionListing"] as const) {
+  for (const capability of ["questions", "commands", "sessionListing", "sessionForks"] as const) {
     assert.equal(agent.capabilities[capability], true, capability);
   }
   assert.equal("usageLimits" in agent, false);

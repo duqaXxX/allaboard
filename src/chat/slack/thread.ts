@@ -203,6 +203,7 @@ const CAPABILITIES = {
   fileUpload: true,
   commandSuggestions: true,
   loopCard: true,
+  threadOpen: true,
 } as const satisfies Omit<ChatCapabilities, "threadTags" | "threadTitles" | "threadDelete">;
 
 /** The Slack provider: one `SlackThread` per thread, one `SlackChannel` per channel. */

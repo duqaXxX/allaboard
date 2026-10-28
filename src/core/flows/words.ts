@@ -15,7 +15,7 @@ import { BypassUnavailable, PlanUnavailable } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
-import type { OtherFlows } from "./contract.ts";
+import type { ForkFlow, OtherFlows } from "./contract.ts";
 import { channelStatus } from "./status.ts";
 import { type FlowDeps, logger, type Talk } from "./talk.ts";
 
@@ -73,6 +73,7 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
     unserved.add(WORD.memory);
     unserved.add(WORD.skills);
   }
+  if (!agent.capabilities.sessionForks || !chat.capabilities.threadOpen) unserved.add(WORD.fork);
   if (!chat.capabilities.fileUpload) unserved.add(WORD.open);
   if (!chat.capabilities.threadTags) {
     unserved.add(WORD.tag);
@@ -85,7 +86,7 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
   return unserved;
 }
 
-export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFlow {
+export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: ForkFlow): WordFlow {
   const { chat, agent, sessions, state, names } = deps;
   const status = channelStatus(deps, talk);
   const unserved = unservedWords(deps, others);
@@ -153,6 +154,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
           backgroundTasks: have.backgroundTasks,
           sessionListing: have.sessionListing,
           loadedContext: have.loadedContext,
+          forks: !unserved.has(WORD.fork),
           fileUpload: chat.capabilities.fileUpload,
           threadTags: chat.capabilities.threadTags,
           threadDelete: chat.capabilities.threadDelete,
@@ -276,6 +278,13 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
               ? memoryText(loaded, session.directory, shown)
               : skillsText(loaded, session.commands, shown);
           await talk.say(channel, thread, text, { ownerOnly: true });
+        }
+        return;
+      case "fork":
+        if (session === null) {
+          await talk.inChannel(channel, texts.FORK_TOP_LEVEL);
+        } else {
+          await fork.word(ref, message, session, command.prompt);
         }
         return;
       case "terminal":

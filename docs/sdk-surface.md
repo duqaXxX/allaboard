@@ -86,6 +86,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `SDKUserMessage` | type | prompt.ts: Content, userMessage; session.ts: QueryFunction, ClaudeSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `SessionStore` | type | goals.ts: goalStore | package | P33 |
 | `@anthropic-ai/claude-agent-sdk` | `SessionMessage` | type | turns.ts: turnsOf | package | none |
+| `@anthropic-ai/claude-agent-sdk` | `forkSession` | function | backend.ts: ClaudeBackend.forkSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `getSessionInfo` | function | backend.ts: ClaudeBackend.sessionTitle | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `getSessionMessages` | function | turns.ts: turnsAfter | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `listSessions` | function | listing.ts: directorySessions | reference | P6 |
@@ -141,6 +142,10 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `ResolvedSettings` | `effective` | field | advisor.ts: advisorModel | reference | none |
 | `Settings` | `advisorModel` | field | advisor.ts: advisorModel | package | none |
 | `Settings` | `env` | field | advisor.ts: advisorModel | package | none |
+| `forkSession` | `dir` | option | backend.ts: ClaudeBackend.forkSession | reference | none |
+| `forkSession` | `title` | option | backend.ts: ClaudeBackend.forkSession | reference | none |
+| `forkSession` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
+| `ForkSessionResult` | `sessionId` | field | backend.ts: ClaudeBackend.forkSession | reference | none |
 | `getSessionInfo` | `dir` | option | backend.ts: ClaudeBackend.sessionTitle | reference | none |
 | `getSessionInfo` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
 | `getSessionMessages` | `dir` | option | turns.ts: turnsAfter | reference | none |

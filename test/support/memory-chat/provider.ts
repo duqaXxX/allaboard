@@ -44,6 +44,7 @@ const CAPABILITIES: ChatCapabilities = {
   threadTags: false,
   threadTitles: false,
   threadDelete: false,
+  threadOpen: true,
   commandSuggestions: false,
   loopCard: true,
 };
@@ -435,6 +436,11 @@ class MemoryChannel implements ChannelChat {
 
   async say(markdown: string): Promise<void> {
     this.#room.write(this.#channel, null, DAEMON, markdown, "reference");
+  }
+
+  async open(markdown: string): Promise<ThreadRef> {
+    const root = this.#room.write(this.#channel, null, DAEMON, markdown, "reference", true);
+    return { channel: this.#channel, thread: root.thread as string };
   }
 
   async offer(list: OwnerList, title: string): Promise<void> {

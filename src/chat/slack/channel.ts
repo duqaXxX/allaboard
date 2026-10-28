@@ -7,7 +7,13 @@ import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../clock.ts";
 import type { Names } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
-import type { ChannelChat, MessageId, OwnerList } from "../seam.ts";
+import {
+  type ChannelChat,
+  ChatError,
+  type MessageId,
+  type OwnerList,
+  type ThreadRef,
+} from "../seam.ts";
 import { bindBlocks } from "./bind.ts";
 import { crossing, deliver, deliverNotice, rewriteAsNotice } from "./notice.ts";
 import { split } from "./reply/blocks.ts";
@@ -65,6 +71,26 @@ export class SlackChannel implements ChannelChat {
         ),
       );
     }
+  }
+
+  // A thread of Slack is named by its root's `ts`. A root past one message's limit is cut there:
+  // the core gives a line.
+  async open(markdown: string): Promise<ThreadRef> {
+    const { slack, ownerUserId, stopped } = this.#parts;
+    if (stopped.aborted) throw new ChatError("stopped");
+    const root = split(markdown)[0] ?? markdown;
+    const ts = await crossing(() =>
+      deliver(
+        slack,
+        ownerUserId,
+        { channel: this.#channel, threadTs: null },
+        root,
+        [{ type: "markdown", text: root }],
+        { ephemeral: false },
+      ),
+    );
+    if (ts === null) throw new ChatError("no_ts");
+    return { channel: this.#channel, thread: ts };
   }
 
   async offer(list: OwnerList, title: string): Promise<void> {

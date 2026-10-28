@@ -40,6 +40,7 @@ test("the provider names itself and supports every part of the seam", () => {
     fileUpload: true,
     commandSuggestions: true,
     loopCard: true,
+    threadOpen: true,
     threadTags: false,
     threadTitles: false,
     threadDelete: false,

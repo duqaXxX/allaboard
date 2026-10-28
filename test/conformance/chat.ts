@@ -493,6 +493,7 @@ export function chatConformance(
           "nativeStreaming",
           "reactions",
           "threadDelete",
+          "threadOpen",
           "threadTags",
           "threadTitles",
         ]);
@@ -521,6 +522,11 @@ export function chatConformance(
 
       check("has openFile exactly when it declares fileUpload", async ({ provider }) => {
         assert.equal(typeof provider.openFile === "function", provider.capabilities.fileUpload);
+      });
+
+      check("has open on a channel exactly when it declares threadOpen", async (s) => {
+        const channel = s.provider.channel(s.rig.channel);
+        assert.equal(typeof channel.open === "function", s.provider.capabilities.threadOpen);
       });
 
       check("has tagThread exactly when it declares threadTags", async ({ provider }) => {
@@ -1250,6 +1256,24 @@ export function chatConformance(
           );
         },
       );
+
+      check("open starts a thread whose root is the message it posted", async (s) => {
+        const channel = s.provider.channel(s.rig.channel);
+        if (channel.open === undefined) return;
+        const ref = await channel.open("Fork of the first thread: look into the timeout");
+        assert.equal(ref.channel, s.rig.channel);
+        const main = s.rig.read({ channel: s.rig.channel });
+        assert.ok(
+          main.some((m) => m.text.includes("look into the timeout")),
+          "posted in the channel",
+        );
+        await s.provider.thread(ref).say("Under the root");
+        const under = s.rig.read({ channel: s.rig.channel, thread: ref.thread });
+        assert.ok(
+          under.some((m) => m.text.includes("Under the root")),
+          "said in the new thread",
+        );
+      });
 
       check("notice and say reject with ChatError when the chat refused", async (s) => {
         s.rig.refuseWrites();

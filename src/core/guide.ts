@@ -22,6 +22,8 @@ export interface GuideOffer {
   readonly backgroundTasks: boolean;
   /** The agent lists its sessions (`sessionListing`). */
   readonly sessionListing: boolean;
+  /** The agent copies a session and the chat opens a thread for it (`sessionForks`, `threadOpen`). */
+  readonly forks: boolean;
   /** The agent lists what a session loaded (`loadedContext`). */
   readonly loadedContext: boolean;
   /** The chat shows a file (`fileUpload`). */
@@ -70,6 +72,7 @@ export function guideText(names: Names, offered: GuideOffer): string {
     texts.GUIDE_SESSIONS_STOP +
     (offered.sessionListing ? ` ${texts.GUIDE_SESSIONS_RESUME}` : "") +
     (offered.loadedContext ? ` ${texts.GUIDE_SESSIONS_LOADED}` : "") +
+    (offered.forks ? ` ${texts.GUIDE_SESSIONS_FORK}` : "") +
     ` ${texts.GUIDE_SESSIONS_TERMINAL}`;
 
   const [first, ...others] = names.newSession.map((name) => `\`!${name}\``);

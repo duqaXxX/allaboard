@@ -426,6 +426,10 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       assert.equal(typeof world.backend.sessionTitle === "function", caps.sessionTitles);
     });
 
+    check("forkSession is a member exactly when it is declared", LIMIT, async (world) => {
+      assert.equal(typeof world.backend.forkSession === "function", caps.sessionForks);
+    });
+
     check("sessionHolders is a member exactly when it is declared", LIMIT, async (world) => {
       assert.equal(typeof world.backend.sessionHolders === "function", caps.sessionHolders);
     });
@@ -1144,6 +1148,30 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       await again.session.send(prompt("go on"));
       assert.equal(written(await again.events.turn()).trim(), "Second.");
     });
+
+    check(
+      "forkSession copies a session under a new id, listed beside the original",
+      lacks(caps.sessionForks && caps.sessionListing, "sessionForks"),
+      async (world, t) => {
+        world.say("Original.");
+        const { session, events } = await open(t, world);
+        await session.send(prompt("say Original."));
+        const id = sessionIdOf(await events.turn());
+        await session.close();
+        await world.persist(world.folder, id, Date.UTC(2026, 9, 1, 10));
+        world.restart();
+        const fork = world.backend.forkSession;
+        assert.ok(fork !== undefined);
+        const copy = await fork.call(world.backend, world.folder, id, "a side problem");
+        assert.notEqual(copy, id);
+        const listed = (await world.backend.listSessions(world.folder)).map((s) => s.id);
+        assert.ok(listed.includes(id) && listed.includes(copy), listed.join(", "));
+        world.say("Copy.");
+        const resumed = await open(t, world, new Requests(), { resume: copy });
+        await resumed.session.send(prompt("go on"));
+        assert.equal(written(await resumed.events.turn()).trim(), "Copy.");
+      },
+    );
 
     check(
       "listSessions lists the sessions of a folder, newest first, and no other",

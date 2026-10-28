@@ -100,6 +100,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   folderTrust: false,
   sessionTags: false,
   sessionTitles: false,
+  sessionForks: true,
   goals: false,
   scheduledJobs: false,
   shellCommands: false,
@@ -278,6 +279,18 @@ export class PlainStore {
     } else {
       stored.lastModified = at ?? this.#last;
     }
+  }
+
+  /**
+   * A copy of the session `id` of `folder` under a new id, named `title` or the original's name
+   * with ` (fork)`, as a transcript folder would hold it. Throws for a session it does not have.
+   */
+  fork(folder: string, id: string, title: string | null): string {
+    const stored = this.#sessions.get(id);
+    if (stored === undefined || stored.folder !== folder) throw new Error(`no session ${id}`);
+    const copy = this.newId();
+    this.remember(folder, copy, title ?? `${stored.title} (fork)`);
+    return copy;
   }
 
   /** The sessions of `folder`, newest first. */
@@ -840,6 +853,10 @@ export class PlainAgent implements AgentBackend {
 
   async listSessions(folder: string): Promise<readonly ListedSession[]> {
     return this.store.list(folder);
+  }
+
+  async forkSession(folder: string, session: string, title: string | null): Promise<string> {
+    return this.store.fork(folder, session, title);
   }
 
   async datedSessions(

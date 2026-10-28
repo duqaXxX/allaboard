@@ -175,6 +175,8 @@ export interface ChatCapabilities {
   readonly threadTitles: boolean;
   /** `ChatProvider.deleteThread`. */
   readonly threadDelete: boolean;
+  /** `ChannelChat.open`. */
+  readonly threadOpen: boolean;
   /** `ChatProvider.suggestCommands`. */
   readonly commandSuggestions: boolean;
   /** `ThreadChat.showLoop` and `endLoop`: without it a scheduled run is an ordinary reply. */
@@ -576,6 +578,11 @@ export interface ChannelChat {
   notice(text: string): Promise<MessageId | null>;
   /** A reference at full size, in Markdown; a long one continues in further messages. */
   say(markdown: string): Promise<void>;
+  /**
+   * Posts `markdown` as a message of the channel that starts a thread of its own, in one message,
+   * and resolves with that thread. Present with `threadOpen`.
+   */
+  open?(markdown: string): Promise<ThreadRef>;
   /** Posts a list, each row with its control; `title` is the list in one line. */
   offer(list: OwnerList, title: string): Promise<void>;
   /** Removes a list that did its job. False when the chat refused and it still shows. */

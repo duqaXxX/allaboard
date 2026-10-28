@@ -100,6 +100,7 @@ const PLAIN_OFFER: GuideOffer = {
   backgroundTasks: false,
   sessionListing: true,
   loadedContext: false,
+  forks: true,
   fileUpload: false,
   threadTags: false,
   threadDelete: false,

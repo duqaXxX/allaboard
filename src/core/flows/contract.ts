@@ -65,6 +65,16 @@ export interface ResumeFlow {
   word(ref: ThreadRef, target: string): Promise<void>;
 }
 
+/** `!fork`. */
+export interface ForkFlow {
+  /**
+   * `!fork` typed in the thread of `session` as the owner's `message`: once no turn runs there,
+   * copies the session into a new thread of the channel, which inherits its effort and bypass and
+   * starts on `prompt` (empty: it waits for the owner's first message), and tells this thread.
+   */
+  word(ref: ThreadRef, message: MessageId, session: ThreadSession, prompt: string): Promise<void>;
+}
+
 /** `!bind`. */
 export interface BindFlow {
   /** `!bind <folder>` typed in a channel. */

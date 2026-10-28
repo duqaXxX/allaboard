@@ -998,6 +998,29 @@ turn starts. It is left out when the thread's folder is missing, unreadable or n
 the reason at the end of the status. `claude --resume <session id>` finds the session from any
 folder (Claude Code 2.1.223 or later); the `cd` makes it work in the thread's folder.
 
+### Copying a session into a new thread
+
+`!fork <prompt>`, sent in a thread, copies its session into a new thread of the same channel, as
+the terminal's `/fork` copies a session into a new one: the copy holds the whole conversation,
+runs the same model, effort and bypass, and starts on the prompt, while the thread you sent it
+from goes on as it was. Use it when a session finds a problem that is not its task.
+
+- allaboard posts the new thread's first message in the channel, `Fork of <link>: <prompt>`, the
+  link going back to the thread you sent it from. That thread gets one line:
+  `Forked into <link> · running · session <id>`.
+- With no prompt, `!fork` opens the new thread and the copy waits for your first message there.
+- Sent while a turn runs, it waits for the turn to end, so the copy holds the whole conversation.
+- A thread that works in an earlier folder of the channel, after a `!bind` to another, cannot be
+  forked: the copy's thread would start in the channel's folder, where the session does not exist.
+- Sent while allaboard waits to restart, it is refused, and nothing is copied.
+- The new thread asks no setup: it starts from the copy's settings. It is a thread like any other
+  afterwards, in `!status` and on the Home tab.
+- The copy works in the same folder as the original. The terminal's `/fork` tells its copy to make
+  a worktree of its own before editing; a copy made here gets no such instruction
+  ([limits.md](limits.md)).
+- `!resume` lists the copy among the folder's sessions, under its prompt as a title, or the
+  original's title with `(fork)` after it.
+
 ### Tagging a thread
 
 Once a thread turns out to matter, mark it from inside the thread: `!tag devops` puts
@@ -1218,6 +1241,7 @@ a `!` is never a command.
 | `!memory` | Refused | The memory files that session loaded, with their sizes |
 | `!skills` | Refused | The skills that session can use, with what each does |
 | `!terminal` | Refused | Moves that session to a terminal, a running turn with it, and gives the command to run there |
+| `!fork [prompt]` | Refused | Copies that session into a new thread of the channel, which starts on the prompt or waits for your first message there |
 | `!help [text]` | Lists allaboard's own words | Lists them and the session's commands |
 | `!open` | Refused | Opens a file picker |
 | `!open <path or words>` | Refused | Shares that file into the thread |

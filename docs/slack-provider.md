@@ -1131,7 +1131,7 @@ The daemon's notices (the answer to `!bind`, `!bypass` and `!stop`, a word used 
 a resume that did not happen or is refused, a refused attachment, a restart, and the ephemeral
 errors) are a context block, small and grey as the footer, so they read apart from Claude's replies:
 `ThreadChat.notice` for the session's own, `ThreadChat.tell`, `ChannelChat.tell` and
-`ChannelChat.notice` for the flows' answers (it resolves with the `ts` of the post, which `ChannelChat.rewrite` takes later), `Answers.notice` and `Answers.tellOwner` for the Slack listeners'. A line for the owner
+`ChannelChat.notice` for the flows' answers (it resolves with the `ts` of the post, which `ChannelChat.rewrite` takes later), `Answers.notice` and `Answers.tellOwner` for the Slack listeners'. The root `!fork` posts is a full-size markdown block at the top level of the channel (`ChannelChat.open`), and the thread it starts is named by that post's `ts`. A line for the owner
 alone about a top-level message that has no reply yet goes to the channel
 (`Answers.tellOwnerAbout`): Slack shows an ephemeral message in a thread only when the thread is
 already active. That covers a refused attachment and a refused channel. The lines about an audio
