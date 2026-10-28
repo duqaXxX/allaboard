@@ -1445,7 +1445,7 @@ the time from your prompt to the moment the session ended everything, the report
 work included, so a turn that leaves a background agent counts up to the end of its report. The
 end time is drawn by Slack in the time zone and the 12 or 24 hour clock of the device that reads
 it. The duration is kept in memory only: `!status` shows none, and after a daemon restart the
-count begins again at the next prompt. Then it holds `⚡ bypass` when bypass is on, the model, the advisor while one is set (`advisor Opus 5.5`), the effort level, the name of the folder this
+count begins again at the next prompt. Then it holds `⚡ bypass` when bypass is on, the model, the advisor while one is set (`advisor Opus`, by the name Claude Code lists for it, as the model), the effort level, the name of the folder this
 thread was opened in (its whole path is on `!status`), the git branch, the lines changed since
 the last commit (untracked files not counted), the session's tokens, the context used, and the
 5-hour and weekly limits with the time to each reset, which exist only with a claude.ai
