@@ -35,7 +35,7 @@ import {
 } from "../../support/memory-chat.ts";
 import { NO_SYNC } from "../../support/no-sync.ts";
 import { PlainAgent } from "../../support/plain-agent.ts";
-import { settledTurn } from "../../support/sessions.ts";
+import { settledTurn } from "../../support/settle.ts";
 
 /** One answer that reached the core. */
 export interface Reached {

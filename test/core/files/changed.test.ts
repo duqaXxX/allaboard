@@ -18,19 +18,19 @@ import { changedIn, changedSince, startCommit } from "../../../src/core/files/ch
 import { projectFiles } from "../../../src/core/files/listing.ts";
 import { newestFirst } from "../../../src/core/files/read.ts";
 import { FakeClock } from "../../support/fake-clock.ts";
-import { commitAt, committed, git, gitAt, gitInit } from "../../support/git-layouts.ts";
 import {
   commitAll,
   commitOf,
   dated,
   datedRepo,
   emptyTree,
-  repository,
+  plainRepository as repository,
   scratch,
   started,
   T0,
   write,
-} from "./support.ts";
+} from "../../support/files.ts";
+import { commitAt, committed, git, gitAt, gitInit } from "../../support/git-layouts.ts";
 
 const tmp = scratch();
 
@@ -132,23 +132,6 @@ test("a repository with no commit has no start and lists what is staged", async 
   assert.equal(await startCommit(await repository(fresh), started(T0)), null);
   const found = await changedIn(fresh, [await repository(fresh)], started(T0));
   assert.deepEqual(found.toSorted(), ["staged.py", "untracked.py"]);
-});
-
-test("a linked worktree has its own start", async () => {
-  const main = gitInit(join(tmp.dir, "main"));
-  commitAt(main, "a.py", T0 + 100);
-  const second = commitAt(main, "b.py", T0 + 200);
-  const wt = join(tmp.dir, "wt");
-  gitAt(main, T0 + 250, "worktree", "add", "-q", wt, "-b", "feature");
-  const third = commitAt(wt, "c.py", T0 + 400);
-  const found = await repository(wt);
-  assert.equal(found.key, main);
-  assert.notEqual(found.gitDir, join(main, ".git"));
-  assert.equal(await startCommit(found, started(T0 + 300)), second);
-  assert.equal(await startCommit(found, started(T0 + 450)), third);
-  // The main checkout's own log is another one: it never saw the worktree's commit.
-  assert.equal(await startCommit(await repository(main), started(T0 + 450)), second);
-  assert.deepEqual(await changedSince(found, wt, second), ["c.py"]);
 });
 
 test("a thread that started before a branch switch counts from where it began", async () => {

@@ -177,6 +177,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `ModelInfo` | `supportedEffortLevels` | field | info.ts: modelOf | reference | P17 |
 | `ModelInfo` | `supportsEffort` | field | info.ts: modelOf | reference | none |
 | `ModelInfo` | `value` | field | info.ts: modelOf | reference | P17 |
+| `ModelInfo` | `"default"` | value | info.ts: modelOf | measured | none |
 | `ModelUsage` | `cacheCreationInputTokens` | field | translate.ts: tokensOf | reference | none |
 | `ModelUsage` | `cacheReadInputTokens` | field | translate.ts: tokensOf | reference | none |
 | `ModelUsage` | `inputTokens` | field | translate.ts: tokensOf | reference | none |

@@ -7,7 +7,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
-import type { AgentEntry } from "../src/agent/seam.ts";
+import { type AgentEntry, NO_TOOL_WORDS } from "../src/agent/seam.ts";
 import { ConfigError } from "../src/core/config.ts";
 import type { ChatEntry } from "../src/core/port.ts";
 import { run } from "../src/daemon.ts";
@@ -27,6 +27,9 @@ test("the plain agent and the memory chat, named in the configuration, run a ses
         "other-agent": {
           required: [],
           optional: [],
+          tools: NO_TOOL_WORDS,
+          toolNames: [],
+          limitsHeading: "Limits of a test agent",
           build: () => {
             built.push("other-agent");
             throw new Error("an agent the configuration did not name was built");
@@ -101,6 +104,9 @@ function registryOf(built: Built): Registry {
   const agent = (name: string, key?: string): AgentEntry => ({
     required: key === undefined ? [] : [key],
     optional: [],
+    tools: NO_TOOL_WORDS,
+    toolNames: [],
+    limitsHeading: "Limits of a test agent",
     build: ({ variables }) => {
       built.agents.push([name, key === undefined ? undefined : variables[key]]);
       return new FakeAgentBackend([]);

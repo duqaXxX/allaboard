@@ -32,6 +32,8 @@ function modelOf(entry: WireRecord): ModelInfo | null {
   const supportsEffort = entry.supportsEffort === true;
   return {
     value,
+    // The list's own entry for the model Claude Code picks when none is set (`default`).
+    isDefault: value === "default",
     resolvedModel: words(entry.resolvedModel),
     displayName: words(entry.displayName) ?? value,
     description: words(entry.description),

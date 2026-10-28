@@ -17,10 +17,9 @@ import { guideText } from "../../src/core/guide.ts";
 import * as texts from "../../src/core/texts.ts";
 import { sdkJson } from "../support/fixtures.ts";
 import { EVERYTHING_OFFERED } from "../support/guide-offer.ts";
-import { NAMES } from "../support/names.ts";
 import { PLAIN_NAMES } from "./flows/messages-world.ts";
 
-const CLEARS = NAMES.newSession;
+const CLEARS = PLAIN_NAMES.newSession;
 
 /**
  * The chat provider's markdown escape, which the core takes as a parameter: the same characters
@@ -32,7 +31,7 @@ function markdownEscape(text: string): string {
 }
 
 function helpOf(commands: readonly CommandInfo[] | null, query = ""): string {
-  return helpText(commands, query, markdownEscape, NAMES);
+  return helpText(commands, query, markdownEscape, PLAIN_NAMES);
 }
 
 /** A command as the session's list holds it: what the agent module makes of the SDK's raw entry. */
@@ -127,12 +126,12 @@ test("help lists the daemon words and every session command", () => {
   for (const word of ["!help", "!status", "!stop", "!bind", "!bypass", "!open"]) {
     assert.ok(text.includes(`\`${word}`), word);
   }
-  assert.ok(commands.filter((c) => c.name !== "clear").every((c) => text.includes(`\`!${c.name}`)));
+  assert.ok(commands.every((c) => text.includes(`\`!${c.name}`)));
 });
 
 test("help leaves out the words the agent or the chat cannot serve", () => {
-  const all = helpText(null, "", (text) => text, NAMES);
-  const fewer = helpText(null, "", (text) => text, NAMES, true, new Set(["bypass", "open"]));
+  const all = helpText(null, "", (text) => text, PLAIN_NAMES);
+  const fewer = helpText(null, "", (text) => text, PLAIN_NAMES, true, new Set(["bypass", "open"]));
   assert.ok(all.includes("`!bypass on|off`") && all.includes("`!open [file]`"));
   assert.ok(!fewer.includes("`!bypass on|off`") && !fewer.includes("`!open [file]`"));
   // Every other line is there, as written.
@@ -145,8 +144,8 @@ test("help leaves out the words the agent or the chat cannot serve", () => {
 test("help speaks of trust in the !bind line only for an agent that keeps a record of it", () => {
   const bindLine = (text: string): string =>
     text.split("\n").find((line) => line.startsWith("`!bind")) ?? "";
-  const trusting = helpText(null, "", (text) => text, NAMES);
-  const open = helpText(null, "", (text) => text, NAMES, true, new Set(), false);
+  const trusting = helpText(null, "", (text) => text, PLAIN_NAMES);
+  const open = helpText(null, "", (text) => text, PLAIN_NAMES, true, new Set(), false);
   assert.ok(bindLine(trusting).includes("trusts"));
   assert.ok(bindLine(open) !== "" && !bindLine(open).includes("trust"));
   assert.deepEqual(
@@ -165,26 +164,25 @@ test("help says how a command is told from a text", () => {
   assert.ok(texts.HELP_RULE.includes("`\\!goal`"));
 });
 
-test("help leaves out clear which a thread refuses", () => {
-  // a session's commands are listed inside its thread only, where `!clear` is
-  // refused. The recorded list (SDK 0.2.163) does carry it.
-  const commands = recordedCommands();
-  assert.ok(commands.some((c) => c.name === "clear"));
-  assert.ok(!helpOf(commands).includes("`!clear"));
-  assert.ok(helpOf(commands).includes("`!compact"));
+test("help leaves out the new-session word which a thread refuses", () => {
+  // a session's commands are listed inside its thread only, where the agent's new-session word
+  // is refused. The agent's own list may carry it.
+  const commands = [command("restart", "Start over"), command("echo", "Say it back")];
+  assert.ok(!helpOf(commands).includes("`!restart"));
+  assert.ok(helpOf(commands).includes("`!echo"));
 });
 
-test("a thread refuses clear and its aliases before the session lists them", () => {
+test("a thread refuses the new-session word before the session lists it", () => {
   // A session rebuilt after a restart has listed no command until it connects.
   for (const listed of [[], null]) {
     const refused = refusedInThread(listed, CLEARS);
-    for (const name of ["clear", "reset", "new"]) assert.ok(refused.has(name), name);
+    for (const name of PLAIN_NAMES.newSession) assert.ok(refused.has(name), name);
   }
 });
 
-test("a thread refuses an alias of clear the session adds", () => {
+test("a thread refuses an alias of the new-session word the session adds", () => {
   const commands = [
-    command("clear", "d", { aliases: ["reset", "new", "wipe"] }),
+    command("restart", "d", { aliases: ["again", "wipe"] }),
     command("rename", "d", { aliases: ["name"] }),
   ];
   const refused = refusedInThread(commands, CLEARS);
@@ -236,8 +234,8 @@ test("the guide and the help explain every word of the daemon", () => {
   }
   // A WORD the parser does not answer would document a word that reaches Claude instead.
   for (const word of words) assert.notEqual(parseBang(`!${word}`)?.kind, "passthrough", word);
-  const guide = guideText(NAMES, EVERYTHING_OFFERED);
-  const helpLines = texts.HELP_WORDS.map((line) => texts.named(line, NAMES)).join("\n");
+  const guide = guideText(PLAIN_NAMES, EVERYTHING_OFFERED);
+  const helpLines = texts.HELP_WORDS.map((line) => texts.named(line, PLAIN_NAMES)).join("\n");
   for (const word of words) {
     assert.ok(guide.includes(`\`!${word}`), word);
     assert.ok(helpLines.includes(`\`!${word}`), word);
@@ -253,7 +251,7 @@ test("the help titles are bold in a markdown block", () => {
   // `!help` goes out as a markdown block, where bold is **text** and *text* is italic
   // (markdown block reference, read 2026-09-25).
   const text = helpOf([], "");
-  assert.ok(text.startsWith("**allaboard**") && text.includes("**Claude Code**"));
+  assert.ok(text.startsWith("**allaboard**") && text.includes(`**${PLAIN_NAMES.agent}**`));
 });
 
 // /doctor's description in the bundled CLI 2.1.280, read 2026-09-25: the 100-character cut falls
@@ -292,33 +290,33 @@ test("a description is cut by code points, never inside an emoji", () => {
 
 test("login and logout are answered on the host, whatever their case", () => {
   assert.equal(
-    hostOnly({ kind: "passthrough", text: "login" }, NAMES),
-    texts.named(texts.LOGIN_ON_HOST, NAMES),
+    hostOnly({ kind: "passthrough", text: "signin" }, PLAIN_NAMES),
+    texts.named(texts.LOGIN_ON_HOST, PLAIN_NAMES),
   );
   assert.equal(
-    hostOnly({ kind: "passthrough", text: "LOGOUT now" }, NAMES),
-    texts.named(texts.LOGOUT_ON_HOST, NAMES),
+    hostOnly({ kind: "passthrough", text: "SIGNOUT now" }, PLAIN_NAMES),
+    texts.named(texts.LOGOUT_ON_HOST, PLAIN_NAMES),
   );
-  assert.equal(hostOnly({ kind: "passthrough", text: "compact" }, NAMES), null);
+  assert.equal(hostOnly({ kind: "passthrough", text: "compact" }, PLAIN_NAMES), null);
 });
 
 test("an agent with no commands of its own has none listed, refused or run on the host", () => {
   const listed = recordedCommands().slice(0, 2);
-  const help = helpText(listed, "", markdownEscape, NAMES, false);
+  const help = helpText(listed, "", markdownEscape, PLAIN_NAMES, false);
   // The daemon's own words and the rule that tells them from a text, and nothing of the agent's.
   assert.ok(help.includes(texts.HELP_OWN) && help.includes(texts.HELP_RULE));
-  assert.ok(!help.includes(texts.named(texts.HELP_AGENT, NAMES)));
+  assert.ok(!help.includes(texts.named(texts.HELP_AGENT, PLAIN_NAMES)));
   assert.ok(listed.every((entry) => !help.includes(`!${entry.name}`)));
   assert.ok(
-    !helpText(null, "", markdownEscape, NAMES, false).includes(
-      texts.named(texts.HELP_UNBOUND, NAMES),
+    !helpText(null, "", markdownEscape, PLAIN_NAMES, false).includes(
+      texts.named(texts.HELP_UNBOUND, PLAIN_NAMES),
     ),
   );
   assert.deepEqual([...refusedInThread(null, CLEARS, false)], []);
-  assert.equal(hostOnly({ kind: "passthrough", text: "login" }, NAMES, false), null);
+  assert.equal(hostOnly({ kind: "passthrough", text: "signin" }, PLAIN_NAMES, false), null);
   // The same calls for an agent that has them are as before.
-  assert.ok(refusedInThread(null, CLEARS).has("clear"));
-  assert.notEqual(hostOnly({ kind: "passthrough", text: "login" }, NAMES), null);
+  assert.ok(refusedInThread(null, CLEARS).has("restart"));
+  assert.notEqual(hostOnly({ kind: "passthrough", text: "signin" }, PLAIN_NAMES), null);
 });
 
 test("an agent's own new-session name is refused in a thread, with the aliases its list gives it", () => {
@@ -326,12 +324,12 @@ test("an agent's own new-session name is refused in a thread, with the aliases i
   assert.deepEqual([...refusedInThread(null, own)], ["restart"]);
   const listed = [command("restart", "d", { aliases: ["Again"] })];
   assert.deepEqual([...refusedInThread(listed, own)].sort(), ["again", "restart"]);
-  // Claude Code's names mean nothing to an agent that does not declare them.
+  // Another agent's names mean nothing to an agent that does not declare them.
   assert.ok(!refusedInThread(null, own).has("clear"));
   assert.deepEqual([...refusedInThread(null, [])], []);
 });
 
-test("an agent's own login and logout are answered on the host, and Claude Code's are not its words", () => {
+test("an agent's own login and logout are answered on the host, and another agent's are not its words", () => {
   assert.equal(
     hostOnly({ kind: "passthrough", text: "SignIn now" }, PLAIN_NAMES),
     texts.named(texts.LOGIN_ON_HOST, PLAIN_NAMES),
@@ -411,7 +409,7 @@ test("the guide names the agent's own new-session commands, and leaves the sente
 // Candidates for a `!word` that is no command.
 
 function poolOf(commands: readonly CommandInfo[], rest = "") {
-  return commandPool(commands, rest, NAMES);
+  return commandPool(commands, rest, PLAIN_NAMES);
 }
 
 const OFFERED = [
@@ -419,7 +417,7 @@ const OFFERED = [
   command("compact", "Summarise the conversation", { aliases: ["squash"] }),
   command("goal", "Set a goal"),
   command("context", "Show the context"),
-  command("clear", "Start over"),
+  command("restart", "Start over"),
 ];
 
 test("the pool holds the daemon's words first, then the session's commands by name", () => {
@@ -455,7 +453,9 @@ test("a candidate carries its usage, one line of description and the text a pick
 });
 
 test("a word the chat or the agent cannot serve is not a candidate", () => {
-  const pool = commandPool(OFFERED, "", NAMES, { unserved: new Set([WORD.open, WORD.bypass]) });
+  const pool = commandPool(OFFERED, "", PLAIN_NAMES, {
+    unserved: new Set([WORD.open, WORD.bypass]),
+  });
   assert.ok(!pool.some((c) => c.name === WORD.open || c.name === WORD.bypass));
 });
 

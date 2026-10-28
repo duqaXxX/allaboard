@@ -1,7 +1,7 @@
 /**
  * A `!word` that is no command, in a chat that suggests commands: the owner gets a field
  * holding what they typed and the commands it could mean, and nothing reaches the agent. Over the
- * memory chat; the Slack side is `test/chat/slack/app/slack-app-suggest.test.ts`.
+ * memory chat; the Slack side is `test/agent/claude/slack-app/slack-app-suggest.test.ts`.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -68,7 +68,7 @@ test("a command the session lists runs at once, as before", async (t) => {
   const world = await MessagesWorld.make(t, { suggests: true });
   const ref = await world.opened();
   await world.says("!echo hi", ref.thread);
-  assert.deepEqual(await world.prompts(), ["first", "/echo hi"]);
+  assert.deepEqual(await world.prompts(), ["first", ":echo hi"]);
   assert.deepEqual(world.chat.suggestions(), []);
 });
 
@@ -124,7 +124,7 @@ test("Enter in the field is read as typed text: a known command then runs", asyn
   const [shown] = world.chat.suggestions();
   assert.ok(shown);
   assert.equal(await world.chat.as(OWNER).types(shown.message, "!echo hello"), true);
-  assert.deepEqual(await world.prompts(), ["first", "/echo hello"]);
+  assert.deepEqual(await world.prompts(), ["first", ":echo hello"]);
   assert.deepEqual(world.chat.suggestions(), []);
 });
 
@@ -195,7 +195,7 @@ test("a typo beside a busy session of the folder asks no hold; the text sent on 
   const open = await world.asked("hold", ref);
   await world.chat.as(OWNER).answers(open.requestId, { type: "hold", send: true });
   await entering;
-  assert.equal((await world.prompts()).filter((p) => p === "/echo hi").length, 1);
+  assert.equal((await world.prompts()).filter((p) => p === ":echo hi").length, 1);
   assert.equal(world.chat.requests().filter((r) => r.request.type === "hold").length, 0);
 });
 

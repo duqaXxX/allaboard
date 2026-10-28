@@ -21,6 +21,7 @@ import type {
   ModelTokens,
   SessionEvent,
   TaskKind,
+  TaskOutcome,
   TurnEnding,
 } from "../seam.ts";
 import { integer, number, string, type WireRecord, words } from "./wire.ts";
@@ -40,6 +41,15 @@ const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set([
   "stopped",
   "killed",
 ]);
+
+/**
+ * The seam's outcome for the SDK's task status: the four terminal words are the seam's own. A
+ * notification carrying any other word still announces an end (a task that goes on sends none),
+ * so it maps to `completed`: an end with no failure claimed, as the daemon always read it.
+ */
+function outcomeOf(reported: string): TaskOutcome {
+  return TERMINAL_TASK_STATUSES.has(reported) ? (reported as TaskOutcome) : "completed";
+}
 const INTERRUPTED: ReadonlySet<string> = new Set(["aborted_streaming", "aborted_tools"]);
 const AUTHENTICATION_FAILED = "authentication_failed";
 const SYNTHETIC_MODEL = "<synthetic>";
@@ -501,7 +511,8 @@ function taskUpdated(_memory: Memory, record: WireRecord): SessionEvent[] {
     {
       type: "task_updated",
       taskId: string(record.task_id) ?? "",
-      status: reported,
+      status:
+        reported !== null && TERMINAL_TASK_STATUSES.has(reported) ? outcomeOf(reported) : null,
       terminal: reported !== null && TERMINAL_TASK_STATUSES.has(reported),
     },
   ];
@@ -534,7 +545,7 @@ function taskNotification(memory: Memory, record: WireRecord): SessionEvent[] {
     {
       type: "task_ended",
       taskId,
-      status: reported,
+      status: outcomeOf(reported),
       summary,
       durationMs: number(usage.duration_ms),
       callId: words(record.tool_use_id),

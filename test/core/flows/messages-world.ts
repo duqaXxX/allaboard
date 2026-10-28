@@ -42,7 +42,7 @@ import {
   PlainAgent,
   type PlainSession,
 } from "../../support/plain-agent.ts";
-import { settledTurn } from "../../support/sessions.ts";
+import { settledTurn } from "../../support/settle.ts";
 import type { FakeUpdatesHost } from "../../support/updates.ts";
 
 /** The names the texts take when the plain agent and the memory chat are the two modules. */
@@ -72,11 +72,15 @@ export class WithFolderTrust extends PlainAgent {
   override readonly words = { ...PLAIN_WORDS, trust: "cd {directory} && plain" };
   readonly trusted = new Set<string>();
 
-  override async trustedRepository(folder: string): Promise<Repository | null> {
+  async folderTrusted(): Promise<boolean> {
+    return true;
+  }
+
+  async trustedRepository(folder: string): Promise<Repository | null> {
     return this.trusted.has(folder) ? WithFolderTrust.#at(folder) : null;
   }
 
-  override async untrustedRepository(folder: string): Promise<Repository | null> {
+  async untrustedRepository(folder: string): Promise<Repository | null> {
     return !this.trusted.has(folder) && existsSync(join(folder, ".git"))
       ? WithFolderTrust.#at(folder)
       : null;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { QUESTION_TOOL, toRequest } from "../../../src/agent/claude/requests.ts";
-import type { PermissionRequest, Question } from "../../../src/agent/seam.ts";
+import type { Question } from "../../../src/agent/seam.ts";
+import type { ApprovalRequest } from "../../../src/chat/seam.ts";
 import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
@@ -27,19 +27,18 @@ import {
   TYPED_LIMIT,
 } from "../../../src/chat/slack/requests.ts";
 import { THREAD } from "../../support/fake-slack.ts";
-import { sdkJson } from "../../support/fixtures.ts";
-import { NAMES } from "../../support/names.ts";
+import { PLAIN_NAMES } from "../../support/names.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: a Slack payload read in a test
 type Json = Record<string, any>;
 
 // The builders return Slack's blocks as plain records; a test reads them by path.
-const approvalBlocks = (id: string, request: PermissionRequest): Json[] =>
-  approvalBlocksOf(id, request, NAMES) as Json[];
+const approvalBlocks = (id: string, request: ApprovalRequest): Json[] =>
+  approvalBlocksOf(id, request, PLAIN_NAMES) as Json[];
 const questionBlocks = (id: string, questions: readonly Question[]): Json[] =>
-  questionBlocksOf(id, questions, NAMES) as Json[];
+  questionBlocksOf(id, questions, PLAIN_NAMES) as Json[];
 const questionView = (draft: Draft, questions: readonly Question[]): Json =>
-  questionViewOf(draft, questions, NAMES) as Json;
+  questionViewOf(draft, questions, PLAIN_NAMES) as Json;
 
 /** The characters of a text as Slack counts them: code points, not UTF-16 units. */
 function chars(text: string): number {
@@ -57,14 +56,15 @@ function actionIds(blocks: Json[]): string[] {
   return ids;
 }
 
-function permission(known: Partial<PermissionRequest> = {}): PermissionRequest {
+function permission(known: Partial<ApprovalRequest> = {}): ApprovalRequest {
   return {
     type: "permission",
     callId: "toolu_1",
-    toolName: "Bash",
+    toolName: "run",
     input: {},
     title: null,
     description: null,
+    plan: null,
     ...known,
   };
 }
@@ -88,14 +88,6 @@ function question(known: {
   };
 }
 
-/** The questions of a recorded `AskUserQuestion` call, through the Claude back end's mapping. */
-function recordedQuestions(name: string): Question[] {
-  const recorded = sdkJson(name) as { input: Record<string, unknown> };
-  const request = toRequest(QUESTION_TOOL, recorded.input, {});
-  assert.equal(request.type, "question");
-  return request.type === "question" ? [...request.questions] : [];
-}
-
 const OTHER_OPTION = {
   text: { type: "plain_text", text: "Other" },
   description: { type: "plain_text", text: "Type your own answer" },
@@ -110,12 +102,12 @@ test("an answered request is one block headed like the reply's record", () => {
   const blocks = answeredBlocks(
     [{ text: "Colour?" }, { text: "Sizes?" }] as Question[],
     { "Colour?": "red", "Sizes?": ["s", "l"] },
-    NAMES,
+    PLAIN_NAMES,
   ) as unknown as Json[];
   assert.equal(blocks.length, 1);
   assert.equal(
     blocks[0]?.elements[0].text,
-    "✓ User answered Claude's questions:\n" +
+    "✓ User answered Plain's questions:\n" +
       "\u00a0\u00a0\u00a0\u00a0⎿ · Colour? → red\n" +
       "\u00a0\u00a0\u00a0\u00a0⎿ · Sizes? → s, l",
   );
@@ -124,7 +116,7 @@ test("an answered request is one block headed like the reply's record", () => {
 test("approval blocks carry the id and the input", () => {
   const request = permission({
     input: { command: "ls -la" },
-    title: "Claude wants to run ls",
+    title: "Plain wants to run ls",
   });
   const blocks = approvalBlocks("abc", request);
   assert.deepEqual(actionIds(blocks), [APPROVAL_ALLOW, APPROVAL_DENY]);
@@ -136,7 +128,7 @@ test("approval blocks carry the id and the input", () => {
   );
   assert.deepEqual(values, new Set(["abc"]));
   const text = JSON.stringify(blocks);
-  assert.ok(text.includes("Claude wants to run ls") && text.includes("ls -la"));
+  assert.ok(text.includes("Plain wants to run ls") && text.includes("ls -la"));
 });
 
 /** A rich text heading's words, each with whether it is bold. */
@@ -150,7 +142,7 @@ function richWords(block: Json): [string, boolean][] {
 test("the heading names the tool, shown as written, when the agent wrote no title", () => {
   const [heading] = approvalBlocks("abc", permission({ toolName: "<b>" }));
   assert.deepEqual(richWords(heading as Json), [
-    ["Claude Code asks to use ", false],
+    ["Plain asks to use ", false],
     ["<b>", true],
   ]);
 });
@@ -161,7 +153,22 @@ test("an agent's title is the heading, as written, with no markup of ours", () =
 });
 
 test("the channel shows one line with answer and skip", () => {
-  const questions = recordedQuestions("ask-can-use-tool");
+  const questions = [
+    question({
+      question: "Which colour do you prefer?",
+      header: "Colour preference",
+      options: [
+        { label: "Red", description: "The colour red" },
+        { label: "Blue", description: "The colour blue" },
+      ],
+    }),
+    question({
+      question: "Do you also like green?",
+      header: "Green preference",
+      options: [{ label: "Yes" }, { label: "No" }],
+      multiSelect: true,
+    }),
+  ];
   const blocks = questionBlocks("abc", questions);
   assert.equal(blocks.length, 2);
   const words = richWords(blocks[0] as Json);
@@ -439,9 +446,26 @@ function bold(text: string): Json {
 }
 
 test("options that say more than a choice holds are shown whole above it", () => {
-  // ask-preview-can-use-tool.json (CLI 2.1.286): two options whose descriptions pass the 75
-  // characters an option object holds, each with a `preview`.
-  const [asked] = recordedQuestions("ask-preview-can-use-tool") as [Question];
+  // Two options whose descriptions pass the 75 characters an option object holds, each with a
+  // `preview`.
+  const asked = question({
+    question: "Which layout?",
+    header: "Layout",
+    options: [
+      {
+        label: "Minimal",
+        description:
+          "A single column with the title, the body and nothing else around them at all, ever",
+        preview: "title\nbody\n",
+      },
+      {
+        label: "Detailed",
+        description:
+          "Two columns with a sidebar of links and a footer that repeats the title on every page of it",
+        preview: "title | links\nbody  | links\n",
+      },
+    ],
+  });
   const [minimal, detailed] = asked.options as [Question["options"][0], Question["options"][0]];
   assert.ok((minimal.description as string).length > OPTION_TEXT_LIMIT && minimal.preview);
   const view = questionView(draftOf(), [asked]);
@@ -695,7 +719,7 @@ test("question headers are shown as written", () => {
     question({ question: "q", header: "<http://x|ok>", options: [] }),
   ]);
   assert.deepEqual(richWords(blocks[0] as Json), [
-    ["Claude Code has a question: ", false],
+    ["Plain has a question: ", false],
     ["<http://x|ok>", true],
   ]);
 });
@@ -966,15 +990,18 @@ test("a note with no choice sends nothing", () => {
   assert.equal(draftAnswers(draft, TWO), null);
 });
 
-// --- ExitPlanMode: the plan as text in the generic code blocks ---
+// --- a plan approval: the plan as text in the generic code blocks ---
 
 const PLAN_INPUT = {
-  plan: "## Plan\n\n1. Read `src/a.ts`\n2. Change it",
-  planFilePath: "/home/dev/.claude/plans/sample.md",
+  steps: "## Plan\n\n1. Read `src/a.ts`\n2. Change it",
+  scratch: "/home/dev/plans/sample.md",
 };
 
-test("an ExitPlanMode approval shows the plan alone in the generic code blocks", () => {
-  const blocks = approvalBlocks("abc", permission({ toolName: "ExitPlanMode", input: PLAN_INPUT }));
+test("a plan approval shows the plan alone in the generic code blocks", () => {
+  const blocks = approvalBlocks(
+    "abc",
+    permission({ toolName: "propose", input: PLAN_INPUT, plan: PLAN_INPUT.steps }),
+  );
   assert.deepEqual(blocks, [
     {
       type: "rich_text",
@@ -982,8 +1009,8 @@ test("an ExitPlanMode approval shows the plan alone in the generic code blocks",
         {
           type: "rich_text_section",
           elements: [
-            { type: "text", text: "Claude Code asks to use " },
-            { type: "text", text: "ExitPlanMode", style: { bold: true } },
+            { type: "text", text: "Plain asks to use " },
+            { type: "text", text: "propose", style: { bold: true } },
           ],
         },
       ],
@@ -997,13 +1024,16 @@ test("an ExitPlanMode approval shows the plan alone in the generic code blocks",
     },
     blocks.at(-1),
   ]);
-  assert.ok(!JSON.stringify(blocks).includes("planFilePath"));
+  assert.ok(!JSON.stringify(blocks).includes("scratch"));
   assert.deepEqual(actionIds(blocks), [APPROVAL_ALLOW, APPROVAL_DENY]);
 });
 
 test("a plan with a link, mentions and a fence shows as literal text", () => {
   const plan = "[x](http://evil.example) <!here> <@U000ALICE>\n```\nrm -rf\n```\n<!-- c -->";
-  const blocks = approvalBlocks("abc", permission({ toolName: "ExitPlanMode", input: { plan } }));
+  const blocks = approvalBlocks(
+    "abc",
+    permission({ toolName: "propose", input: { steps: plan }, plan }),
+  );
   const shown = blocks.filter((b) => b.type === "section").map((b) => b.text.text as string);
   assert.equal(
     shown[0],
@@ -1015,9 +1045,9 @@ test("a plan longer than the approval limit is cut by the rule every input follo
   const long = `${"a".repeat(200_000)}\nTHE END`;
   const plan = approvalBlocks(
     "abc",
-    permission({ toolName: "ExitPlanMode", input: { plan: long } }),
+    permission({ toolName: "propose", input: { steps: long }, plan: long }),
   );
-  const same = approvalBlocks("abc", permission({ toolName: "Bash", input: { command: long } }));
+  const same = approvalBlocks("abc", permission({ toolName: "run", input: { command: long } }));
   // Full to Slack's limit, the actions block closing it, the start and the end kept.
   assert.ok(plan.length === 50 && plan.at(-1)?.type === "actions");
   assert.ok(plan.at(-2)?.text.text.includes("THE END"));
@@ -1027,11 +1057,11 @@ test("a plan longer than the approval limit is cut by the rule every input follo
   assert.equal(plan.filter((b) => b.type === "context").length, 1);
 });
 
-test("an ExitPlanMode input with another key is shown whole, as any input is", () => {
+test("an approval the core read no plan from shows the input whole, as any input is", () => {
   const blocks = approvalBlocks(
     "abc",
-    permission({ toolName: "ExitPlanMode", input: { ...PLAN_INPUT, extra: "x" } }),
+    permission({ toolName: "propose", input: { ...PLAN_INPUT, extra: "x" }, plan: null }),
   );
   assert.ok(JSON.stringify(blocks).includes("extra"));
-  assert.ok(JSON.stringify(blocks).includes("planFilePath"));
+  assert.ok(JSON.stringify(blocks).includes("scratch"));
 });

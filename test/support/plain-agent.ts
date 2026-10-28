@@ -7,7 +7,8 @@
  * questions, two commands of its own and session listing. It lacks subagents, background tasks,
  * compaction, usage limits, a model list, a prompt during a turn and folder trust. A session is
  * named (`session_started`) with its first prompt, as Claude's is: until then it has no id the
- * core could resume.
+ * core could resume; `namedAtStart` names it at the start instead, as an agent that allots an id
+ * before any prompt does.
  *
  * A test scripts what each prompt does with `agent.next(...steps)`: one turn per call, played by
  * the next prompt of any session, in order (a prompt past the script gets `say("ok")`). A prompt
@@ -34,10 +35,12 @@ import type {
   Capabilities,
   CommandInfo,
   ContextUsage,
+  FileChange,
   ForeignTurns,
   GoalChange,
   ListedSession,
   LoadedContext,
+  ModelInfo,
   PermissionAnswer,
   PermissionMode,
   PermissionRequest,
@@ -45,7 +48,6 @@ import type {
   Question,
   QuestionAnswer,
   QuestionRequest,
-  Repository,
   RequestHandler,
   SavedMessage,
   ScheduledJob,
@@ -54,15 +56,43 @@ import type {
   ShellMode,
   ShellRun,
   StartOptions,
+  ToolVocabulary,
 } from "../../src/agent/seam.ts";
-import { ResumeRefused } from "../../src/agent/seam.ts";
+import { NO_TOOL_WORDS, ResumeRefused } from "../../src/agent/seam.ts";
 
 export const PLAIN_NAME = "Plain";
+
+/**
+ * The plain agent's own tool vocabulary, in names no real agent uses: a `run` and a `look` tool
+ * the terminal would fold in words, a `change` tool whose edits it previews as `Modify`, an `ask`
+ * tool that puts questions, a `delegate` tool that starts a task and a `propose` tool whose approval
+ * asks for a plan, written under `steps`.
+ */
+export const PLAIN_TOOLS: ToolVocabulary = Object.freeze({
+  ...NO_TOOL_WORDS,
+  words: Object.freeze<ToolVocabulary["words"]>({
+    run: ["Executed {n} job", "Executed {n} jobs"],
+    look: ["Looked at {n} file", "Looked at {n} files"],
+  }),
+  askers: Object.freeze(["ask"]),
+  launchers: Object.freeze(["delegate"]),
+  previews: Object.freeze({ change: "Modify" }),
+  failsCounted: Object.freeze(["run"]),
+  described: Object.freeze({ run: "summary" }),
+  commanded: Object.freeze({ run: "line" }),
+  plan: Object.freeze({
+    tool: "propose",
+    keys: Object.freeze(["steps", "scratch"]),
+    text: "steps",
+  }),
+});
 
 export const PLAIN_WORDS: AgentWords = Object.freeze({
   author: "Plain",
   command: "plain",
   examples: "`!echo hello`, `!count one two`",
+  // Not the `/` of the one real agent: a core that assumed it would send `/echo` and read nothing.
+  commandPrefix: ":",
   newSession: ["restart"],
   login: "signin",
   logout: "signout",
@@ -110,7 +140,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   loadedContext: false,
 });
 
-/** The two commands of the agent, run by a prompt `/echo text` and `/count text`. */
+/** The two commands of the agent, run by a prompt `:echo text` and `:count text`. */
 export const PLAIN_COMMANDS: readonly CommandInfo[] = Object.freeze([
   { name: "echo", description: "Say the text back", argumentHint: "<text>", aliases: ["say"] },
   { name: "count", description: "Count the words", argumentHint: "<text>", aliases: [] },
@@ -129,6 +159,8 @@ export interface CallOptions {
   readonly permission?: boolean;
   /** The agent gives the request up while the handler waits (aborts the signal it passed). */
   readonly giveUp?: boolean;
+  /** What the call did to a file, as the end of a call reports it; none when absent. */
+  readonly fileChange?: FileChange;
 }
 
 export type PlainStep =
@@ -278,6 +310,7 @@ export class PlainStore {
       this.#sessions.set(id, { id, folder, title, lastModified: at ?? this.#last });
     } else {
       stored.lastModified = at ?? this.#last;
+      if (stored.title === "") stored.title = title;
     }
   }
 
@@ -411,6 +444,10 @@ export interface PlainSessionContext {
   readonly store: PlainStore;
   /** The steps of the next turn of the script. */
   readonly takeTurn: () => readonly PlainStep[];
+  /** The models the agent lists, in its order; none when it lists no model. */
+  readonly models: readonly ModelInfo[];
+  /** The session is named (`session_started`) when it starts, not with its first prompt. */
+  readonly namedAtStart: boolean;
 }
 
 export class PlainSession implements AgentSession {
@@ -435,15 +472,22 @@ export class PlainSession implements AgentSession {
     this.id = context.id;
     this.options = context.options;
     this.events = this.#queue;
+    if (context.namedAtStart) this.#name();
+  }
+
+  #name(): void {
+    // A session named at its start has a record from then on, titled by its first prompt.
+    if (this.#context.namedAtStart) {
+      this.#context.store.remember(this.options.folder, this.id, "");
+    }
+    this.#queue.push({ type: "session_started", sessionId: this.id, agentVersion: VERSION });
   }
 
   async send(prompt: Prompt): Promise<void> {
     if (this.closed || this.lost) throw new PlainSessionClosed();
     // Named with the first prompt, as Claude's init record comes with it: the core takes a stored
     // session id for a session that ran, and resumes it when a setup needs a fresh client.
-    if (this.prompts.length === 0) {
-      this.#queue.push({ type: "session_started", sessionId: this.id, agentVersion: VERSION });
-    }
+    if (this.prompts.length === 0 && !this.#context.namedAtStart) this.#name();
     this.prompts.push(prompt);
     const text = textOf(prompt);
     this.#context.store.remember(this.options.folder, this.id, text);
@@ -468,20 +512,14 @@ export class PlainSession implements AgentSession {
     this.#turn?.abort();
   }
 
-  async stopTask(): Promise<void> {
-    throw new Error("the plain agent runs no task");
-  }
-
   async setPermissionMode(mode: PermissionMode): Promise<void> {
     if (mode !== PLAIN_MODE) throw new RangeError(`unknown permission mode: ${mode}`);
   }
 
   async setModel(model: string | null): Promise<void> {
-    if (model !== null) throw new Error("the plain agent has no model to choose");
-  }
-
-  async setEffort(): Promise<void> {
-    throw new Error("the plain agent cannot change its effort on a live session");
+    if (model !== null && !this.#context.models.some((entry) => entry.value === model)) {
+      throw new Error("the plain agent has no such model to choose");
+    }
   }
 
   async contextUsage(): Promise<ContextUsage> {
@@ -491,7 +529,12 @@ export class PlainSession implements AgentSession {
   loaded?: () => Promise<LoadedContext>;
 
   async info(): Promise<AgentInfo> {
-    return { models: [], commands: PLAIN_COMMANDS, permissionMode: PLAIN_MODE, account: null };
+    return {
+      models: this.#context.models,
+      commands: PLAIN_COMMANDS,
+      permissionMode: PLAIN_MODE,
+      account: null,
+    };
   }
 
   async close(): Promise<void> {
@@ -545,14 +588,14 @@ export class PlainSession implements AgentSession {
 
   /** The output of a command the prompt names, or null for a prompt that is a turn. */
   #command(text: string): string | null {
-    const match = /^\/(\S+)\s*(.*)$/s.exec(text.trim());
+    const match = /^:(\S+)\s*(.*)$/s.exec(text.trim());
     if (match === null) return null;
     const name = match[1] ?? "";
     const argument = (match[2] ?? "").trim();
     const known = PLAIN_COMMANDS.find(
       (entry) => entry.name === name || entry.aliases.includes(name),
     );
-    if (known === undefined) return `Unknown command: /${name}`;
+    if (known === undefined) return `Unknown command: :${name}`;
     if (known.name === "count") return `${argument.split(/\s+/).filter(Boolean).length} words`;
     return argument === "" ? "(nothing to say)" : argument;
   }
@@ -659,7 +702,7 @@ export class PlainSession implements AgentSession {
       callId,
       isError: !allowed || options.isError === true,
       output: allowed ? (options.output ?? "done") : message,
-      fileChange: null,
+      fileChange: options.fileChange ?? null,
       model: null,
       parentCallId: null,
     });
@@ -750,6 +793,12 @@ export interface PlainAgentOptions {
   readonly terminal?: true;
   /** What each live session has loaded (`loadedContext`), as `!memory` and `!skills` list it. */
   readonly loaded?: LoadedContext;
+  /** The agent lists these models (`models`, even an empty list), which a session takes with `setModel`. */
+  readonly models?: readonly ModelInfo[];
+  /** The agent has no terminal to continue a session in (`AgentWords.terminal` is null). */
+  readonly noTerminal?: true;
+  /** Each session is named when it starts, not with its first prompt. */
+  readonly namedAtStart?: true;
 }
 
 /** How the plain agent is told of a shell command: one text, which a test reads back. */
@@ -759,7 +808,8 @@ export function plainShellPrompt(run: ShellRun): string {
 
 export class PlainAgent implements AgentBackend {
   readonly name = PLAIN_NAME;
-  readonly words = PLAIN_WORDS;
+  readonly words: AgentWords;
+  readonly tools = PLAIN_TOOLS;
   readonly capabilities: Capabilities;
   readonly shell?: ShellMode;
   readonly store: PlainStore;
@@ -781,12 +831,23 @@ export class PlainAgent implements AgentBackend {
   turnsAfter?: (folder: string, session: string, after: SavedMessage) => Promise<ForeignTurns>;
   /** What each live session answers to `loaded`, with `loadedContext`. */
   readonly loaded: LoadedContext | null;
+  readonly models: readonly ModelInfo[];
+  readonly #namedAtStart: boolean;
 
   constructor(options: PlainAgentOptions = {}) {
+    this.words =
+      options.noTerminal === true
+        ? Object.freeze({ ...PLAIN_WORDS, terminal: null, terminalContinue: null })
+        : PLAIN_WORDS;
     this.store = options.store ?? new PlainStore();
     this.turns = options.turns ?? [];
     this.capabilities = PLAIN_CAPABILITIES;
     this.loaded = options.loaded ?? null;
+    this.models = options.models ?? [];
+    this.#namedAtStart = options.namedAtStart === true;
+    if (options.models !== undefined) {
+      this.capabilities = Object.freeze({ ...this.capabilities, models: true });
+    }
     if (this.loaded !== null) {
       this.capabilities = Object.freeze({ ...this.capabilities, loadedContext: true });
     }
@@ -844,6 +905,8 @@ export class PlainAgent implements AgentBackend {
       requests,
       store: this.store,
       takeTurn: () => this.turns.shift() ?? [say("ok")],
+      models: this.models,
+      namedAtStart: this.#namedAtStart,
     });
     const loaded = this.loaded;
     if (loaded !== null) session.loaded = async () => loaded;
@@ -870,18 +933,9 @@ export class PlainAgent implements AgentBackend {
     return new Set(this.store.list(folder).map((session) => session.id));
   }
 
-  // The agent keeps no record of trust: no folder is refused, and the daemon's git runs nowhere.
-  async folderTrusted(): Promise<boolean> {
-    return true;
-  }
-
-  async trustedRepository(_folder: string): Promise<Repository | null> {
-    return null;
-  }
-
-  async untrustedRepository(_folder: string): Promise<Repository | null> {
-    return null;
-  }
+  // No `folderTrust`: the agent keeps no record of trust, so no folder is refused and the
+  // daemon's git runs nowhere. No `stopTask` or `setEffort` either: it runs no task, and its
+  // effort changes only at a start.
 
   async close(): Promise<void> {
     this.closed = true;
@@ -899,6 +953,9 @@ export function plainAgent(options: PlainAgentOptions = {}): PlainEntry {
   return {
     required: [],
     optional: [],
+    tools: PLAIN_TOOLS,
+    toolNames: Object.freeze(["run", "look", "change", "ask", "delegate", "propose"]),
+    limitsHeading: "Limits of the plain agent",
     built,
     build: (_context: AgentContext) => {
       const agent = new PlainAgent(options);
@@ -907,3 +964,39 @@ export function plainAgent(options: PlainAgentOptions = {}): PlainEntry {
     },
   };
 }
+
+/** A model entry of the plain agent's list, with the efforts it takes. */
+export function plainModel(
+  value: string,
+  options: { readonly isDefault?: boolean; readonly efforts?: readonly string[] } = {},
+): ModelInfo {
+  const efforts = options.efforts ?? [];
+  return {
+    value,
+    isDefault: options.isDefault ?? false,
+    resolvedModel: options.isDefault === true ? null : `${value}-1`,
+    displayName: value.toUpperCase(),
+    description: null,
+    supportsEffort: efforts.length > 0,
+    supportedEffortLevels: efforts,
+  };
+}
+
+/**
+ * A model list in the shape agents give one: the default entry first, a model that takes both
+ * efforts, and one that takes none.
+ */
+export const PLAIN_MODELS: readonly ModelInfo[] = Object.freeze([
+  {
+    ...plainModel("standard", { isDefault: true, efforts: ["brief", "full"] }),
+    displayName: "Standard (recommended)",
+    description: "The model the agent picks when none is chosen",
+    resolvedModel: "big-2",
+  },
+  {
+    ...plainModel("big", { efforts: ["brief", "full"] }),
+    displayName: "Big 2",
+    resolvedModel: "big-2",
+  },
+  { ...plainModel("small"), displayName: "Small 1", resolvedModel: "small-1" },
+]);

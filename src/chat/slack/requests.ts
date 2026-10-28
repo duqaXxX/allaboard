@@ -9,11 +9,11 @@
  * `<url|label>` can hide what it links and no text can close its code block.
  */
 
-import type { PermissionRequest, Question, QuestionOption } from "../../agent/seam.ts";
-import { answerOf, type Names, named, oneLine, proposedPlan, texts } from "../../core/port.ts";
+import type { Question, QuestionOption } from "../../agent/seam.ts";
+import { answerOf, type Names, named, oneLine, texts } from "../../core/port.ts";
 import { PY_SPACE, strip } from "../../text.ts";
 import { isRecord } from "../../values.ts";
-import type { ShellRequest, TerminalRequest } from "../seam.ts";
+import type { ApprovalRequest, ShellRequest, TerminalRequest } from "../seam.ts";
 import { shownAsWritten } from "./reply/escape.ts";
 import * as slackTexts from "./texts.ts";
 
@@ -129,7 +129,7 @@ function code(chunk: string): Block {
  */
 export function approvalBlocks(
   approvalId: string,
-  request: PermissionRequest,
+  request: ApprovalRequest,
   names: Names,
 ): Block[] {
   // A title is the agent's own words, shown with no markup of ours.
@@ -142,10 +142,9 @@ export function approvalBlocks(
   if (request.description) {
     blocks.push(context(head(shownAsWritten(request.description), SECTION_LIMIT)));
   }
-  // An `ExitPlanMode` request shows the plan alone, as text in the same code blocks as any
-  // other input: markdown would draw a link, a mention or a fence the model wrote.
-  const detail =
-    proposedPlan(request.toolName, request.input) ?? JSON.stringify(request.input, null, 2);
+  // A plan request shows the plan alone, as text in the same code blocks as any other input:
+  // markdown would draw a link, a mention or a fence the model wrote.
+  const detail = request.plan ?? JSON.stringify(request.input, null, 2);
   const room = MESSAGE_BLOCKS - blocks.length - 1; // the actions block closes it
   blocks.push(...codeBlocks(detail, room, slackTexts.APPROVAL_CUT), {
     type: "actions",

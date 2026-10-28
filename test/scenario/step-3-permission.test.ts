@@ -31,6 +31,7 @@ test("the owner approves a permission, the tool runs and the request's message i
     input: { command: "rm x" },
     title: null,
     description: null,
+    plan: null,
   });
   const messages = world.chat.messages(world.channel, thread);
   assert.deepEqual(

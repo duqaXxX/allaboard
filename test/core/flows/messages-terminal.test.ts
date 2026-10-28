@@ -10,7 +10,7 @@ import { fill } from "../../../src/core/texts.ts";
 import { shellQuote } from "../../../src/text.ts";
 import { OWNER } from "../../support/memory-chat.ts";
 import { hold, PlainAgent, saved, say } from "../../support/plain-agent.ts";
-import { settledTurn } from "../../support/sessions.ts";
+import { settledTurn } from "../../support/settle.ts";
 import { MessagesWorld } from "./messages-world.ts";
 
 test("!terminal during a turn cuts it with no interrupt and gives the continuing line", async (t) => {

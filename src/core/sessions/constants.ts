@@ -23,8 +23,9 @@ export const TASK_EVENTS: ReadonlySet<SessionEventType> = new Set([
   "task_ended",
   "task_updated",
 ]);
-// After a background task's notification, the CLI starts a turn of its own to report it
-// (measured on Claude Code 2.1.280). If that turn never comes, the owner's queue moves on.
+// After a background task's notification, the agent starts a turn of its own to report it, as
+// `backgroundTasks` declares (measured on Claude Code 2.1.280). Only a session of an agent with
+// that capability waits at all. If that turn never comes, the owner's queue moves on.
 export const INJECTED_TURN_WAIT = 30.0;
 // How long the answer to `!stop` waits for the reply it cut short to end. An interrupted turn
 // ends within a second or two; a final write that is retried takes ten.

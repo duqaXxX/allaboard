@@ -1,9 +1,14 @@
+/**
+ * The file index over repositories an agent handed the core (`test/support/repositories.ts`: any
+ * folder with a `.git` directory). What a real agent's trust record has to tell apart (usable
+ * repositories below a folder, worktrees, gitfiles, bare layouts) is tested with the Claude module
+ * (`test/agent/claude/files/listing.test.ts`).
+ */
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import { trustedRepository, untrustedRepository } from "../../../src/agent/claude/trust.ts";
 import type { Repository } from "../../../src/agent/seam.ts";
 import {
   folderFiles,
@@ -13,22 +18,21 @@ import {
   type RepositoryLookup,
   rank,
   repositoriesOf,
-  untrustedRepositories,
   usable,
   walkFiles,
 } from "../../../src/core/files/listing.ts";
 import { regularFiles } from "../../../src/core/files/read.ts";
 import { AsyncEvent, FakeClock } from "../../support/fake-clock.ts";
-import { addWorktree, committed, git, gitInit, trust } from "../../support/git-layouts.ts";
 import {
-  anyRepository,
   commitAll,
   POSIX,
-  repository,
+  plainRepository as repository,
   scratch,
   write,
   writeAll,
-} from "./support.ts";
+} from "../../support/files.ts";
+import { committed, gitInit } from "../../support/git-layouts.ts";
+import { repositoryAt as anyRepository } from "../../support/repositories.ts";
 
 const tmp = scratch();
 const BOTH = {
@@ -50,18 +54,15 @@ function work(): { work: string; home: string; lookup: RepositoryLookup } {
   mkdirSync(home, { recursive: true });
   const folder = join(tmp.dir, "work");
   mkdirSync(folder, { recursive: true });
-  trust(home, [folder]);
   return { work: folder, home, lookup: lookupIn(home) };
 }
 
-function lookupIn(home: string): RepositoryLookup {
-  return (directory) => trustedRepository(directory, home);
+function lookupIn(_home: string): RepositoryLookup {
+  return anyRepository;
 }
 
 /** The owner's trust of `repositories`, each on its own, beside the session's folder. */
-function trustAlso(folder: string, home: string, ...repositories: string[]): void {
-  trust(home, [folder, ...repositories]);
-}
+function trustAlso(_folder: string, _home: string, ..._repositories: string[]): void {}
 
 async function roots(folder: string, lookup: RepositoryLookup): Promise<string[]> {
   return (await repositoriesOf(folder, lookup)).map((found) => found.root).toSorted();
@@ -152,25 +153,7 @@ test("a folder without a repository has no source", async () => {
   assert.equal(usable(await anyRepository(plain)), null);
 });
 
-test("a git dir with no work tree is no source", async () => {
-  const folder = app();
-  const inside = await repository(join(folder, ".git"));
-  assert.ok(inside.insideGitDir);
-  assert.equal(usable(inside), null);
-  assert.notEqual(usable(await repository(folder)), null);
-});
-
 // --- the repositories of a session's folder ---
-
-test("a folder inside a repository has that repository", async () => {
-  const folder = app();
-  const home = join(tmp.dir, "home");
-  mkdirSync(home);
-  trust(home, [folder]);
-  mkdirSync(join(folder, "src"));
-  assert.deepEqual(await roots(folder, lookupIn(home)), [folder]);
-  assert.deepEqual(await roots(join(folder, "src"), lookupIn(home)), [folder]);
-});
 
 test("a plain folder has the usable repositories two levels below it", async () => {
   const { work: folder, home, lookup } = work();
@@ -179,63 +162,6 @@ test("a plain folder has the usable repositories two levels below it", async () 
   const three = gitInit(join(folder, "group", "deeper", "three")); // three levels down: not found
   trustAlso(folder, home, one, two, three);
   assert.deepEqual(await roots(folder, lookup), [one, two].toSorted());
-});
-
-test("a repository below a folder is kept only with its own trust", async () => {
-  const { work: folder, home, lookup } = work();
-  const trusted = gitInit(join(folder, "trusted"));
-  gitInit(join(folder, "group", "other"));
-  trustAlso(folder, home, trusted);
-  assert.deepEqual(await roots(folder, lookup), [trusted]); // the folder's trust is not theirs
-  trust(home, [folder]);
-  assert.deepEqual(await roots(folder, lookup), []);
-});
-
-/** The keys of the repositories below `folder` still to trust, with the record in `home`. */
-async function toTrust(folder: string, home: string): Promise<string[]> {
-  const found = await untrustedRepositories(folder, lookupIn(home), (directory) =>
-    untrustedRepository(directory, home),
-  );
-  return found.map((repository) => repository.key);
-}
-
-test("the repositories below a folder that lack their own trust are named, by key", async () => {
-  // the ones `repositoriesOf` leaves out, which the owner can trust in the terminal.
-  const { work: folder, home } = work();
-  const trusted = gitInit(join(folder, "trusted"));
-  const other = gitInit(join(folder, "group", "other"));
-  const first = gitInit(join(folder, "a-first"));
-  gitInit(join(folder, "group", "deeper", "three")); // three levels down: not looked at
-  mkdirSync(join(folder, "plain")); // no repository
-  trustAlso(folder, home, trusted);
-  assert.deepEqual(await toTrust(folder, home), [first, other]);
-  trust(home, [folder, trusted, other, first]);
-  assert.deepEqual(await toTrust(folder, home), []);
-});
-
-test("worktrees of one checkout are named once, at the checkout their trust is keyed on", async () => {
-  const { work: folder, home } = work();
-  const main = gitInit(join(tmp.dir, "main"));
-  addWorktree(main, join(folder, "wt-one"));
-  addWorktree(main, join(folder, "wt-two"));
-  assert.deepEqual(await toTrust(folder, home), [main]);
-});
-
-test("a repository no trust would cover is not named", async () => {
-  const { work: folder, home } = work();
-  git(folder, "init", "-q", "--bare", "store.git"); // a bare layout: no work tree, no key
-  mkdirSync(join(folder, "broken"));
-  writeFileSync(join(folder, "broken", ".git"), "not a gitfile\n"); // names no git dir
-  assert.deepEqual(await toTrust(folder, home), []);
-});
-
-test("a folder in a usable repository names none below it", async () => {
-  const folder = app();
-  const home = join(tmp.dir, "home");
-  mkdirSync(home);
-  trust(home, [folder]);
-  gitInit(join(folder, "vendor", "lib"));
-  assert.deepEqual(await toTrust(folder, home), []);
 });
 
 test("the repositories below a folder are looked up together", async () => {
@@ -285,38 +211,7 @@ test("hidden folders are not searched for a repository", async () => {
   assert.deepEqual(await roots(folder, lookup), []);
 });
 
-test("a folder in an untrusted repository has nothing below it", async () => {
-  const home = join(tmp.dir, "home");
-  mkdirSync(home);
-  const outer = gitInit(join(tmp.dir, "outer"));
-  const folder = join(outer, "packages");
-  const inner = gitInit(join(folder, "lib"));
-  const lookup = lookupIn(home);
-  assert.deepEqual(await roots(folder, lookup), []);
-  trust(home, [inner]); // a repository the owner trusted on its own stays usable
-  assert.deepEqual(await roots(folder, lookup), [inner]);
-  trust(home, [outer]);
-  assert.deepEqual(await roots(folder, lookup), [outer]);
-});
-
 // --- what the folder offers to search ---
-
-test("a plain folder is walked for regular files only", POSIX, async () => {
-  const plain = join(tmp.dir, "plain");
-  writeAll(plain, "a.txt", "docs/b.md", "docs/deep/c.md", ".hidden/d.txt");
-  write(join(tmp.dir, "outside"), "secret.txt");
-  symlinkSync(join(tmp.dir, "outside"), join(plain, "dir-link"));
-  symlinkSync(join(plain, "a.txt"), join(plain, "file-link"));
-  writeAll(plain, ".git/config", "sub/.git/config");
-  mkdirSync(join(plain, "empty-dir"));
-  const listing = new Listings(anyRepository);
-  assert.deepEqual((await filesOf(listing, plain)).toSorted(), [
-    ".hidden/d.txt",
-    "a.txt",
-    "docs/b.md",
-    "docs/deep/c.md",
-  ]);
-});
 
 test("a folder inside a repository lists what git does not ignore", async () => {
   const folder = app();

@@ -31,12 +31,12 @@ import {
   WebAPIRequestError,
   WebClient,
 } from "@slack/web-api";
-import { NAME, WORDS } from "../../src/agent/claude/backend.ts";
 import { ASIDE_ID } from "../../src/chat/slack/reply/blocks.ts";
 import { type Json, type JsonObject, slackPayload } from "./fixtures.ts";
+import { PLAIN_NAME, PLAIN_TOOLS, PLAIN_WORDS } from "./plain-agent.ts";
 
-/** The agent a provider's texts name in a test: the Claude back end's own name and words. */
-export const AGENT = { name: NAME, words: WORDS };
+/** The agent a provider's texts name in a test: the plain agent's own name and words. */
+export const AGENT = { name: PLAIN_NAME, words: PLAIN_WORDS, tools: PLAIN_TOOLS };
 export const OWNER = "U000ALICE";
 export const STRANGER = "U000BOB";
 export const TEAM = "T000TEAM";

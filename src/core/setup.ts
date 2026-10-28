@@ -18,10 +18,20 @@ export interface Choice {
 
 export const DEFAULT_CHOICE: Choice = { model: DEFAULT, effort: DEFAULT, bypass: false };
 
+/**
+ * The list's entry for a choice's model: the agent's default entry for `DEFAULT`, else the entry
+ * with that value. Undefined when the list holds none.
+ */
+export function modelEntry(models: readonly ModelInfo[], model: string): ModelInfo | undefined {
+  return model === DEFAULT
+    ? models.find((m) => m.isDefault)
+    : models.find((m) => m.value === model);
+}
+
 /** The levels `model` accepts, in the agent's order; empty for a model without effort. */
 export function effortLevels(models: readonly ModelInfo[], model: string): readonly string[] {
-  const entry = models.find((m) => m.value === model && m.supportsEffort);
-  return entry === undefined ? [] : entry.supportedEffortLevels;
+  const entry = modelEntry(models, model);
+  return entry === undefined || !entry.supportsEffort ? [] : entry.supportedEffortLevels;
 }
 
 /** What a provider's controls report, before it is checked against the models listed. */
@@ -56,7 +66,7 @@ export interface Summary {
 }
 
 export function summaryOf(models: readonly ModelInfo[], choice: Choice): Summary {
-  const listed = models.find((m) => m.value === choice.model);
+  const listed = modelEntry(models, choice.model);
   return {
     model: listed === undefined ? choice.model : listed.displayName,
     effort: choice.effort === DEFAULT ? null : choice.effort,

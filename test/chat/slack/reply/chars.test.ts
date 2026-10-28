@@ -34,6 +34,7 @@ import {
   THREAD,
 } from "../../../support/fake-slack.ts";
 import type { Json, JsonObject } from "../../../support/fixtures.ts";
+import { PLAIN_PREVIEWS } from "../../../support/plain-tools.ts";
 
 const R = "🟥";
 const G = "🟩";
@@ -144,71 +145,6 @@ const SCENARIOS: Record<string, Op[]> = {
     ["finish"],
     ["close", "footer"],
   ],
-  // previews and cards: titles, details that grow, a context block, code blocks, an error
-  previews: [
-    [
-      "task",
-      upd("e", "Edit: e", "complete", {
-        name: "Edit",
-        preview: view(`Update(${R.repeat(200)})`, G.repeat(200), DIFF, "diff"),
-      }),
-    ],
-    ["settle"],
-    [
-      "task",
-      upd("a", `Agent: ${R.repeat(200)}`, "in_progress", {
-        name: "Agent",
-        task: true,
-        message: false,
-        calls: 3,
-        details: lines(30, (i) => `Read: ${G}${i}`).join("\n"),
-      }),
-    ],
-    ["settle"],
-    [
-      "task",
-      upd("a", `Agent: ${R.repeat(200)}`, "in_progress", {
-        name: "Agent",
-        task: true,
-        message: false,
-        calls: 4,
-        details: lines(35, (i) => `Read: ${G}${i}`, 25).join("\n"),
-      }),
-    ],
-    ["settle"],
-    [
-      "task",
-      upd("q", "AskUserQuestion: q", "complete", {
-        name: "AskUserQuestion",
-        preview: view(
-          "User answered",
-          "",
-          lines(40, () => `· ${R.repeat(50)} → ${G.repeat(50)}\`x\`<b>`).join("\n"),
-          "",
-          true,
-        ),
-      }),
-    ],
-    ["settle"],
-    ["task", upd("w", "Write: w", "in_progress", { name: "Write" })],
-    ["settle"],
-    [
-      "task",
-      upd("w", "Write: w", "complete", {
-        name: "Write",
-        preview: view(
-          "Write(n.txt)",
-          "Wrote lines",
-          lines(2499, (i) => `${i} ${R}\`\`\`${G}`, 1).join("\n"),
-        ),
-      }),
-    ],
-    ["settle"],
-    ["task", upd("b", `Bash: ${R.repeat(100)}`, "error", { name: "Bash", output: G.repeat(4000) })],
-    ["settle"],
-    ["finish"],
-    ["close", "footer"],
-  ],
   // after the 280 seconds: the update path, the banner, continuation posts
   window: [
     ["text", `${R.repeat(400)}\n\nsecond`],
@@ -218,8 +154,8 @@ const SCENARIOS: Record<string, Op[]> = {
     ["settle"],
     [
       "task",
-      upd("e", "Edit: e", "complete", {
-        name: "Edit",
+      upd("e", "Move: e", "complete", {
+        name: "Move",
         preview: view("Update(a)", "Added", DIFF, "diff"),
       }),
     ],
@@ -315,34 +251,6 @@ const PYTHON: Record<string, [string, number[]][]> = {
     ["postMessage", [12, 110]],
     ["postMessage", [7, 0, 1]],
   ],
-  // The failed Bash card and the fold line are the two sizes set by hand: the
-  // run is now one card titled by its counts (19 points), which the Python sink never drew.
-  previews: [
-    ["startStream", [10965]],
-    ["stopStream", []],
-    ["startStream", [10975]],
-    ["stopStream", []],
-    ["startStream", [10975]],
-    ["stopStream", []],
-    ["startStream", [10975]],
-    ["stopStream", []],
-    ["startStream", [48]],
-    ["appendStream", [150, 289, 0]],
-    ["appendStream", [150, 300, 0]],
-    ["appendStream", [13, 0, 0, 3000]],
-    ["appendStream", [8, 0, 0]],
-    ["appendStream", [12, 0, 11]],
-    ["stopStream", []],
-    ["startStream", [10999, 2208]],
-    ["stopStream", []],
-    ["startStream", [11005, 2009]],
-    ["stopStream", []],
-    ["startStream", [5194]],
-    ["update", [150, 48, 150, 13, 3000, 12]],
-    ["appendStream", [19, 0, 0]],
-    ["stopStream", [0, 6]],
-    ["update", [12, 5194, 19, 0, 6]],
-  ],
   "text-nolines": [
     ["startStream", [8000]],
     ["appendStream", [3000]],
@@ -427,6 +335,7 @@ async function replay(ops: Op[]): Promise<FakeSlack> {
     userId: OWNER,
     botUserId: BOT,
     limiter: new UpdateLimiter({ limit: 10 ** 9, burst: 10 ** 9, clock }),
+    previews: PLAIN_PREVIEWS,
     clock,
   });
   for (const op of ops) {

@@ -75,8 +75,8 @@ import { StateStore } from "../../src/core/state.ts";
 import * as texts from "../../src/core/texts.ts";
 import { Updates } from "../../src/core/updates.ts";
 import { setWriter } from "../../src/log.ts";
+import { CLAUDE_AGENT } from "./claude-tools.ts";
 import {
-  AGENT,
   type AsyncEvent,
   BOT,
   CHANNEL,
@@ -302,7 +302,7 @@ export class World {
       slack,
       replies: slack,
       identity: this.identity,
-      agent: () => AGENT,
+      agent: () => CLAUDE_AGENT,
       limiter: this.limiter,
       clock: this.slackClock,
     });

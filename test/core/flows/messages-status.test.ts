@@ -11,7 +11,7 @@ import * as texts from "../../../src/core/texts.ts";
 import { fill } from "../../../src/core/texts.ts";
 import { shellQuote } from "../../../src/text.ts";
 import { OWNER } from "../../support/memory-chat.ts";
-import { call, die, hold, type PlainAgent } from "../../support/plain-agent.ts";
+import { call, die, hold, PlainAgent } from "../../support/plain-agent.ts";
 import {
   MessagesWorld,
   PLAIN_NAMES,
@@ -262,4 +262,33 @@ test("past ten threads the answer lists the newest and counts the others", async
   for (const ref of opened.slice(0, 2)) {
     assert.ok(!lines.some((line) => line.includes(linkTo(ref.thread))), ref.thread);
   }
+});
+
+test("a thread's !status gives the line that continues the session in a terminal", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  const status = await session.status();
+  assert.ok(status.includes(`plain --resume`), status);
+});
+
+test("for an agent with no terminal the thread's !status shows no such line", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new PlainAgent({ noTerminal: true }) });
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  const status = await session.status();
+  assert.ok(!status.includes("--resume"), status);
+  assert.ok(
+    status.startsWith(fill(texts.STATUS, { directory: world.folder, session: "plain-session-1" })),
+    status,
+  );
+});
+
+test("!terminal for an agent with no terminal says there is none", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new PlainAgent({ noTerminal: true }) });
+  const ref = await world.opened("one");
+  await world.says("!terminal", ref.thread);
+  assert.equal(world.shown(ref).at(-1), texts.named(texts.TERMINAL_UNAVAILABLE, PLAIN_NAMES));
 });

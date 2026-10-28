@@ -37,7 +37,6 @@ const FOLDER = "/srv/alice/app";
 const START: StartOptions = {
   folder: FOLDER,
   resume: null,
-  settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
 };
@@ -213,14 +212,14 @@ test("a command runs without a turn of the script, by its name or its alias", LI
   const agent = new PlainAgent().next(say("Scripted."));
   const { session, events } = await started(agent);
   const outputs: string[] = [];
-  for (const text of ["/echo hi there", "/say again", "/count a b c", "/nope"]) {
+  for (const text of [":echo hi there", ":say again", ":count a b c", ":nope"]) {
     await session.send(prompt(text));
     const turn = await turnOf(events);
     outputs.push(turn.flatMap((e) => (e.type === "text" ? [e.text] : [])).join(""));
     const end = turn.at(-1);
     assert.ok(end?.type === "turn_ended" && end.steps === 0 && end.tokens !== undefined);
   }
-  assert.deepEqual(outputs, ["hi there", "again", "3 words", "Unknown command: /nope"]);
+  assert.deepEqual(outputs, ["hi there", "again", "3 words", "Unknown command: :nope"]);
   assert.equal(agent.turns.length, 1, "the scripted turn is still waiting");
 });
 
@@ -294,8 +293,8 @@ test(
 
 test("what a live session cannot do, it refuses", LIMIT, async () => {
   const { session } = (await started(new PlainAgent())) as { session: AgentSession };
-  await assert.rejects(session.setEffort("full"));
-  await assert.rejects(session.stopTask("task-1"));
+  assert.equal(session.setEffort, undefined);
+  assert.equal(session.stopTask, undefined);
   await assert.rejects(session.setModel("some-model"));
   await session.setModel(null);
   await session.setPermissionMode(PLAIN_MODE);

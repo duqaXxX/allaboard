@@ -60,10 +60,10 @@ What crosses the agent seam:
 
 | Crossing | Direction | What |
 |---|---|---|
-| commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions`, `aliveSessions`, `folderTrusted`, `trustedRepository`, `untrustedRepository`, `usageLimits`, `tagSession`, `forkSession` (with `sessionForks`), `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask`, `setPermissionMode`, `setModel`, `setEffort`, `contextUsage`, `loaded` (with `loadedContext`), `info`, `close` |
+| commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions` and `aliveSessions` (with `sessionListing`), `folderTrusted`, `trustedRepository` and `untrustedRepository` (with `folderTrust`), `usageLimits`, `tagSession`, `forkSession` (with `sessionForks`), `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask` (with `subagents` or `backgroundTasks`), `setPermissionMode`, `setModel`, `setEffort` (with `liveEffort`), `contextUsage`, `loaded` (with `loadedContext`), `info`, `close` |
 | events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), word that the running turn took a task's notification (`notification_folded`), a message from another of the owner's sessions (`peer_message`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
-| declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
+| declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, and `AgentBackend.tools`, the `ToolVocabulary` of the tools the terminal shows in words or a preview of its own (also on the `AgentEntry`, readable without a back end; `NO_TOOL_WORDS` for an agent with none), which `Previews` of `src/core/reply/previews.ts` draws and every other tool shows generically, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
 
 What crosses the chat seam, in both directions:
 
@@ -308,6 +308,17 @@ stopped stream back as Slack does for one run of plain words (the recording
 `api-conversations-replies-stream`); marks, cards and other chunk shapes read back no blocks, and
 the tests of the provider's own `endReply` cover them with recorded reads.
 
+Tests keep to the same layers. `test/core/` and `test/chat/` use the plain agent and the memory
+chat and never reach `src/agent/<module>/`, directly or through a file of `test/support/` or of `src/` (`src/registry.ts`
+imports the modules); `test/vocabulary.test.ts` follows every relative import, bare ones included.
+A test of the configuration the daemon ships (`test/config.test.ts`) names the registry and lives at
+the top of `test/`. A test that runs the core or the Slack provider
+over Claude's recorded streams, tool vocabulary, trust record or model list is a test of the Claude
+module and lives under `test/agent/claude/`: the sessions (`sessions/`), the Slack app handlers
+(`slack-app/`), the reply over the recordings and the golden files (`reply/`), the folder trust
+under the footer's git and `!open` (`files/`, `footer-git.test.ts`). `test/conformance/` and
+`test/scenario/` run every module the registry names.
+
 Not tested: a module other than these. No second real agent or chat ships, and the seams were
 shaped on the two test modules, so a first real one may need a seam change. With Claude and Slack
 the behaviour was compared by the existing suite and the golden files; on 2026-10-11 the daemon had
@@ -321,7 +332,8 @@ module that breaks it fails only in use.
 
 | Subject | Rule | Checked by `test/conformance/agent.ts` |
 |---|---|---|
-| A command | The owner types `!name args`. When `name` is the `name` of an entry of `AgentInfo.commands`, the agent receives the prompt `/name args` (the message flow, `messages.messages`); an alias does not match, and any other `!text` arrives as typed. A name in `AgentWords.newSession` is refused inside a thread, and the names in `AgentWords.login` and `AgentWords.logout`, and those in `AgentWords.notOffered` that the session's own list does not have, are answered by the core (`commands.notOfferedAnswer`): none of them reaches the agent | `a command's output arrives whole, once, and uses no model`; nothing checks the text that arrives as typed |
+| A tool the terminal words | `AgentBackend.tools` names, by the agent's own tool names, the tools whose calls the terminal folds in words, whose file changes it previews (the title for a change to an existing file; a created file shows its content under the tool's name), whose calls a reply holds until they end (`askers`, `launchers`), whose failure it counts with the others, and the input keys it titles or times a call by. The core draws exactly what is declared and shows any other tool as its name and its line; `plan` names the tool whose approval asks for a plan, and the core hands the chat the plan as `ApprovalRequest.plan`. `AgentEntry.toolNames` lists every tool name the agent is known to offer; none of them, and none of the vocabulary, appears as a string literal under `src/core/` or `src/chat/`, but in a constant `test/vocabulary.test.ts` lists by name (a task kind's label, a button's) | not checked: the plain agent (`PLAIN_TOOLS`) and `test/core/reply/vocabulary.test.ts` prove the core draws a vocabulary of another agent |
+| A command | The owner types `!name args`. When `name` is the `name` of an entry of `AgentInfo.commands`, the agent receives the prompt `name args` behind `AgentWords.commandPrefix` (`/` for Claude Code; the message flow, `messages.messages`); an alias does not match, and any other `!text` arrives as typed. A name in `AgentWords.newSession` is refused inside a thread, and the names in `AgentWords.login` and `AgentWords.logout`, and those in `AgentWords.notOffered` that the session's own list does not have, are answered by the core (`commands.notOfferedAnswer`): none of them reaches the agent | `a command's output arrives whole, once, and uses no model`; nothing checks the text that arrives as typed |
 | The effort | `effort_observed` and `effort_changed` come before the `turn_ended` of their turn: `ThreadSession.showFooterIfEnded` builds the footer once the session has ended, from what it has by then. Null is the agent's default | Not checked: only that a level is one of `Capabilities.effortLevels` |
 | The model | `model_changed` carries the id of the model the agent runs after a switch (a command, `setModel`, a fallback, a resume) and comes before the `turn_ended` of the command's turn, ahead of a `contextUsage` that after a command still names the model before it. Needs `models` | `a command that switches the model says so before the turn ends`; a back end without `models` emits none (`assertDeclared`) |
 | A goal | `goal_changed` says what became of the goal the owner set with the agent's command: `set`, `not_met` (the agent goes on working for it), `achieved` with the counts it gives, or `cleared`. A check and an achievement come before the `turn_ended` of the turn they belong to; the core draws them in that turn's reply and keeps the condition of a set goal in memory for `!stop`, which names `AgentWords.goalClear` when the agent has one. The agent's own command says when a goal is set or cleared. `clearGoal` is called on an idle session only, after a channel's stop, and shows no event. Needs `goals` | a back end without `goals` emits none (`assertDeclared`) |
@@ -332,16 +344,24 @@ module that breaks it fails only in use.
 | `interrupt` | The running turn ends with `turn_ended` whose `ending` is `interrupted`, and the session stays usable. With no turn running it resolves and ends nothing. The core has no timer for a turn that never ends after it | `interrupt ends the turn as interrupted, and the session goes on` |
 | `stopTask` | The task's line closes only when the agent then sends `task_ended`, or `task_updated` with `terminal` and a status. Until then the reply that holds the line stays open | Not checked |
 | `setEffort(null)`, `setModel(null)` | Null is the agent's default. The core calls `setEffort` only with `liveEffort` and `setModel` only with `models`, and never `setModel(null)` | `setEffort takes a declared level or null, and refuses another`, `setModel takes a listed model or null` |
+| The default model | The entry of `AgentInfo.models` with `ModelInfo.isDefault` stands for the model the agent picks when none is chosen. The setup draws it as the default choice (`setup.DEFAULT`) and sends nothing to `setModel` for it; the names of the core skip it (`models.modelName`, `models.settingName`) | `the default entry is the one the list marks, whatever its value` |
 | `setPermissionMode` | A mode the agent refuses rejects. The core then changes nothing of its own: the bypass it stores is written only after the call resolves | `a permission mode the back end names is taken, another is refused` |
 | `session_started` | Emitted only once a start that resumes that id would succeed: the core stores the id when the event arrives, and the setup's Start may resume it before any prompt | `an id that session_started names can be resumed at once` |
 | A request | `RequestHandler.permission` and `RequestHandler.question` each resolve once. The agent passes a signal and aborts it when it no longer waits: the core takes the request back from the owner and resolves it as refused | `a request the agent gives up aborts the signal it passed, and the turn goes on to its end` |
 | A start that fails | `ResumeRefused`, the one error class of the seam, when the session a start names cannot be resumed: the core forgets the thread. Any other rejection is shown to the owner by its name and the next message tries again. Neither leaves a process running | `a resume the agent refuses rejects with ResumeRefused and leaves no process` |
 
-Some members are required by the type and serve a capability the module may not declare. The core
-never calls them then, and the plain agent shows what to give back: `folderTrusted` answers true
-and `trustedRepository` and `untrustedRepository` null without `folderTrust`, `setEffort` and `stopTask` throw without
-`liveEffort` and `backgroundTasks`, and `AgentInfo.models` is an empty list without `models`.
-`AgentBackend.usageLimits`, `AgentBackend.tagSession`, `AgentBackend.sessionTitle` and `AgentSession.loaded` are the members left out when their capability is not declared.
+Members that serve a capability are optional on the type and present exactly when the module
+declares it (a conformance check asserts that): `listSessions`, `datedSessions` and
+`aliveSessions` with `sessionListing`; `folderTrusted`, `trustedRepository` and
+`untrustedRepository` with `folderTrust`; `AgentSession.setEffort` with `liveEffort`;
+`AgentSession.stopTask` with `subagents` or `backgroundTasks`; `AgentBackend.usageLimits`,
+`AgentBackend.tagSession`, `AgentBackend.sessionTitle` and `AgentSession.loaded` with theirs. The
+core checks the capability and the member before it calls one; a module that declares
+`folderTrust` with no `folderTrusted` has no folder trusted. `AgentInfo.models` is an empty list
+without `models`. `AgentWords.terminal` is null for an agent with no terminal to continue in: the
+core answers `!terminal` with `texts.TERMINAL_UNAVAILABLE`, leaves the terminal line out of
+`!status` and does not look for terminals that hold a session. `SessionEvent.peer_message` needs
+no capability: an agent whose sessions cannot message each other never emits it.
 
 ### What a chat must do that the types do not say
 
@@ -899,12 +919,12 @@ left unfinished does not hide the next turn's text.
 | `text_delta` | a top-level `stream_event` of type `content_block_delta` carrying a `text_delta`; a subagent's gives none | the text, as it is written |
 | none | a top-level text block in an `assistant` record whose message id a `message_start` announced | nothing more: the same text already arrived as deltas |
 | `text` | the same in a top-level `assistant` record whose message id no `message_start` announced; a subagent's gives none | the text, where it arrives, a paragraph apart from text before it (note 1) |
-| `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument`, or with its description for a command (`previews.described`), as the terminal titles its line. A command's line also carries `$ <command>` as its `details` (`previews.commandLine`) and when it started (`TaskUpdate.startedAt`), for a chat that shows its seconds. A call of a tool that starts an agent is held until its task starts, and a message that continues an agent that has ended is no line (note 2) |
+| `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument`, or with its description for a command (`Previews.described`), as the terminal titles its line. A command's line also carries `$ <command>` as its `details` (`Previews.commandLine`) and when it started (`TaskUpdate.startedAt`), for a chat that shows its seconds. A call of a tool that starts an agent is held until its task starts, and a message that continues an agent that has ended is no line (note 2) |
 | the same with `parentCallId` set, from the record's `parent_tool_use_id` (a subagent, or a skill run in a forked context) | the same blocks | the parent's line counts the subagent's calls and holds its latest ones; nothing under the call of a subagent in the background (note 2) |
 | `call_ended` for a line | a `tool_result` or `advisor_tool_result` block; `model` is `resolvedModel` of the Agent call's `tool_use_result` when it differs from the main thread's last `message.model` | the line completes, or shows an error with the output's first line when `isError`; a line whose task already ended as stopped keeps `Stopped` |
 | `task_started` | a `system` record of subtype `task_started`; `agentType` is its `subagent_type`, `background` its `is_backgrounded` | for a tool call, nothing yet; a task's line once the call's result arrives with the task still running (note 3). For a subagent in the background, its launch line as text and no line (note 2) |
 | `task_progress` | subtype `task_progress` | the line shows the task's description |
-| `task_ended`, a terminal `task_updated` | subtype `task_notification`; subtype `task_updated` whose patch names the status `completed`, `failed`, `stopped` or `killed` | the line completes, shows an error when the task failed, or completes with `Stopped` |
+| `task_ended`, a terminal `task_updated` | subtype `task_notification`; subtype `task_updated` whose patch names the status `completed`, `failed`, `stopped` or `killed` | the line completes, shows an error when the task failed, or completes with `Stopped`. The status is a `TaskOutcome` of the seam (`completed`, `failed`, `stopped`, `killed`); the Claude translator maps any other word of a notification to `completed` |
 | `agent_error` with `parentCallId` set | an `assistant` record that carries `error` | nothing in the reply's text; its words become a nested line of the call's card, when the call has one (note 4) |
 | `agent_error` of kind `authentication` | the same, with `error` `authentication_failed` | a note asking to run `claude` and `/login` on the host. Claude Code sends this category for a 401 and for a 403 alike |
 | any other `agent_error` | the same, with any other `error` | the text of the message, as a notice (note 5) |
@@ -921,24 +941,24 @@ Notes on the table:
    `message_stop`, or once a `message_start` named no id. A subagent's reply arrives the same way,
    as one whole `assistant` record with `parent_tool_use_id` and no stream event (measured:
    "Subagent reply is one record"); the back end emits no text of a subagent.
-2. A call of a tool that starts an agent (`previews.LAUNCHERS`) is kept from the sink until its
+2. A call of a tool that starts an agent (`ToolVocabulary.launchers`) is kept from the sink until its
    task starts, since a stream cannot take back a card. A task that starts in the background
    (`background` true: every subagent Claude Code starts with fork mode on, a command or a
    Monitor left running, a task of any other kind) is written in one form whatever its kind, two
    lines of text and no card: its name in bold and its description, then
-   `⎿ Running in background` (`previews.launched`, `texts.TASK_LAUNCHED`). The two lines are the ones the
+   `⎿ Running in background` (`Previews.launched`, `texts.TASK_LAUNCHED`). The two lines are the ones the
    terminal writes for a subagent (captured on Claude Code 2.1.296), with words under the name
    that fit every task. The name is the agent's type when it names one
    (`**mechanical**(Background sleeper)`; the type `general-purpose` reads `Agent`), else the
    name of the call that started the task (`**Monitor**(ticks)`). A held call is that line alone;
    any other call stays a call, counted in its run. The tasks one message starts share one line,
-   `3 background tasks launched` with what each does under it (`previews.launchedTogether`): the
+   `3 background tasks launched` with what each does under it (`Previews.launchedTogether`): the
    line is written when the message has ended and every held call of it has said how its agent
    runs, below the cards of the message's calls and before anything else the reply writes. A
    task that starts again under another call (a subagent a message continues) writes no second
    line when the reply saw it start before, or the session did, which counts each task's starts
    past its end: a resumed task keeps its id, and nothing else says it is one. A message to an
-   agent whose task has ended (`previews.continued`, `SendMessage` naming the task in `to`) draws
+   agent whose task has ended (`Previews.continued`, `SendMessage` naming the task in `to`) draws
    no line at all: the reply writes `⎿ Resuming agent <id>` as a line about the work
    (`previews.resuming`), as the terminal does (captured on Claude Code 2.1.301), and the task that
    starts again under it gets no card and no launch line; such a message that fails shows its
@@ -1093,7 +1113,7 @@ line is the record of the answers, as the terminal keeps it: one `context` block
 `✓ User answered Claude's questions:` and whose next lines are `⎿ · question → answer`, one per
 question, cut at Slack's 3,000 characters (`previews.answered`, a `Preview.record`, drawn by
 `sinks.pieceBlocks`). There is no card, so no gap opens under the heading. The reply holds the
-call's line while the question waits (`previews.ASKERS`, as it holds an Edit or a Write), because a
+call's line while the question waits (`ToolVocabulary.askers`, as it holds an Edit or a Write), because a
 stream cannot take a card back: while the owner decides, the reply shows nothing for the call and
 the request message is the only sign. A call that ends with no answer kept (skipped, denied,
 failed, stopped) writes its card then. The record sits in the reply where the question was asked,
@@ -1273,9 +1293,10 @@ closed when the start returns (`ThreadSession.connect`).
   and key are found, and what the daemon has not verified on Windows, is in the header of
   `src/agent/claude/trust.ts`.
 - The session asks the back end for a start with the thread's own directory, the thread's stored
-  session id to resume, its stored effort level and the owner's own settings sources (user, project
-  and local): the `StartOptions` built in `ThreadSession.connect`. `ClaudeSession` makes the SDK's
-  options of them (`ClaudeSession.#options`), and four more make the session start as a terminal
+  session id to resume and its stored effort level: the `StartOptions` built in
+  `ThreadSession.connect`. `ClaudeSession` makes the SDK's options of them
+  (`ClaudeSession.#options`), adds the owner's own settings sources (user, project and local:
+  `THREAD_SETTINGS_SOURCES`, which a probe's `ClaudeStartOptions` can replace), and four more make the session start as a terminal
   session does: the `claude_code` system prompt, `askUserQuestion.previewFormat` set to
   `markdown`, `CLAUDE_CODE_FORK_SUBAGENT=1` and `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`. The
   environment is the terminal's defaults, then the daemon's own, then the Claude Code variables

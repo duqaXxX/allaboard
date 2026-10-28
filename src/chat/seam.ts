@@ -474,9 +474,18 @@ export interface TerminalRequest {
   readonly command: string | null;
 }
 
+/** The agent's request for a tool's permission, with what the core read of it for the chat. */
+export interface ApprovalRequest extends PermissionRequest {
+  /**
+   * The plan an approval asks for, when the agent declares a plan tool and the request is for
+   * it: shown in place of the input, which holds nothing else. Null otherwise.
+   */
+  readonly plan: string | null;
+}
+
 /** What `ThreadChat.ask` puts to the owner. */
 export type OwnerRequest =
-  | PermissionRequest
+  | ApprovalRequest
   | QuestionRequest
   | HoldRequest
   | SetupRequest

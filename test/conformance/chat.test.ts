@@ -6,7 +6,7 @@
  * Where Slack stands: every listener tells the core through `ChatInbound`, and the adapter builds
  * the payloads Slack would send (the recorded click and form fixtures, through the builders of
  * `test/support/slack-app.ts`). The owner checks of each Slack listener are also
- * `test/chat/slack/app/owner-checks.test.ts`.
+ * `test/agent/claude/slack-app/owner-checks.test.ts`.
  */
 import type { App, Receiver } from "@slack/bolt";
 import type { Question } from "../../src/agent/seam.ts";

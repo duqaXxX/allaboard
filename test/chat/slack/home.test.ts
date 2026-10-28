@@ -74,7 +74,7 @@ import {
   type Scripted,
 } from "../../support/fake-slack.ts";
 import { slackPayload, type Json as Wire } from "../../support/fixtures.ts";
-import { NAMES } from "../../support/names.ts";
+import { PLAIN_NAMES } from "../../support/names.ts";
 
 // Today and Yesterday are days of the machine's time zone: the same on every machine here.
 process.env.TZ = "UTC";
@@ -125,7 +125,7 @@ function view(rows: HomeRow[], chosen: HomeFilter = homeFilter(), extra: ViewExt
       now: NOW,
       ...options,
     },
-    NAMES,
+    PLAIN_NAMES,
   ) as unknown as Json;
 }
 
@@ -397,7 +397,7 @@ test("a day a clock change makes longer is still one day", (t: TestContext) => {
     [early],
     CHANNELS,
     { ...options, chosen: homeFilter({ date: TODAY }) },
-    NAMES,
+    PLAIN_NAMES,
   );
   assert.deepEqual(titles(page as unknown as Json), [
     ":hourglass_flowing_sand:  *just after midnight*",
@@ -406,7 +406,7 @@ test("a day a clock change makes longer is still one day", (t: TestContext) => {
     [early],
     CHANNELS,
     { ...options, chosen: homeFilter({ date: YESTERDAY }) },
-    NAMES,
+    PLAIN_NAMES,
   );
   assert.deepEqual(titles(page as unknown as Json), []);
 });
@@ -704,7 +704,7 @@ function makeHome(w: World, sessions: Listing, extra: Partial<HomeOptions> = {})
     ownerUserId: OWNER,
     teamId: TEAM,
     state: w.state,
-    names: () => NAMES,
+    names: () => PLAIN_NAMES,
     sessionsOf: (directory) => {
       const found = sessions.get(directory);
       if (found === undefined) throw new Error(`no listing for ${directory}`);
@@ -911,7 +911,7 @@ test("a folder that cannot be listed does not stop the page", async (t) => {
     ownerUserId: OWNER,
     teamId: TEAM,
     state: w.state,
-    names: () => NAMES,
+    names: () => PLAIN_NAMES,
     sessionsOf: () => {
       throw new OSError("gone");
     },
@@ -1393,7 +1393,7 @@ test("edit mode shows delete on each session and no new thread", () => {
     title: { type: "plain_text", text: "Delete this thread?" },
     text: {
       type: "plain_text",
-      text: `“Fix the footer” in #cc-articles, 19 replies. ${namedText(slackTexts.HOME_DELETE_TEXT, NAMES)}`,
+      text: `“Fix the footer” in #cc-articles, 19 replies. ${namedText(slackTexts.HOME_DELETE_TEXT, PLAIN_NAMES)}`,
     },
     confirm: { type: "plain_text", text: "Delete thread" },
     deny: { type: "plain_text", text: "Cancel" },
@@ -1440,12 +1440,16 @@ test("a delete the deleter refuses as pinned says so under the row's name, in it
   await home.delete(CHANNEL, OLD_THREAD);
   page = published(w.slack).at(-1) as Json;
   assert.ok(
-    notes(page).includes(`“Fix the footer”: ${namedText(slackTexts.DELETE_PINNED_BY_HAND, NAMES)}`),
+    notes(page).includes(
+      `“Fix the footer”: ${namedText(slackTexts.DELETE_PINNED_BY_HAND, PLAIN_NAMES)}`,
+    ),
   );
   await home.delete(CHANNEL, OLD_THREAD);
   page = published(w.slack).at(-1) as Json;
   assert.ok(
-    notes(page).includes(`“Fix the footer”: ${namedText(slackTexts.DELETE_PINNED_REPLY, NAMES)}`),
+    notes(page).includes(
+      `“Fix the footer”: ${namedText(slackTexts.DELETE_PINNED_REPLY, PLAIN_NAMES)}`,
+    ),
   );
 });
 
@@ -1460,7 +1464,7 @@ test("a confirmation never passes the dialog s limit", () => {
   assert.equal(deletes.length, 1);
   const text: string = deletes[0]?.confirm.text.text;
   assert.ok(Array.from(text).length <= CONFIRM_TEXT);
-  assert.ok(text.endsWith(namedText(slackTexts.HOME_DELETE_TEXT, NAMES)));
+  assert.ok(text.endsWith(namedText(slackTexts.HOME_DELETE_TEXT, PLAIN_NAMES)));
 });
 
 test("a notice shows under the header", () => {
@@ -1550,7 +1554,7 @@ test("a thread being deleted says so from the click on and takes no second click
   );
   assert.deepEqual(buttons(page, DELETE_ACTION), []);
   // And the page says it in full size under the header, with how many are on their way.
-  assert.ok(titles(page).includes(namedText(slackTexts.HOME_DELETING_ONE, NAMES)));
+  assert.ok(titles(page).includes(namedText(slackTexts.HOME_DELETING_ONE, PLAIN_NAMES)));
   await home.delete(CHANNEL, OLD_THREAD); // a second click while it runs
   assert.deepEqual(started, [[CHANNEL, OLD_THREAD]]);
   // Leaving edit mode does not hide what is going on.
@@ -1563,7 +1567,7 @@ test("a thread being deleted says so from the click on and takes no second click
   finish.set();
   await running;
   const last = published(w.slack).at(-1) as Json;
-  assert.ok(!titles(last).includes(namedText(slackTexts.HOME_DELETING_ONE, NAMES)));
+  assert.ok(!titles(last).includes(namedText(slackTexts.HOME_DELETING_ONE, PLAIN_NAMES)));
   assert.ok(!titles(last).some((title) => title.includes("Fix the footer")));
 });
 
@@ -1595,7 +1599,7 @@ test("the page counts the threads being deleted", () => {
   const page = view([row()], homeFilter(), { channels, canEdit: true, deleting: 3 });
   assert.ok(
     titles(page).includes(
-      texts.fill(namedText(slackTexts.HOME_DELETING_MANY, NAMES), { count: 3 }),
+      texts.fill(namedText(slackTexts.HOME_DELETING_MANY, PLAIN_NAMES), { count: 3 }),
     ),
   );
   assert.ok(
@@ -1684,7 +1688,7 @@ test("a channel being cleaned says so and has no button", () => {
   });
   assert.deepEqual(buttons(page, CLEAN_ACTION), []);
   assert.ok(titles(page).includes(`*<#${CHANNEL}>*   ${slackTexts.HOME_CHANNEL_CLEANING}`));
-  assert.ok(titles(page).includes(namedText(slackTexts.HOME_CLEANING_ONE, NAMES)));
+  assert.ok(titles(page).includes(namedText(slackTexts.HOME_CLEANING_ONE, PLAIN_NAMES)));
 });
 
 test("clean publishes at once takes no second click and shows a failure", async (t) => {
@@ -1713,7 +1717,7 @@ test("clean publishes at once takes no second click and shows a failure", async 
     buttons(page, CLEAN_ACTION).map((b) => b.value),
     [OTHER_CHANNEL],
   );
-  assert.ok(titles(page).includes(namedText(slackTexts.HOME_CLEANING_ONE, NAMES)));
+  assert.ok(titles(page).includes(namedText(slackTexts.HOME_CLEANING_ONE, PLAIN_NAMES)));
   await home.clean(CHANNEL);
   assert.deepEqual(started, [CHANNEL]);
   finish.set();
@@ -1723,7 +1727,7 @@ test("clean publishes at once takes no second click and shows a failure", async 
   const failed = texts.fill(slackTexts.HOME_CLEAN_FAILED, { error: "ratelimited" });
   assert.ok(notes(page).includes(`#${name}: ${failed}`)); // it names the channel
   assert.equal(buttons(page, CLEAN_ACTION).length, 2);
-  assert.ok(!titles(page).includes(namedText(slackTexts.HOME_CLEANING_ONE, NAMES)));
+  assert.ok(!titles(page).includes(namedText(slackTexts.HOME_CLEANING_ONE, PLAIN_NAMES)));
 });
 
 test("one delete s notice is not erased by the next one s result", async (t) => {

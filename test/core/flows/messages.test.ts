@@ -107,7 +107,7 @@ test("a command the agent offers is sent as its slash command", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
   await world.says("!echo hello there", ref.thread);
-  assert.equal((await world.prompts()).at(-1), "/echo hello there");
+  assert.equal((await world.prompts()).at(-1), ":echo hello there");
 });
 
 test("a command the agent does not offer is sent as typed", async (t) => {
@@ -154,7 +154,7 @@ test("a command the session's own list offers is sent, though the agent's words 
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
   await world.says("!count one two", ref.thread);
-  assert.equal((await world.prompts()).at(-1), "/count one two");
+  assert.equal((await world.prompts()).at(-1), ":count one two");
 });
 
 test("an agent with no commands of its own gets every !text as text", async (t) => {

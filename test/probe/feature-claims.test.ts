@@ -328,7 +328,7 @@ test("a shell card needs the command line its call's input carries", async () =>
 
 // The records of a background subagent that starts a background command, in the shapes recorded
 // on 2026-10-24 (2.1.309; `subagent-handback` for the note and the report apart, the child's
-// start as `test/core/sessions/sessions.test.ts` has it); the content is synthetic.
+// start as `test/agent/claude/sessions/sessions.test.ts` has it); the content is synthetic.
 const NOTE =
   'This agent\'s report was delivered to you as a message from "a1" (its SubagentHandback call). Read it there; it is not repeated here.\n';
 const agentStart = {

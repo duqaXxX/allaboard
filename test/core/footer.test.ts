@@ -12,7 +12,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
-import { locate, Unkeyed } from "../../src/agent/claude/trust.ts";
 import type { ModelTokens, Repository } from "../../src/agent/seam.ts";
 import type { FooterFields } from "../../src/chat/seam.ts";
 import {
@@ -28,6 +27,7 @@ import {
 } from "../../src/core/footer.ts";
 import { type Json, sdkRecords } from "../support/fixtures.ts";
 import { git, gitInit } from "../support/git-layouts.ts";
+import { repositoryAt } from "../support/repositories.ts";
 
 // 2026-09-23 21:00 in Europe/Berlin (UTC+2 in September).
 const NOW = Date.UTC(2026, 8, 23, 19, 0);
@@ -207,39 +207,27 @@ test("a failing fetch keeps the old value and logs no content", async () => {
   assert.ok(!warnings.join("\n").includes("SECRET-DETAIL"));
 });
 
-/** `trust.trustedRepository` for a test about something else: every repository counts as trusted. */
-async function anyRepository(directory: string): Promise<Repository | null> {
-  try {
-    return await locate(directory);
-  } catch (error) {
-    if (error instanceof Unkeyed) {
-      return null;
-    }
-    throw error;
-  }
-}
-
 /** A fresh repository on `feature-x`. */
 function repo(): string {
   return gitInit(join(tmp, "repo"));
 }
 
 async function gitChanges(folder: string): Promise<readonly [number, number] | null> {
-  return (await gitState(folder, anyRepository))[1];
+  return (await gitState(folder, repositoryAt))[1];
 }
 
 test("git branch", async () => {
   const folder = repo();
   git(folder, "switch", "-q", "-c", "feature-x");
-  assert.deepEqual(await gitState(folder, anyRepository), ["feature-x", [0, 0]]);
-  assert.deepEqual(await gitState(join(folder, "missing"), anyRepository), [null, null]);
+  assert.deepEqual(await gitState(folder, repositoryAt), ["feature-x", [0, 0]]);
+  assert.deepEqual(await gitState(join(folder, "missing"), repositoryAt), [null, null]);
 });
 
 test("a branch name keeps what Python's strip leaves", async () => {
   // U+FEFF is no whitespace to Python: git prints it, and the name is shown as it is.
   const folder = repo();
   git(folder, "switch", "-q", "-c", "feature-x\ufeff");
-  assert.deepEqual(await gitState(folder, anyRepository), ["feature-x\ufeff", [0, 0]]);
+  assert.deepEqual(await gitState(folder, repositoryAt), ["feature-x\ufeff", [0, 0]]);
 });
 
 test("git changes add staged and unstaged lines", async () => {

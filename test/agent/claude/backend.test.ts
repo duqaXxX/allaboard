@@ -27,7 +27,6 @@ const LIMIT = { timeout: 10_000 };
 const START: StartOptions = {
   folder: "/srv/alice/app",
   resume: null,
-  settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
 };
@@ -143,6 +142,7 @@ test("the line that opens Claude Code to trust a folder names the login's config
 test("the config dir is quoted as the folder is, and a brace in it fills as written", () => {
   const configDir = join(tmp, "my login {x}");
   const { terminal } = new ClaudeBackend({ home, configDir }).words;
+  assert.ok(terminal !== null);
   const line = fill(terminal, { directory: "/srv/alice/app", session: "0000-id" });
   // A shell reads the quoted word back as the folder.
   const word = /CLAUDE_CONFIG_DIR=(.*) claude/.exec(line)?.[1] ?? "";

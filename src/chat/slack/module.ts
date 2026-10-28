@@ -284,7 +284,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     teamId: identity.teamId,
     state,
     names,
-    sessionsOf: (directory) => context.core().agent.listSessions(directory),
+    sessionsOf: async (directory) => (await context.core().agent.listSessions?.(directory)) ?? [],
     ...(threadDeleter !== null && {
       delete: (channelId, threadId) => threadDeleter.delete(channelId, threadId),
       clean: (channelId) => threadDeleter.clean(channelId),

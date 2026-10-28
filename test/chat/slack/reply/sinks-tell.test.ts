@@ -17,6 +17,7 @@ import {
   TEAM,
   THREAD,
 } from "../../../support/fake-slack.ts";
+import { PLAIN_PREVIEWS } from "../../../support/plain-tools.ts";
 
 class Paced {
   now = 0;
@@ -39,6 +40,7 @@ function made(slack: FakeSlack, clock: FakeClock): ReplySink {
     userId: OWNER,
     botUserId: BOT,
     limiter: new UpdateLimiter({ clock: new Paced() }),
+    previews: PLAIN_PREVIEWS,
     clock,
     debounceSeconds: 0,
     finalRetrySeconds: 1,

@@ -521,6 +521,13 @@ test("the readme stays a landing page", () => {
   );
 });
 
+// One `## Limits of ...` section per agent module, its heading declared by the module's entry
+// (`AgentEntry.limitsHeading`): a test reads the headings from the registry, so a module added
+// there has a section to write before the checks below pass.
+const AGENT_LIMITS = Object.values(REGISTRY.agents).map((entry) => entry.limitsHeading);
+// Claude's section is the one the probe checks, with the recorded server info and its words.
+const CLAUDE_LIMITS = REGISTRY.agents.claude?.limitsHeading ?? "";
+
 /** The header cells of the table under `heading` in docs/limits.md. */
 function limitsHeader(heading: string): string[] {
   const section = (read(LIMITS).split(`## ${heading}\n`)[1] ?? "").split("\n## ")[0] ?? "";
@@ -548,7 +555,7 @@ function limitsRows(heading: string): string[][] {
 
 test("the commands the daemon answers as not offered are the ones the page lists so", () => {
   // `!name` for one of them is answered by the daemon, so the two lists are one.
-  const listed = ["Limits of the Claude Agent SDK", "Choices of allaboard"].flatMap((heading) =>
+  const listed = [CLAUDE_LIMITS, "Choices of allaboard"].flatMap((heading) =>
     limitsRows(heading)
       .filter((row) => (row[2] ?? "").startsWith("Not offered"))
       .flatMap((row) => [...(row[1] ?? "").matchAll(/`\/([a-z-]+)`/g)].map((m) => m[1] ?? "")),
@@ -562,7 +569,7 @@ test("a command listed as not offered is not in the recorded commands", () => {
   // the page loses the row.
   const info = sdkJson("server-info") as { commands: { name: string }[] };
   const offered = new Set(info.commands.map((c) => c.name));
-  const named = limitsRows("Limits of the Claude Agent SDK").flatMap((row) =>
+  const named = limitsRows(CLAUDE_LIMITS).flatMap((row) =>
     [...(row[1] ?? "").matchAll(/`\/([a-z-]+)`/g)].map((m) => m[1] ?? ""),
   );
   assert.ok(named.length >= 18, `${named}`);
@@ -572,10 +579,22 @@ test("a command listed as not offered is not in the recorded commands", () => {
   );
 });
 
+test("the page holds one Limits of section for each agent module, with at least one row", () => {
+  const headings = [...read(LIMITS).matchAll(/^## (.+)$/gm)].map((m) => m[1] ?? "");
+  assert.ok(AGENT_LIMITS.length > 0);
+  assert.equal(new Set(AGENT_LIMITS).size, AGENT_LIMITS.length, "two modules share a heading");
+  for (const heading of AGENT_LIMITS) {
+    assert.ok(heading.startsWith("Limits of "), `${heading}: not a Limits of heading`);
+    assert.equal(headings.filter((found) => found === heading).length, 1, `${heading}: sections`);
+    assert.ok(limitsRows(heading).length > 0, `${heading}: no row`);
+  }
+});
+
 test("every limit says whether an issue looks into it", () => {
   const headings = [...read(LIMITS).matchAll(/^## (.+)$/gm)].map((m) => m[1] ?? "");
   const tables = headings.filter((heading) => heading !== "Not checked");
-  assert.equal(tables.length, 4, `${headings}`);
+  for (const heading of AGENT_LIMITS) assert.ok(tables.includes(heading), heading);
+  assert.ok(tables.length >= 4, `${headings}`);
   const issue = /^\[#(\d+)\]\(https:\/\/github\.com\/duqaXxX\/allaboard\/issues\/\1\)$/;
   for (const heading of tables) {
     // The column is found by its header: a table may carry others beside it.
@@ -591,7 +610,7 @@ test("every limit says whether an issue looks into it", () => {
 test("every limit of the Agent SDK names the claims that check it, or why a person must", () => {
   // `readLimits` throws on a cell that is neither backticked claim ids nor `by hand: <why>`.
   const limits = readLimits();
-  assert.equal(limits.length, limitsRows("Limits of the Claude Agent SDK").length);
+  assert.equal(limits.length, limitsRows(CLAUDE_LIMITS).length);
   const known = new Map(CLAIMS.map((claim) => [claim.id, claim.kind]));
   for (const limit of limits) {
     for (const id of limit.checkedBy) {

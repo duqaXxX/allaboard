@@ -475,7 +475,9 @@ export async function run(options: RunOptions = {}): Promise<number> {
           threadLookup: (ref) => chat.threadState(ref),
           stopping: isStopping,
           alive: async (directory) =>
-            backend.capabilities.sessionListing ? backend.aliveSessions(directory) : null,
+            backend.capabilities.sessionListing && backend.aliveSessions !== undefined
+              ? backend.aliveSessions(directory)
+              : null,
           live: () => sessions.liveThreads(),
           chat: chat.name,
           openedAt: (ref) => chat.openedAt(ref),

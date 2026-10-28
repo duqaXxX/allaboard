@@ -26,6 +26,7 @@ import {
   RESUME_ROWS,
 } from "../../../src/agent/claude/listing.ts";
 import type { ListedSession } from "../../../src/agent/seam.ts";
+import { RESUME_ROWS as PICKER_ROWS } from "../../../src/chat/slack/resume.ts";
 
 const LIMIT = { timeout: 10_000 };
 // A superuser reads a closed folder anyway, and Windows has no such mode.
@@ -347,4 +348,10 @@ test("a transcript that is a FIFO does not hold the read", POSIX, async (t) => {
     // A read that is still blocked in the pool is released by a writer, so the run can end.
     closeSync(openSync(file, constants.O_RDWR | constants.O_NONBLOCK));
   }
+});
+
+// The Claude back end dates only the sessions that can enter the picker's rows, and the two
+// modules cannot share the number: one changed alone sorts the rows past it by another key.
+test("the rows the back end dates are the rows the resume picker lists", () => {
+  assert.equal(RESUME_ROWS, PICKER_ROWS);
 });

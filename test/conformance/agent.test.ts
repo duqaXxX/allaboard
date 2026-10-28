@@ -32,6 +32,7 @@ import {
   hold,
   PLAIN_CAPABILITIES,
   type PlainAgent,
+  type PlainEntry,
   type PlainStep,
   PlainStore,
   plainAgent,
@@ -454,10 +455,15 @@ class PlainWorld implements AgentWorld {
   readonly otherFolder = OTHER;
   readonly #store = new PlainStore();
   readonly #turns: PlainStep[][] = [];
-  readonly #entry = plainAgent({ store: this.#store, turns: this.#turns });
+  readonly #entry: PlainEntry;
   #current: PlainAgent;
 
-  constructor() {
+  constructor(namedAtStart = false) {
+    this.#entry = plainAgent({
+      store: this.#store,
+      turns: this.#turns,
+      ...(namedAtStart && { namedAtStart: true as const }),
+    });
     this.#current = this.#build();
   }
 
@@ -506,7 +512,7 @@ class PlainWorld implements AgentWorld {
 
   // A command takes no turn of the script.
   command(): { readonly prompt: string; readonly includes: string } {
-    return { prompt: "/echo hello", includes: "hello" };
+    return { prompt: ":echo hello", includes: "hello" };
   }
 
   effortCommand(to: "level" | "default"): { readonly prompt: string; readonly level: string } {
@@ -574,4 +580,12 @@ agentConformance("plain agent", {
   refusesUnrecordedResume: true,
   capabilities: PLAIN_CAPABILITIES,
   create: async () => new PlainWorld(),
+} satisfies AgentHarness);
+
+// The same agent, naming each session (`session_started`) when it starts, as one that allots an
+// id before any prompt does: the suite holds both timings to the same promises.
+agentConformance("plain agent naming its session at start", {
+  refusesUnrecordedResume: true,
+  capabilities: PLAIN_CAPABILITIES,
+  create: async () => new PlainWorld(true),
 } satisfies AgentHarness);

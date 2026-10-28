@@ -37,6 +37,7 @@ import { claudeAgent } from "../src/agent/claude/module.ts";
 import {
   type AgentBackend,
   AgentConfigError,
+  NO_TOOL_WORDS,
   type RequestHandler,
   type StartOptions,
 } from "../src/agent/seam.ts";
@@ -123,7 +124,16 @@ const USER_TOKEN = "xox" + "p-1";
  */
 function registryOf(backend: AgentBackend, slack: SlackOptions = {}): Registry {
   return {
-    agents: { claude: { required: [], optional: [], build: () => backend } },
+    agents: {
+      claude: {
+        required: [],
+        optional: [],
+        tools: NO_TOOL_WORDS,
+        toolNames: [],
+        limitsHeading: "Limits of a test agent",
+        build: () => backend,
+      },
+    },
     chats: { slack: slackChat(slack) },
     defaults: { agent: "claude", chat: "slack" },
   };
@@ -473,6 +483,9 @@ test("a session the daemon starts receives the name of its instance", async (t) 
       claude: {
         required: [],
         optional: [],
+        tools: NO_TOOL_WORDS,
+        toolNames: [],
+        limitsHeading: "Limits of a test agent",
         build: (context) => {
           backend = claudeAgent({ query: sdk.query, home: claudeHome }).build(context);
           return backend;
@@ -487,7 +500,6 @@ test("a session the daemon starts receives the name of its instance", async (t) 
   const start: StartOptions = {
     folder: d.dir,
     resume: null,
-    settingsSources: ["user", "project", "local"],
     model: null,
     effort: null,
   };
@@ -1484,6 +1496,9 @@ test("an agent setting that cannot be used ends with 1 and logs its sentence", a
       claude: {
         required: [],
         optional: [],
+        tools: NO_TOOL_WORDS,
+        toolNames: [],
+        limitsHeading: "Limits of a test agent",
         build: () => {
           throw new AgentConfigError("SETTING must be an absolute path");
         },

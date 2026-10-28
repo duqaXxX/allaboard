@@ -4,7 +4,9 @@
  * Code 2.1.312), so it is read again each time it is shown.
  */
 import { resolveSettings as sdkResolveSettings } from "@anthropic-ai/claude-agent-sdk";
-import type { SettingsSource } from "../seam.ts";
+
+/** The settings files Claude Code reads: the owner's, the folder's, and the folder's own local one. */
+export type SettingsSource = "user" | "project" | "local";
 
 /** The SDK's `resolveSettings` as this module calls it: a test passes a fake. */
 export type ResolveSettings = (options: {
