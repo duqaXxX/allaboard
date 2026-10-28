@@ -1,0 +1,797 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "text": "HERON",
+     "type": "markdown"
+    },
+    {
+     "text": "📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+     "type": "markdown"
+    },
+    {
+     "block_id": "task-fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ ls -la && git rev-parse --is-inside-work-tree 2>&1; git branch --show-current 2>&1; find . -maxdepth 3 -iname '*migrat*' -not -path '*/node_modules/*' 2>/dev/null | head -50",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+     "title": "Ran 1 shell command, ToolSearch, SendMessage",
+     "type": "task_card"
+    },
+    {
+     "text": "I did not run the migration tests, so I'm not replying KESTREL.\n\nThe working directory `/home/dev/project` is empty and is not a git repository. There is no pushed branch or migration code here to test. I replied to the peer session (`terminal-7c`) saying so and asked for the correct repo path. Its Claude hasn't read the message yet, so it may not have arrived.\n\nTo finish this, point me at the repo that holds the pushed branch (or clone it into this directory), and I'll run the migration tests and report the results.",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn",
+       "verbatim": true
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   [
+    {
+     "details": "$ ls -la && git rev-parse --is-inside-work-tree 2>&1; git branch --show-current 2>&1; find . -maxdepth 3 -iname '*migrat*' -not -path '*/node_modules/*' 2>/dev/null | head -50",
+     "id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+     "status": "complete",
+     "title": "Ran 1 shell command, ToolSearch, SendMessage"
+    }
+   ]
+  ],
+  "message_texts": [
+   "HERON\n\n📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.\n\nI did not run the migration tests, so I'm not replying KESTREL.\n\nThe working directory `/home/dev/project` is empty and is not a git repository. There is no pushed branch or migration code here to test. I replied to the peer session (`terminal-7c`) saying so and asked for the correct repo path. Its Claude hasn't read the message yet, so it may not have arrived.\n\nTo finish this, point me at the repo that holds the pushed branch (or clone it into this directory), and I'll run the migration tests and report the results."
+  ],
+  "pushes": 1
+ },
+ "recording": "peer-message",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "HERON",
+      "type": "markdown_text"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\n📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ ls -la && git rev-parse --is-inside-work-tree 2>&1; git branch --show-current 2>&1; find . -maxdepth 3 -iname '*migrat*' -not -path '*/node_modules/*' 2>/dev/null | head -50",
+      "id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "status": "in_progress",
+      "title": "Inspect working directory for git state and migration files",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "status": "in_progress",
+      "title": "ToolSearch: select:SendMessage",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 5,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "status": "complete",
+      "title": "Ran 1 shell command, ToolSearch",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "status": "in_progress",
+      "title": "SendMessage: uds:/tmp/cc-socks/41000.sock",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 7,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "status": "complete",
+      "title": "Ran 1 shell command, ToolSearch, SendMessage",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 8,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "I did not run ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 9,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "the migration ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 10,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "tests, so I'm ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "not replying K",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 12,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ESTREL.\n\nThe w",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 13,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "orking directo",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 14,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ry `/home/dev/",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 15,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "project` is em",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 16,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "pty and is not",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 17,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " a git reposit",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 18,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ory. There is ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 19,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "no pushed bran",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 20,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ch or migratio",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 21,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "n code here to",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 22,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " test. I repli",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 23,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ed to the peer",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 24,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " session (`ter",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 25,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "minal-7c`) say",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 26,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ing so and ask",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 27,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ed for the cor",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 28,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "rect repo path",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 29,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ". Its Claude h",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 30,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "asn't read the",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 31,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " message yet, ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 32,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "so it may not ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 33,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "have arrived.\n",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 34,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\nTo finish thi",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 35,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "s, point me at",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 36,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " the repo that",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 37,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " holds the pus",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 38,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "hed branch (or",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 39,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " clone it into",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 40,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " this director",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 41,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "y), and I'll r",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 42,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "un the migrati",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 43,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "on tests and r",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 44,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "eport the resu",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 45,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "lts.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 47,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 47,
+   "args": {
+    "blocks": [
+     {
+      "text": "HERON",
+      "type": "markdown"
+     },
+     {
+      "text": "📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+      "type": "markdown"
+     },
+     {
+      "block_id": "task-fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ ls -la && git rev-parse --is-inside-work-tree 2>&1; git branch --show-current 2>&1; find . -maxdepth 3 -iname '*migrat*' -not -path '*/node_modules/*' 2>/dev/null | head -50",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01JbTVb4QN3MCFvc4TwoZE7q",
+      "title": "Ran 1 shell command, ToolSearch, SendMessage",
+      "type": "task_card"
+     },
+     {
+      "text": "I did not run the migration tests, so I'm not replying KESTREL.\n\nThe working directory `/home/dev/project` is empty and is not a git repository. There is no pushed branch or migration code here to test. I replied to the peer session (`terminal-7c`) saying so and asked for the correct repo path. Its Claude hasn't read the message yet, so it may not have arrived.\n\nTo finish this, point me at the repo that holds the pushed branch (or clone it into this directory), and I'll run the migration tests and report the results.",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn",
+        "verbatim": true
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "HERON",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

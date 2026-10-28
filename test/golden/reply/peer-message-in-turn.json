@@ -1,0 +1,176 @@
+{
+ "recording": "peer-message-in-turn",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c 'import time; time.sleep(40)'",
+      "folded": null,
+      "id": "toolu_01EeGfnRYKF5T725yA7oWgCx",
+      "message": false,
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep for 40 seconds via python3"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c 'import time; time.sleep(40)'",
+      "folded": null,
+      "id": "toolu_01EeGfnRYKF5T725yA7oWgCx",
+      "message": false,
+      "name": "Bash",
+      "output": "Sleep for 40 seconds via python3",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 40 seconds via python3"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c 'import time; time.sleep(40)'",
+      "folded": null,
+      "id": "toolu_01EeGfnRYKF5T725yA7oWgCx",
+      "message": false,
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 40 seconds via python3"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nHERON",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ python3 -c 'import time; time.sleep(40)'",
+     "folded": null,
+     "id": "toolu_01EeGfnRYKF5T725yA7oWgCx",
+     "message": false,
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Sleep for 40 seconds via python3"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ python3 -c 'import time; time.sleep(40)'",
+     "folded": null,
+     "id": "toolu_01EeGfnRYKF5T725yA7oWgCx",
+     "message": false,
+     "name": "Bash",
+     "output": "Sleep for 40 seconds via python3",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Sleep for 40 seconds via python3"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ python3 -c 'import time; time.sleep(40)'",
+     "folded": null,
+     "id": "toolu_01EeGfnRYKF5T725yA7oWgCx",
+     "message": false,
+     "name": "Bash",
+     "output": "(Bash completed with no output)",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Sleep for 40 seconds via python3"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nHERON",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

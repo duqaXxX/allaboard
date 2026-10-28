@@ -506,6 +506,8 @@ export const TERMINAL_WAIT =
   "with:\n{command}";
 // A turn the owner ran in the terminal, shown in the thread before the reply to his next message.
 export const TERMINAL_TURN = "🖥 In the terminal:\n› {prompt}\n\n{reply}";
+// A message another of the owner's sessions sent this one, at its place in the reply.
+export const PEER_MESSAGE = "📨 From another session:\n› {text}";
 export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n› {prompt}";
 // A turn moved with `!terminal`, which the terminal went on with by itself.
 export const TERMINAL_TURN_WENT_ON = "🖥 In the terminal, the turn went on:\n\n{reply}";

@@ -308,6 +308,12 @@ export class TurnRenderer {
       case "model_refused":
         await this.#refused(event);
         break;
+      case "peer_message":
+        // Markdown another session's agent wrote, drawn as the agent's own text is: its
+        // formatting lives, and the chat keeps any mention in a reply from notifying.
+        await this.#writeLaunches();
+        await this.#line(texts.fill(texts.PEER_MESSAGE, { text: event.text }));
+        break;
       case "call_started":
         await this.#callStarted(event);
         break;

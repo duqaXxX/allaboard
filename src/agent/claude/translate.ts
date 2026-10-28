@@ -352,6 +352,14 @@ function user(memory: Memory, record: WireRecord): SessionEvent[] {
   const origin = isRecord(record.origin) ? record.origin : {};
   const sender = origin.kind === "peer" ? string(origin.senderTaskId) : null;
   if (sender !== null) return [{ type: "report_started", taskId: sender }];
+  // Another of the owner's sessions wrote (`SendMessage`): the record is replayed, its envelope
+  // stripped into `body`, for a turn it opens from idle and inside a running one (recorded
+  // 2026-10-28, `peer-message.jsonl`, `peer-message-in-turn.jsonl`). A record whose wire is not
+  // one envelope has no `body`: nothing shows. Told apart from a subagent of this session by the
+  // absence of `senderTaskId` alone, which `sdk.d.ts` 0.3.312 promises only for a background
+  // subagent; no recording holds another in-process sender.
+  const body = origin.kind === "peer" ? string(origin.body) : null;
+  if (body !== null) return [{ type: "peer_message", text: body }];
   // A task's notification folded into the running turn is replayed with the run it reports
   // (recorded 2026-10-15, `task-end-in-turn-folded`); one a turn of its own reports is not
   // (`task-end-in-turn-unfolded`), nor is a Monitor's line, which names no run.

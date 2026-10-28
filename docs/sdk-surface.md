@@ -185,6 +185,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKMessage` | `subtype` | field | translate.ts: kindOf | package | none |
 | `SDKMessage` | `type` | field | translate.ts: kindOf | package | none |
 | `SDKMessageOrigin` | `kind` | field | translate.ts: result, user | reference | none |
+| `SDKMessageOrigin` | `body` | field | translate.ts: user | package | none |
 | `SDKMessageOrigin` | `runId` | field | translate.ts: user | package | none |
 | `SDKMessageOrigin` | `senderTaskId` | field | translate.ts: user | reference | none |
 | `SDKModelRefusalFallbackMessage` | `api_refusal_category` | field | translate.ts: refusalFallback | package | none |
@@ -498,6 +499,10 @@ no check covers them here.
   a message of several blocks ("per-block derived uuids", `sdk.d.ts`), are unmeasured. The
   daemon reads `retracted_message_uuids` for whether it holds any, never for their values. The
   rows are `package` because the reference page was not read for them.
+- `SDKMessageOrigin.body` marks a message from another of the owner's sessions only when no
+  `senderTaskId` comes with it: `sdk.d.ts` 0.3.312 gives `body` to an in-process agent's message
+  too, and promises `senderTaskId` only for a background subagent. The recordings hold the two
+  shapes `peer-message.jsonl` and `subagent-handback.jsonl`, and no other in-process sender.
 - `SDKControlInitializeResponse.current_permission_mode` is in `server-info.json` and in no
   declaration. `CanUseTool.title` is declared and was absent in both permission calls measured on
   SDK 0.3.296 on 2026-10-10. `"human"` of `SDKMessageOrigin.kind` is in no recording: the results

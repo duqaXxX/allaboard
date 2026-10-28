@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A message another of your Claude Code sessions sends a thread's session (`SendMessage`) now
+  shows at its place in the reply, as `📨 From another session:` then its text, whether it opens
+  a turn or arrives during one; its mentions notify nobody (#30).
 - What your stop hooks say at a turn's end is now said in the reply, in the terminal's words:
   `Ran 3 stop hooks`, then why one stopped the session, `⎿ Stop hook error: <reason>` for each
   refusal and `⎿ Stop hook feedback: <context>` for each context added for Claude, where the turn
