@@ -25,7 +25,7 @@ const FULL_GUIDE = [
   "When Claude Code asks permission, the request shows what will run, with **Approve** and **Deny**; a very long one shows its start and its end and says how much it leaves out. A question from Claude comes with **Answer**, which opens a short form, and **Skip**.",
   "",
   "**Sessions**",
-  "`!status` typed in the channel lists the folder and every session still live, each linked to its thread; inside a thread it shows that session's directory, mode and the footer's values. `!stop` typed in the channel stops every running session and its background tasks; inside a thread it stops only that one. `!resume`, typed in the channel only, lists this folder's twenty newest sessions, from the terminal too, each with the start of its id and a **Resume** button; `!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes it in the thread of your `!resume` message. To continue a session in the terminal, run the `Terminal:` command `!status` shows in its thread, or send `!terminal` there, which moves a running turn too. Write from one side at a time: a terminal left open does not see what you write here, and is reopened before you write there again.",
+  "`!status` typed in the channel lists the folder and every session still live, each linked to its thread; inside a thread it shows that session's directory, mode and the footer's values. `!stop` typed in the channel stops every running session and its background tasks; inside a thread it stops only that one. `!resume`, typed in the channel only, lists this folder's twenty newest sessions, from the terminal too, each with the start of its id and a **Resume** button; `!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes it in the thread of your `!resume` message. Inside a thread, `!memory` lists the memory files its session loaded and `!skills` the skills it can use, read only. To continue a session in the terminal, run the `Terminal:` command `!status` shows in its thread, or send `!terminal` there, which moves a running turn too. Write from one side at a time: a terminal left open does not see what you write here, and is reopened before you write there again.",
   "",
   "**Files**",
   "`!open`, sent inside a session's thread, offers the files changed in that session and a search over the folder's files; choosing one shares it into the thread, where Slack opens it in its file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file whose path contains them, or lists the files that do. The search reads the folder from disk and leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
@@ -173,10 +173,21 @@ test("without sessionListing the Sessions section says nothing of !resume", () =
   const { removed, added } = difference(linesOf({ sessionListing: false }));
   assert.deepEqual(removed, [SESSIONS]);
   const from = SESSIONS.indexOf(" `!resume`, typed in the channel only");
+  const to = SESSIONS.indexOf(" Inside a thread, `!memory`");
+  assert.ok(from > 0 && to > from);
+  assert.deepEqual(added, [SESSIONS.slice(0, from) + SESSIONS.slice(to)]);
+  assert.ok(
+    added[0]?.includes("inside a thread it stops only that one. Inside a thread, `!memory`"),
+  );
+});
+
+test("without loadedContext the Sessions section says nothing of !memory and !skills", () => {
+  const { removed, added } = difference(linesOf({ loadedContext: false }));
+  assert.deepEqual(removed, [SESSIONS]);
+  const from = SESSIONS.indexOf(" Inside a thread, `!memory`");
   const to = SESSIONS.indexOf(" To continue a session in the terminal");
   assert.ok(from > 0 && to > from);
   assert.deepEqual(added, [SESSIONS.slice(0, from) + SESSIONS.slice(to)]);
-  assert.ok(added[0]?.includes("inside a thread it stops only that one. To continue"));
 });
 
 test("without updates the Updates section is gone", () => {

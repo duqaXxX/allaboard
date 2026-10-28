@@ -510,6 +510,16 @@ export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n› {prompt}";
 // A turn moved with `!terminal`, which the terminal went on with by itself.
 export const TERMINAL_TURN_WENT_ON = "🖥 In the terminal, the turn went on:\n\n{reply}";
 export const SHELL_OUTSIDE_SESSION = "`!!` runs a shell command inside a session's thread.";
+// `!memory` and `!skills` (`loaded.ts`): what a live session has loaded, read only.
+export const MEMORY_TITLE = "Memory files loaded ({count}, {tokens} tokens):";
+export const MEMORY_LINE = "• {path} · {tokens} tokens";
+export const MEMORY_NONE = "No memory file is loaded in this session.";
+export const SKILLS_TITLE = "Skills ({count}):";
+export const SKILLS_LINE = "• {name} · {about}";
+export const SKILLS_NONE = "No skill is available in this session.";
+export const LOADED_TOP_LEVEL =
+  "`!memory` and `!skills` list what a session loaded, inside its thread.";
+export const LOADED_UNAVAILABLE = naming("{agent} does not list what a session loaded.");
 export const SHELL_FIRST_PROMPT =
   "Send this session its first prompt before a shell command: it starts with its setup.";
 // Session setup: asked once per top-level message, before the first prompt of a new session.
@@ -617,6 +627,10 @@ export const HELP_WORDS: readonly Named[] = [
     "directory, mode and the footer's values",
   "`!stop` in the channel: every running session, its background tasks and its pending " +
     "approvals; inside a thread: only that session",
+  "`!memory` the memory files this session loaded, with their size; inside a thread, refused " +
+    "in the channel",
+  "`!skills` the skills this session can use, with what each does; inside a thread, refused in " +
+    "the channel",
   "`!terminal` move this session to a terminal on the host: a running turn goes on there by " +
     "itself; inside a thread, refused in the channel",
   "`!bind [folder]` the folders {agent} trusts, or bind this channel to one, its path " +
@@ -763,6 +777,9 @@ export const GUIDE_SESSIONS_RESUME =
   "newest sessions, from the terminal too, each with the start of its id and a **Resume** button; " +
   "`!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes " +
   "it in the thread of your `!resume` message.";
+export const GUIDE_SESSIONS_LOADED =
+  "Inside a thread, `!memory` lists the memory files its session loaded and `!skills` the skills " +
+  "it can use, read only.";
 export const GUIDE_SESSIONS_TERMINAL =
   "To continue a session in the terminal, run the `Terminal:` command `!status` shows in its " +
   "thread, or send `!terminal` there, which moves a running turn too. Write from one side at a " +

@@ -11,6 +11,7 @@ export const EVERYTHING_OFFERED: GuideOffer = {
   questions: true,
   backgroundTasks: true,
   sessionListing: true,
+  loadedContext: true,
   fileUpload: true,
   threadTags: true,
   threadDelete: true,
