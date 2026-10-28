@@ -7,7 +7,7 @@ import { locate, Unkeyed } from "../../../src/agent/claude/trust.ts";
 import type { Repository } from "../../../src/agent/seam.ts";
 import { commitAt, git, gitInit } from "../../support/git-layouts.ts";
 
-/** Symbolic links and FIFOs are a POSIX matter; Windows is not a supported host yet. */
+/** Symbolic links and FIFOs are a POSIX matter. */
 export const POSIX = {
   skip: process.platform === "win32" ? "links and FIFOs are read by POSIX rules" : false,
 };

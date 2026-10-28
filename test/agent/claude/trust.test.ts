@@ -54,8 +54,9 @@ afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-// Symlinks, FIFOs, hard links and POSIX modes: the daemon is not supported on Windows yet.
-const POSIX = { skip: process.platform === "win32" };
+const POSIX = {
+  skip: process.platform === "win32" && "symlinks, FIFOs, hard links and POSIX modes",
+};
 
 /** `promise`, or a failure when it is not settled within `ms`: a read blocked on a FIFO. */
 async function within<T>(promise: Promise<T>, ms: number): Promise<T> {

@@ -27,7 +27,7 @@ import { named } from "../../../src/core/texts.ts";
 import { slackPayload } from "../../support/fixtures.ts";
 import { NAMES } from "../../support/names.ts";
 
-const WINDOWS = { skip: process.platform === "win32" };
+const WINDOWS = { skip: process.platform === "win32" && "a folder's mode is POSIX" };
 const TOKEN = "xox" + "b-fake";
 const URL_OF_FILE = "https://files.slack.com/files-pri/T000TEAM-F000FILE/download/photo.png";
 

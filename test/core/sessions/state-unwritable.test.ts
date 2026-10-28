@@ -13,7 +13,11 @@ import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
 import { canUseToolCall, harnessFor, sdkMessages } from "../../support/sessions.ts";
 import { pending } from "./helpers.ts";
 
-const NEEDS_PERMISSIONS = { skip: process.platform === "win32" || process.getuid?.() === 0 };
+const NEEDS_PERMISSIONS = {
+  skip:
+    (process.platform === "win32" || process.getuid?.() === 0) &&
+    "permission bits mean nothing on Windows, and root reads what a mode forbids",
+};
 const PROMPT = "SECRET-PROMPT-CONTENT";
 const COMMAND = "SECRET-COMMAND-CONTENT";
 const STATUS_LINE = "could not record the root's status in state.json";

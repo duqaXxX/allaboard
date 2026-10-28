@@ -119,7 +119,8 @@ socket or pipe, and Windows has no POSIX signals). A pull request is ready once 
 green. To reproduce a failure of the Linux job, `npm run test:linux` runs the suite in Docker the
 way that job does (Node 22, a clean copy, a user that is not root); `npm run test:linux -- --ref
 <rev>` runs it on one commit. A test whose subject exists on some systems only says so with
-`skip` and the reason.
+`skip` and the reason. The suite runs on Linux and Windows to keep the code portable;
+the daemon itself is supported on macOS only.
 
 Test fixtures are synthetic in content (ids such as `U000ALICE`) and recorded in shape, under
 `test/fixtures/`, which `test/support/fixtures.ts` reads. Never write the shape of an SDK message

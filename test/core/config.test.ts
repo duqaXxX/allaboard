@@ -22,7 +22,11 @@ import {
 } from "../../src/core/config.ts";
 import { REGISTRY } from "../../src/registry.ts";
 
-const POSIX_ONLY = { skip: process.platform === "win32" };
+const POSIX_ONLY = {
+  skip:
+    process.platform === "win32" &&
+    "file modes, owners, links, the home and paths are read by POSIX rules",
+};
 
 const BOT = `${"xox"}b-000-fake`;
 const APP = `${"xap"}p-000-fake`;

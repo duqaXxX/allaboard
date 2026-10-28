@@ -106,8 +106,11 @@ import {
   withTaskStatus,
 } from "./helpers.ts";
 
-// Windows is not a supported host: a mode, a symbolic link and a git layout are read by POSIX rules.
-const POSIX_ONLY = { skip: process.platform === "win32" };
+const POSIX_ONLY = {
+  skip:
+    process.platform === "win32" &&
+    "a mode, a symbolic link and a git layout are read by POSIX rules",
+};
 
 const NESTED = texts.NESTED;
 
