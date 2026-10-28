@@ -111,11 +111,15 @@ export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow
       const label =
         chat.escape(line || (await titleOf(session.directory, copy)), "notice") ||
         texts.FORK_COPY_LABEL;
-      await talk.thread(ref).notice(
+      // A line that stays in the thread, in a notice's markup: a notice of the session's own is
+      // plain text, which would show the link's markup as written.
+      await talk.tell(
+        ref,
         fill(prompt === "" ? texts.FORK_WAITING : texts.FORK_RUNNING, {
           link: await talk.noticeLink(opened, label),
           session: copy,
         }),
+        { stays: true },
       );
       if (prompt !== "") await send(opened, prompt);
     },
