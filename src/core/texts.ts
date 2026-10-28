@@ -488,6 +488,10 @@ export const TERMINAL_BUSY =
   "⏳ This session is running a turn in a terminal. Your message waits here until that turn ends.";
 export const TERMINAL_MOVE_TITLE = "Move this session to the terminal?";
 export const TERMINAL_MOVE = "⚠️ Moving to the terminal stops what still runs here: {running}.";
+export const TERMINAL_BACKGROUND_TITLE = "The terminal wrote while work runs here";
+export const TERMINAL_BACKGROUND =
+  "⚠️ This session was continued in a terminal while work runs here: {running}. To send this " +
+  "here, that work stops first.";
 export const TERMINAL_SENT = "Sent here.";
 export const TERMINAL_TURN_ENDED = "The terminal's turn ended.";
 export const TERMINAL_MOVED = "Moved to the terminal.";
@@ -498,17 +502,19 @@ export const TERMINAL_TOP_LEVEL =
 export const TERMINAL_NOT_STARTED = "This session has not started yet: send it a message first.";
 export const TERMINAL_CUT = naming(
   "Stopped here. The terminal continues this turn by itself: the command that was running is " +
-    "stopped, and {author} runs it again there.\n{command}",
+    "stopped, and {author} decides there whether to run it again.\n{command}",
 );
 export const TERMINAL_IDLE = "Continue in the terminal with:\n{command}";
 export const TERMINAL_WAIT =
   "A turn is running here: wait for its end, or `!stop` it, then continue in the terminal " +
   "with:\n{command}";
 // A turn the owner ran in the terminal, shown in the thread before the reply to his next message.
-export const TERMINAL_TURN = "🖥 In the terminal:\n› {prompt}\n\n{reply}";
-export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n› {prompt}";
+export const TERMINAL_TURN = "🖥 In the terminal:\n{prompt}\n\n{reply}";
+export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n{prompt}";
 // A turn moved with `!terminal`, which the terminal went on with by itself.
 export const TERMINAL_TURN_WENT_ON = "🖥 In the terminal, the turn went on:\n\n{reply}";
+export const TERMINAL_TURN_WENT_ON_INTERRUPTED =
+  "🖥 In the terminal, the turn went on, and you interrupted it.";
 export const SHELL_OUTSIDE_SESSION = "`!!` runs a shell command inside a session's thread.";
 export const SHELL_FIRST_PROMPT =
   "Send this session its first prompt before a shell command: it starts with its setup.";

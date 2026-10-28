@@ -29,6 +29,13 @@ export function splitLines(text: string): string[] {
   return lines;
 }
 
+/** `text` as a Markdown quote, every line of it, so a chat draws it as quoted words. */
+export function quoted(text: string): string {
+  return splitLines(text)
+    .map((line) => `> ${line}`.trimEnd())
+    .join("\n");
+}
+
 /** `value` on one line, its runs of whitespace as one space, cut with `…` past `limit` characters. */
 export function oneLine(value: string, limit: number): string {
   const text = spaced(value);

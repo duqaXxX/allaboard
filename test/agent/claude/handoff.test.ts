@@ -331,6 +331,44 @@ test("what the agent wrote before any typed prompt is the turn going on, shown f
   );
 });
 
+test("an interruption in the terminal is no prompt: it ends the turn it interrupts", () => {
+  // As `getSessionMessages` returned it on 2026-10-28 (Claude Code 2.1.311): the owner stopped
+  // the command the terminal ran again after `!terminal`, and Claude Code wrote its marker as a
+  // user text after the refused call's result.
+  const interrupted = turnsOf([
+    user("u1", [{ type: "tool_result", tool_use_id: "t1", content: "Exit code 137" }]),
+    assistant("a1", [{ type: "thinking", thinking: "", signature: "s" }]),
+    assistant("a2", [{ type: "tool_use", id: "t2", name: "Bash", input: {} }]),
+    user("u2", [{ type: "tool_result", tool_use_id: "t2", content: "The user doesn't want to" }]),
+    user("u3", [{ type: "text", text: "[Request interrupted by user for tool use]" }]),
+  ]);
+  assert.deepEqual(interrupted, [{ prompt: null, reply: null, interrupted: true }]);
+  // A typed prompt the owner then interrupts keeps its prompt and what was written before.
+  assert.deepEqual(
+    turnsOf([
+      user("u4", "Write the notes"),
+      assistant("a3", [{ type: "text", text: "Starting." }]),
+      user("u5", [{ type: "text", text: "[Request interrupted by user]" }]),
+    ]),
+    [{ prompt: "Write the notes", reply: "Starting.", interrupted: true }],
+  );
+  // As a plain string too, twice in a row, and a prompt after it opens a turn of its own.
+  assert.deepEqual(
+    turnsOf([
+      user("u6", "Go on"),
+      user("u7", "[Request interrupted by user]"),
+      user("u8", "[Request interrupted by user]"),
+      user("u9", "Next"),
+      assistant("a4", [{ type: "text", text: "Done." }]),
+    ]),
+    [
+      { prompt: "Go on", reply: null, interrupted: true },
+      { prompt: "Next", reply: "Done." },
+    ],
+  );
+  assert.equal(promptOf(user("u10", "[Request interrupted by user for tool use]")), null);
+});
+
 test("a notification's turn right after the turn going on joins neither", () => {
   const turns = turnsOf([
     user("u1", [{ type: "tool_result", tool_use_id: "t1", content: "Exit code 137" }]),
