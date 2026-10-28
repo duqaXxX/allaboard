@@ -396,8 +396,8 @@ export class Room {
 
   /**
    * Writes a message. Without a `thread` it is top-level: by the owner or anybody it opens a
-   * thread of its own, by the daemon it is a line of the channel. Throws `ChatError` for a
-   * channel the chat does not have.
+   * thread of its own, by the daemon it is a line of the channel unless `opens` says it starts a
+   * thread. Throws `ChatError` for a channel the chat does not have.
    */
   write(
     channel: string,
@@ -405,12 +405,13 @@ export class Room {
     author: string,
     text: string,
     kind: MessageKind,
+    opens = author !== DAEMON,
   ): StoredMessage {
     if (!this.#channels.has(channel)) throw new ChatError("channel_not_found");
     this.#sequence += 1;
     const id = `msg-${this.#sequence}`;
     let name = thread;
-    if (name === null && author !== DAEMON) {
+    if (name === null && opens) {
       if (this.#clock === null) throw new Error("the memory chat is not built yet");
       name = `thread-${this.#sequence}`;
       this.#threads.set(key(channel, name), this.#clock.time());

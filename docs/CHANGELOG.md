@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!fork [prompt]` inside a thread copies its session into a new thread of the channel, as the
+  terminal's `/fork` does: the copy keeps the model, effort and bypass, starts on the prompt (or
+  waits for your first message there), and the original thread goes on. The new thread's first
+  message links back to the original, which gets one line with a link to the copy. Sent during a
+  turn, it waits for the turn to end. The agent seam gains `forkSession` (`sessionForks`) and the
+  chat seam `ChannelChat.open` (`threadOpen`) (#4).
 - The footer and `!status` name the advisor while one is set (`advisor Opus`), read from
   Claude Code's settings each time they are drawn: `/advisor` saves it for every session, the
   terminal's included (#8).
@@ -41,6 +47,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `!bg`, the terminal's alias of `/background`, is answered as not offered, as `!background` is,
+  instead of reaching the session (#4).
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.312, which bundles Claude Code 2.1.312. The
   release probe certified it on 2026-10-27: the SDK surface table holds and so do the 49 claims.
   Its stream carries ten paths the fixtures do not hold, none of which the source reads, and all

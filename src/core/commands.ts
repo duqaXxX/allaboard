@@ -52,6 +52,13 @@ export interface Skills {
   readonly kind: "skills";
 }
 
+/** `!fork [prompt]`: a copy of the session in a new thread of the channel, as the terminal's `/fork`. */
+export interface Fork {
+  readonly kind: "fork";
+  /** What the copy starts on; empty when it waits for the owner's first message. */
+  readonly prompt: string;
+}
+
 /** `!terminal`: the session moves to a terminal on the host, a running turn with it. */
 export interface Terminal {
   readonly kind: "terminal";
@@ -123,6 +130,7 @@ export type Word =
   | Memory
   | Skills
   | Terminal
+  | Fork
   | Resume
   | Open
   | Tag
@@ -145,6 +153,7 @@ export const WORD = {
   memory: "memory",
   skills: "skills",
   terminal: "terminal",
+  fork: "fork",
   resume: "resume",
   open: "open",
   tag: "tag",
@@ -230,6 +239,8 @@ export function parseBang(text: string): Command | null {
     case "terminal":
       if (rest === "") return { kind: "terminal" };
       break;
+    case "fork":
+      return { kind: "fork", prompt: rest };
     case "resume":
       return { kind: "resume", target: rest };
     case "open":

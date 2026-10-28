@@ -31,6 +31,7 @@ test("the Claude back end declares what the core adapts to", () => {
     folderTrust: true,
     sessionTags: true,
     sessionTitles: true,
+    sessionForks: true,
     goals: true,
     scheduledJobs: true,
     shellCommands: true,

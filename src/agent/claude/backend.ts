@@ -5,6 +5,7 @@
  */
 import { homedir } from "node:os";
 import {
+  forkSession as sdkForkSession,
   getSessionInfo as sdkGetSessionInfo,
   tagSession as sdkTagSession,
 } from "@anthropic-ai/claude-agent-sdk";
@@ -74,10 +75,10 @@ const BOUND_FOLDER = "A thread works in the folder its channel was bound to.";
 const NOT_OFFERED: Readonly<Record<string, string | null>> = Object.freeze({
   rewind: null,
   branch: null,
-  fork: null,
   subtask: null,
   btw: null,
   background: null,
+  bg: null,
   cd: BOUND_FOLDER,
   "add-dir": BOUND_FOLDER,
   diff: "Ask Claude for the diff.",
@@ -274,6 +275,23 @@ export class ClaudeBackend implements AgentBackend {
    */
   tagSession(folder: string, session: string, tag: string | null): Promise<void> {
     return sdkTagSession(session, tag, { dir: folder });
+  }
+
+  /**
+   * Copies a session of `folder` into a new transcript with fresh message ids, as the terminal's
+   * `/fork` does, through `CLAUDE_CONFIG_DIR` as `tagSession` does. Measured on 2026-10-28 (SDK
+   * 0.3.312, CLI 2.1.312): the original is left as it was; the copy is listed beside it, named
+   * `<title> (fork)` without a `title`; a resume of the copy runs the model the original last
+   * ran, a switch included, and reads the original's prompt cache; its system prompt is the
+   * original's, with no instruction to work in a worktree of its own, which the terminal's
+   * `/fork` gives.
+   */
+  async forkSession(folder: string, session: string, title: string | null): Promise<string> {
+    const forked = await sdkForkSession(session, {
+      dir: folder,
+      ...(title === null ? {} : { title }),
+    });
+    return forked.sessionId;
   }
 
   /**

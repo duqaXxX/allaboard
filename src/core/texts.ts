@@ -499,6 +499,24 @@ export const TERMINAL_TURN_ENDED = "The terminal's turn ended.";
 export const TERMINAL_MOVED = "Moved to the terminal.";
 export const TERMINAL_NOT_MOVED = "Not moved.";
 // `!terminal`'s answers. `{command}` is the line to run, shown as a command.
+// `!fork`'s answers. `{link}` is a link to a thread; `{session}` the copy's id.
+export const FORK_TOP_LEVEL = "`!fork` works inside a session's thread, not in the channel.";
+export const FORK_UNAVAILABLE = naming(
+  "`!fork` is not offered here: {agent} or {chat} cannot copy a session into a new thread.",
+);
+export const FORK_NOT_STARTED = "This session has not started yet: send it a message first.";
+// The new thread's root, in a reference's markup.
+export const FORK_ROOT = "Fork of {link}";
+export const FORK_ROOT_PROMPT = "Fork of {link}: {prompt}";
+// The line in the origin's thread, as the terminal's `/fork` confirms in one line.
+export const FORK_RUNNING = "Forked into {link} · running · session `{session}`";
+export const FORK_WAITING =
+  "Forked into {link} · waiting for your first message there · session `{session}`";
+export const FORK_COPY_LABEL = "the copy";
+// A copy is resumed in the channel's folder, so a session of an earlier folder has nowhere to go.
+export const FORK_OLD_FOLDER =
+  "This session works in an earlier folder of the channel: a copy of it would start in the " +
+  "channel's folder, where it does not exist.";
 export const TERMINAL_TOP_LEVEL =
   "`!terminal` works inside a session's thread, not in the channel.";
 export const TERMINAL_NOT_STARTED = "This session has not started yet: send it a message first.";
@@ -641,6 +659,10 @@ export const HELP_WORDS: readonly Named[] = [
     "the channel",
   "`!terminal` move this session to a terminal on the host: a running turn goes on there by " +
     "itself; inside a thread, refused in the channel",
+  "`!fork [prompt]` copy this session into a new thread of the channel, as the terminal's " +
+    "`/fork` does: the copy keeps this session's settings and starts on the prompt, or waits for " +
+    "your first message there; this thread goes on as it was; inside a thread, refused in the " +
+    "channel",
   "`!bind [folder]` the folders {agent} trusts, or bind this channel to one, its path " +
     "relative to the allowed root; in the channel, refused inside a thread",
   "`!bypass on|off` run every tool without asking, until `!bypass off`; it survives a " +
@@ -788,6 +810,9 @@ export const GUIDE_SESSIONS_RESUME =
 export const GUIDE_SESSIONS_LOADED =
   "Inside a thread, `!memory` lists the memory files its session loaded and `!skills` the skills " +
   "it can use, read only.";
+export const GUIDE_SESSIONS_FORK =
+  "Inside a thread, `!fork <prompt>` copies its session into a new thread of the channel, which " +
+  "starts on the prompt while this one goes on, as the terminal's `/fork` does.";
 export const GUIDE_SESSIONS_TERMINAL =
   "To continue a session in the terminal, run the `Terminal:` command `!status` shows in its " +
   "thread, or send `!terminal` there, which moves a running turn too. Write from one side at a " +

@@ -92,6 +92,7 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!memory` | Lists the memory files a thread's session loaded |
 | `!skills` | Lists the skills a thread's session can use |
 | `!terminal` | Moves a thread's session to a terminal on your Mac, a running turn with it |
+| `!fork [prompt]` | Copies a thread's session into a new thread, as the terminal's `/fork` does |
 | `!resume` | Lists the folder's sessions, the terminal's included, with a Resume button each |
 | `!bypass on` / `off` | Switches a session to `bypassPermissions` and back |
 | `!plan` / `!plan off` | Switches a session to plan mode and back |

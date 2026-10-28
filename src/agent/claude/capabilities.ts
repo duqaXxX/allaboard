@@ -35,6 +35,8 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   sessionTags: true,
   // The SDK's `getSessionInfo`.
   sessionTitles: true,
+  // The SDK's `forkSession`.
+  sessionForks: true,
   // The `goal_status` entries a session store receives (`goals.ts`).
   goals: true,
   // `session_crons` of the Stop hook's input (`hooks.ts`).

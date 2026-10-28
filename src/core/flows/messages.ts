@@ -33,6 +33,7 @@ import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
 import { askOwner } from "./ask-owner.ts";
 import type { MessagesFlow, OtherFlows } from "./contract.ts";
+import { forkFlow } from "./fork.ts";
 import type { FlowDeps, Report, Talk } from "./talk.ts";
 import { unservedWords, wordFlow } from "./words.ts";
 
@@ -57,7 +58,7 @@ export function isClear(
 
 export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): MessagesFlow {
   const { chat, agent, sessions, state, names } = deps;
-  const word = wordFlow(deps, talk, others);
+  const word = wordFlow(deps, talk, others, forkFlow(deps, talk, sendPrompt));
   const unserved = unservedWords(deps, others);
   // One lock per thread, alive only while someone holds or waits on it (a channel keeps
   // opening new threads for as long as it runs; a lock kept forever would leak).
@@ -153,6 +154,29 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
       candidates: candidates.map(({ aliases: _aliases, ...shown }) => shown),
     });
     return true;
+  }
+
+  /**
+   * A prompt the daemon sends on the owner's word (`!fork`'s), in a thread that holds a session:
+   * it takes the path of a message they wrote there, the same-folder hold and the terminal's
+   * check included, and a failure is told in that thread. Its id is the thread's root, which
+   * nothing reads for a message that is no command.
+   */
+  async function sendPrompt(ref: ThreadRef, prompt: string): Promise<void> {
+    const session = sessions.get(ref.channel, ref.thread);
+    if (session === null) throw new SessionGone(names);
+    const message: InboundMessage = {
+      ref,
+      id: ref.thread,
+      topLevel: false,
+      text: prompt,
+      plain: prompt,
+      literal: true,
+      content: async () => prompt,
+    };
+    await talk.replyOnFailure(ref, () =>
+      submitToSession(message, session, null, { inThread: true, typed: prompt }),
+    );
   }
 
   /**
