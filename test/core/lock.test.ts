@@ -38,7 +38,11 @@ import {
 } from "../../src/core/lock.ts";
 
 const LOCK_MODULE = pathToFileURL(join(import.meta.dirname, "..", "..", "src", "core", "lock.ts"));
-const POSIX_ONLY = { skip: process.platform === "win32" };
+const POSIX_ONLY = {
+  skip:
+    process.platform === "win32" &&
+    "the lock is a named pipe on Windows, with no socket file or claim, and folder modes are POSIX",
+};
 // The directory lock is the macOS mechanism; the others run the socket one.
 const MACOS_ONLY = {
   skip: process.platform === "darwin" ? false : "the directory lock is the macOS mechanism",

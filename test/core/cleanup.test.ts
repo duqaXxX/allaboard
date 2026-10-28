@@ -24,7 +24,11 @@ const THREAD = "1789000000.000100";
 const GONE_THREAD = "1789000500.000100";
 const SESSION = "68da9311-0000-4000-8000-00000000000a";
 const NOBODY: readonly ThreadRef[] = [];
-const NEEDS_PERMISSIONS = { skip: process.platform === "win32" || process.getuid?.() === 0 };
+const NEEDS_PERMISSIONS = {
+  skip:
+    (process.platform === "win32" || process.getuid?.() === 0) &&
+    "permission bits mean nothing on Windows, and root reads what a mode forbids",
+};
 
 /** A thread's name read as its opening time in epoch seconds, as a chat whose names are times does. */
 const opened = (ref: ThreadRef): number | null => Number(ref.thread);

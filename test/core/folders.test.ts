@@ -5,8 +5,11 @@ import { basename, join, relative } from "node:path";
 import { after, test } from "node:test";
 import { bindableFolders, FOLDER_ROWS, TRUST_BATCH } from "../../src/core/folders.ts";
 
-// Permission bits mean nothing on Windows, and root reads what a mode forbids.
-const NEEDS_PERMISSIONS = { skip: process.platform === "win32" || process.getuid?.() === 0 };
+const NEEDS_PERMISSIONS = {
+  skip:
+    (process.platform === "win32" || process.getuid?.() === 0) &&
+    "permission bits mean nothing on Windows, and root reads what a mode forbids",
+};
 
 const made: string[] = [];
 

@@ -20,7 +20,9 @@ import {
   UnknownChannel,
 } from "../../src/core/state.ts";
 
-const POSIX_ONLY = { skip: process.platform === "win32" };
+const POSIX_ONLY = {
+  skip: process.platform === "win32" && "file modes and a directory's sync are POSIX",
+};
 
 const CHANNEL = "C000CHAN";
 const OTHER_CHANNEL = "C000OTHR";

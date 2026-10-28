@@ -12,7 +12,9 @@ import { named } from "../../src/core/texts.ts";
 import { plainShellPrompt, say } from "../support/plain-agent.ts";
 import { NAMES, World } from "./world.ts";
 
-const POSIX_ONLY = { skip: process.platform === "win32" };
+const POSIX_ONLY = {
+  skip: process.platform === "win32" && "the command needs Bash and POSIX tools",
+};
 
 /** A session's thread whose first prompt has had its answer. */
 async function session(world: World): Promise<string> {
@@ -69,7 +71,8 @@ test(
   },
 );
 
-test("Cancel runs nothing and tells the owner", POSIX_ONLY, async (t) => {
+// Runs nothing, so it needs no Bash: it runs on Windows too.
+test("Cancel runs nothing and tells the owner", async (t) => {
   const world = World.make(t, { shell: true });
   await world.start();
   const thread = await session(world);
