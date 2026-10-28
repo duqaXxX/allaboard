@@ -7,7 +7,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- The footer and `!status` name the advisor while one is set (`advisor Opus 5.5`), read from
+- The footer and `!status` name the advisor while one is set (`advisor Opus`), read from
   Claude Code's settings each time they are drawn: `/advisor` saves it for every session, the
   terminal's included (#8).
 - A message another of your Claude Code sessions sends a thread's session (`SendMessage`) now
