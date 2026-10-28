@@ -113,6 +113,7 @@ export const SHELL_CUT =
 export const SHELL_CANCEL_BUTTON = "Cancel";
 export const TERMINAL_SEND_BUTTON = "Send here";
 export const TERMINAL_MOVE_BUTTON = "Stop them and move";
+export const TERMINAL_STOP_SEND_BUTTON = "Stop them and send";
 export const TERMINAL_CANCEL_BUTTON = "Cancel";
 export const SETUP_HEADER = "*Choose how this session starts*";
 export const SETUP_EFFORT_OPTION = "Effort: {level}";

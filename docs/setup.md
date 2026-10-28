@@ -959,6 +959,11 @@ processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_
   `!terminal` moved, which the terminal went on with by itself, comes first as
   `🖥 In the terminal, the turn went on:` with its last reply. The session's process is then
   started again, so that it reads them.
+- Background work running in the thread while the terminal wrote: the process that runs it never
+  reads what the terminal wrote, and starting it again stops the work. allaboard asks first,
+  `⚠️ This session was continued in a terminal while work runs here: <tasks>. To send this here,
+  that work stops first.`, with **Stop them and send** and **Cancel**. The question becomes
+  `Sent here.` or `Not sent.`
 
 A terminal left open does not read what you write in Slack: close it and run the command again
 before writing there. `/resume <session id>` inside it does not reload a session started from

@@ -488,6 +488,10 @@ export const TERMINAL_BUSY =
   "⏳ This session is running a turn in a terminal. Your message waits here until that turn ends.";
 export const TERMINAL_MOVE_TITLE = "Move this session to the terminal?";
 export const TERMINAL_MOVE = "⚠️ Moving to the terminal stops what still runs here: {running}.";
+export const TERMINAL_BACKGROUND_TITLE = "The terminal wrote while work runs here";
+export const TERMINAL_BACKGROUND =
+  "⚠️ This session was continued in a terminal while work runs here: {running}. To send this " +
+  "here, that work stops first.";
 export const TERMINAL_SENT = "Sent here.";
 export const TERMINAL_TURN_ENDED = "The terminal's turn ended.";
 export const TERMINAL_MOVED = "Moved to the terminal.";

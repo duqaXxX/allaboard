@@ -3,8 +3,9 @@
  * other's messages, and the second to write branches the conversation (measured 2026-10-27), so
  * the owner writes from one side at a time. Before his message reaches the session: a terminal
  * that runs a turn is waited out, a terminal left open is named once and he chooses to send here
- * or not, and the turns written there since this thread's last message are shown, one message
- * each, before the reply.
+ * or not, background work here that the terminal wrote beside is stopped only if he chooses to,
+ * and the turns written there since this thread's last message are shown, one message each,
+ * before the reply.
  */
 import type { SessionHolder } from "../../agent/seam.ts";
 import type { TerminalRequest, ThreadRef } from "../../chat/seam.ts";
@@ -183,6 +184,34 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
       if (answer === null) return false;
       for (const holder of found) session.terminalsAllowed.add(holder.id);
       break;
+    }
+    // What the terminal wrote is resumed into only once the process here is closed, which the
+    // work it runs would not survive: the owner chooses, as for `!terminal`. Looked at again
+    // after a stop, since that turn may have started more work. Read only while
+    // work runs: a plain message takes no extra step on its way.
+    while (session.stillRunning !== "") {
+      if (talk.stopped) return false;
+      const running = await session.writtenBesideWork();
+      if (running === "") break;
+      const answer = await askOwner(deps, talk, ref, session, {
+        kind: "terminal",
+        title: texts.TERMINAL_BACKGROUND_TITLE,
+        request: (requestId) => ({
+          type: "terminal",
+          requestId,
+          state: "background",
+          running,
+          command: null,
+        }),
+        ends: { sent: texts.TERMINAL_SENT, cancelled: texts.NOT_SENT },
+      });
+      if (answer === null) return false;
+      await session.stopForTerminal();
+      // A turn the agent opened meanwhile (a task's report) keeps the process: its end is waited
+      // out, so the message never reaches the process that missed the terminal's turns.
+      while (session.busy && !talk.stopped) {
+        await clock.sleep(TERMINAL_POLL_SECONDS, deps.stopped).catch(() => {});
+      }
     }
     for (const turn of await session.takeForeignTurns()) {
       await talk.say(ref.channel, ref.thread, turnText(turn.prompt, turn.reply));
