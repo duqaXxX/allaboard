@@ -40,7 +40,10 @@ test("!fork <prompt> opens a thread whose session is a copy and starts it on the
   assert.equal(world.state.thread(origin.channel, origin.thread)?.sessionId, original);
   const root = world.inChannel().find((line) => line.startsWith("Fork of "));
   assert.ok(root?.endsWith(": look into the timeout"), String(root));
-  assert.equal(agent.starts.at(-1)?.resume, copied.sessionId, "the copy is what starts");
+  const start = agent.starts.at(-1);
+  assert.equal(start?.resume, copied.sessionId, "the copy is what starts");
+  assert.equal(start?.forkOf?.session, original, "told what it is a copy of");
+  assert.equal(start?.forkOf?.at, new Date(world.now * 1000).toISOString());
   const sent = await world.prompts();
   assert.ok(
     sent.includes("look into the timeout"),
@@ -61,17 +64,42 @@ test("!fork alone opens the copy's thread and leaves it waiting", async (t) => {
   const agent = new PlainAgent();
   const world = await MessagesWorld.make(t, { agent });
   const origin = await world.opened("the first task");
-  const starts = agent.starts.length;
+  const sent = (await world.prompts()).length;
 
   await world.says("!fork", origin.thread);
   await world.settle();
 
   const ref = copyOf(world, origin);
   assert.ok(world.inChannel().some((line) => line.startsWith("Fork of ") && !line.includes(": ")));
-  assert.equal(agent.starts.length, starts, "nothing is sent to the copy");
+  assert.equal((await world.prompts()).length, sent, "nothing is sent to the copy");
+  const copied = world.state.thread(ref.channel, ref.thread)?.sessionId;
+  assert.equal(
+    agent.starts.at(-1)?.resume,
+    copied,
+    "the copy starts at once, as the terminal's does",
+  );
+  assert.ok(agent.starts.at(-1)?.forkOf);
   const line = world.shown(origin).at(-1) ?? "";
   assert.ok(line.includes("waiting for your first message there"), line);
   assert.ok(world.state.thread(ref.channel, ref.thread)?.sessionId);
+});
+
+test("a copy keeps what it was copied from across a restart of the daemon", async (t) => {
+  const agent = new PlainAgent();
+  const first = await MessagesWorld.make(t, { agent });
+  const origin = await first.opened("the first task");
+  const original = first.state.thread(origin.channel, origin.thread)?.sessionId;
+  await first.says("!fork", origin.thread);
+  await first.settle();
+  const ref = copyOf(first, origin);
+  await first.sessions.closeAll();
+  const world = await MessagesWorld.make(t, { agent, restartOf: first });
+  agent.next(say("Back."));
+  await world.says("go on", ref.thread);
+  await world.settle();
+  const start = agent.starts.at(-1);
+  assert.equal(start?.resume, world.state.thread(ref.channel, ref.thread)?.sessionId);
+  assert.equal(start?.forkOf?.session, original, "started as the copy it is, every time");
 });
 
 test("!fork during a turn waits for it to end", async (t) => {

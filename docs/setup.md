@@ -1013,6 +1013,9 @@ from goes on as it was. Use it when a session finds a problem that is not its ta
 - A thread that works in an earlier folder of the channel, after a `!bind` to another, cannot be
   forked: the copy's thread would start in the channel's folder, where the session does not exist.
 - Sent while allaboard waits to restart, it is refused, and nothing is copied.
+- The copy is told it was forked from a session that still runs, and can message it, as the
+  terminal's copy is; a command the original left running in the background stays the
+  original's, and the copy is not told it stopped. The original is not told of the copy.
 - The new thread asks no setup: it starts from the copy's settings. It is a thread like any other
   afterwards, in `!status` and on the Home tab.
 - The copy works in the same folder as the original. The terminal's `/fork` tells its copy to make
@@ -1831,7 +1834,7 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice, the `/effort` level, the status of its root message, the ids and kinds of the replies and requests a crash repair needs, and the text the root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file); at the top of the file, `update_notice` and `restart_notice`. The fields one by one and how they are written are in [State and the single-instance lock](architecture.md#state-and-the-single-instance-lock) |
+| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice, the `/effort` level, the status of its root message, the ids and kinds of the replies and requests a crash repair needs, and the text the root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file), and for a thread `!fork` opened, the session it copies and when (`fork_of`); at the top of the file, `update_notice` and `restart_notice`. The fields one by one and how they are written are in [State and the single-instance lock](architecture.md#state-and-the-single-instance-lock) |
 
 `state.json` looks like this; you never need to edit it:
 

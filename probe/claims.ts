@@ -482,6 +482,19 @@ export const CLAIMS: readonly Claim[] = [
       "entries in a transcript",
   ),
   claim(
+    "P43",
+    "gesture",
+    "a copy made with `forkSession` and started with `CLAUDE_CODE_RESUME_SOURCE_ALIVE` while the " +
+      "original runs a background command, as the terminal's `/fork` starts its copy, is told it " +
+      "was made from a session that still runs: its transcript holds a `<fork-source>` note",
+    "src/agent/claude/session.ts#forkSource",
+    "the variable is in Claude Code's own source, on no page. In a thread, ask for `sleep 90` in " +
+      "the background, then `!fork tell me in one line whether you have a background task`: the " +
+      "copy says it has one still running and names the session it was forked from, never that " +
+      "the command stopped. If it fails, look for `CLAUDE_CODE_RESUME_SOURCE_ALIVE` and " +
+      "`fork-source` in the bundled CLI's strings, and read `docs/limits.md` for the row on `!fork`",
+  ),
+  claim(
     "L1",
     "limit",
     "the Bash tool of a session started as the daemon starts it, with no `BASH_DEFAULT_TIMEOUT_MS`, " +

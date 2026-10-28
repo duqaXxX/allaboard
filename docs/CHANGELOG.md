@@ -47,6 +47,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A copy `!fork` makes starts at once, told it was forked from a session that still runs, as the
+  terminal's `/fork` starts its copy (`CLAUDE_CODE_RESUME_SOURCE_ALIVE`): it no longer reads that a
+  command the original left running in the background stopped, and it can message the original.
+  The copy's thread keeps what it was copied from in `state.json` (`fork_of`: two ids and a time),
+  so every start of the copy, after a restart too, is the same. The release probe checks it on
+  each SDK release (P43) (#4).
 - `!bg`, the terminal's alias of `/background`, is answered as not offered, as `!background` is,
   instead of reaching the session (#4).
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.312, which bundles Claude Code 2.1.312. The

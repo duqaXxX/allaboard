@@ -905,6 +905,24 @@ test("a file without the ended key loads with none", () => {
   assert.equal(mustThread(new StateStore(path)).ended, null);
 });
 
+test("a copy's source round trips, is written only when set, and a broken one reads as none", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  const store = new StateStore(path);
+  store.bind(CHANNEL, join(dir, "project"));
+  store.openThread(CHANNEL, THREAD_TS);
+  assert.equal("fork_of" in written(path), false);
+  const source = { session: "orig-1", at: "2026-10-28T21:09:12.578Z" };
+  store.setForkOf(CHANNEL, THREAD_TS, source);
+  assert.deepEqual(written(path).fork_of, { session_id: "orig-1", at: source.at });
+  assert.deepEqual(mustThread(new StateStore(path)).forkOf, source);
+  store.setForkOf(CHANNEL, "1790000000.000000", source); // unknown: a no-op
+  assert.equal(store.thread(CHANNEL, "1790000000.000000"), null);
+  const broken = join(dir, "broken.json");
+  writeThreadFile(broken, dir, { directory: dir, session_id: SESSION, fork_of: { at: source.at } });
+  assert.equal(mustThread(new StateStore(broken)).forkOf, null);
+});
+
 test("the root's prompt round trips, and a file without it reads as none", () => {
   const dir = scratch();
   const path = join(dir, "state.json");

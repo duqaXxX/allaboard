@@ -335,6 +335,8 @@ const NO_FACTS = new Set([
   "P39",
   // What the stop hooks said is the whole check: no fact of the release beside it.
   "P42",
+  // Whether the copy got its note is the whole check.
+  "P43",
   // Limit claims: each holds on a constant the page states, or a name that is there or not.
   "L1",
   "L2",

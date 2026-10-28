@@ -1,5 +1,7 @@
 {
-  "kinds": {},
+  "kinds": {
+    "system/session_title_changed": "2.1.312"
+  },
   "paths": {
     "assistant": {
       "aborted:boolean": "2.1.304",

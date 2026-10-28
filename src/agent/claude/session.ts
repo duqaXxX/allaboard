@@ -24,6 +24,7 @@ import {
   type AgentInfo,
   type AgentSession,
   type ContextUsage,
+  type ForkSource,
   type LoadedContext,
   type PermissionMode,
   type Prompt,
@@ -223,6 +224,18 @@ export function sessionEnvironment(
   return { ...TERMINAL_DEFAULTS, ...process.env, ...variables, ...SESSION_SIGNALS };
 }
 
+/**
+ * What the terminal's `/fork` starts its copy with (Claude Code 2.1.312's own source; no page
+ * documents it): the copy's id, the moment of the fork and the original's id. With it, a resume of
+ * the copy takes no background task of the original's for one of its own that died, and, where
+ * sessions can message each other, tells the copy it was made from a session that still runs.
+ * Measured on 2026-10-28 (SDK 0.3.312): without it the copy is told the original's background
+ * command stopped; with it, that it has one still running, forked from a named live session.
+ */
+export function forkSource(copy: string, source: ForkSource): Record<string, string> {
+  return { CLAUDE_CODE_RESUME_SOURCE_ALIVE: `${copy}|${source.at}|${source.session}` };
+}
+
 // A level outside what `CAPABILITIES` declares, or a mode Claude Code does not take, is refused
 // (the seam's contract).
 function effortOf(level: string): EffortLevel {
@@ -285,7 +298,7 @@ export class ClaudeSession implements AgentSession {
   }
 
   #options(requests: RequestHandler): Options {
-    const { folder, resume, model, effort, chrome, bare, variables } = this.#config;
+    const { folder, resume, model, effort, chrome, bare, variables, forkOf } = this.#config;
     // Makes bypass possible, not active: `setPermissionMode` switches it on the live session.
     // `replay-user-messages` (CLI reference): Claude Code re-emits each prompt with the uuid the
     // daemon sent it under, which tells a prompt it took into a running turn from one that waits
@@ -309,7 +322,10 @@ export class ClaudeSession implements AgentSession {
         // `env` replaces the environment the process would inherit, so the daemon's own is
         // passed on: over the terminal's defaults, and under what the owner's file sets. What
         // the daemon reads from the stream is not the owner's to turn off.
-        env: sessionEnvironment(variables),
+        env: {
+          ...sessionEnvironment(variables),
+          ...(resume !== null && forkOf !== undefined && forkSource(resume, forkOf)),
+        },
         // A goal's changes reach only the transcript, which this store is handed as it is
         // written. `eager` delivers each entry at once; the SDK flushes the store before it
         // yields a `result` (`sdk.mjs` 0.3.304), so a turn's changes come before its end.

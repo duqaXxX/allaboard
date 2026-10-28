@@ -2132,6 +2132,7 @@ export class ThreadSession {
     signal?: AbortSignal,
   ): Promise<AgentSession> {
     const valid = this.validEffort(effort);
+    const forkOf = this.deps.state.thread(this.channelId, this.threadId)?.forkOf;
     if (effort !== null && valid === null) {
       logger.warning(`dropped an unrecognized stored effort level in ${this.where}`);
     }
@@ -2139,6 +2140,8 @@ export class ThreadSession {
       {
         folder: this.directory,
         resume: sessionId,
+        // A copy `!fork` made is started as the terminal starts its copy, every time.
+        ...(forkOf != null && { forkOf }),
         settingsSources: ["user", "project", "local"],
         model: null,
         // A model set by command survives a resume by itself (measured); the effort a command
