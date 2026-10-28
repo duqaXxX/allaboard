@@ -594,7 +594,7 @@ fields of the `Config`, and each holds only non-enumerable properties, so a log 
 `StateStore` (in `state`) keeps, for each bound channel, its directory and, for each of its threads,
 the folder it was opened in, its Claude Code session id, its bypass choice (on, off, or never
 chosen), the effort level set with `/effort` and `ended`, the status of its root once it is done or
-in error (cleared when the root turns working or waiting again; read only by the session index), the text of its root as the owner wrote it, kept when the root is replaced by the session's title (`root_prompt`), in
+in error (cleared when the root turns working or waiting again; read only by the session index), the text of its root as the owner wrote it, kept when the root is replaced by the session's title (`root_prompt`), and for a thread `!fork` opened the session its own is a copy of and when the copy was made (`fork_of`, `session_id` and `at`, written only when set), in
 `state.json` in the instance's configuration folder (version 3: version 2 plus `agent` and `chat`, the names of the agent
 and the chat that wrote the file). `bypass` is `true` for on and `false` for not on; an
 explicit off also writes `bypass_off: true`, and a thread with `bypass` false and no `bypass_off`
@@ -1280,7 +1280,7 @@ closed when the start returns (`ThreadSession.connect`).
   `markdown`, `CLAUDE_CODE_FORK_SUBAGENT=1` and `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`. The
   environment is the terminal's defaults, then the daemon's own, then the Claude Code variables
   the owner's file sets (`VARIABLES` in `src/agent/claude/module.ts`), then
-  `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`, which nothing overrides: the back end passes the
+  `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`, which nothing overrides, and for a copy `!fork` made, `CLAUDE_CODE_RESUME_SOURCE_ALIVE` from its thread's `fork_of` at every start (`forkSource`), as the terminal's `/fork` starts its copy: the back end passes the
   `session_state_changed` record on as `state_changed` (`working`, `idle`, `waiting`). The session
   the usage probe starts gets none of this. The reason for each option, with the measurement and
   the date, is the comment above its constant in `src/agent/claude/session.ts`.

@@ -19,7 +19,12 @@ import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node
 import { homedir, tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
 import { crc32, deflateSync } from "node:zlib";
-import { getSessionInfo, type query, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import {
+  getSessionInfo,
+  getSessionMessages,
+  type query,
+  type SDKUserMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import { ClaudeBackend } from "../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../src/agent/claude/capabilities.ts";
 import { directorySessions, projectKey, projectsDir } from "../src/agent/claude/listing.ts";
@@ -116,6 +121,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "terminal form": ["P30", "L4", "L5", "L8"],
   "session tag": ["P31"],
   "generated title": ["P32"],
+  "fork source": ["P43"],
   "folder trust": ["P34"],
   "stop hooks": ["P42"],
   "settings mode": ["P37"],
@@ -2437,6 +2443,8 @@ async function subagentHandback(s: Stage): Promise<Seen> {
 // waits after each for the title to reach the transcript.
 const TITLE_TURNS = 3;
 const TITLE_SETTLE_MS = 5_000;
+// How long the copy's transcript is read for its `<fork-source>` note after its first turn.
+const FORK_NOTE_MS = 10_000;
 
 /**
  * P32: Claude Code writes a title for a session of its own (the `ai-title` entry of the
@@ -2472,6 +2480,40 @@ async function generatedTitle(s: Stage): Promise<Seen> {
   return {
     P32: observation(false, false, `Claude Code wrote no title in ${TITLE_TURNS} turns`),
   };
+}
+
+/**
+ * P43: a copy (`forkSession`) started with `forkOf`, which the back end passes as
+ * `CLAUDE_CODE_RESUME_SOURCE_ALIVE`, while the original keeps a background command running, is
+ * told by Claude Code that it was forked from a session still running: a `<fork-source>` note in
+ * its transcript, after its first turn (measured on 2026-10-28, Claude Code 2.1.312). The control
+ * is the copy's own turn: a copy that never answered proves nothing about the variable.
+ */
+async function forkSourceAlive(s: Stage): Promise<Seen> {
+  const folder = join(s.root, "fork-source");
+  await mkdir(folder);
+  const original = await s.open(folder);
+  await original.turn(
+    "Run `sleep 90` with the Bash tool in the background (run_in_background true), then reply with the single word: started",
+  );
+  const id = sessionIdOf(original.events);
+  if (id === null) return { P43: observation(false, false, "the original reported no id") };
+  const copy = await s.backend.forkSession(folder, id, null);
+  const at = new Date().toISOString();
+  const forked = await s.open(folder, { resume: copy, forkOf: { session: id, at } });
+  await forked.turn("Reply with the single word: ok");
+  if (sessionIdOf(forked.events) === null) {
+    return { P43: observation(false, false, "the copy did not answer") };
+  }
+  const deadline = Date.now() + FORK_NOTE_MS;
+  for (;;) {
+    const messages = await getSessionMessages(copy, { dir: folder });
+    if (JSON.stringify(messages).includes("<fork-source>"))
+      return { P43: observation(true, true, "") };
+    if (Date.now() >= deadline) break;
+    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+  }
+  return { P43: observation(true, false, "the copy's transcript holds no <fork-source> note") };
 }
 
 /**
@@ -2544,6 +2586,7 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
       Object.assign(seen, await attempt("terminal form", s, () => terminalForm(s)));
       Object.assign(seen, await attempt("session tag", s, () => sessionTag(s.root)));
       Object.assign(seen, await attempt("generated title", s, () => generatedTitle(s)));
+      Object.assign(seen, await attempt("fork source", s, () => forkSourceAlive(s)));
       Object.assign(seen, await attempt("folder trust", s, () => folderTrust(s)));
       Object.assign(seen, await attempt("stop hooks", s, () => stopHooks(s)));
       Object.assign(seen, await attempt("settings mode", s, () => settingsMode(s)));

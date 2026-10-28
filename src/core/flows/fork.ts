@@ -79,6 +79,7 @@ export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow
         return;
       }
       const line = oneLine(prompt, TITLE_LIMIT);
+      const at = new Date(deps.now() * 1000).toISOString();
       const copy = await fork.call(agent, session.directory, origin.sessionId, line || null);
       const back = await talk.referenceLink(
         ref,
@@ -103,11 +104,13 @@ export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow
       }
       // The copy runs as its origin does: the effort and the bypass the origin's entry holds, and
       // the model its transcript ends on (a resume of a copy runs it, measured 2026-10-28).
-      if ((await sessions.resume(opened.channel, opened.thread, copy)) === null) {
-        throw new SessionGone(names);
-      }
+      const copied = await sessions.resume(opened.channel, opened.thread, copy);
+      if (copied === null) throw new SessionGone(names);
       state.setEffort(opened.channel, opened.thread, origin.effort);
       state.setBypass(opened.channel, opened.thread, origin.bypass);
+      // What it is a copy of, for every start of it: the agent then takes no background work of
+      // the original's for its own.
+      state.setForkOf(opened.channel, opened.thread, { session: origin.sessionId, at });
       const label =
         chat.escape(line || (await titleOf(session.directory, copy)), "notice") ||
         texts.FORK_COPY_LABEL;
@@ -121,7 +124,10 @@ export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow
         }),
         { stays: true },
       );
+      // Started at once, as the terminal's `/fork` starts its copy, once the line above is there:
+      // a start that fails is told with the link to the copy's thread already given.
       if (prompt !== "") await send(opened, prompt);
+      else await copied.ensureConnected();
     },
   };
 }

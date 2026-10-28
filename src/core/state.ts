@@ -8,6 +8,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import { dirname, join } from "node:path";
+import type { ForkSource } from "../agent/seam.ts";
 import type { SessionStatus, ThreadRef } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
 import { errorName } from "../values.ts";
@@ -97,6 +98,11 @@ export interface ThreadState {
   // message content `state.json` holds, since the daemon deleted it from the chat. Null until the
   // root is titled; a file without it reads as none, as for `ended`.
   readonly rootPrompt: string | null;
+  // For a thread `!fork` opened: the session its own is a copy of and when the copy was made,
+  // passed at every start of the copy, as the terminal passes it to every launch of its own: a
+  // start without it tells the copy that the original's background commands stopped. Ids and a
+  // time, never content; null for any other thread, and in a file without it.
+  readonly forkOf: ForkSource | null;
 }
 
 export interface ChannelRecord {
@@ -122,6 +128,7 @@ export function threadState(
     status: null,
     ended: null,
     rootPrompt: null,
+    forkOf: null,
     ...fields,
   };
 }
@@ -192,6 +199,13 @@ function requiredString(raw: Raw, key: string): string {
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+/** A thread's `fork_of`; one that is not whole is read as none. */
+function parseForkOf(value: unknown): ForkSource | null {
+  if (!isRaw(value)) return null;
+  const { session_id: session, at } = value;
+  return typeof session === "string" && typeof at === "string" ? { session, at } : null;
 }
 
 /** The restart notice a file holds; one that is not whole is read as none, as `update_notice` is. */
@@ -279,6 +293,7 @@ export function parseThread(raw: Raw): ThreadState {
     status: statusOrNull(raw.status),
     ended: statusOrNull(raw.ended),
     rootPrompt: stringOrNull(raw.root_prompt),
+    forkOf: parseForkOf(raw.fork_of),
   };
 }
 
@@ -559,6 +574,12 @@ export class StateStore {
     if (current !== null && current.rootPrompt !== null) {
       this.setThread(channelId, threadId, { ...current, rootPrompt: null });
     }
+  }
+
+  /** Record that a thread's session is a copy of `source` (`!fork`); a no-op for an unknown thread. */
+  setForkOf(channelId: string, threadId: string, source: ForkSource): void {
+    const current = this.thread(channelId, threadId);
+    if (current !== null) this.setThread(channelId, threadId, { ...current, forkOf: source });
   }
 
   /** Record the effort level a command set for a thread; a no-op for an unknown thread. */
@@ -915,6 +936,9 @@ export class StateStore {
                   status: t.status,
                   ended: t.ended,
                   root_prompt: t.rootPrompt,
+                  ...(t.forkOf !== null && {
+                    fork_of: { session_id: t.forkOf.session, at: t.forkOf.at },
+                  }),
                 },
               ]),
             ),

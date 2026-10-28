@@ -245,10 +245,19 @@ export interface AgentWords {
 
 export type SettingsSource = "user" | "project" | "local";
 
+/** The session a copy was made from (`AgentBackend.forkSession`), still running, and when. */
+export interface ForkSource {
+  readonly session: string;
+  /** ISO 8601: what ran before it is the original's, not the copy's. */
+  readonly at: string;
+}
+
 export interface StartOptions {
   readonly folder: string;
   /** The session to resume, or null for a new one. */
   readonly resume: string | null;
+  /** With `resume` naming a copy: the session it was made from, which still runs. */
+  readonly forkOf?: ForkSource;
   readonly settingsSources: readonly SettingsSource[];
   readonly model: string | null;
   readonly effort: string | null;

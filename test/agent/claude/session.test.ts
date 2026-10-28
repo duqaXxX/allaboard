@@ -203,6 +203,19 @@ test("a session starts with the defaults of an interactive one", LIMIT, async (t
   for (const [name, value] of own) assert.equal(env[name], value, name);
 });
 
+test(
+  "a copy is started as the terminal's /fork starts one, and no other session is",
+  LIMIT,
+  async (t) => {
+    const name = "CLAUDE_CODE_RESUME_SOURCE_ALIVE";
+    const at = "2026-10-28T21:09:12.578Z";
+    const { query } = await started(t, {}, { resume: "copy-1", forkOf: { session: "orig-1", at } });
+    assert.equal(query.options.env?.[name], `copy-1|${at}|orig-1`);
+    const plain = await started(t, {}, { resume: "orig-1" });
+    assert.equal(plain.query.options.env?.[name], process.env[name]);
+  },
+);
+
 // What the daemon reads from the stream is asked for whatever the owner's file says.
 test("a session is asked to say its state, over the owner's variables", LIMIT, async (t) => {
   const asked = "CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS";
