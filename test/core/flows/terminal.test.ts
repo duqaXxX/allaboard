@@ -145,8 +145,8 @@ test("the turns a terminal wrote come first, one message each", async (t) => {
   assert.deepEqual(agent.foreignAsked, [`${SESSION} m1`]);
   assert.deepEqual(after(world, ref), [
     fill(texts.TERMINAL_TURN_WENT_ON, { reply: "FINISHED" }),
-    fill(texts.TERMINAL_TURN, { prompt: "Rename the helper", reply: "Renamed it." }),
-    fill(texts.TERMINAL_TURN_UNANSWERED, { prompt: "Still there?" }),
+    fill(texts.TERMINAL_TURN, { prompt: "> Rename the helper", reply: "Renamed it." }),
+    fill(texts.TERMINAL_TURN_UNANSWERED, { prompt: "> Still there?" }),
   ]);
   assert.deepEqual(session.saved, { id: "m9", at: 9 });
 });
@@ -279,7 +279,7 @@ test("a turn going on is not shown when no move cut one here", async (t) => {
   });
   assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
   assert.deepEqual(after(world, ref), [
-    fill(texts.TERMINAL_TURN, { prompt: "Typed there", reply: "Done" }),
+    fill(texts.TERMINAL_TURN, { prompt: "> Typed there", reply: "Done" }),
   ]);
   assert.equal(session.movedMidTurn, false);
 });

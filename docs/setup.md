@@ -955,7 +955,7 @@ processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_
   or `Not sent.` A `!stop` sent while either is shown removes it, and `Not sent.` shows to you
   alone.
 - The turns the terminal wrote since the thread's last message come first, one message each:
-  `🖥 In the terminal:`, your prompt after `›`, then Claude's last reply of that turn. A turn
+  `🖥 In the terminal:`, your prompt as a quote, then Claude's last reply of that turn. A turn
   `!terminal` moved, which the terminal went on with by itself, comes first as
   `🖥 In the terminal, the turn went on:` with its last reply. The session's process is then
   started again, so that it reads them.

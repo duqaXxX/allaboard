@@ -11,6 +11,7 @@ import type { SessionHolder } from "../../agent/seam.ts";
 import type { TerminalRequest, ThreadRef } from "../../chat/seam.ts";
 import { systemClock } from "../../clock.ts";
 import { shellQuote } from "../../text.ts";
+import { quoted } from "../reply/words.ts";
 import { commandShown } from "../sessions/directory.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
@@ -159,7 +160,8 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
   function turnText(prompt: string | null, reply: string | null): string {
     const written = reply === null ? null : chat.escape(reply, "written");
     if (prompt === null) return fill(texts.TERMINAL_TURN_WENT_ON, { reply: written ?? "" });
-    const shown = { prompt: chat.escape(prompt, "written") };
+    // The owner's prompt as a quote, every line of it: words he wrote, nothing to open.
+    const shown = { prompt: quoted(chat.escape(prompt, "written")) };
     if (written === null) return fill(texts.TERMINAL_TURN_UNANSWERED, shown);
     return fill(texts.TERMINAL_TURN, { ...shown, reply: written });
   }
