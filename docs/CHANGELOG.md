@@ -24,13 +24,17 @@ All notable changes to this project are documented here. The format follows
   terminal and gives the command; a running turn goes on there by itself
   (`CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`), its last reply shown in the thread when you come
   back, and background work it would stop is confirmed first. While a turn or background work runs, `!status` warns that writing in the terminal now
-  splits the session.
+  splits the session. When the terminal wrote while background work runs in the thread, a
+  message there asks first, with **Stop them and send** and **Cancel**, since starting the
+  session again stops that work (#101).
 
 - The footer ends with the email of the Claude account the session runs on, and `!status` shows
   it with the account's plan (`Account: alice@example.com (Claude Max)`), so an instance with a
   login of its own (`CLAUDE_CONFIG_DIR`) says which one it uses. Read when a session connects:
   after a `/login` to another account, a session already open shows the new one from its next
   connect. Slack draws the footer as written, so the email is not a link.
+- `!memory` and `!skills` list, inside a thread, the memory files and the skills its session
+  loaded, read only, as the terminal's `/memory` and `/skills` panels do (#15).
 
 ### Changed
 

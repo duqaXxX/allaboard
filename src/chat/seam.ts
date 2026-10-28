@@ -459,8 +459,12 @@ export interface ShellRequest {
 export interface TerminalRequest {
   readonly type: "terminal";
   readonly requestId: string;
-  readonly state: "open" | "busy" | "move";
-  /** What `!terminal` would stop, for `move`; null otherwise. */
+  /**
+   * `open`: a terminal holds the session; `busy`: it runs a turn; `move`: `!terminal` would stop
+   * what runs here; `background`: a terminal wrote while work runs here, which sending stops.
+   */
+  readonly state: "open" | "busy" | "move" | "background";
+  /** What would be stopped, for `move` and `background`; null otherwise. */
   readonly running: string | null;
   /** The command that reopens the session in the terminal, for `open`; null otherwise. */
   readonly command: string | null;

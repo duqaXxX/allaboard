@@ -42,6 +42,16 @@ export interface Stop {
   readonly kind: "stop";
 }
 
+/** `!memory`: the memory files the thread's session loaded, as the terminal's `/memory` lists them. */
+export interface Memory {
+  readonly kind: "memory";
+}
+
+/** `!skills`: the skills the thread's session can use, as the terminal's `/skills` lists them. */
+export interface Skills {
+  readonly kind: "skills";
+}
+
 /** `!terminal`: the session moves to a terminal on the host, a running turn with it. */
 export interface Terminal {
   readonly kind: "terminal";
@@ -110,6 +120,8 @@ export type Word =
   | Plan
   | Status
   | Stop
+  | Memory
+  | Skills
   | Terminal
   | Resume
   | Open
@@ -130,6 +142,8 @@ export const WORD = {
   plan: "plan",
   status: "status",
   stop: "stop",
+  memory: "memory",
+  skills: "skills",
   terminal: "terminal",
   resume: "resume",
   open: "open",
@@ -206,6 +220,12 @@ export function parseBang(text: string): Command | null {
       break;
     case "stop":
       if (rest === "") return { kind: "stop" };
+      break;
+    case "memory":
+      if (rest === "") return { kind: "memory" };
+      break;
+    case "skills":
+      if (rest === "") return { kind: "skills" };
       break;
     case "terminal":
       if (rest === "") return { kind: "terminal" };
@@ -361,7 +381,7 @@ export function refusedInThread(
 }
 
 /** `description` on one line, cut at `DESCRIPTION_LIMIT` code points (a unit-wise cut could split an emoji). */
-function oneLine(description: string): string {
+export function oneLine(description: string): string {
   const joined = description
     .split(RUNS_OF_SPACE)
     .filter((word) => word !== "")

@@ -37,6 +37,7 @@ import type {
   ForeignTurns,
   GoalChange,
   ListedSession,
+  LoadedContext,
   PermissionAnswer,
   PermissionMode,
   PermissionRequest,
@@ -104,6 +105,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   shellCommands: false,
   sessionHolders: false,
   foreignTurns: false,
+  loadedContext: false,
 });
 
 /** The two commands of the agent, run by a prompt `/echo text` and `/count text`. */
@@ -472,6 +474,8 @@ export class PlainSession implements AgentSession {
     return { model: null, percentage: null };
   }
 
+  loaded?: () => Promise<LoadedContext>;
+
   async info(): Promise<AgentInfo> {
     return { models: [], commands: PLAIN_COMMANDS, permissionMode: PLAIN_MODE, account: null };
   }
@@ -730,6 +734,8 @@ export interface PlainAgentOptions {
    * reads the turns another one wrote (`foreignTurns`, from `foreign`), both set by the test.
    */
   readonly terminal?: true;
+  /** What each live session has loaded (`loadedContext`), as `!memory` and `!skills` list it. */
+  readonly loaded?: LoadedContext;
 }
 
 /** How the plain agent is told of a shell command: one text, which a test reads back. */
@@ -759,13 +765,19 @@ export class PlainAgent implements AgentBackend {
   readonly foreignAsked: string[] = [];
   sessionHolders?: (session: string) => Promise<readonly SessionHolder[] | null>;
   turnsAfter?: (folder: string, session: string, after: SavedMessage) => Promise<ForeignTurns>;
+  /** What each live session answers to `loaded`, with `loadedContext`. */
+  readonly loaded: LoadedContext | null;
 
   constructor(options: PlainAgentOptions = {}) {
     this.store = options.store ?? new PlainStore();
     this.turns = options.turns ?? [];
     this.capabilities = PLAIN_CAPABILITIES;
+    this.loaded = options.loaded ?? null;
+    if (this.loaded !== null) {
+      this.capabilities = Object.freeze({ ...this.capabilities, loadedContext: true });
+    }
     if (options.shell !== undefined) {
-      this.capabilities = Object.freeze({ ...PLAIN_CAPABILITIES, shellCommands: true });
+      this.capabilities = Object.freeze({ ...this.capabilities, shellCommands: true });
       this.shell = {
         timeoutMs: options.shell.timeoutMs ?? 10_000,
         environment: { PATH: process.env.PATH },
@@ -819,6 +831,8 @@ export class PlainAgent implements AgentBackend {
       store: this.store,
       takeTurn: () => this.turns.shift() ?? [say("ok")],
     });
+    const loaded = this.loaded;
+    if (loaded !== null) session.loaded = async () => loaded;
     this.sessions.push(session);
     return session;
   }

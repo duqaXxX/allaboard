@@ -174,8 +174,16 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKCompactBoundaryMessage` | `compact_metadata` | field | translate.ts: compactBoundary | reference | none |
 | `SDKCompactBoundaryMessage.compact_metadata` | `post_tokens` | field | translate.ts: compactBoundary | package | none |
 | `SDKCompactBoundaryMessage.compact_metadata` | `pre_tokens` | field | translate.ts: compactBoundary | package | none |
+| `SDKControlGetContextUsageResponse` | `memoryFiles` | field | info.ts: loadedContext | package | none |
 | `SDKControlGetContextUsageResponse` | `model` | field | info.ts: contextUsage | reference | none |
 | `SDKControlGetContextUsageResponse` | `percentage` | field | info.ts: contextUsage | reference | none |
+| `SDKControlGetContextUsageResponse` | `skills` | field | info.ts: loadedContext | package | none |
+| `SDKControlGetContextUsageResponse.memoryFiles[]` | `path` | field | info.ts: loadedContext | package | none |
+| `SDKControlGetContextUsageResponse.memoryFiles[]` | `tokens` | field | info.ts: loadedContext | package | none |
+| `SDKControlGetContextUsageResponse.skills` | `skillFrontmatter` | field | info.ts: loadedContext | package | none |
+| `SDKControlGetContextUsageResponse.skills.skillFrontmatter[]` | `name` | field | info.ts: loadedContext | package | none |
+| `SDKControlGetContextUsageResponse.skills.skillFrontmatter[]` | `source` | field | info.ts: loadedContext | package | none |
+| `SDKControlGetContextUsageResponse.skills.skillFrontmatter[]` | `tokens` | field | info.ts: loadedContext | package | none |
 | `SDKControlInitializeResponse` | `account` | field | info.ts: agentInfo | package | none |
 | `SDKControlInitializeResponse` | `commands` | field | info.ts: agentInfo | reference | none |
 | `SDKControlInitializeResponse` | `current_permission_mode` | field | info.ts: agentInfo | measured | none |
@@ -308,6 +316,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SessionMessage` | `uuid` | field | turns.ts: turnsAfter | package | none |
 | `SessionMessage` | `message` | field | turns.ts: promptOf | package | none |
 | `SessionMessage.message` | `content` | key | turns.ts: promptOf | measured | none |
+| `SessionMessage.message.content` | `"[Request interrupted by user"` | value | turns.ts: INTERRUPTED | measured | none |
 | `SessionStoreEntry` | `type` | field | goals.ts: goalChange | package | P33 |
 | `SessionStoreEntry` | `uuid` | field | goals.ts: savedMessage | package | none |
 | `SessionStoreEntry` | `timestamp` | field | goals.ts: savedMessage | package | none |

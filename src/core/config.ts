@@ -222,7 +222,7 @@ export function loadConfig(modules: Modules, configDir: string, env: Env = proce
   if (!st.isFile()) {
     throw new ConfigError(`${envPath} must be a regular file, not a link`);
   }
-  // Ownership and mode are POSIX facts; the daemon is not supported on Windows yet.
+  // Ownership and mode are POSIX facts; the daemon is supported on macOS only.
   if (process.platform !== "win32") {
     if (st.uid !== process.getuid?.()) {
       throw new ConfigError(`${envPath} must belong to the user running allaboard`);

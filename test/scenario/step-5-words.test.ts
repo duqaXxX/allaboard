@@ -119,9 +119,17 @@ test("!stop ends the turn that runs, in a thread or in the channel, and says so 
 // one that speaks of none.
 const OFFERED_WORDS = texts.HELP_WORDS_ANY.map((line) => named(line, NAMES)).filter(
   (line) =>
-    !["`!bypass", "`!plan", "`!open", "`!tag", "`!untag", "`!delete-thread", "`!!"].some((word) =>
-      line.startsWith(word),
-    ),
+    ![
+      "`!bypass",
+      "`!plan",
+      "`!memory",
+      "`!skills",
+      "`!open",
+      "`!tag",
+      "`!untag",
+      "`!delete-thread",
+      "`!!",
+    ].some((word) => line.startsWith(word)),
 );
 
 test("!help lists the daemon's words and the plain agent's two commands, and none of Claude's", async (t) => {
@@ -310,6 +318,7 @@ test("!guide describes only what this agent and this chat can serve", async (t) 
       questions: true,
       backgroundTasks: false,
       sessionListing: true,
+      loadedContext: false,
       fileUpload: false,
       threadTags: false,
       threadDelete: false,

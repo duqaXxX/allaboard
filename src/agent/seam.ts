@@ -138,6 +138,12 @@ export interface Capabilities {
    * terminal is not shown in the thread, and a live session is not resumed again to see it.
    */
   readonly foreignTurns: boolean;
+  /**
+   * The agent lists the memory files and the skills a live session has loaded
+   * (`AgentSession.loaded`), read only: `!memory` and `!skills`. Without it both words are
+   * refused.
+   */
+  readonly loadedContext: boolean;
 }
 
 /** A process that holds a session open, as `AgentBackend.sessionHolders` lists it. */
@@ -165,6 +171,8 @@ export interface SavedMessage {
 export interface ForeignTurn {
   readonly prompt: string | null;
   readonly reply: string | null;
+  /** The owner interrupted the turn there; absent when it ran to its end. */
+  readonly interrupted?: true;
 }
 
 /** What `AgentBackend.turnsAfter` read. */
@@ -284,6 +292,25 @@ export interface Prompt {
   /** The prompt's own id, a UUID the core makes, which `prompt_taken` names. */
   readonly id: string;
   readonly content: PromptContent;
+}
+
+/** A memory file a session loaded: its path on the host, and its size in its context. */
+export interface LoadedFile {
+  readonly path: string;
+  readonly tokens: number;
+}
+
+/** A skill a session can use: its name, where it comes from (`built-in`, a plugin...), its size. */
+export interface LoadedSkill {
+  readonly name: string;
+  readonly source: string;
+  readonly tokens: number;
+}
+
+/** What a live session has loaded, as `AgentSession.loaded` lists it. */
+export interface LoadedContext {
+  readonly memoryFiles: readonly LoadedFile[];
+  readonly skills: readonly LoadedSkill[];
 }
 
 /** What the agent says of its context window; a value it does not report is null. */
@@ -774,6 +801,8 @@ export interface AgentSession {
   clearGoal?(): Promise<void>;
   setEffort(level: string | null): Promise<void>;
   contextUsage(): Promise<ContextUsage>;
+  /** The memory files and skills the session has loaded now. Present with `loadedContext`. */
+  loaded?(): Promise<LoadedContext>;
   info(): Promise<AgentInfo>;
   /**
    * Resolves once the agent's process has gone, so a session started right after may resume

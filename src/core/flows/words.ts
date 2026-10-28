@@ -9,6 +9,7 @@ import { ChatError, type MessageId, type ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import { helpText, type Shell, WORD, type Word } from "../commands.ts";
 import { guideText } from "../guide.ts";
+import { memoryText, skillsText } from "../loaded.ts";
 import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import { BypassUnavailable, PlanUnavailable } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
@@ -68,6 +69,10 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
   if (agent.capabilities.permissionModes.bypass === null) unserved.add(WORD.bypass);
   if (agent.capabilities.permissionModes.plan === null) unserved.add(WORD.plan);
   if (!agent.capabilities.sessionListing) unserved.add(WORD.resume);
+  if (!agent.capabilities.loadedContext) {
+    unserved.add(WORD.memory);
+    unserved.add(WORD.skills);
+  }
   if (!chat.capabilities.fileUpload) unserved.add(WORD.open);
   if (!chat.capabilities.threadTags) {
     unserved.add(WORD.tag);
@@ -147,6 +152,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
           questions: have.questions,
           backgroundTasks: have.backgroundTasks,
           sessionListing: have.sessionListing,
+          loadedContext: have.loadedContext,
           fileUpload: chat.capabilities.fileUpload,
           threadTags: chat.capabilities.threadTags,
           threadDelete: chat.capabilities.threadDelete,
@@ -254,6 +260,22 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
               },
             );
           }
+        }
+        return;
+      case "memory":
+      case "skills":
+        if (session === null) {
+          await talk.inChannel(channel, texts.LOADED_TOP_LEVEL);
+        } else if (!agent.capabilities.loadedContext) {
+          await talk.tell(ref, named(texts.LOADED_UNAVAILABLE, names));
+        } else {
+          const loaded = await session.loaded();
+          const shown = (text: string) => chat.escape(text, "reference");
+          const text =
+            command.kind === "memory"
+              ? memoryText(loaded, session.directory, shown)
+              : skillsText(loaded, session.commands, shown);
+          await talk.say(channel, thread, text, { ownerOnly: true });
         }
         return;
       case "terminal":

@@ -22,7 +22,11 @@ import {
 } from "../../src/core/config.ts";
 import { REGISTRY } from "../../src/registry.ts";
 
-const POSIX_ONLY = { skip: process.platform === "win32" };
+const POSIX_ONLY = {
+  skip:
+    process.platform === "win32" &&
+    "file modes, owners, links, the home and paths are read by POSIX rules",
+};
 
 const BOT = `${"xox"}b-000-fake`;
 const APP = `${"xap"}p-000-fake`;
@@ -218,7 +222,7 @@ test("rejects a root that is not a directory", () => {
 // Review round 2026-10-11: a relative `ALLOWED_ROOT` was read from the working directory, which
 // is the terminal's folder at Checkpoint 2 and `/` under launchd.
 
-test("a relative root is refused whatever the working directory", POSIX_ONLY, () => {
+test("a relative root is refused whatever the working directory", () => {
   const directory = scratch();
   mkdirSync(join(directory, "proj"));
   writeEnv(directory, "proj");
@@ -240,7 +244,7 @@ test("a relative root is refused whatever the working directory", POSIX_ONLY, ()
   }
 });
 
-test("a root that names another user or the current folder is refused", POSIX_ONLY, () => {
+test("a root that names another user or the current folder is refused", () => {
   const directory = scratch();
   for (const value of ["./proj", "../proj", ".", "~alice/proj"]) {
     writeEnv(directory, value);

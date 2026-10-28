@@ -14,7 +14,7 @@ import {
 } from "../../src/core/shell.ts";
 
 // A real Bash: the process group, the kill and the streams are what is under test.
-const POSIX_ONLY = { skip: process.platform === "win32" };
+const POSIX_ONLY = { skip: process.platform === "win32" && "a real Bash and its process group" };
 
 function folder(t: { after: (fn: () => void) => void }): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "shell-")));

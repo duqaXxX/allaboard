@@ -60,7 +60,7 @@ What crosses the agent seam:
 
 | Crossing | Direction | What |
 |---|---|---|
-| commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions`, `aliveSessions`, `folderTrusted`, `trustedRepository`, `untrustedRepository`, `usageLimits`, `tagSession`, `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask`, `setPermissionMode`, `setModel`, `setEffort`, `contextUsage`, `info`, `close` |
+| commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions`, `aliveSessions`, `folderTrusted`, `trustedRepository`, `untrustedRepository`, `usageLimits`, `tagSession`, `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask`, `setPermissionMode`, `setModel`, `setEffort`, `contextUsage`, `loaded` (with `loadedContext`), `info`, `close` |
 | events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), word that the running turn took a task's notification (`notification_folded`), a message from another of the owner's sessions (`peer_message`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
 | declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
@@ -264,6 +264,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `promptDuringTurn` | the next prompt is sent once the running turn has ended |
 | `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find. The Slack Home tab does not check it: it calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
 | `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root (`texts.BIND_LIST_ANY`; the notice of an unbound channel, `texts.UNBOUND_ANY`, and the `!bind` line of `!help`, `texts.HELP_WORDS_ANY`, say nothing of trust either), and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
+| `loadedContext` | `AgentSession.loaded` is absent: `!memory` and `!skills` answer that the agent does not list what a session loaded (`texts.LOADED_UNAVAILABLE`), and neither `!help`, the suggestions nor `!guide` offer them |
 
 | Chat capability | What the core does without it |
 |---|---|
@@ -340,7 +341,7 @@ Some members are required by the type and serve a capability the module may not 
 never calls them then, and the plain agent shows what to give back: `folderTrusted` answers true
 and `trustedRepository` and `untrustedRepository` null without `folderTrust`, `setEffort` and `stopTask` throw without
 `liveEffort` and `backgroundTasks`, and `AgentInfo.models` is an empty list without `models`.
-`AgentBackend.usageLimits`, `AgentBackend.tagSession` and `AgentBackend.sessionTitle` are the members left out when their capability is not declared.
+`AgentBackend.usageLimits`, `AgentBackend.tagSession`, `AgentBackend.sessionTitle` and `AgentSession.loaded` are the members left out when their capability is not declared.
 
 ### What a chat must do that the types do not say
 
