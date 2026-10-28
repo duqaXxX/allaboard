@@ -7,7 +7,7 @@
  * and the turns written there since this thread's last message are shown, one message each,
  * before the reply.
  */
-import type { SessionHolder } from "../../agent/seam.ts";
+import type { ForeignTurn, SessionHolder } from "../../agent/seam.ts";
 import type { TerminalRequest, ThreadRef } from "../../chat/seam.ts";
 import { systemClock } from "../../clock.ts";
 import { shellQuote } from "../../text.ts";
@@ -155,10 +155,16 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
 
   /**
    * One terminal turn as the thread shows it: the owner's prompt, then the final reply; a turn
-   * the terminal went on with by itself (no prompt), its final reply.
+   * the terminal went on with by itself (no prompt), its final reply, or that the owner
+   * interrupted it there.
    */
-  function turnText(prompt: string | null, reply: string | null): string {
+  function turnText({ prompt, reply, interrupted }: ForeignTurn): string {
     const written = reply === null ? null : chat.escape(reply, "written");
+    if (prompt === null && interrupted) {
+      // The owner stopped it there: said so, with what it wrote before, if anything.
+      const said = texts.TERMINAL_TURN_WENT_ON_INTERRUPTED;
+      return written === null ? said : `${said}\n\n${written}`;
+    }
     if (prompt === null) return fill(texts.TERMINAL_TURN_WENT_ON, { reply: written ?? "" });
     // The owner's prompt as a quote, every line of it: words he wrote, nothing to open.
     const shown = { prompt: quoted(chat.escape(prompt, "written")) };
@@ -216,7 +222,7 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
       }
     }
     for (const turn of await session.takeForeignTurns()) {
-      await talk.say(ref.channel, ref.thread, turnText(turn.prompt, turn.reply));
+      await talk.say(ref.channel, ref.thread, turnText(turn));
     }
     return true;
   }

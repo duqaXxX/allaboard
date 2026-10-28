@@ -502,7 +502,7 @@ export const TERMINAL_TOP_LEVEL =
 export const TERMINAL_NOT_STARTED = "This session has not started yet: send it a message first.";
 export const TERMINAL_CUT = naming(
   "Stopped here. The terminal continues this turn by itself: the command that was running is " +
-    "stopped, and {author} runs it again there.\n{command}",
+    "stopped, and {author} decides there whether to run it again.\n{command}",
 );
 export const TERMINAL_IDLE = "Continue in the terminal with:\n{command}";
 export const TERMINAL_WAIT =
@@ -513,6 +513,8 @@ export const TERMINAL_TURN = "🖥 In the terminal:\n{prompt}\n\n{reply}";
 export const TERMINAL_TURN_UNANSWERED = "🖥 In the terminal:\n{prompt}";
 // A turn moved with `!terminal`, which the terminal went on with by itself.
 export const TERMINAL_TURN_WENT_ON = "🖥 In the terminal, the turn went on:\n\n{reply}";
+export const TERMINAL_TURN_WENT_ON_INTERRUPTED =
+  "🖥 In the terminal, the turn went on, and you interrupted it.";
 export const SHELL_OUTSIDE_SESSION = "`!!` runs a shell command inside a session's thread.";
 export const SHELL_FIRST_PROMPT =
   "Send this session its first prompt before a shell command: it starts with its setup.";

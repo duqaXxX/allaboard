@@ -165,6 +165,8 @@ export interface SavedMessage {
 export interface ForeignTurn {
   readonly prompt: string | null;
   readonly reply: string | null;
+  /** The owner interrupted the turn there; absent when it ran to its end. */
+  readonly interrupted?: true;
 }
 
 /** What `AgentBackend.turnsAfter` read. */

@@ -307,6 +307,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SessionMessage` | `uuid` | field | turns.ts: turnsAfter | package | none |
 | `SessionMessage` | `message` | field | turns.ts: promptOf | package | none |
 | `SessionMessage.message` | `content` | key | turns.ts: promptOf | measured | none |
+| `SessionMessage.message.content` | `"[Request interrupted by user"` | value | turns.ts: INTERRUPTED | measured | none |
 | `SessionStoreEntry` | `type` | field | goals.ts: goalChange | package | P33 |
 | `SessionStoreEntry` | `uuid` | field | goals.ts: savedMessage | package | none |
 | `SessionStoreEntry` | `timestamp` | field | goals.ts: savedMessage | package | none |

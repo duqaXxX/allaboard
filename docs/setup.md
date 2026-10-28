@@ -957,8 +957,9 @@ processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_
 - The turns the terminal wrote since the thread's last message come first, one message each:
   `🖥 In the terminal:`, your prompt as a quote, then Claude's last reply of that turn. A turn
   `!terminal` moved, which the terminal went on with by itself, comes first as
-  `🖥 In the terminal, the turn went on:` with its last reply. The session's process is then
-  started again, so that it reads them.
+  `🖥 In the terminal, the turn went on:` with its last reply, or as
+  `🖥 In the terminal, the turn went on, and you interrupted it.` when you stopped it there. The
+  session's process is then started again, so that it reads them.
 - Background work running in the thread while the terminal wrote: the process that runs it never
   reads what the terminal wrote, and starting it again stops the work. allaboard asks first,
   `⚠️ This session was continued in a terminal while work runs here: <tasks>. To send this here,
@@ -973,8 +974,8 @@ Slack, which the picker does not list.
 
 - During a turn, the turn is cut there without an interrupt and continues in the terminal by
   itself: the command adds `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`, the command that was running
-  stops and Claude runs it again there (its card in the thread shows it stopped), and the reply
-  ends with `Moved to the terminal, which continues this turn.`
+  stops (its card in the thread shows it stopped) and Claude decides there whether to run it
+  again, and the reply ends with `Moved to the terminal, which continues this turn.`
 - With no turn running, the thread's process is closed and the answer is `Continue in the
   terminal with:` and the plain command.
 - Background work running in the thread stops with the process, so `!terminal` first asks

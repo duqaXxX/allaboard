@@ -265,6 +265,27 @@ test("a list that cannot be read keeps a wait going", async (t) => {
   assert.equal(await sent, false);
 });
 
+test("a turn the terminal went on with and the owner interrupted there says so", async (t) => {
+  const { world, agent, ref, session } = await makeWorld(t);
+  session.saved = { id: "m1", at: 1 };
+  session.movedMidTurn = true; // `!terminal` cut a turn here
+  agent.foreign.set(SESSION, {
+    changed: true,
+    turns: [
+      { prompt: null, reply: "Half way.", interrupted: true },
+      { prompt: "Write the notes", reply: "Starting.", interrupted: true },
+    ],
+    last: { id: "m9", at: 9 },
+  });
+  assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
+  assert.deepEqual(after(world, ref), [
+    // what it wrote before he stopped it stays under the sentence
+    `${texts.TERMINAL_TURN_WENT_ON_INTERRUPTED}\n\nHalf way.`,
+    // a typed prompt stays the owner's, with what was written before he stopped it
+    fill(texts.TERMINAL_TURN, { prompt: "> Write the notes", reply: "Starting." }),
+  ]);
+});
+
 test("a turn going on is not shown when no move cut one here", async (t) => {
   // What has no typed prompt before it, with no move, is this session's own, saved late.
   const { world, agent, ref, session } = await makeWorld(t);
