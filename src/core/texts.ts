@@ -356,6 +356,8 @@ export const REFUSED_MARK = "⚠️ ";
 export const REFUSED_NO_FALLBACK =
   "{model} refused this request{category}; no other model answered.";
 export const REFUSED_RETRACTED = "↩ Retracted: the {model} attempt above.";
+// A message another of the owner's sessions sent this one, at its place in the reply.
+export const PEER_MESSAGE = "📨 From another session:\n{text}";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";
 // A goal's lines in its reply, in the terminal's words (captured 2026-10-20, Claude Code 2.1.303).

@@ -646,6 +646,12 @@ export type SessionEvent =
    * so before that turn ends is owed a turn of its own.
    */
   | { readonly type: "notification_folded"; readonly taskId: string }
+  /**
+   * Another of the owner's sessions sent this one a message, which the agent answers in the
+   * turn it opens, or in the one running when it arrives during one. `text` is the message as
+   * its sender wrote it.
+   */
+  | { readonly type: "peer_message"; readonly text: string }
   | {
       readonly type: "turn_ended";
       readonly sessionId: string | null;

@@ -27,7 +27,7 @@ import {
   preview,
   resuming,
 } from "./previews.ts";
-import { BACKGROUND, oneLine, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
+import { BACKGROUND, oneLine, quoted, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
 
 export const OUTPUT_LIMIT = 200;
 export const CHILD_LINES = 10;
@@ -307,6 +307,12 @@ export class TurnRenderer {
         break;
       case "model_refused":
         await this.#refused(event);
+        break;
+      case "peer_message":
+        // Markdown another session's agent wrote, drawn as the agent's own text is: its
+        // formatting lives, and the chat keeps any mention in a reply from notifying.
+        await this.#writeLaunches();
+        await this.#line(texts.fill(texts.PEER_MESSAGE, { text: quoted(event.text) }));
         break;
       case "call_started":
         await this.#callStarted(event);
@@ -652,12 +658,8 @@ export class TurnRenderer {
             model,
             category: event.category === null ? "" : ` (${event.category})`,
           });
-    const quote = (lines: string): string =>
-      splitLines(lines)
-        .map((text) => `> ${text}`.trimEnd())
-        .join("\n");
-    const parts = [quote(`${texts.REFUSED_MARK}${said}`)];
-    if (event.retracted) parts.push(quote(texts.fill(texts.REFUSED_RETRACTED, { model })));
+    const parts = [quoted(`${texts.REFUSED_MARK}${said}`)];
+    if (event.retracted) parts.push(quoted(texts.fill(texts.REFUSED_RETRACTED, { model })));
     await this.#writeLaunches();
     await this.#line(parts.join("\n>\n"));
   }

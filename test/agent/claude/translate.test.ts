@@ -1260,6 +1260,46 @@ test("a subagent's hand-back names the task whose report the turn is", () => {
   assert.ok(ended < at && at < worded);
 });
 
+// Another of the owner's sessions writes (`peer-message`, recorded on 2026-10-28 with
+// `@anthropic-ai/claude-agent-sdk` 0.3.312, Claude Code 2.1.312, the receiver idle and in
+// bypass as the sender was). The record is replayed although it opens the turn from idle, with
+// the envelope stripped into `origin.body`, and the turn's `result` carries the same origin.
+
+test("another session's message is its body, before the first word of the turn it opens", () => {
+  const all = events("peer-message");
+  const said = of(all, "peer_message");
+  assert.deepEqual(said, [
+    {
+      type: "peer_message",
+      text:
+        "Please run the migration tests on the branch I just pushed and reply with the single " +
+        "word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+    },
+  ]);
+  const at = all.findIndex((event) => event.type === "peer_message");
+  const ended = all.findIndex((event) => event.type === "turn_ended");
+  const worded = all.findIndex((event, index) => index > at && event.type === "text_started");
+  assert.ok(ended < at && at < worded);
+  assert.equal(of(all, "turn_ended").at(-1)?.startedBy, "agent");
+});
+
+test("a peer record with no body shows nothing, and a task's hand-back stays a report", () => {
+  const translator = new Translator();
+  const peer = (origin: JsonObject) =>
+    translator.translate({
+      type: "user",
+      message: { role: "user", content: "Another Claude session sent a message: ..." },
+      parent_tool_use_id: null,
+      uuid: "u-1",
+      isReplay: true,
+      origin,
+    });
+  assert.deepEqual(peer({ kind: "peer", from: "uds:/tmp/cc-socks/1.sock" }), []);
+  assert.deepEqual(peer({ kind: "peer", from: "x", senderTaskId: "t-1", body: "done" }), [
+    { type: "report_started", taskId: "t-1" },
+  ]);
+});
+
 test("a subagent's end carries its words apart from the note the summary is", () => {
   const all = events("subagent-handback");
   const ends = of(all, "task_ended");
@@ -1295,7 +1335,10 @@ test("a message from a peer that names no task of the session starts no report",
   assert.ok(peer);
   const origin = { ...(peer.origin as JsonObject) };
   delete origin.senderTaskId;
-  assert.deepEqual(new Translator().translate({ ...peer, origin }), []);
+  // Another session's message: shown, never a report.
+  assert.deepEqual(new Translator().translate({ ...peer, origin }), [
+    { type: "peer_message", text: String(origin.body) },
+  ]);
   assert.deepEqual(new Translator().translate({ ...peer, origin: { kind: "channel" } }), []);
 });
 
