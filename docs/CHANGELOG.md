@@ -30,6 +30,8 @@ All notable changes to this project are documented here. The format follows
   login of its own (`CLAUDE_CONFIG_DIR`) says which one it uses. Read when a session connects:
   after a `/login` to another account, a session already open shows the new one from its next
   connect. Slack draws the footer as written, so the email is not a link.
+- `!memory` and `!skills` list, inside a thread, the memory files and the skills its session
+  loaded, read only, as the terminal's `/memory` and `/skills` panels do (#15).
 
 ### Changed
 

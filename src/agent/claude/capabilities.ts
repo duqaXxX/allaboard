@@ -45,4 +45,6 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   sessionHolders: true,
   // `turns.ts`, and the conversation's entries a session store receives (`goals.ts`).
   foreignTurns: true,
+  // `memoryFiles` and `skills` of `getContextUsage`.
+  loadedContext: true,
 });

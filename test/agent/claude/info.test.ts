@@ -5,7 +5,12 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agentInfo, contextUsage, listedSession } from "../../../src/agent/claude/info.ts";
+import {
+  agentInfo,
+  contextUsage,
+  listedSession,
+  loadedContext,
+} from "../../../src/agent/claude/info.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 
 const SERVER_INFO = sdkJson("server-info") as JsonObject;
@@ -192,6 +197,26 @@ test("a context usage that lacks a value gives none for it", () => {
   for (const usage of [null, undefined, {}, "usage"]) {
     assert.deepEqual(contextUsage(usage), { model: null, percentage: null });
   }
+});
+
+test("the context usage lists the skills a session loaded, and its memory files", () => {
+  // Recorded with no memory file loaded; the skills are Claude Code's own.
+  const loaded = loadedContext(sdkJson("context-usage"));
+  assert.deepEqual(loaded.memoryFiles, []);
+  assert.equal(loaded.skills.length, 13);
+  assert.deepEqual(loaded.skills[0], { name: "dataviz", source: "built-in", tokens: 362 });
+  const files = loadedContext({
+    memoryFiles: [
+      { path: "/home/dev/.claude/CLAUDE.md", type: "User", tokens: 40 },
+      { type: "Project", tokens: 9 },
+    ],
+  });
+  // An entry with no path is left out, an absent section is empty.
+  assert.deepEqual(files, {
+    memoryFiles: [{ path: "/home/dev/.claude/CLAUDE.md", tokens: 40 }],
+    skills: [],
+  });
+  assert.deepEqual(loadedContext(null), { memoryFiles: [], skills: [] });
 });
 
 // Listed sessions.

@@ -15,6 +15,7 @@ import type {
   CommandInfo,
   ContextUsage,
   ListedSession,
+  LoadedContext,
   ModelInfo,
 } from "../seam.ts";
 import { number, string, type WireRecord, words } from "./wire.ts";
@@ -77,6 +78,28 @@ export function agentInfo(info: unknown): AgentInfo {
 export function contextUsage(usage: unknown): ContextUsage {
   const answer = isRecord(usage) ? usage : {};
   return { model: string(answer.model), percentage: number(answer.percentage) };
+}
+
+/**
+ * The memory files and skills of a `getContextUsage` answer (`SDKControlGetContextUsageResponse`,
+ * `sdk.d.ts` 0.3.312); an entry with no name or path is left out, a section absent is empty.
+ */
+export function loadedContext(usage: unknown): LoadedContext {
+  const answer = isRecord(usage) ? usage : {};
+  const files = Array.isArray(answer.memoryFiles) ? answer.memoryFiles : [];
+  const skills = isRecord(answer.skills) ? answer.skills : {};
+  const front = Array.isArray(skills.skillFrontmatter) ? skills.skillFrontmatter : [];
+  return {
+    memoryFiles: files.flatMap((file) => {
+      const path = isRecord(file) ? string(file.path) : null;
+      return path === null ? [] : [{ path, tokens: number(file.tokens) ?? 0 }];
+    }),
+    skills: front.flatMap((skill) => {
+      const name = isRecord(skill) ? string(skill.name) : null;
+      if (name === null) return [];
+      return [{ name, source: string(skill.source) ?? "", tokens: number(skill.tokens) ?? 0 }];
+    }),
+  };
 }
 
 /** A session the SDK lists, as a row of `!resume`. */

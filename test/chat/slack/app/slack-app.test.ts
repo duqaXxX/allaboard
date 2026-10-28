@@ -419,9 +419,10 @@ test("bang help lists the session commands", async (t) => {
   await world.dispatch(reply("!help", THREAD));
   const shown = world.ephemerals(); // inside a session's thread the owner alone sees the answer
   assert.equal(shown.length, 1);
-  const [text] = shown as [string];
-  assert.ok(text.includes("`!compact") && text.includes("`!bypass"));
+  // The whole list is the message's markdown block; its `text` is the fallback, cut.
   const asked = world.slack.callsTo("chat.postEphemeral") as Body[];
+  const text = JSON.stringify(asked[0]?.blocks);
+  assert.ok(text.includes("`!compact") && text.includes("`!bypass"));
   assert.equal(asked.length, 1);
   assert.equal(asked[0]?.thread_ts, THREAD);
   assert.equal(asked[0]?.user, OWNER);
@@ -809,7 +810,8 @@ test("a malformed daemon word inside a thread shows the session s help too", asy
   await world.dispatch(reply("!bypass maybe", THREAD));
   const shown = world.ephemerals();
   assert.equal(shown.length, 1);
-  const [text] = shown as [string];
+  // The whole list is the message's markdown block; its `text` is the fallback, cut.
+  const text = JSON.stringify((world.slack.callsTo("chat.postEphemeral") as Body[])[0]?.blocks);
   assert.ok(text.includes("`!bypass") && text.includes("`!compact"));
   assert.ok(!text.includes(namedText(texts.HELP_UNBOUND, NAMES)));
 });

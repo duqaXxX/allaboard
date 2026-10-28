@@ -50,6 +50,7 @@ import type {
   ContextUsage,
   ForeignTurn,
   ForeignTurns,
+  LoadedContext,
   ModelInfo,
   PermissionAnswer,
   PermissionRequest,
@@ -1587,6 +1588,17 @@ export class ThreadSession {
     // drops the persisted ⏳.
     this.react("done", { byOwner: true });
     return true;
+  }
+
+  /**
+   * What the live session has loaded (`loadedContext`), for `!memory` and `!skills`; its process
+   * is started when it has none, as `!help` does for the commands. Called only with the
+   * capability; a session that declares it and lacks the member is an error, never an empty list.
+   */
+  async loaded(): Promise<LoadedContext> {
+    const client = await this.ensureConnected();
+    if (client.loaded === undefined) throw new Error("the agent session lists nothing it loaded");
+    return client.loaded();
   }
 
   /** What still runs here in the background (`1 shell · 2 agents`), or empty. */
