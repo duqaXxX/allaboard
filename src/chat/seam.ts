@@ -96,6 +96,8 @@ export interface FooterFields {
   /** The session is in plan mode: shown in place of bypass, the mode actually in force. */
   readonly planning: boolean;
   readonly model: string | null;
+  /** The model that advises the session's, by its name; null when none is set. */
+  readonly advisor: string | null;
   /** A fixed level, or the agent's word for its default. */
   readonly effort: string | null;
   /**

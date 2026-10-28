@@ -17,6 +17,7 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     planning: false,
     model: null,
     effort: null,
+    advisor: null,
     effortObserved: null,
     folder: null,
     branch: null,
@@ -59,6 +60,17 @@ test("the account ends the footer, without its plan", () => {
   assert.equal(formatFooter(data, NOW), "claude-opus-5-5 · *7d* 25% · alice@example.com");
 });
 
+test("the advisor follows the model, before the effort and the folder, only when one is set", () => {
+  const data = fields({
+    model: "Haiku 4.5",
+    advisor: "Opus 5.5",
+    effort: "high",
+    folder: "/work/app",
+  });
+  assert.equal(formatFooter(data, NOW), "Haiku 4.5 · *advisor* Opus 5.5 · *effort* high · app");
+  assert.equal(formatFooter({ ...data, advisor: null }, NOW), "Haiku 4.5 · *effort* high · app");
+});
+
 test("minimal footer hides what it does not know", () => {
   assert.equal(formatFooter(fields(), NOW), "");
 });
@@ -90,6 +102,7 @@ test("status fields hold the values the footer shows", () => {
     sessionLimit: { percent: 3, resetsAt: NOW + 2 * HOUR + 10 * MINUTE },
     weekLimit: { percent: 25, resetsAt: null },
     effort: "high",
+    advisor: null,
     effortObserved: null,
   });
   const shown = formatFooter(data, NOW);

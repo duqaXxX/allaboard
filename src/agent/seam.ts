@@ -139,6 +139,11 @@ export interface Capabilities {
    */
   readonly foreignTurns: boolean;
   /**
+   * `AgentSession.advisor`: the agent can consult a second model during a turn, which the owner
+   * sets in the agent's own settings. Without it the footer and `!status` name no advisor.
+   */
+  readonly advisor: boolean;
+  /**
    * The agent lists the memory files and the skills a live session has loaded
    * (`AgentSession.loaded`), read only: `!memory` and `!skills`. Without it both words are
    * refused.
@@ -801,6 +806,12 @@ export interface AgentSession {
   clearGoal?(): Promise<void>;
   setEffort(level: string | null): Promise<void>;
   contextUsage(): Promise<ContextUsage>;
+  /**
+   * The model the agent's settings name as the session's advisor now, as they name it (an alias
+   * `AgentInfo.models` lists by value, or a model's id); null when none is set or the advisor is
+   * turned off. Present with `advisor`.
+   */
+  advisor?(): Promise<string | null>;
   /** The memory files and skills the session has loaded now. Present with `loadedContext`. */
   loaded?(): Promise<LoadedContext>;
   info(): Promise<AgentInfo>;

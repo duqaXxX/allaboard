@@ -105,6 +105,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   shellCommands: false,
   sessionHolders: false,
   foreignTurns: false,
+  advisor: false,
   loadedContext: false,
 });
 

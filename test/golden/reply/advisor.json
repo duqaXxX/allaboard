@@ -1,0 +1,275 @@
+{
+ "recording": "advisor",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "srvtoolu_01DhDTEACdzTetM9t8fazrgD",
+      "message": false,
+      "name": "advisor",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "advisor"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "srvtoolu_01DhDTEACdzTetM9t8fazrgD",
+      "message": false,
+      "name": "advisor",
+      "output": "advisor_redacted_result",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "advisor"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c \"n=2147483647; print(all(n % d for d in range(2, 46341)))\"",
+      "folded": null,
+      "id": "toolu_01GT1QMUSYfaGoxm46PCLWVP",
+      "message": false,
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Trial-division primality check for 2147483647"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c \"n=2147483647; print(all(n % d for d in range(2, 46341)))\"",
+      "folded": null,
+      "id": "toolu_01GT1QMUSYfaGoxm46PCLWVP",
+      "message": false,
+      "name": "Bash",
+      "output": "True",
+      "preview": null,
+      "startedAt": 0,
+      "status": "complete",
+      "task": false,
+      "title": "Trial-division primality check for 2147483647"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "Yes, 21474836",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "47 (2^31 − 1,",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the Mersenne",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " prime M31) i",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "s prime, conf",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "irmed by a tr",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ial-division ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "check up to 4",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "6341.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "srvtoolu_01DhDTEACdzTetM9t8fazrgD",
+     "message": false,
+     "name": "advisor",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "advisor"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "srvtoolu_01DhDTEACdzTetM9t8fazrgD",
+     "message": false,
+     "name": "advisor",
+     "output": "advisor_redacted_result",
+     "preview": null,
+     "startedAt": null,
+     "status": "complete",
+     "task": false,
+     "title": "advisor"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ python3 -c \"n=2147483647; print(all(n % d for d in range(2, 46341)))\"",
+     "folded": null,
+     "id": "toolu_01GT1QMUSYfaGoxm46PCLWVP",
+     "message": false,
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "startedAt": 0,
+     "status": "in_progress",
+     "task": false,
+     "title": "Trial-division primality check for 2147483647"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": "$ python3 -c \"n=2147483647; print(all(n % d for d in range(2, 46341)))\"",
+     "folded": null,
+     "id": "toolu_01GT1QMUSYfaGoxm46PCLWVP",
+     "message": false,
+     "name": "Bash",
+     "output": "True",
+     "preview": null,
+     "startedAt": 0,
+     "status": "complete",
+     "task": false,
+     "title": "Trial-division primality check for 2147483647"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "Yes, 21474836",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "47 (2^31 − 1,",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the Mersenne",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " prime M31) i",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "s prime, conf",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "irmed by a tr",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ial-division ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "check up to 4",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "6341.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

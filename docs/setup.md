@@ -1445,12 +1445,18 @@ the time from your prompt to the moment the session ended everything, the report
 work included, so a turn that leaves a background agent counts up to the end of its report. The
 end time is drawn by Slack in the time zone and the 12 or 24 hour clock of the device that reads
 it. The duration is kept in memory only: `!status` shows none, and after a daemon restart the
-count begins again at the next prompt. Then it holds `⚡ bypass` when bypass is on, the model, the effort level, the name of the folder this
+count begins again at the next prompt. Then it holds `⚡ bypass` when bypass is on, the model, the advisor while one is set (`advisor Opus 5.5`), the effort level, the name of the folder this
 thread was opened in (its whole path is on `!status`), the git branch, the lines changed since
 the last commit (untracked files not counted), the session's tokens, the context used, and the
 5-hour and weekly limits with the time to each reset, which exist only with a claude.ai
-subscription. The labels (`effort`, `tok`, `ctx`, `5h`, `7d`) are bold. A field that is not known
+subscription. The labels (`advisor`, `effort`, `tok`, `ctx`, `5h`, `7d`) are bold. A field that is not known
 is left out.
+The advisor is the model Claude Code's `/advisor` set: `!advisor opus` in a thread sets it and
+`!advisor off` clears it. Claude Code saves it in your user settings, so it holds for every
+session from then on, the terminal's and those already running included, until it is turned off
+(measured 2026-10-28). The footer reads it again each time it is drawn, and names it even when it
+ranks below the session's model, where Claude Code keeps the setting but does not use the advisor
+(Claude Code's error reference, read 2026-10-28).
 The branch and the changes are those of the folder the session works in: the thread's own folder
 at first, then the one Claude moved to with `cd` or a worktree, as Claude Code reported it after
 its last tool; `!status` names that folder when it is not the thread's own. The effort reads as

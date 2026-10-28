@@ -86,7 +86,7 @@ import {
   sessionTokens,
   type UsageCache,
 } from "../footer.ts";
-import { modelName } from "../models.ts";
+import { modelName, settingName } from "../models.ts";
 import { resolvePath } from "../paths.ts";
 import { LoopReply } from "../reply/loop-card.ts";
 import { described } from "../reply/previews.ts";
@@ -366,6 +366,8 @@ export class ThreadSession {
   // that resumes the session replaces it with its first read. A model switch or a compaction
   // drops it, since its share no longer holds. Never shared with another session.
   private lastContext: ContextUsage | null = null;
+  // The advisor the last read named: a footer drawn with no process shows it, as `lastContext`.
+  private lastAdvisor: string | null = null;
   // Counts the invalidations of `lastContext`: a read that started before one is not kept.
   private contextGeneration = 0;
   // Whether this turn's end already asked for the read `keepContext` makes: one per turn.
@@ -4329,6 +4331,23 @@ export class ThreadSession {
   }
 
   /**
+   * The advisor the agent's settings name now, read at every footer and `!status`: the owner may
+   * set it in a terminal at any moment, and every running session follows. With no live process
+   * to read through, or a failed read, the last one read.
+   */
+  private async advisorSetting(live: boolean): Promise<string | null> {
+    if (!live || this.client === null || !this.deps.agent.capabilities.advisor) {
+      return this.lastAdvisor;
+    }
+    try {
+      this.lastAdvisor = (await this.client.advisor?.()) ?? null;
+    } catch (error) {
+      logger.warning(`could not read the advisor in ${this.channelId}: ${errorName(error)}`);
+    }
+    return this.lastAdvisor;
+  }
+
+  /**
    * The footer's values from what the session knows now and `tokens`: the one source for both
    * the footer and `!status`, so the two never disagree.
    */
@@ -4354,10 +4373,12 @@ export class ThreadSession {
     // new model the usage names it, and from then on the usage alone speaks.
     if (context.model === this.modelSwitched) this.modelSwitched = null;
     const model = this.modelSwitched ?? context.model;
+    const advisor = await this.advisorSetting(live);
     return {
       bypass: this.bypass,
       planning: this.planning,
       model: model === null ? null : modelName(this.models, model),
+      advisor: advisor === null ? null : settingName(this.models, advisor),
       ...this.effortFields(),
       folder: this.directory,
       branch,

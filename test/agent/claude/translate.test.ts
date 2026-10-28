@@ -490,32 +490,24 @@ test("a subagent's calls name the call that runs it", () => {
 });
 
 test("a server tool's call starts and ends like any other", () => {
-  // No recording holds one: the blocks are those the Python SDK's parser reads
-  // (`server_tool_use`, `advisor_tool_result`), and the reply shows them as a call.
-  const translator = new Translator();
-  const wire = record("tools", 19);
-  const base = wire.message as JsonObject;
-  const use = { type: "server_tool_use", id: "srvtoolu_000", name: "advisor", input: { q: "why" } };
-  assert.deepEqual(translator.translate({ ...wire, message: { ...base, content: [use] } }), [
+  // `advisor.jsonl` (Claude Code 2.1.312, 2026-10-28): one consultation of the advisor is a
+  // `server_tool_use` block and an `advisor_tool_result` whose guidance is encrypted.
+  const calls = events("advisor").filter(
+    (event) => event.type === "call_started" || event.type === "call_ended",
+  );
+  assert.deepEqual(calls.slice(0, 2), [
     {
       type: "call_started",
-      callId: "srvtoolu_000",
+      callId: "srvtoolu_01DhDTEACdzTetM9t8fazrgD",
       toolName: "advisor",
-      input: { q: "why" },
+      input: {},
       parentCallId: null,
     },
-  ]);
-  const result = {
-    type: "advisor_tool_result",
-    tool_use_id: "srvtoolu_000",
-    content: { type: "advisor_result", text: "because" },
-  };
-  assert.deepEqual(translator.translate({ ...wire, message: { ...base, content: [result] } }), [
     {
       type: "call_ended",
-      callId: "srvtoolu_000",
+      callId: "srvtoolu_01DhDTEACdzTetM9t8fazrgD",
       isError: false,
-      output: "advisor_result",
+      output: "advisor_redacted_result",
       fileChange: null,
       model: null,
       parentCallId: null,

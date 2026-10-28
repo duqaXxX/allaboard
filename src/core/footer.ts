@@ -34,6 +34,7 @@ export type GitState = readonly [
 /** Which of the footer's values a field is, for a provider that marks each in its own way. */
 export type FooterKey =
   | "model"
+  | "advisor"
   | "effort"
   | "branch"
   | "changes"
@@ -373,6 +374,9 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
   const fields: FooterField[] = [];
   if (data.model) {
     fields.push({ key: "model", label: "Model", value: data.model });
+  }
+  if (data.advisor) {
+    fields.push({ key: "advisor", label: "Advisor", value: data.advisor });
   }
   if (data.effort) {
     fields.push({

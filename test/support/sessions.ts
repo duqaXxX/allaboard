@@ -217,6 +217,9 @@ export interface Script {
   readonly startGate?: AsyncEvent;
   readonly infoError?: Error;
   readonly contextUsageError?: Error;
+  /** The answer to each `advisor()`, asked at every read; none set when absent. */
+  readonly advisor?: () => string | null;
+  readonly advisorError?: Error;
   /** `close` rejects with it. */
   readonly closeError?: Error;
   /** A close that waits for the test, as a CLI takes real time to flush and exit after EOF. */
@@ -279,6 +282,7 @@ export class FakeAgentSession implements AgentSession {
   effortsSet: Array<string | null> = [];
   interrupts = 0;
   stoppedTasks: string[] = [];
+  advisorReads = 0;
   /** What the core answered each request with, in order. */
   permissionResults: Array<PermissionAnswer | QuestionAnswer> = [];
 
@@ -409,6 +413,12 @@ export class FakeAgentSession implements AgentSession {
   async contextUsage(): Promise<ContextUsage> {
     if (this.#script.contextUsageError !== undefined) throw this.#script.contextUsageError;
     return this.#script.contextUsage ?? contextUsage(sdkJson("context-usage"));
+  }
+
+  async advisor(): Promise<string | null> {
+    this.advisorReads += 1;
+    if (this.#script.advisorError !== undefined) throw this.#script.advisorError;
+    return this.#script.advisor?.() ?? null;
   }
 
   async close(): Promise<void> {
