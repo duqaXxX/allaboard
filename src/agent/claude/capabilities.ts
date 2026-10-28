@@ -47,4 +47,6 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   foreignTurns: true,
   // `advisor.ts`: the `advisorModel` setting, read with the SDK's `resolveSettings`.
   advisor: true,
+  // `memoryFiles` and `skills` of `getContextUsage`.
+  loadedContext: true,
 });

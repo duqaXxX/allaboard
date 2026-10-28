@@ -10,6 +10,9 @@ All notable changes to this project are documented here. The format follows
 - The footer and `!status` name the advisor while one is set (`advisor Opus 5.5`), read from
   Claude Code's settings each time they are drawn: `/advisor` saves it for every session, the
   terminal's included (#8).
+- A message another of your Claude Code sessions sends a thread's session (`SendMessage`) now
+  shows at its place in the reply, as `📨 From another session:` then its text as a quote, whether it opens
+  a turn or arrives during one; its mentions notify nobody (#30).
 - What your stop hooks say at a turn's end is now said in the reply, in the terminal's words:
   `Ran 3 stop hooks`, then why one stopped the session, `⎿ Stop hook error: <reason>` for each
   refusal and `⎿ Stop hook feedback: <context>` for each context added for Claude, where the turn
@@ -24,13 +27,17 @@ All notable changes to this project are documented here. The format follows
   terminal and gives the command; a running turn goes on there by itself
   (`CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`), its last reply shown in the thread when you come
   back, and background work it would stop is confirmed first. While a turn or background work runs, `!status` warns that writing in the terminal now
-  splits the session.
+  splits the session. When the terminal wrote while background work runs in the thread, a
+  message there asks first, with **Stop them and send** and **Cancel**, since starting the
+  session again stops that work (#101).
 
 - The footer ends with the email of the Claude account the session runs on, and `!status` shows
   it with the account's plan (`Account: alice@example.com (Claude Max)`), so an instance with a
   login of its own (`CLAUDE_CONFIG_DIR`) says which one it uses. Read when a session connects:
   after a `/login` to another account, a session already open shows the new one from its next
   connect. Slack draws the footer as written, so the email is not a link.
+- `!memory` and `!skills` list, inside a thread, the memory files and the skills its session
+  loaded, read only, as the terminal's `/memory` and `/skills` panels do (#15).
 
 ### Changed
 

@@ -22,6 +22,10 @@ export type GetSessionMessages = typeof sdkGetSessionMessages;
 // </command-name>`, with its arguments beside), read off transcripts of Claude Code 2.1.310.
 const COMMAND_NAME = /<command-name>([^<]*)<\/command-name>/;
 const COMMAND_ARGS = /<command-args>([^<]*)<\/command-args>/;
+// What Claude Code writes as a user text when the owner interrupts a turn (`[Request interrupted
+// by user]`, `… for tool use]`), read off a transcript of Claude Code 2.1.311 on 2026-10-28: no
+// field of the SDK's says a turn was interrupted.
+const INTERRUPTED = "[Request interrupted by user";
 
 /** The text parts of a message's content, joined; null when it has none. */
 function texts(content: unknown, kind: "text"): string | null {
@@ -52,8 +56,10 @@ export function promptOf(message: SessionMessage): string | null {
     const args = COMMAND_ARGS.exec(text)?.[1]?.trim() ?? "";
     return args === "" ? name : `${name} ${args}`;
   }
-  // Claude Code's own tags (`<task-notification>`, `<local-command-stdout>`, reminders)
-  return text.trimStart().startsWith("<") ? null : text;
+  // Claude Code's own tags (`<task-notification>`, `<local-command-stdout>`, reminders) and its
+  // marker of an interruption
+  const start = text.trimStart();
+  return start.startsWith("<") || start.startsWith(INTERRUPTED) ? null : text;
 }
 
 /**
@@ -66,15 +72,22 @@ export function promptOf(message: SessionMessage): string | null {
  * is left out.
  */
 export function turnsOf(messages: readonly SessionMessage[]): ForeignTurn[] {
-  const going: { prompt: string | null; reply: string | null; shown: boolean } = {
+  const going: { prompt: string | null; reply: string | null; shown: boolean; stop?: true } = {
     prompt: null,
     reply: null,
     shown: true,
   };
-  const turns = [going];
+  const turns: (typeof going)[] = [going];
   for (const message of messages) {
     if (message.type === "user") {
-      if (hasToolResult(isRecord(message.message) ? message.message.content : null)) continue;
+      const content = isRecord(message.message) ? message.message.content : null;
+      if (hasToolResult(content)) continue;
+      // The owner stopped the turn there: it ends it, and opens none.
+      if (texts(content, "text")?.trimStart().startsWith(INTERRUPTED)) {
+        const turn = turns.at(-1);
+        if (turn !== undefined) turn.stop = true;
+        continue;
+      }
       const prompt = promptOf(message);
       turns.push({ prompt, reply: null, shown: prompt !== null });
     } else if (message.type === "assistant" && isRecord(message.message)) {
@@ -85,9 +98,10 @@ export function turnsOf(messages: readonly SessionMessage[]): ForeignTurn[] {
   }
   return turns.flatMap((turn) => {
     if (!turn.shown) return [];
-    // The turn going on shows only when it wrote something.
-    if (turn === going && turn.reply === null) return [];
-    return [{ prompt: turn.prompt, reply: turn.reply }];
+    // The turn going on shows only when it wrote something, or was interrupted.
+    if (turn === going && turn.reply === null && !turn.stop) return [];
+    const shown = { prompt: turn.prompt, reply: turn.reply };
+    return [turn.stop ? { ...shown, interrupted: true as const } : shown];
   });
 }
 

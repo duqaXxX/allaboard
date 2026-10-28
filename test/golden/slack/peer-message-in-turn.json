@@ -1,0 +1,193 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "block_id": "task-fold:toolu_01EeGfnRYKF5T725yA7oWgCx",
+     "details": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "$ python3 -c 'import time; time.sleep(40)'",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "complete",
+     "task_id": "fold:toolu_01EeGfnRYKF5T725yA7oWgCx",
+     "title": "Ran 1 shell command",
+     "type": "task_card"
+    },
+    {
+     "text": "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+     "type": "markdown"
+    },
+    {
+     "text": "HERON",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn",
+       "verbatim": true
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   [
+    {
+     "details": "$ python3 -c 'import time; time.sleep(40)'",
+     "id": "fold:toolu_01EeGfnRYKF5T725yA7oWgCx",
+     "status": "complete",
+     "title": "Ran 1 shell command"
+    }
+   ]
+  ],
+  "message_texts": [
+   "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.\n\nHERON"
+  ],
+  "pushes": 1
+ },
+ "recording": "peer-message-in-turn",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "$ python3 -c 'import time; time.sleep(40)'",
+      "id": "fold:toolu_01EeGfnRYKF5T725yA7oWgCx",
+      "status": "in_progress",
+      "title": "Sleep for 40 seconds via python3",
+      "type": "task_update"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01EeGfnRYKF5T725yA7oWgCx",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nHERON",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "blocks": [
+     {
+      "block_id": "task-fold:toolu_01EeGfnRYKF5T725yA7oWgCx",
+      "details": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "$ python3 -c 'import time; time.sleep(40)'",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "complete",
+      "task_id": "fold:toolu_01EeGfnRYKF5T725yA7oWgCx",
+      "title": "Ran 1 shell command",
+      "type": "task_card"
+     },
+     {
+      "text": "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+      "type": "markdown"
+     },
+     {
+      "text": "HERON",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn",
+        "verbatim": true
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "HERON",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

@@ -24,6 +24,7 @@ import {
   type AgentInfo,
   type AgentSession,
   type ContextUsage,
+  type LoadedContext,
   type PermissionMode,
   type Prompt,
   type RequestHandler,
@@ -35,7 +36,7 @@ import { advisorModel, type ResolveSettings } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
 import { GOAL_CLEAR, goalStore } from "./goals.ts";
 import { postModelSwitchHookEvents, postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
-import { agentInfo, contextUsage as contextUsageOf } from "./info.ts";
+import { agentInfo, contextUsage as contextUsageOf, loadedContext } from "./info.ts";
 import { userMessage } from "./prompt.ts";
 import { permissionResult, questionResult, toRequest } from "./requests.ts";
 import { Translator } from "./translate.ts";
@@ -548,6 +549,10 @@ export class ClaudeSession implements AgentSession {
       sessionEnvironment(variables),
       this.#resolveSettings,
     );
+  }
+
+  async loaded(): Promise<LoadedContext> {
+    return loadedContext(await this.#ask(() => this.#query.getContextUsage()));
   }
 
   /**

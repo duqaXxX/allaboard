@@ -955,10 +955,22 @@ processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_
   or `Not sent.` A `!stop` sent while either is shown removes it, and `Not sent.` shows to you
   alone.
 - The turns the terminal wrote since the thread's last message come first, one message each:
-  `🖥 In the terminal:`, your prompt after `›`, then Claude's last reply of that turn. A turn
+  `🖥 In the terminal:`, your prompt as a quote, then Claude's last reply of that turn. A turn
   `!terminal` moved, which the terminal went on with by itself, comes first as
-  `🖥 In the terminal, the turn went on:` with its last reply. The session's process is then
-  started again, so that it reads them.
+  `🖥 In the terminal, the turn went on:` with its last reply, or as
+  `🖥 In the terminal, the turn went on, and you interrupted it.` when you stopped it there. The
+  session's process is then started again, so that it reads them.
+- Background work running in the thread while the terminal wrote: the process that runs it never
+  reads what the terminal wrote, and starting it again stops the work. allaboard asks first,
+  `⚠️ This session was continued in a terminal while work runs here: <tasks>. To send this here,
+  that work stops first.`, with **Stop them and send** and **Cancel**. The question becomes
+  `Sent here.` or `Not sent.`
+
+Another of your Claude Code sessions can write to a thread's session (`SendMessage`, which lists
+it among the sessions it can reach). Its message shows in the reply as `📨 From another session:`
+then the text as a quote, whether it starts a turn or arrives during one, and Claude answers
+it. A message Claude Code holds for your approval (seen with bypass off in the thread and on in
+the sender) cannot be approved from Slack, and is dropped when the approval expires.
 
 A terminal left open does not read what you write in Slack: close it and run the command again
 before writing there. `/resume <session id>` inside it does not reload a session started from
@@ -968,8 +980,8 @@ Slack, which the picker does not list.
 
 - During a turn, the turn is cut there without an interrupt and continues in the terminal by
   itself: the command adds `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1`, the command that was running
-  stops and Claude runs it again there (its card in the thread shows it stopped), and the reply
-  ends with `Moved to the terminal, which continues this turn.`
+  stops (its card in the thread shows it stopped) and Claude decides there whether to run it
+  again, and the reply ends with `Moved to the terminal, which continues this turn.`
 - With no turn running, the thread's process is closed and the answer is `Continue in the
   terminal with:` and the plain command.
 - Background work running in the thread stops with the process, so `!terminal` first asks
@@ -1203,6 +1215,8 @@ a `!` is never a command.
 | `!plan` / `!plan off` | Refused | Switches that session to plan mode and back |
 | `!status` | The channel's directory and its threads that hold a session | That session's details |
 | `!stop` | Stops every running session of the channel | Stops that session |
+| `!memory` | Refused | The memory files that session loaded, with their sizes |
+| `!skills` | Refused | The skills that session can use, with what each does |
 | `!terminal` | Refused | Moves that session to a terminal, a running turn with it, and gives the command to run there |
 | `!help [text]` | Lists allaboard's own words | Lists them and the session's commands |
 | `!open` | Refused | Opens a file picker |
@@ -1243,6 +1257,12 @@ a `!` is never a command.
 - `!stop`
   - At the top level: Stops every running session of the channel and its background tasks, and denies its pending approvals, then drops the goal (`!goal`) of every session of the channel whose Claude Code process is still open; the answer is `Stopped what was running in this channel.`, or `Nothing is running in this channel.`, once that is done; each stopped session's root shows ✅. A session closed after an hour with nothing to do keeps its goal, which resumes with your next message there
   - In a thread: Stops that session the same way; the answer is `Stopped.`, or `Nothing is running in this session.`, in a message that stays in the thread; ✅ on the session's root. A stop ends the turn, not a goal set with `!goal`: the answer then adds ``◎ Goal still active: <condition> · `!goal clear` drops it``, and your next message resumes the goal. A stop you gave is not an error, so it never shows ❌
+- `!memory`
+  - At the top level: Answers ``!memory` and `!skills` list what a session loaded, inside its thread.``
+  - In a thread: Lists the memory files that session loaded, read only, in a message only you see, with the sizes the terminal's `/context` gives them: `Memory files loaded (<count>, <tokens> tokens):`, then each `CLAUDE.md` or memory file with its size in tokens, its path from the session's folder or from `~`; `No memory file is loaded in this session.` when there is none. The session's Claude Code process starts if it is not running, as for `!help`; nothing is sent to Claude
+- `!skills`
+  - At the top level: The same answer as `!memory`.
+  - In a thread: Lists the skills that session can use, read only, as the terminal's `/skills` panel does, in a message only you see: `Skills (<count>):`, then each skill with its description on one line, shortened, or where it comes from when it has none; `No skill is available in this session.` when there is none
 - `!help [text]`
   - At the top level: Says what makes a message a command, then lists allaboard's own words; Claude Code's own commands are listed inside a session's thread
   - In a thread: The same line, then allaboard's own words and every command that session offers now, in an ephemeral message; with a text, only the lines whose name or description contains it, for example `!help model`

@@ -28,6 +28,7 @@ import {
   isResult,
   recordOf,
   sdkMessages,
+  splitTurns,
 } from "../../support/sessions.ts";
 import { pending, play, send, splitBackground, withResult } from "./helpers.ts";
 
@@ -178,6 +179,18 @@ test("runs share one message that the latest run rewrites, and open no reply of 
   assert.equal(loopMessages(h).length, 1);
   assert.equal(h.reactions().length, reactions, "a run moves no status");
   assert.ok(session.scheduledJobs.length === 1);
+});
+
+test("a turn another session's message opens is no run of the loop", async (t) => {
+  // Recorded on SDK 0.3.312 (`peer-message.jsonl`): the message opens the turn from idle.
+  const [h] = await withLoop(t);
+  const [, peer] = splitTurns(sdkMessages("peer-message")) as [Item[], Item[]];
+  const replies = messageCount(h);
+  h.clients[0]?.inject(peer);
+  await h.until(() => messageCount(h) > replies || h.slack.callsTo("chat.startStream").length > 1);
+  await h.idle();
+  assert.deepEqual(loopMessages(h), []);
+  assert.ok(JSON.stringify(h.slack.apiCalls).includes("From another session"));
 });
 
 /** The card's blocks as one JSON text, label and footer among them. */

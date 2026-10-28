@@ -31,7 +31,9 @@ const LIMIT = { timeout: 10_000 };
 // A superuser reads a closed folder anyway, and Windows has no such mode.
 const NEEDS_PERMISSIONS = {
   ...LIMIT,
-  skip: process.platform === "win32" || process.getuid?.() === 0,
+  skip:
+    (process.platform === "win32" || process.getuid?.() === 0) &&
+    "permission bits mean nothing on Windows, and root reads what a mode forbids",
 };
 const HOUR = 3_600_000;
 const NOW = new Date(2026, 8, 25, 12, 0).getTime();
@@ -312,7 +314,10 @@ test("with no config directory given the projects directory is the environment's
 // The review round of 2026-10-10: a transcript is a regular file, opened without following a link
 // and without waiting on a FIFO. A plain open follows a symlink and blocks on a FIFO.
 
-const POSIX = { ...LIMIT, skip: process.platform === "win32" };
+const POSIX = {
+  ...LIMIT,
+  skip: process.platform === "win32" && "symlinks and FIFOs are POSIX",
+};
 const ENTRY = `${JSON.stringify({ type: "user", timestamp: "2026-09-25T10:00:00.000Z" })}\n`;
 
 async function folderOf(t: TestContext): Promise<string> {

@@ -143,6 +143,12 @@ export interface Capabilities {
    * sets in the agent's own settings. Without it the footer and `!status` name no advisor.
    */
   readonly advisor: boolean;
+  /**
+   * The agent lists the memory files and the skills a live session has loaded
+   * (`AgentSession.loaded`), read only: `!memory` and `!skills`. Without it both words are
+   * refused.
+   */
+  readonly loadedContext: boolean;
 }
 
 /** A process that holds a session open, as `AgentBackend.sessionHolders` lists it. */
@@ -170,6 +176,8 @@ export interface SavedMessage {
 export interface ForeignTurn {
   readonly prompt: string | null;
   readonly reply: string | null;
+  /** The owner interrupted the turn there; absent when it ran to its end. */
+  readonly interrupted?: true;
 }
 
 /** What `AgentBackend.turnsAfter` read. */
@@ -289,6 +297,25 @@ export interface Prompt {
   /** The prompt's own id, a UUID the core makes, which `prompt_taken` names. */
   readonly id: string;
   readonly content: PromptContent;
+}
+
+/** A memory file a session loaded: its path on the host, and its size in its context. */
+export interface LoadedFile {
+  readonly path: string;
+  readonly tokens: number;
+}
+
+/** A skill a session can use: its name, where it comes from (`built-in`, a plugin...), its size. */
+export interface LoadedSkill {
+  readonly name: string;
+  readonly source: string;
+  readonly tokens: number;
+}
+
+/** What a live session has loaded, as `AgentSession.loaded` lists it. */
+export interface LoadedContext {
+  readonly memoryFiles: readonly LoadedFile[];
+  readonly skills: readonly LoadedSkill[];
 }
 
 /** What the agent says of its context window; a value it does not report is null. */
@@ -624,6 +651,12 @@ export type SessionEvent =
    * so before that turn ends is owed a turn of its own.
    */
   | { readonly type: "notification_folded"; readonly taskId: string }
+  /**
+   * Another of the owner's sessions sent this one a message, which the agent answers in the
+   * turn it opens, or in the one running when it arrives during one. `text` is the message as
+   * its sender wrote it.
+   */
+  | { readonly type: "peer_message"; readonly text: string }
   | {
       readonly type: "turn_ended";
       readonly sessionId: string | null;
@@ -779,6 +812,8 @@ export interface AgentSession {
    * turned off. Present with `advisor`.
    */
   advisor?(): Promise<string | null>;
+  /** The memory files and skills the session has loaded now. Present with `loadedContext`. */
+  loaded?(): Promise<LoadedContext>;
   info(): Promise<AgentInfo>;
   /**
    * Resolves once the agent's process has gone, so a session started right after may resume

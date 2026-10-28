@@ -194,8 +194,8 @@ export function shellBlocks(requestId: string, request: ShellRequest): Block[] {
 
 /**
  * A question about the terminal that holds the session (`TerminalRequest`): its sentence, then
- * the go button (`Send here`, or `Stop them and move`) and Cancel; a turn the terminal runs is
- * waited out, so its notice has Cancel alone.
+ * the go button (`Send here`, `Stop them and move` or `Stop them and send`) and Cancel; a turn
+ * the terminal runs is waited out, so its notice has Cancel alone.
  */
 export function terminalBlocks(requestId: string, request: TerminalRequest): Block[] {
   let sentence: string;
@@ -210,6 +210,11 @@ export function terminalBlocks(requestId: string, request: TerminalRequest): Blo
   } else if (request.state === "busy") {
     sentence = texts.TERMINAL_BUSY;
     go = null;
+  } else if (request.state === "background") {
+    sentence = texts.fill(texts.TERMINAL_BACKGROUND, {
+      running: shownAsWritten(request.running ?? ""),
+    });
+    go = slackTexts.TERMINAL_STOP_SEND_BUTTON;
   } else {
     sentence = texts.fill(texts.TERMINAL_MOVE, { running: shownAsWritten(request.running ?? "") });
     go = slackTexts.TERMINAL_MOVE_BUTTON;

@@ -26,10 +26,13 @@ const identity = (text: string): string => text;
 // --- !help and !guide
 
 // The plain agent has no bypass mode and the memory chat no file upload: `!bypass` and `!open`
-// are refused when typed, and the help does not list them.
+// are refused when typed, and the help does not list them; nor `!memory` and `!skills`, since
+// the plain agent lists nothing a session loaded.
 const UNSERVED = new Set([
   "bypass",
   "plan",
+  "memory",
+  "skills",
   "open",
   "tag",
   "untag",
@@ -96,6 +99,7 @@ const PLAIN_OFFER: GuideOffer = {
   questions: true,
   backgroundTasks: false,
   sessionListing: true,
+  loadedContext: false,
   fileUpload: false,
   threadTags: false,
   threadDelete: false,

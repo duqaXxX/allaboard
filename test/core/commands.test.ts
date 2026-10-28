@@ -471,7 +471,8 @@ function ranked(word: string, commands: readonly CommandInfo[] = OFFERED): strin
 
 test("prefix matches come first, then names that contain the word, then the near ones", () => {
   assert.deepEqual(ranked("co"), ["compact", "context"]);
-  assert.deepEqual(ranked("mo"), ["model"]);
+  // `mo` starts `model` and is inside `memory`.
+  assert.deepEqual(ranked("mo"), ["model", "memory"]);
   // `del` starts `delete-thread`, is inside `model`, and is two edits from `help`.
   assert.deepEqual(ranked("del"), ["delete-thread", "model", "help"]);
   // `modle` is two edits from `model` and contains nothing.

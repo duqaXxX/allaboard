@@ -3,13 +3,15 @@
  * other's messages, and the second to write branches the conversation (measured 2026-10-27), so
  * the owner writes from one side at a time. Before his message reaches the session: a terminal
  * that runs a turn is waited out, a terminal left open is named once and he chooses to send here
- * or not, and the turns written there since this thread's last message are shown, one message
- * each, before the reply.
+ * or not, background work here that the terminal wrote beside is stopped only if he chooses to,
+ * and the turns written there since this thread's last message are shown, one message each,
+ * before the reply.
  */
-import type { SessionHolder } from "../../agent/seam.ts";
+import type { ForeignTurn, SessionHolder } from "../../agent/seam.ts";
 import type { TerminalRequest, ThreadRef } from "../../chat/seam.ts";
 import { systemClock } from "../../clock.ts";
 import { shellQuote } from "../../text.ts";
+import { quoted } from "../reply/words.ts";
 import { commandShown } from "../sessions/directory.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
@@ -153,12 +155,19 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
 
   /**
    * One terminal turn as the thread shows it: the owner's prompt, then the final reply; a turn
-   * the terminal went on with by itself (no prompt), its final reply.
+   * the terminal went on with by itself (no prompt), its final reply, or that the owner
+   * interrupted it there.
    */
-  function turnText(prompt: string | null, reply: string | null): string {
+  function turnText({ prompt, reply, interrupted }: ForeignTurn): string {
     const written = reply === null ? null : chat.escape(reply, "written");
+    if (prompt === null && interrupted) {
+      // The owner stopped it there: said so, with what it wrote before, if anything.
+      const said = texts.TERMINAL_TURN_WENT_ON_INTERRUPTED;
+      return written === null ? said : `${said}\n\n${written}`;
+    }
     if (prompt === null) return fill(texts.TERMINAL_TURN_WENT_ON, { reply: written ?? "" });
-    const shown = { prompt: chat.escape(prompt, "written") };
+    // The owner's prompt as a quote, every line of it: words he wrote, nothing to open.
+    const shown = { prompt: quoted(chat.escape(prompt, "written")) };
     if (written === null) return fill(texts.TERMINAL_TURN_UNANSWERED, shown);
     return fill(texts.TERMINAL_TURN, { ...shown, reply: written });
   }
@@ -184,8 +193,36 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
       for (const holder of found) session.terminalsAllowed.add(holder.id);
       break;
     }
+    // What the terminal wrote is resumed into only once the process here is closed, which the
+    // work it runs would not survive: the owner chooses, as for `!terminal`. Looked at again
+    // after a stop, since that turn may have started more work. Read only while
+    // work runs: a plain message takes no extra step on its way.
+    while (session.stillRunning !== "") {
+      if (talk.stopped) return false;
+      const running = await session.writtenBesideWork();
+      if (running === "") break;
+      const answer = await askOwner(deps, talk, ref, session, {
+        kind: "terminal",
+        title: texts.TERMINAL_BACKGROUND_TITLE,
+        request: (requestId) => ({
+          type: "terminal",
+          requestId,
+          state: "background",
+          running,
+          command: null,
+        }),
+        ends: { sent: texts.TERMINAL_SENT, cancelled: texts.NOT_SENT },
+      });
+      if (answer === null) return false;
+      await session.stopForTerminal();
+      // A turn the agent opened meanwhile (a task's report) keeps the process: its end is waited
+      // out, so the message never reaches the process that missed the terminal's turns.
+      while (session.busy && !talk.stopped) {
+        await clock.sleep(TERMINAL_POLL_SECONDS, deps.stopped).catch(() => {});
+      }
+    }
     for (const turn of await session.takeForeignTurns()) {
-      await talk.say(ref.channel, ref.thread, turnText(turn.prompt, turn.reply));
+      await talk.say(ref.channel, ref.thread, turnText(turn));
     }
     return true;
   }

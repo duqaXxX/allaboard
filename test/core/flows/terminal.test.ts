@@ -8,6 +8,7 @@ import { type TestContext, test } from "node:test";
 import type { SessionHolder } from "../../../src/agent/seam.ts";
 import type { TerminalRequest, ThreadRef } from "../../../src/chat/seam.ts";
 import { TERMINAL_POLL_SECONDS } from "../../../src/core/flows/terminal.ts";
+import type { ThreadSession } from "../../../src/core/sessions/session.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill } from "../../../src/core/texts.ts";
 import { shellQuote } from "../../../src/text.ts";
@@ -144,10 +145,82 @@ test("the turns a terminal wrote come first, one message each", async (t) => {
   assert.deepEqual(agent.foreignAsked, [`${SESSION} m1`]);
   assert.deepEqual(after(world, ref), [
     fill(texts.TERMINAL_TURN_WENT_ON, { reply: "FINISHED" }),
-    fill(texts.TERMINAL_TURN, { prompt: "Rename the helper", reply: "Renamed it." }),
-    fill(texts.TERMINAL_TURN_UNANSWERED, { prompt: "Still there?" }),
+    fill(texts.TERMINAL_TURN, { prompt: "> Rename the helper", reply: "Renamed it." }),
+    fill(texts.TERMINAL_TURN_UNANSWERED, { prompt: "> Still there?" }),
   ]);
   assert.deepEqual(session.saved, { id: "m9", at: 9 });
+});
+
+/** Background work runs here (`running`) beside what a terminal wrote; stops are counted. */
+function besideWork(session: ThreadSession, running: string): { stops: number } {
+  const seen = { stops: 0 };
+  Object.defineProperty(session, "stillRunning", { get: () => (seen.stops === 0 ? running : "") });
+  Object.assign(session, {
+    writtenBesideWork: async () => (seen.stops === 0 ? running : ""),
+    stopForTerminal: async () => {
+      seen.stops += 1;
+    },
+  });
+  return seen;
+}
+
+test("background work the terminal wrote beside is stopped only with Stop them and send", async (t) => {
+  const { world, ref, session } = await makeWorld(t);
+  const seen = besideWork(session, "1 shell");
+  const sent = world.flows.terminal.beforeSending(ref, session);
+  const asked = await world.asked(ref, "terminal");
+  assert.deepEqual(asked.request, {
+    type: "terminal",
+    requestId: asked.requestId,
+    state: "background",
+    running: "1 shell",
+    command: null,
+  } satisfies TerminalRequest);
+  assert.equal(asked.title, texts.TERMINAL_BACKGROUND_TITLE);
+  assert.equal(seen.stops, 0, "nothing stops before the owner chooses");
+  assert.equal(await world.answers(asked.requestId, { type: "terminal", go: true }), true);
+  assert.equal(await sent, true);
+  assert.equal(seen.stops, 1);
+  assert.ok(world.shown(ref).includes(texts.TERMINAL_SENT));
+});
+
+test("Cancel beside background work stops nothing and sends nothing", async (t) => {
+  const { world, ref, session } = await makeWorld(t);
+  const seen = besideWork(session, "2 agents");
+  const sent = world.flows.terminal.beforeSending(ref, session);
+  const asked = await world.asked(ref, "terminal");
+  assert.equal(await world.answers(asked.requestId, { type: "terminal", go: false }), true);
+  assert.equal(await sent, false);
+  assert.equal(seen.stops, 0);
+  assert.ok(world.shown(ref).includes(texts.NOT_SENT));
+});
+
+test("a turn the agent opens during the question is waited out before the message goes", async (t) => {
+  // A task that ended while the question was shown leaves its report turn in this process.
+  const { world, ref, session } = await makeWorld(t);
+  const seen = besideWork(session, "1 agent");
+  let busy = false;
+  Object.defineProperty(session, "busy", { get: () => busy });
+  Object.assign(session, {
+    stopForTerminal: async () => {
+      seen.stops += 1;
+      busy = true; // the report turn runs: the stop left the process
+    },
+  });
+  let done = false;
+  const sent = world.flows.terminal.beforeSending(ref, session).then((value) => {
+    done = true;
+    return value;
+  });
+  const asked = await world.asked(ref, "terminal");
+  assert.equal(await world.answers(asked.requestId, { type: "terminal", go: true }), true);
+  await world.clock.advance(TERMINAL_POLL_SECONDS);
+  await settledTurn();
+  assert.equal(done, false, "the message waits for the report turn");
+  busy = false;
+  await world.clock.advance(TERMINAL_POLL_SECONDS);
+  assert.equal(await sent, true);
+  assert.equal(seen.stops, 1);
 });
 
 test("!terminal on a session that has not started says so", async (t) => {
@@ -192,6 +265,27 @@ test("a list that cannot be read keeps a wait going", async (t) => {
   assert.equal(await sent, false);
 });
 
+test("a turn the terminal went on with and the owner interrupted there says so", async (t) => {
+  const { world, agent, ref, session } = await makeWorld(t);
+  session.saved = { id: "m1", at: 1 };
+  session.movedMidTurn = true; // `!terminal` cut a turn here
+  agent.foreign.set(SESSION, {
+    changed: true,
+    turns: [
+      { prompt: null, reply: "Half way.", interrupted: true },
+      { prompt: "Write the notes", reply: "Starting.", interrupted: true },
+    ],
+    last: { id: "m9", at: 9 },
+  });
+  assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
+  assert.deepEqual(after(world, ref), [
+    // what it wrote before he stopped it stays under the sentence
+    `${texts.TERMINAL_TURN_WENT_ON_INTERRUPTED}\n\nHalf way.`,
+    // a typed prompt stays the owner's, with what was written before he stopped it
+    fill(texts.TERMINAL_TURN, { prompt: "> Write the notes", reply: "Starting." }),
+  ]);
+});
+
 test("a turn going on is not shown when no move cut one here", async (t) => {
   // What has no typed prompt before it, with no move, is this session's own, saved late.
   const { world, agent, ref, session } = await makeWorld(t);
@@ -206,7 +300,7 @@ test("a turn going on is not shown when no move cut one here", async (t) => {
   });
   assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
   assert.deepEqual(after(world, ref), [
-    fill(texts.TERMINAL_TURN, { prompt: "Typed there", reply: "Done" }),
+    fill(texts.TERMINAL_TURN, { prompt: "> Typed there", reply: "Done" }),
   ]);
   assert.equal(session.movedMidTurn, false);
 });

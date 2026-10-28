@@ -50,6 +50,7 @@ import type {
   ContextUsage,
   ForeignTurn,
   ForeignTurns,
+  LoadedContext,
   ModelInfo,
   PermissionAnswer,
   PermissionRequest,
@@ -1374,11 +1375,7 @@ export class ThreadSession {
     }
     if (!found.changed) return [];
     if (found.last !== null) this.saved = found.last;
-    // A turn going on with no typed prompt is shown only after a move cut one: anything else
-    // with no prompt before it is this process's own, saved late.
-    const turns = this.movedMidTurn
-      ? found.turns
-      : found.turns.filter((turn) => turn.prompt !== null);
+    const turns = this.shownTurns(found);
     this.movedMidTurn = false;
     // Decided under the connect lock, after the read: a turn the agent opened by itself
     // meanwhile (a report, a loop's run) is never cut, and no start runs beside the close.
@@ -1391,6 +1388,54 @@ export class ThreadSession {
       release();
     }
     return turns;
+  }
+
+  /**
+   * A turn going on with no typed prompt is shown only after a move cut one: anything else with
+   * no prompt before it is this process's own, saved late.
+   */
+  private shownTurns(found: ForeignTurns): readonly ForeignTurn[] {
+    return this.movedMidTurn ? found.turns : found.turns.filter((turn) => turn.prompt !== null);
+  }
+
+  /**
+   * What runs here in the background (`1 shell · 2 agents`) while a terminal wrote turns this
+   * process never saw: sending beside it would branch the session, and `takeForeignTurns` does
+   * not cut the work to resume. Empty when nothing runs, a turn runs here, nothing was written,
+   * or the agent cannot tell. Reads only: the record's place is not moved.
+   */
+  async writtenBesideWork(): Promise<string> {
+    const { agent } = this.deps;
+    const running = this.stillRunning;
+    const saved = this.saved;
+    const sessionId = this.deps.state.thread(this.channelId, this.threadId)?.sessionId ?? null;
+    if (running === "" || this.busy || this.client === null) return "";
+    if (!agent.capabilities.foreignTurns || agent.turnsAfter === undefined) return "";
+    if (saved === null || sessionId === null) return "";
+    let found: ForeignTurns;
+    try {
+      found = await agent.turnsAfter(this.directory, sessionId, saved);
+    } catch (error) {
+      logger.warning(`could not read what a terminal wrote in ${this.where}: ${errorName(error)}`);
+      return "";
+    }
+    return found.changed && this.shownTurns(found).length > 0 ? running : "";
+  }
+
+  /**
+   * The owner chose to stop the background work so his message reaches what a terminal wrote:
+   * the work ends with the process, drawn as `!stop` draws it, and the next connect resumes the
+   * record. The ✅ is the owner's own act, as a `!stop`'s: the sweep after the ends would
+   * otherwise tell him of an end he made. Nothing when a turn started here meanwhile: the
+   * caller waits for its end and looks again.
+   */
+  async stopForTerminal(): Promise<void> {
+    const client = this.client;
+    if (client === null || this.busy) return;
+    const tasks = this.background ? this.runningTaskIds() : [];
+    if (tasks.length > 0 && (await this.endWithProcess(client, tasks))) {
+      this.react("done", { byOwner: true });
+    }
   }
 
   /**
@@ -1545,6 +1590,17 @@ export class ThreadSession {
     // drops the persisted ⏳.
     this.react("done", { byOwner: true });
     return true;
+  }
+
+  /**
+   * What the live session has loaded (`loadedContext`), for `!memory` and `!skills`; its process
+   * is started when it has none, as `!help` does for the commands. Called only with the
+   * capability; a session that declares it and lacks the member is an error, never an empty list.
+   */
+  async loaded(): Promise<LoadedContext> {
+    const client = await this.ensureConnected();
+    if (client.loaded === undefined) throw new Error("the agent session lists nothing it loaded");
+    return client.loaded();
   }
 
   /** What still runs here in the background (`1 shell · 2 agents`), or empty. */
@@ -2643,7 +2699,9 @@ export class ThreadSession {
           return;
         }
       }
-      await this.startTurn(worded, worded && task === null && this.opensRun());
+      // A turn another session's message opens says so first: it is no run of a loop.
+      const run = worded && task === null && event.type !== "peer_message" && this.opensRun();
+      await this.startTurn(worded, run);
       // A report turn has no prompt behind it: only now does `threadLine` read it.
       this.showThreadStatus();
     }
