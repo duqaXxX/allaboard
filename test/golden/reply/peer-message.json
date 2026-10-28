@@ -25,7 +25,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+     "markdown": "📨 From another session:\n> Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\n> Second line: a <b>tag</b>, a `code span` and the word here.",
      "notice": true
     },
     {
@@ -400,7 +400,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "\n\n📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+    "markdown": "\n\n📨 From another session:\n> Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\n> Second line: a <b>tag</b>, a `code span` and the word here.",
     "notice": true
    },
    {

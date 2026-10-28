@@ -8,7 +8,7 @@
      "type": "markdown"
     },
     {
-     "text": "📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+     "text": "📨 From another session:\n> Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\n> Second line: a <b>tag</b>, a `code span` and the word here.",
      "type": "markdown"
     },
     {
@@ -62,7 +62,7 @@
    ]
   ],
   "message_texts": [
-   "HERON\n\n📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.\n\nI did not run the migration tests, so I'm not replying KESTREL.\n\nThe working directory `/home/dev/project` is empty and is not a git repository. There is no pushed branch or migration code here to test. I replied to the peer session (`terminal-7c`) saying so and asked for the correct repo path. Its Claude hasn't read the message yet, so it may not have arrived.\n\nTo finish this, point me at the repo that holds the pushed branch (or clone it into this directory), and I'll run the migration tests and report the results."
+   "HERON\n\n📨 From another session:\n> Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\n> Second line: a <b>tag</b>, a `code span` and the word here.\n\nI did not run the migration tests, so I'm not replying KESTREL.\n\nThe working directory `/home/dev/project` is empty and is not a git repository. There is no pushed branch or migration code here to test. I replied to the peer session (`terminal-7c`) saying so and asked for the correct repo path. Its Claude hasn't read the message yet, so it may not have arrived.\n\nTo finish this, point me at the repo that holds the pushed branch (or clone it into this directory), and I'll run the migration tests and report the results."
   ],
   "pushes": 1
  },
@@ -91,7 +91,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\n📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+      "text": "\n\n📨 From another session:\n> Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\n> Second line: a <b>tag</b>, a `code span` and the word here.",
       "type": "markdown_text"
      }
     ],
@@ -745,7 +745,7 @@
       "type": "markdown"
      },
      {
-      "text": "📨 From another session:\n› Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\nSecond line: a <b>tag</b>, a `code span` and the word here.",
+      "text": "📨 From another session:\n> Please run the migration tests on the branch I just pushed and reply with the single word KESTREL.\n> Second line: a <b>tag</b>, a `code span` and the word here.",
       "type": "markdown"
      },
      {

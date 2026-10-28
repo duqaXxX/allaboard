@@ -57,7 +57,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "\n\n📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+     "markdown": "\n\n📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
      "notice": true
     },
     {
@@ -153,7 +153,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "\n\n📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+    "markdown": "\n\n📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
     "notice": true
    },
    {

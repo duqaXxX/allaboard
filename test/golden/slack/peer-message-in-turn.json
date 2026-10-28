@@ -25,7 +25,7 @@
      "type": "task_card"
     },
     {
-     "text": "📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+     "text": "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
      "type": "markdown"
     },
     {
@@ -58,7 +58,7 @@
    ]
   ],
   "message_texts": [
-   "📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.\n\nHERON"
+   "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.\n\nHERON"
   ],
   "pushes": 1
  },
@@ -106,7 +106,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+      "text": "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
       "type": "markdown_text"
      }
     ],
@@ -162,7 +162,7 @@
       "type": "task_card"
      },
      {
-      "text": "📨 From another session:\n› Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
+      "text": "📨 From another session:\n> Probe message for issue 30 during a running turn: after HERON, also reply with the word OSPREY.",
       "type": "markdown"
      },
      {

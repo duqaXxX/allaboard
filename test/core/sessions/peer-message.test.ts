@@ -36,7 +36,8 @@ test("a message from another session opens the reply of the turn it starts", asy
   h.clients[0]?.inject(peer);
   await h.until(() => session.idle && h.slack.callsTo("chat.startStream").length === 2);
   await h.idle();
-  const line = texts.fill(texts.PEER_MESSAGE, { text: "Run the tests\nthen report" });
+  // Quoted line by line, as the reply draws words it passes on.
+  const line = texts.fill(texts.PEER_MESSAGE, { text: "> Run the tests\n> then report" });
   assert.ok(written(h).includes(JSON.stringify(line).slice(1, -1)), written(h));
   // the line rides on the turn's reply: no message of its own
   assert.equal(h.slack.callsTo("chat.postMessage").length, posted);

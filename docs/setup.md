@@ -962,9 +962,9 @@ processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_
 
 Another of your Claude Code sessions can write to a thread's session (`SendMessage`, which lists
 it among the sessions it can reach). Its message shows in the reply as `📨 From another session:`
-then the text, whether it starts a turn or arrives during one, and Claude answers it. A message
-Claude Code holds for your approval (seen with bypass off in the thread and on in the sender)
-cannot be approved from Slack.
+then the text as a quote, whether it starts a turn or arrives during one, and Claude answers
+it. A message Claude Code holds for your approval (seen with bypass off in the thread and on in
+the sender) cannot be approved from Slack.
 
 A terminal left open does not read what you write in Slack: close it and run the command again
 before writing there. `/resume <session id>` inside it does not reload a session started from
