@@ -90,6 +90,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `getSessionMessages` | function | turns.ts: turnsAfter | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `listSessions` | function | listing.ts: directorySessions | reference | P6 |
 | `@anthropic-ai/claude-agent-sdk` | `query` | function | session.ts: ClaudeSession.constructor | reference | none |
+| `@anthropic-ai/claude-agent-sdk` | `resolveSettings` | function | advisor.ts: advisorModel | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `tagSession` | function | backend.ts: ClaudeBackend.tagSession | reference | P31 |
 | `Query` | `applyFlagSettings` | method | session.ts: ClaudeSession.setEffort | reference | none |
 | `Query` | `close` | method | session.ts: ClaudeSession.#pump, ClaudeSession.close | reference | none |
@@ -137,12 +138,18 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.message.content[].source` | `media_type` | option | prompt.ts: contentOf | measured | none |
 | `SDKUserMessage.message.content[].source` | `type` | option | prompt.ts: contentOf | measured | none |
 | `Settings` | `effortLevel` | option | session.ts: ClaudeSession.setEffort | package | none |
+| `ResolvedSettings` | `effective` | field | advisor.ts: advisorModel | reference | none |
+| `Settings` | `advisorModel` | field | advisor.ts: advisorModel | package | none |
+| `Settings` | `env` | field | advisor.ts: advisorModel | package | none |
 | `getSessionInfo` | `dir` | option | backend.ts: ClaudeBackend.sessionTitle | reference | none |
 | `getSessionInfo` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
 | `getSessionMessages` | `dir` | option | turns.ts: turnsAfter | reference | none |
 | `listSessions` | `dir` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `includeWorktrees` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | P29 |
+| `resolveSettings` | `cwd` | option | advisor.ts: advisorModel | reference | none |
+| `resolveSettings` | `settingSources` | option | advisor.ts: advisorModel | reference | none |
+| `resolveSettings` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
 | `tagSession` | `dir` | option | backend.ts: ClaudeBackend.tagSession | reference | P31 |
 | `tagSession` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | P31 |
 | `BaseHookInput` | `cwd` | field | hooks.ts: folderChanged | reference | P14 |
@@ -475,8 +482,8 @@ no check covers them here.
   declare. The same holds for the rows under `SDKAssistantMessage.message` and
   `SDKUserMessage.message` (`BetaMessage` and `MessageParam`), whose content blocks the daemon
   reads and writes. Two block types in the table, `"server_tool_use"` and `"advisor_tool_result"`,
-  are declared in `@anthropic-ai/sdk` and carried by no recording, so their rows are `measured`
-  only in the sense that no declaration of the package names them.
+  are declared in `@anthropic-ai/sdk` and not in this package; `advisor.jsonl` carries both
+  (recorded 2026-10-28, Claude Code 2.1.312).
 - The rows under `AskUserQuestion.input` describe the input of a Claude Code tool, which the SDK
   hands to `canUseTool` as a plain record. The reference lists it under Tool Input Types and the
   package declares it in `sdk-tools.d.ts`; the checks of this table read neither, so the rows stand

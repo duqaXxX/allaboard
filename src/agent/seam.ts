@@ -138,6 +138,11 @@ export interface Capabilities {
    * terminal is not shown in the thread, and a live session is not resumed again to see it.
    */
   readonly foreignTurns: boolean;
+  /**
+   * `AgentSession.advisor`: the agent can consult a second model during a turn, which the owner
+   * sets in the agent's own settings. Without it the footer and `!status` name no advisor.
+   */
+  readonly advisor: boolean;
 }
 
 /** A process that holds a session open, as `AgentBackend.sessionHolders` lists it. */
@@ -768,6 +773,12 @@ export interface AgentSession {
   clearGoal?(): Promise<void>;
   setEffort(level: string | null): Promise<void>;
   contextUsage(): Promise<ContextUsage>;
+  /**
+   * The model the agent's settings name as the session's advisor now, as they name it (an alias
+   * `AgentInfo.models` lists by value, or a model's id); null when none is set or the advisor is
+   * turned off. Present with `advisor`.
+   */
+  advisor?(): Promise<string | null>;
   info(): Promise<AgentInfo>;
   /**
    * Resolves once the agent's process has gone, so a session started right after may resume

@@ -519,3 +519,13 @@ test("nativeStreaming off: each text is handed to the reply whole, once", async 
   assert.equal(whole.join(""), streamed.join(""));
   assert.equal(new Set(whole).size, whole.length);
 });
+
+test("advisor off: the advisor is never read, and the footer names none", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], advisor: () => "opus" });
+  lacking(h, { advisor: false });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(!(await session.status()).includes("Advisor"));
+  assert.equal(h.clients[0]?.advisorReads, 0);
+});

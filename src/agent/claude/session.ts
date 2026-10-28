@@ -31,6 +31,7 @@ import {
   type SessionEvent,
   type StartOptions,
 } from "../seam.ts";
+import { advisorModel, type ResolveSettings } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
 import { GOAL_CLEAR, goalStore } from "./goals.ts";
 import { postModelSwitchHookEvents, postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
@@ -256,6 +257,7 @@ export class ClaudeSession implements AgentSession {
   readonly #queue = new AsyncQueue<SessionEvent>();
   readonly #input = new AsyncQueue<SDKUserMessage>();
   readonly #query: QueryHandle;
+  readonly #resolveSettings: ResolveSettings | undefined;
   readonly #finished: Promise<void>;
   #closing = false;
   #ended = false;
@@ -269,8 +271,10 @@ export class ClaudeSession implements AgentSession {
     config: SessionConfig,
     requests: RequestHandler,
     queryFunction: QueryFunction = sdkQuery,
+    resolveSettings?: ResolveSettings,
   ) {
     this.#config = config;
+    this.#resolveSettings = resolveSettings;
     this.events = this.#queue;
     this.#query = queryFunction({
       prompt: this.#input,
@@ -533,6 +537,17 @@ export class ClaudeSession implements AgentSession {
 
   async contextUsage(): Promise<ContextUsage> {
     return contextUsageOf(await this.#ask(() => this.#query.getContextUsage()));
+  }
+
+  /** Read from the settings files, with no request to the process: 8 to 14 ms (2026-10-28). */
+  async advisor(): Promise<string | null> {
+    const { folder, settingsSources, variables } = this.#config;
+    return advisorModel(
+      folder,
+      settingsSources,
+      sessionEnvironment(variables),
+      this.#resolveSettings,
+    );
   }
 
   /**

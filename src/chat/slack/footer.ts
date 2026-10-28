@@ -12,7 +12,7 @@ import type { FooterFields } from "../seam.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
 
 // The footer's fields that come before the folder.
-const SESSION: readonly FooterKey[] = ["model", "effort"];
+const SESSION: readonly FooterKey[] = ["model", "advisor", "effort"];
 
 /** A field as the footer writes it: the label in bold (`*ctx* 15%`, the owner's choice). */
 function short(field: FooterField): string {
@@ -21,6 +21,8 @@ function short(field: FooterField): string {
     case "model":
     case "changes":
       return value;
+    case "advisor":
+      return `*advisor* ${value}`;
     case "effort":
       return `*effort* ${valueWithDetail(field)}`;
     case "branch":
@@ -59,7 +61,7 @@ function workPart(work: NonNullable<FooterFields["work"]>): string {
 }
 
 /**
- * One line: the work's duration and end time, bypass, model and effort, the channel's folder,
+ * One line: the work's duration and end time, bypass, model, advisor and effort, the channel's folder,
  * then branch, changes, tokens, context, limits and the account (the owner's order); the account's
  * plan is left to `!status`.
  */

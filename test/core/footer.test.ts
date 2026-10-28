@@ -42,6 +42,7 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     planning: false,
     model: null,
     effort: null,
+    advisor: null,
     effortObserved: null,
     folder: null,
     branch: null,
@@ -77,6 +78,7 @@ test("status fields list the footer s values one per line", () => {
     sessionLimit: { percent: 3, resetsAt: NOW + 2 * HOUR + 10 * MINUTE },
     weekLimit: { percent: 25, resetsAt: null },
     effort: "high",
+    advisor: null,
     effortObserved: null,
     folder: "/work/personal/app",
   });
@@ -103,6 +105,16 @@ for (const [delta, shown, name] of [
     assert.equal(formatUntil(delta), shown);
   });
 }
+
+test("status fields name the advisor after the model, and only when one is set", () => {
+  const data = fields({ model: "Haiku 4.5", advisor: "Opus 5.5", effort: "high" });
+  assert.deepEqual(formatStatusFields(data, NOW), [
+    "Model: `Haiku 4.5`",
+    "Advisor: `Opus 5.5`",
+    "Effort: `high`",
+  ]);
+  assert.deepEqual(formatStatusFields(fields({ model: "Haiku 4.5" }), NOW), ["Model: `Haiku 4.5`"]);
+});
 
 test("status fields leave out what is not known", () => {
   assert.deepEqual(formatStatusFields(fields(), NOW), []);

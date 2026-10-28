@@ -24,6 +24,7 @@ import type {
   StartOptions,
   UsageLimits,
 } from "../seam.ts";
+import type { ResolveSettings } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
 import { chromeEnabled } from "./chrome.ts";
 import { GOAL_CLEAR } from "./goals.ts";
@@ -148,6 +149,8 @@ export interface ClaudeBackendOptions {
   readonly runOutput?: RunOutput;
   /** The SDK's `getSessionMessages`; a test passes a fake. */
   readonly getSessionMessages?: GetSessionMessages;
+  /** The SDK's `resolveSettings`, which reads the advisor; a test passes a fake. */
+  readonly resolveSettings?: ResolveSettings;
 }
 
 export class ClaudeBackend implements AgentBackend {
@@ -162,6 +165,7 @@ export class ClaudeBackend implements AgentBackend {
   readonly #probe: UsageProbe;
   readonly #runOutput: RunOutput | undefined;
   readonly #getSessionMessages: GetSessionMessages | undefined;
+  readonly #resolveSettings: ResolveSettings | undefined;
   readonly shell: ShellMode;
 
   constructor(options: ClaudeBackendOptions = {}) {
@@ -175,6 +179,7 @@ export class ClaudeBackend implements AgentBackend {
     this.shell = shellMode(this.#variables);
     this.#runOutput = options.runOutput;
     this.#getSessionMessages = options.getSessionMessages;
+    this.#resolveSettings = options.resolveSettings;
     const bare = options.bareStart ?? ((folder, requests) => this.startBare(folder, requests));
     this.#probe = new UsageProbe(this.#home, bare, { clock: options.clock });
   }
@@ -191,6 +196,7 @@ export class ClaudeBackend implements AgentBackend {
       { ...options, chrome, variables: this.#variables },
       requests,
       this.#query,
+      this.#resolveSettings,
     );
     await session.ready();
     return session;

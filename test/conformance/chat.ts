@@ -266,6 +266,7 @@ const FOOTER: FooterFields = {
   planning: false,
   model: "model-a",
   effort: null,
+  advisor: null,
   effortObserved: null,
   folder: FOLDER,
   branch: null,

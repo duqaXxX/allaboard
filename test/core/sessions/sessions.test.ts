@@ -5371,3 +5371,47 @@ test("a posted and a removed request are logged by id and age only", async (t) =
   assert.ok(!everything.includes("SECRET-PROMPT-CONTENT"));
   assert.ok(!everything.includes("SECRET-COMMAND-TEXT"));
 });
+
+test("the footer and status name the advisor the settings set, by the agent's list", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], advisor: () => "opus" });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes(" · *advisor* Opus 5.5 · "), statuses(h).at(-1));
+  assert.ok((await session.status()).includes("Advisor: `Opus 5.5`"));
+});
+
+test("with no advisor set the footer and status name none", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(!statuses(h).at(-1)?.includes("advisor"), statuses(h).at(-1));
+  assert.ok(!(await session.status()).includes("Advisor"));
+});
+
+test("the advisor is read again for each footer and status: a terminal may set it at any time", async (t) => {
+  let advisor: string | null = "opus";
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], advisor: () => advisor });
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok((await session.status()).includes("Advisor: `Opus 5.5`"));
+  advisor = null;
+  assert.ok(!(await session.status()).includes("Advisor"));
+});
+
+test("an advisor read that fails leaves the footer drawn, and logs no more than its name", async (t) => {
+  const h = harnessFor(t)({
+    turns: [sdkMessages("tools")],
+    advisorError: new TypeError("secret detail"),
+  });
+  const warnings = logged(t, "warning");
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.length, "a footer is drawn");
+  assert.ok(!statuses(h).at(-1)?.includes("advisor"));
+  assert.ok(warnings.some((line) => line.includes("advisor") && line.includes("TypeError")));
+  assert.ok(!warnings.some((line) => line.includes("secret detail")));
+});

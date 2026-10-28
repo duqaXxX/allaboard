@@ -104,6 +104,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   shellCommands: false,
   sessionHolders: false,
   foreignTurns: false,
+  advisor: false,
 });
 
 /** The two commands of the agent, run by a prompt `/echo text` and `/count text`. */

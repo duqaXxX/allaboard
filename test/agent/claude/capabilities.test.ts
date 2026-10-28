@@ -36,6 +36,7 @@ test("the Claude back end declares what the core adapts to", () => {
     shellCommands: true,
     sessionHolders: true,
     foreignTurns: true,
+    advisor: true,
   });
 });
 

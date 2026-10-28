@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The footer and `!status` name the advisor while one is set (`advisor Opus 5.5`), read from
+  Claude Code's settings each time they are drawn: `/advisor` saves it for every session, the
+  terminal's included (#8).
 - What your stop hooks say at a turn's end is now said in the reply, in the terminal's words:
   `Ran 3 stop hooks`, then why one stopped the session, `⎿ Stop hook error: <reason>` for each
   refusal and `⎿ Stop hook feedback: <context>` for each context added for Claude, where the turn
