@@ -1,19 +1,22 @@
 /** `!memory` and `!skills` as text (`loaded.ts`): paths shown short, sizes, one-line descriptions. */
 import assert from "node:assert/strict";
+import { join, sep } from "node:path";
 import { test } from "node:test";
 import type { CommandInfo, LoadedContext } from "../../src/agent/seam.ts";
 import { memoryText, skillsText } from "../../src/core/loaded.ts";
 import * as texts from "../../src/core/texts.ts";
 
-const HOME = `/ho${"me"}/alice`;
-const FOLDER = `${HOME}/work/app`;
+// Paths in the system's own form, as Claude Code reports them: `~` keeps the system's separator.
+const HOME = join(sep, `ho${"me"}`, "alice");
+const FOLDER = join(HOME, "work", "app");
+const ELSEWHERE = join(sep, "etc", "claude", "CLAUDE.md");
 const same = (text: string) => text;
 
 const LOADED: LoadedContext = {
   memoryFiles: [
-    { path: `${HOME}/.claude/CLAUDE.md`, tokens: 2300 },
-    { path: `${FOLDER}/CLAUDE.md`, tokens: 1650 },
-    { path: "/etc/claude/CLAUDE.md", tokens: 170 },
+    { path: join(HOME, ".claude", "CLAUDE.md"), tokens: 2300 },
+    { path: join(FOLDER, "CLAUDE.md"), tokens: 1650 },
+    { path: ELSEWHERE, tokens: 170 },
   ],
   skills: [
     { name: "pdf", source: "plugin", tokens: 90 },
@@ -33,9 +36,9 @@ test("memory files show from the session's folder or the home, with their sizes"
     memoryText(LOADED, FOLDER, same, HOME),
     [
       "Memory files loaded (3, 4,120 tokens):",
-      "• ~/.claude/CLAUDE.md · 2,300 tokens",
+      `• ~${sep}.claude${sep}CLAUDE.md · 2,300 tokens`,
       "• CLAUDE.md · 1,650 tokens",
-      "• /etc/claude/CLAUDE.md · 170 tokens",
+      `• ${ELSEWHERE} · 170 tokens`,
     ].join("\n"),
   );
 });
