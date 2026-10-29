@@ -390,12 +390,12 @@ export const CLAIMS: readonly Claim[] = [
   claim(
     "P33",
     "gesture",
-    "a `/goal` reaches the session store as `goal_status` entries: the goal set, then achieved " +
+    "a `/goal` reaches the session's transcript as `goal_status` entries: the goal set, then achieved " +
       "with whole `iterations`, `durationMs` and `tokens`, both before the turn's result",
     "src/agent/claude/goals.ts#goalChange",
     "send `!goal reply with the single word tick`; the reply ends with `✔ Goal achieved (…)` " +
       "before its footer. If it fails, the reply shows no goal line and `!stop` never says a " +
-      "goal is still active: read `docs/sdk-surface.md` for the rows under `SessionStoreEntry`, " +
+      "goal is still active: read the `transcript.ts` entry of `docs/sdk-surface.md`, " +
       "and look for the `goal_status` attachments in a transcript",
   ),
   claim(
@@ -470,16 +470,15 @@ export const CLAIMS: readonly Claim[] = [
   claim(
     "P42",
     "gesture",
-    "what a project's stop hooks say reaches the session store as `stop_hook_summary` entries, each " +
+    "what a project's stop hooks say reaches the session's transcript as `stop_hook_summary` entries, each " +
       "read before the turn's end and counted without the daemon's own callback: a refusal " +
       "(`hookErrors`), then an added context (`hookAdditionalContext`), then a stop with its reason " +
       "(`preventedContinuation`, `stopReason`)",
     "src/agent/claude/goals.ts#stopHookSummary",
     'in a bound folder, add a project Stop hook that prints `{"decision":"block","reason":"say ' +
       'OSPREY"}` once, send a prompt: the reply shows `Ran 1 stop hook` and `⎿ Stop hook error: ' +
-      "say OSPREY` between its two answers. If it fails, read `docs/sdk-surface.md` for the rows " +
-      "under `SessionStoreEntry` that name `stopHookSummary`, and look for the `stop_hook_summary` " +
-      "entries in a transcript",
+      "say OSPREY` between its two answers. If it fails, read the `transcript.ts` entry of " +
+      "`docs/sdk-surface.md`, and look for the `stop_hook_summary` entries in a transcript",
   ),
   claim(
     "P43",

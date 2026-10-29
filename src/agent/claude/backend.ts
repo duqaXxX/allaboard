@@ -38,6 +38,7 @@ import { type RewindStart, rewindPoints, rewindStart } from "./rewind.ts";
 import { ClaudeSession, type QueryFunction, THREAD_SETTINGS_SOURCES } from "./session.ts";
 import { shellMode } from "./shell.ts";
 import { TOOLS } from "./tools.ts";
+import { Transcript } from "./transcript.ts";
 import { trustedRepository, untrustedRepository, workspaceTrusted } from "./trust.ts";
 import { type GetSessionMessages, turnsAfter } from "./turns.ts";
 import { type BareStart, UsageProbe } from "./usage-probe.ts";
@@ -207,9 +208,12 @@ export class ClaudeBackend implements AgentBackend {
     // Read at every start, so a change in `/chrome` holds from a session's next start.
     const chrome = await chromeEnabled(this.#home, this.#configDir);
     const rewind = await this.#rewindStart(options);
+    // Before the process starts: what the transcript holds by then was not written by it.
+    const transcript = await Transcript.open(this.#projects, options.folder, options.resume);
     const session = new ClaudeSession(
       {
         ...options,
+        transcript,
         ...(rewind !== null && {
           resumeSessionAt: rewind.at,
           resumeTail: rewind.tail,

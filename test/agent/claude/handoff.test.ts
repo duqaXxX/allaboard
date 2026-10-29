@@ -8,13 +8,12 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
-import type { SessionMessage, SessionStoreEntry } from "@anthropic-ai/claude-agent-sdk";
+import type { SessionMessage } from "@anthropic-ai/claude-agent-sdk";
 import { ClaudeBackend } from "../../../src/agent/claude/backend.ts";
-import { goalStore, savedMessage } from "../../../src/agent/claude/goals.ts";
+import { savedMessage, transcriptEvents } from "../../../src/agent/claude/goals.ts";
 import { listed, parents, sessionHolders } from "../../../src/agent/claude/holders.ts";
 import { projectKey } from "../../../src/agent/claude/listing.ts";
 import { promptOf, turnsAfter, turnsOf } from "../../../src/agent/claude/turns.ts";
-import type { SessionEvent } from "../../../src/agent/seam.ts";
 
 const SESSION = "1f3f5507-0000-4000-8000-000000000001";
 const OTHER = "a9ebe601-0000-4000-8000-000000000002";
@@ -107,19 +106,20 @@ test("no holder asks nothing of ps, and a failure of either list is no answer", 
   assert.equal(failed, null);
 });
 
-// Real entries a session store received for one turn (SDK 0.3.310, Claude Code 2.1.310,
-// 2026-10-27), scrubbed: their uuids are those `getSessionMessages` returned for the session.
-async function storeEntries(): Promise<SessionStoreEntry[]> {
+/** A transcript entry as Claude Code writes it: the fields these tests read. */
+type Entry = Record<string, unknown> & { readonly uuid: string; readonly timestamp: string };
+
+// Real transcript entries a session store received for one turn (SDK 0.3.310, Claude Code
+// 2.1.310, 2026-10-27), scrubbed: their uuids are those `getSessionMessages` returned for the
+// session.
+async function storeEntries(): Promise<Entry[]> {
   const path = new URL("../../fixtures/sdk/message-store.json", import.meta.url);
-  return JSON.parse(await readFile(path, "utf8")) as SessionStoreEntry[];
+  return JSON.parse(await readFile(path, "utf8")) as Entry[];
 }
 
 test("a user or an assistant entry is a saved message, with its uuid and time", async () => {
-  const [user, assistant] = (await storeEntries()) as [SessionStoreEntry, SessionStoreEntry];
-  assert.deepEqual(savedMessage(user), {
-    id: user.uuid,
-    at: Date.parse(user.timestamp as string),
-  });
+  const [user, assistant] = (await storeEntries()) as [Entry, Entry];
+  assert.deepEqual(savedMessage(user), { id: user.uuid, at: Date.parse(user.timestamp) });
   assert.equal(savedMessage(assistant)?.id, assistant.uuid);
   assert.equal(
     savedMessage({ type: "queue-operation", timestamp: "2026-10-27T03:12:51.350Z" }),
@@ -131,20 +131,13 @@ test("a user or an assistant entry is a saved message, with its uuid and time", 
   );
 });
 
-test("the store hands the last message of each batch of the main transcript", async () => {
+test("the last message among the transcript's entries is the one saved", async () => {
   const entries = await storeEntries();
-  const last = entries[1] as SessionStoreEntry;
-  const events: SessionEvent[] = [];
-  const store = goalStore((event) => events.push(event));
-  await store.append({ projectKey: "p", sessionId: SESSION }, entries);
-  await store.append({ projectKey: "p", sessionId: SESSION, subpath: "subagents/a" }, entries);
-  await store.append({ projectKey: "p", sessionId: SESSION }, [{ type: "queue-operation" }]);
-  assert.deepEqual(events, [
-    {
-      type: "message_saved",
-      message: { id: last.uuid, at: Date.parse(last.timestamp as string) },
-    },
+  const last = entries[1] as Entry;
+  assert.deepEqual(transcriptEvents(entries), [
+    { type: "message_saved", message: { id: last.uuid, at: Date.parse(last.timestamp) } },
   ]);
+  assert.deepEqual(transcriptEvents([{ type: "queue-operation" }]), []);
 });
 
 /** A message as `getSessionMessages` returns it, around a real entry's `message`. */

@@ -84,7 +84,6 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `PermissionResult` | type | requests.ts: permissionResult, questionResult | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `SDKSessionInfo` | type | info.ts: listedSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `SDKUserMessage` | type | prompt.ts: Content, userMessage; session.ts: QueryFunction, ClaudeSession | reference | none |
-| `@anthropic-ai/claude-agent-sdk` | `SessionStore` | type | goals.ts: goalStore | package | P33 |
 | `@anthropic-ai/claude-agent-sdk` | `RewindFilesResult` | type | rewind.ts: filesRestore; session.ts: QueryHandle | reference | P44 |
 | `@anthropic-ai/claude-agent-sdk` | `SessionMessage` | type | turns.ts: turnsOf | package | none |
 | `@anthropic-ai/claude-agent-sdk` | `forkSession` | function | backend.ts: ClaudeBackend.forkSession | reference | P43 |
@@ -121,11 +120,6 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `stderr` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `systemPrompt` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `toolConfig` | option | session.ts: ClaudeSession.#options | reference | none |
-| `Options` | `sessionStore` | option | session.ts: ClaudeSession.#options | package | P33 |
-| `Options` | `sessionStoreFlush` | option | session.ts: ClaudeSession.#options | package | P33 |
-| `Options.sessionStoreFlush` | `"eager"` | value | session.ts: ClaudeSession.#options | package | P33 |
-| `SessionStore` | `append` | option | goals.ts: goalStore | package | P33 |
-| `SessionStore` | `load` | option | goals.ts: goalStore | package | P7 |
 | `ToolConfig` | `askUserQuestion` | option | session.ts: TOOL_CONFIG | reference | none |
 | `ToolConfig.askUserQuestion` | `previewFormat` | option | session.ts: TOOL_CONFIG | package | none |
 | `ToolConfig.askUserQuestion.previewFormat` | `"markdown"` | value | session.ts: TOOL_CONFIG | package | none |
@@ -338,7 +332,6 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `lines` | key | translate.ts: hunkOf | measured | none |
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `newStart` | key | translate.ts: hunkOf | measured | none |
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `oldStart` | key | translate.ts: hunkOf | measured | none |
-| `SessionKey` | `subpath` | field | goals.ts: goalStore | package | none |
 | `SessionMessage` | `type` | field | turns.ts: turnsOf | package | none |
 | `SessionMessage` | `uuid` | field | turns.ts: turnsAfter | package | none |
 | `SessionMessage` | `message` | field | turns.ts: promptOf | package | none |
@@ -347,6 +340,8 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SessionStoreEntry` | `type` | field | goals.ts: goalChange | package | P33 |
 | `SessionStoreEntry` | `uuid` | field | goals.ts: savedMessage | package | none |
 | `SessionStoreEntry` | `timestamp` | field | goals.ts: savedMessage | package | none |
+| `SessionStoreEntry` | `entrypoint` | key | transcript.ts: ownEntry | measured | none |
+| `SessionStoreEntry.entrypoint` | `"sdk-ts"` | value | transcript.ts: OWN_ENTRYPOINT | measured | none |
 | `SessionStoreEntry.type` | `"user"` | value | goals.ts: savedMessage | measured | none |
 | `SessionStoreEntry.type` | `"assistant"` | value | goals.ts: savedMessage | measured | none |
 | `SessionStoreEntry.type` | `"attachment"` | value | goals.ts: goalChange | measured | P33 |
@@ -543,6 +538,15 @@ no check covers them here.
   declaration. `CanUseTool.title` is declared and was absent in both permission calls measured on
   SDK 0.3.296 on 2026-10-10. `"human"` of `SDKMessageOrigin.kind` is in no recording: the results
   of the owner's own prompts carry no `origin` there.
+- The rows under `SessionStoreEntry` are lines of a session's transcript, which `transcript.ts`
+  reads as Claude Code appends to them and `goals.ts` turns into events. The SDK hands the same
+  lines to an `Options.sessionStore` ("one per line in the local JSONL", session storage page,
+  read 2026-10-29) and types them so; the daemon passes no store, which the SDK refuses beside
+  `enableFileCheckpointing`. `entrypoint` comes from `CLAUDE_CODE_ENTRYPOINT`, which the SDK sets
+  to `"sdk-ts"` only when the environment it is given has none (`sdk.mjs` 0.3.312);
+  `session.ts: ClaudeSession.#options` sets it. On 2026-10-29 (SDK 0.3.312) the `goal_status` and
+  `stop_hook_summary` lines of a turn were on disk when its `result` arrived, in three turns of
+  three, which claims P33 and P42 see again on each release.
 - `listing.ts` derives the folder of a folder's transcripts by a rule read in the package's
   `sdk.mjs` 0.3.296, which nothing documents. `test/agent/claude/listing.test.ts` writes a
   transcript where the rule puts it and has the SDK's own `listSessions` find it. `lastMessageMs`

@@ -53,3 +53,8 @@ test("a command runs in the environment a thread's session gets", () => {
     }
   }
 });
+
+test("a command keeps the entrypoint it inherits, which only the session's own is pinned to", () => {
+  const environment = shellMode({ CLAUDE_CODE_ENTRYPOINT: "cli" }).environment;
+  assert.equal(environment.CLAUDE_CODE_ENTRYPOINT, "cli");
+});

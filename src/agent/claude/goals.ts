@@ -1,21 +1,23 @@
 /**
- * A session's goal (`/goal`), read off the transcript Claude Code mirrors to a session store.
+ * A session's goal (`/goal`) and its stop hooks, read off the entries of its transcript
+ * (`transcript.ts`).
  *
  * The query's stream says when a goal is set (the command's `Goal set:` text) and when a check
  * fails (a `Stop hook feedback` user record), never when one is achieved or cleared, and
- * `active_goal`, which `sdk.d.ts` declares, never reaches it (measured 2026-10-20, SDK 0.3.304). The terminal reads a `goal_status` attachment for each change, and an
- * `Options.sessionStore` with `sessionStoreFlush: 'eager'` receives the same entries as they are
- * written. `SessionStoreEntry` is declared opaque ("CLI-internal"): the shape below was read off
- * real entries, recorded in `test/fixtures/sdk/goal-lifecycle-store.json`.
+ * `active_goal`, which `sdk.d.ts` declares, never reaches it (measured 2026-10-20, SDK 0.3.304,
+ * and 2026-10-29, SDK 0.3.312). The terminal reads a `goal_status` attachment for each change,
+ * which only the transcript holds. Its format is not documented: the shape below was read off
+ * real entries, recorded in `test/fixtures/sdk/goal-lifecycle-store.json` (as a session store
+ * received them, which mirrors the transcript line for line).
  *
- * The same store carries the one account of what the owner's stop hooks said at a turn's end,
- * which the terminal draws from it: the `stop_hook_summary` entry. The stream says at most a
+ * The transcript also carries the one account of what the owner's stop hooks said at a turn's
+ * end, which the terminal draws from it: the `stop_hook_summary` entry. The stream says at most a
  * refusal's words (a `Stop hook feedback` user record), never how many hooks ran, an added context
  * or why a hook stopped the session (measured 2026-10-27, SDK 0.3.310,
- * `test/fixtures/sdk/stop-hook-block-store.json`).
+ * `test/fixtures/sdk/stop-hook-block-store.json`). With `includeHookEvents` it reports each
+ * command hook, never a goal's own prompt hook, so it cannot count them (measured 2026-10-29).
  */
 
-import type { SessionStore } from "@anthropic-ai/claude-agent-sdk";
 import { isRecord } from "../../values.ts";
 import type { GoalChange, SavedMessage, SessionEvent } from "../seam.ts";
 import { integer, words } from "./wire.ts";
@@ -96,26 +98,20 @@ export function savedMessage(entry: unknown): SavedMessage | null {
 }
 
 /**
- * The store a session is given: it keeps nothing, and hands each goal change and each account of
- * the stop hooks of the main transcript to `deliver` (a subagent's transcript has a `subpath`),
- * and the last message of each batch the session saved (what `turnsAfter` reads after). `load`
- * answers that nothing was stored, and a resume then reads the transcript Claude Code keeps on
- * disk (measured 2026-10-20, SDK 0.3.304; the contract of `load` does not say).
+ * The events of entries the session's process wrote to its main transcript, in order: each goal
+ * change and each account of the stop hooks, then the last message among them (what `turnsAfter`
+ * reads after), when there is one.
  */
-export function goalStore(deliver: (event: SessionEvent) => void): SessionStore {
-  return {
-    append: async (key, entries) => {
-      if (key.subpath !== undefined) return;
-      let saved: SavedMessage | null = null;
-      for (const entry of entries) {
-        const goal = goalChange(entry);
-        if (goal !== null) deliver({ type: "goal_changed", goal });
-        const hooks = stopHookSummary(entry);
-        if (hooks !== null) deliver(hooks);
-        saved = savedMessage(entry) ?? saved;
-      }
-      if (saved !== null) deliver({ type: "message_saved", message: saved });
-    },
-    load: async () => null,
-  };
+export function transcriptEvents(entries: readonly unknown[]): SessionEvent[] {
+  const events: SessionEvent[] = [];
+  let saved: SavedMessage | null = null;
+  for (const entry of entries) {
+    const goal = goalChange(entry);
+    if (goal !== null) events.push({ type: "goal_changed", goal });
+    const hooks = stopHookSummary(entry);
+    if (hooks !== null) events.push(hooks);
+    saved = savedMessage(entry) ?? saved;
+  }
+  if (saved !== null) events.push({ type: "message_saved", message: saved });
+  return events;
 }

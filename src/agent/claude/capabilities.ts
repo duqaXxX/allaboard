@@ -41,7 +41,7 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   fileRestore: true,
   // `resumeSessionAt` and `resumeDropsTurn` (`rewind.ts`).
   conversationRewind: true,
-  // The `goal_status` entries a session store receives (`goals.ts`).
+  // The `goal_status` entries of the session's transcript (`goals.ts`, `transcript.ts`).
   goals: true,
   // `session_crons` of the Stop hook's input (`hooks.ts`).
   scheduledJobs: true,
@@ -49,7 +49,7 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   shellCommands: true,
   // `holders.ts`: `claude agents --json`, and `ps` for which holder is the daemon's own.
   sessionHolders: true,
-  // `turns.ts`, and the conversation's entries a session store receives (`goals.ts`).
+  // `turns.ts`, and the conversation's entries of the session's transcript (`goals.ts`).
   foreignTurns: true,
   // `advisor.ts`: the `advisorModel` setting, read with the SDK's `resolveSettings`.
   advisor: true,
