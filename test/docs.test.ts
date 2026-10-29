@@ -15,6 +15,7 @@ import { WORDS } from "../src/agent/claude/backend.ts";
 import { WORD } from "../src/core/commands.ts";
 import { REQUIRED, SELECTORS } from "../src/core/config.ts";
 import { REGISTRY } from "../src/registry.ts";
+import { excerpt, isNotEnglish, markdownParagraphs } from "./support/english.ts";
 import { sdkJson } from "./support/fixtures.ts";
 import { blank } from "./support/source-scan.ts";
 
@@ -649,4 +650,13 @@ test("every limit claim checks a row of the Agent SDK section", () => {
     missing.map((claim) => claim.id),
     [],
   );
+});
+
+test("every markdown file is written in English", () => {
+  const found = DOCS.flatMap((doc) =>
+    markdownParagraphs(read(doc))
+      .filter(isNotEnglish)
+      .map((paragraph) => `${relative(ROOT, doc)}: ${excerpt(paragraph)}`),
+  );
+  assert.deepEqual(found, []);
 });
