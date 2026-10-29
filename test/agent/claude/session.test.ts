@@ -712,7 +712,7 @@ test(
 
 test("a transcript that cannot be read loses its lines, not the session", LIMIT, async (t) => {
   const { path } = await transcriptOf(t);
-  // A folder where the file should be: opening it works, reading it fails.
+  // A folder where the file should be: every read of it fails.
   await mkdir(path);
   const transcript = new Transcript(async () => path);
   const errors: string[] = [];
@@ -722,9 +722,8 @@ test("a transcript that cannot be read loses its lines, not the session", LIMIT,
   await session.send(PROMPT);
   const seen = await until(events, "turn_ended");
   assert.equal(seen.at(-1)?.type, "turn_ended");
-  // Once for a failure that lasts the whole turn, by its code alone (`EISDIR`).
-  assert.equal(errors.length, 1);
-  assert.match(errors[0] ?? "", /^could not read the transcript: E[A-Z]+$/);
+  // Once for a failure that lasts the whole turn, by its name alone.
+  assert.deepEqual(errors, ["could not read the transcript: NotAFileError"]);
 });
 
 test("the PostToolUse hook gives the folder alone", LIMIT, async (t) => {

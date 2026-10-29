@@ -44,6 +44,15 @@ export function ownEntry(entry: unknown): boolean {
 // do not exist on Windows.
 const OPEN_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
 
+/** The transcript's path names something other than a regular file. */
+export class NotAFileError extends Error {
+  override readonly name = "NotAFileError";
+
+  constructor() {
+    super("the transcript is not a regular file");
+  }
+}
+
 /** Where the transcript of `session` is, or null while it is not there. */
 export type FindTranscript = (session: string) => Promise<string | null>;
 
@@ -119,7 +128,10 @@ export class Transcript {
     let chunk: string;
     try {
       // The common case, a record that wrote nothing, costs one `stat`.
-      const { size } = await stat(this.#path);
+      const found = await stat(this.#path);
+      // Before the size: Windows gives a folder a size of 0, which would read as nothing written.
+      if (!found.isFile()) throw new NotAFileError();
+      const { size } = found;
       if (size === this.#offset) return [];
       if (size < this.#offset) {
         // Rewritten under the session: what it held is unknown, so reading goes on from here.

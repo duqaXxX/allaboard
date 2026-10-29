@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { projectKey } from "../../../src/agent/claude/listing.ts";
-import { ownEntry, Transcript } from "../../../src/agent/claude/transcript.ts";
+import { NotAFileError, ownEntry, Transcript } from "../../../src/agent/claude/transcript.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 
 const SESSION = "68da9311-0000-4000-8000-000000000001";
@@ -126,9 +126,9 @@ test("a transcript rewritten shorter is read on from its new end", async (t) => 
   assert.deepEqual(await transcript.read(), [THIRD]);
 });
 
-test("a transcript that cannot be read rejects", async (t) => {
+test("a folder where the transcript should be rejects, on every platform", async (t) => {
   const { file } = await stage(t);
   await mkdir(file);
   const transcript = new Transcript(async () => file, SESSION);
-  await assert.rejects(transcript.read());
+  await assert.rejects(transcript.read(), NotAFileError);
 });
