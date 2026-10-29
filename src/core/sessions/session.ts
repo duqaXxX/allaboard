@@ -38,8 +38,8 @@
  *    never waits: so around a call that only looks asynchronous (making a reply, showing the
  *    running list) there is no `await` at all, and a turn is made the active one before its
  *    first write.
- * 7. A reaction is asked for at once and not awaited (`react`): the chat makes the changes in
- *    the order they were asked.
+ * 7. The root's status is asked for at once and not awaited (`react`): the chat makes the
+ *    changes in the order they were asked.
  */
 import { basename } from "node:path";
 import type {
@@ -67,6 +67,7 @@ import type {
 } from "../../agent/seam.ts";
 import { ResumeRefused } from "../../agent/seam.ts";
 import type {
+  Activity,
   FooterFields,
   MessageId,
   Reply,
@@ -284,7 +285,7 @@ export class ThreadSession {
   /** A line of the daemon's own that opens the next reply. */
   private notice: string | null = null;
   // `expireUnreported`'s own timers only: this session's alone, so `close` can cancel them.
-  // What the session only starts and never waits on (a usage refresh, a reaction) is not kept:
+  // What the session only starts and never waits on (a usage refresh, the root's status) is not kept:
   // a usage refresh shares one probe across every session, and is never cancelled.
   private readonly expiring = new Set<Task>();
   // Approval ids open right now, waiting on the owner's decision (`waitingForOwner`); a hold
@@ -579,9 +580,9 @@ export class ThreadSession {
     return this.deps.agent.capabilities.backgroundTasks;
   }
 
-  /** Whether the chat shows a status on the thread's root (`reactions`). */
+  /** Whether the chat shows a status on the thread's root (`rootStatus`). */
   private get reacts(): boolean {
-    return this.deps.chat.capabilities.reactions;
+    return this.deps.chat.capabilities.rootStatus;
   }
 
   /**
@@ -666,27 +667,23 @@ export class ThreadSession {
    * waits on the owner, while `!stop` winds a turn down, and once the session is closed. A
    * restart waiting on tasks says which.
    */
-  private threadLine(): readonly [text: string, afterName: string] {
-    if (this.closedFlag || this.waitingForOwner || this.interrupting) return ["", ""];
-    if (this.compacting && (this.busy || this.promptOwed())) {
-      return [texts.THREAD_COMPACTING, texts.THREAD_COMPACTING_STATUS];
-    }
-    if (this.promptOwed() || this.turnEnding) {
-      return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
-    }
+  private threadActivity(): Activity | null {
+    if (this.closedFlag || this.waitingForOwner || this.interrupting) return null;
+    if (this.compacting && (this.busy || this.promptOwed())) return { kind: "compacting" };
+    if (this.promptOwed() || this.turnEnding) return { kind: "working" };
     const held = this.draining ? this.runningKindsOf({ awaitedOnly: true }) : "";
     if (held) {
       // A stop that only background tasks hold: said here whatever the list shows, since
       // `!stop` is what ends the wait. It comes before the agent's own word, which says
       // `working` all through a subagent left in the background.
-      const them = held.startsWith("1 ") && !held.includes(" · ") ? "it" : "them";
-      return [
-        texts.fill(texts.RESTART_WAITS, { counts: held, them }),
-        texts.fill(texts.RESTART_WAITS_STATUS, { counts: held }),
-      ];
+      return {
+        kind: "restart-wait",
+        counts: held,
+        single: held.startsWith("1 ") && !held.includes(" · "),
+      };
     }
-    if (this.agentState === "working") return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
-    return ["", ""];
+    if (this.agentState === "working") return { kind: "working" };
+    return null;
   }
 
   /**
@@ -706,12 +703,12 @@ export class ThreadSession {
   }
 
   /**
-   * Bring the thread's activity line to `threadLine`, after anything that can change it: it
+   * Bring the thread's activity line to `threadActivity`, after anything that can change it: it
    * never waits on the chat.
    */
   private showThreadStatus(): void {
     if (!this.deps.chat.capabilities.activityLine) return;
-    this.thread.showActivity(...this.threadLine());
+    this.thread.showActivity?.(this.threadActivity());
   }
 
   /**
@@ -889,7 +886,7 @@ export class ThreadSession {
   async cancelHold(): Promise<boolean> {
     const pending = this.deps.holds.cancel(this.channelId, this.threadId);
     if (pending === null) return false;
-    await this.deleteRequest(pending.messageTs);
+    await this.deleteRequest(pending.messageId);
     return true;
   }
 
@@ -1489,7 +1486,7 @@ export class ThreadSession {
 
   /**
    * During a stop: bring the thread's activity line up to date. Once only background tasks are
-   * left it says which ones the restart waits for (`threadLine`), since only the owner knows
+   * left it says which ones the restart waits for (`threadActivity`), since only the owner knows
    * whether a task (a dev server, a watcher) ever ends. A line and not a message: a message
    * would notify, and would stay in the thread after the restart. Where the chat refuses this
    * app an activity line, a message says it, once: a restart that waits without a word is worse
@@ -1500,10 +1497,10 @@ export class ThreadSession {
     // No call when the root already shows it. A ❌ shown with ⏳ kept in the state (a reply that
     // never landed) stands.
     if (this.reacts && this.lastStatus === "working" && !this.errorStanding) {
-      this.thread.showStatus(this.rootStatus("working")).catch(() => {});
+      this.thread.showStatus?.(this.rootStatus("working"))?.catch(() => {});
     }
     if (!this.deps.chat.capabilities.activityLine) return;
-    if (!this.thread.activityRefused || this.toldWaiting || this.busy) return;
+    if (this.thread.activityRefused !== true || this.toldWaiting || this.busy) return;
     const held = this.runningKindsOf({ awaitedOnly: true });
     if (held) {
       this.toldWaiting = true;
@@ -1539,7 +1536,7 @@ export class ThreadSession {
     // (sync) With no hold open, nothing waits between the call and the checks below.
     const hold = this.deps.holds.cancel(this.channelId, this.threadId);
     const held = hold !== null;
-    if (hold !== null) await this.deleteRequest(hold.messageTs);
+    if (hold !== null) await this.deleteRequest(hold.messageId);
     // A shell command of the owner's that runs is stopped like a turn, and the rest still stops.
     const shell = this.shellStop !== null;
     this.shellStop?.abort();
@@ -1576,7 +1573,7 @@ export class ThreadSession {
     this.interrupting = true;
     this.stopTail = this.stopTail ?? new Event();
     for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
-      await this.deleteRequest(pending.messageTs);
+      await this.deleteRequest(pending.messageId);
     }
     try {
       await client.interrupt();
@@ -1626,7 +1623,7 @@ export class ThreadSession {
    */
   async moveToTerminal(): Promise<"cut" | "idle"> {
     const hold = this.deps.holds.cancel(this.channelId, this.threadId);
-    if (hold !== null) await this.deleteRequest(hold.messageTs);
+    if (hold !== null) await this.deleteRequest(hold.messageId);
     // Work on its way to the agent is work to cut too: a turn taken or queued, a start in
     // progress, a shell command of the owner's, whose end would start a process again.
     const sending =
@@ -1729,7 +1726,7 @@ export class ThreadSession {
       await this.leaveLoop().catch(() => {});
       // An approval a background agent waits on goes with the process, as in a stopped turn.
       for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
-        await this.deleteRequest(pending.messageTs);
+        await this.deleteRequest(pending.messageId);
       }
       if (!answered) {
         this.closingContext = null;
@@ -2086,8 +2083,8 @@ export class ThreadSession {
         // there. No call when the root already reads as asked. A 🔄 asked last goes back to ⏳:
         // the stop that waited is over, and the root must not say it after the restart.
         if (this.lastStatus === "working" && !this.errorStanding) {
-          await this.thread.showStatus("working");
-        } else await this.thread.settleStatus();
+          await this.thread.showStatus?.("working");
+        } else await this.thread.settleStatus?.();
       }
       // Crash repair: a graceful close is not what repair is for, whatever is
       // still live in the chat when it ends, so this thread's fields end up empty either way.
@@ -2183,7 +2180,7 @@ export class ThreadSession {
   private requestMessages(): Array<MessageId | null> {
     return this.deps.approvals
       .pendingIn(this.channelId, this.threadId)
-      .map((pending) => pending.messageTs);
+      .map((pending) => pending.messageId);
   }
 
   /**
@@ -2195,7 +2192,7 @@ export class ThreadSession {
     this.deps.approvals.denyAll(this.channelId, this.threadId);
     // The denial above resolves each handler of a request, and each is awaited to its end.
     await Promise.allSettled([...this.asking]);
-    for (const messageTs of messages) await this.deleteRequest(messageTs);
+    for (const messageId of messages) await this.deleteRequest(messageId);
   }
 
   /** A request handler in flight, tracked so that a close can wait for it. */
@@ -2713,7 +2710,7 @@ export class ThreadSession {
       // A turn another session's message opens says so first: it is no run of a loop.
       const run = worded && task === null && event.type !== "peer_message" && this.opensRun();
       await this.startTurn(worded, run);
-      // A report turn has no prompt behind it: only now does `threadLine` read it.
+      // A report turn has no prompt behind it: only now does `threadActivity` read it.
       this.showThreadStatus();
     }
     const active = this.active;
@@ -2743,7 +2740,7 @@ export class ThreadSession {
       // A `Working…` that shows stays until the footer is drawn, so the thread's bottom never
       // goes blank between the two; a line that shows something else, or nothing, is not turned
       // into it, and a stop clears it at once, as `interrupting` already does.
-      this.turnEnding = this.threadLine()[0] === texts.THREAD_WORKING;
+      this.turnEnding = this.threadActivity()?.kind === "working";
       try {
         try {
           turnStopped = await this.finish(active, event, signal);
@@ -3185,8 +3182,11 @@ export class ThreadSession {
     if (change.unlanded) this.recordUnlanded();
     else this.recordPending(state);
     if (!this.reacts) return Promise.resolve();
-    if (state === null) return this.thread.clearStatus();
-    return this.thread.showStatus(this.rootStatus(state), { signal: change.signal, notify });
+    if (state === null) return this.thread.clearStatus?.() ?? Promise.resolve();
+    return (
+      this.thread.showStatus?.(this.rootStatus(state), { signal: change.signal, notify }) ??
+      Promise.resolve()
+    );
   }
 
   /**
@@ -3281,7 +3281,7 @@ export class ThreadSession {
     if (this.sessionEnded() && !this.errorStanding) {
       done = this.setStatus("done", { ...change, signal });
     } else {
-      logger.info(`no done reaction in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
+      logger.info(`no done status set in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
     }
     // Beside the checkmark, which never waits on the agent the footer asks; and not held back
     // by an error: an error ends the session too, and its footer says how it stood.
@@ -3597,7 +3597,7 @@ export class ThreadSession {
     else if (believed.some((job) => job.recurring)) {
       line = texts.fill(texts.LOOP_PAUSED, { runs: count });
     } else line = texts.named(texts.LOOP_STOPPED, this.names);
-    await this.thread.endLoop(line);
+    await this.thread.endLoop?.(line);
   }
 
   private async startTurn(worded: boolean, run = false): Promise<ActiveTurn> {
@@ -4448,11 +4448,11 @@ export class ThreadSession {
       givenUp = this.deps.approvals.giveUp(approvalId) !== null;
     };
     signal.addEventListener("abort", giveUp, { once: true });
-    let messageTs: MessageId;
+    let messageId: MessageId;
     let decision: Decision;
     try {
       try {
-        messageTs = await this.thread.ask(
+        messageId = await this.thread.ask(
           approvalId,
           request.type === "permission"
             ? { ...request, plan: this.previews.plan(request.toolName, request.input) }
@@ -4468,9 +4468,9 @@ export class ThreadSession {
       }
       logger.info(
         `posted ${questions === null ? "an approval" : "a question"} request in ` +
-          `${this.where}: message ${messageTs}`,
+          `${this.where}: message ${messageId}`,
       );
-      if (this.deps.approvals.posted(approvalId, messageTs)) {
+      if (this.deps.approvals.posted(approvalId, messageId)) {
         // Crash repair: still carrying buttons, until it is answered. Best-effort:
         // the message is already live either way, so a failed write here is logged loudly
         // rather than left silently unrecorded.
@@ -4478,7 +4478,7 @@ export class ThreadSession {
           this.deps.state.addRequest(
             this.channelId,
             this.threadId,
-            messageTs,
+            messageId,
             questions === null ? "approval" : "question",
           );
         } catch (error) {
@@ -4488,7 +4488,7 @@ export class ThreadSession {
         }
       } else {
         withdrawn = true;
-        await this.deleteRequest(messageTs); // decided while it was posted
+        await this.deleteRequest(messageId); // decided while it was posted
       }
       decision = await pending.decision;
     } finally {
@@ -4500,9 +4500,9 @@ export class ThreadSession {
     }
     // After the bookkeeping above, so a turn that ends during the chat round trip finds the
     // request gone and the root free to settle on done.
-    if (givenUp && !withdrawn) await this.deleteRequest(messageTs);
+    if (givenUp && !withdrawn) await this.deleteRequest(messageId);
     if (questions !== null && "answered" in decision && decision.answered) {
-      await this.keepAnswers(request.callId, messageTs, questions, decision.answers);
+      await this.keepAnswers(request.callId, messageId, questions, decision.answers);
     }
     return decision;
   }
@@ -4516,27 +4516,27 @@ export class ThreadSession {
    */
   private async keepAnswers(
     callId: string | null,
-    messageTs: MessageId,
+    messageId: MessageId,
     questions: readonly Question[],
     answers: Readonly<Record<string, string | readonly string[]>>,
   ): Promise<void> {
     const active = this.active;
     if (callId !== null && active?.renderer.answered(callId, questions, answers)) {
-      await this.deleteRequest(messageTs);
+      await this.deleteRequest(messageId);
       return;
     }
     try {
-      await this.thread.keepAnswers(messageTs, questions, answers);
+      await this.thread.keepAnswers(messageId, questions, answers);
     } catch (error) {
       // The request must not keep buttons that no longer work: remove it.
       logger.warning(`could not record an answer in ${this.where}: ${errorName(error)}`);
-      await this.deleteRequest(messageTs);
+      await this.deleteRequest(messageId);
       return;
     }
     // Crash repair: it carries no buttons now, so it leaves the tracked list.
     // Outside the try above: a failed write here must never delete a message just rewritten.
     try {
-      this.deps.state.removeRequest(this.channelId, this.threadId, messageTs);
+      this.deps.state.removeRequest(this.channelId, this.threadId, messageId);
     } catch (error) {
       logger.warning(
         `could not clear an answered request from state.json in ${this.where}: ${errorName(error)}`,
@@ -4629,14 +4629,14 @@ export class ThreadSession {
   }
 
   /** Remove a decided request: the tool's line in the reply records what happened. */
-  private async deleteRequest(messageTs: MessageId | null): Promise<void> {
-    if (messageTs === null) return;
-    await this.thread.withdraw(messageTs);
+  private async deleteRequest(messageId: MessageId | null): Promise<void> {
+    if (messageId === null) return;
+    await this.thread.withdraw(messageId);
     try {
       // Crash repair: the request is spoken for either way, so a startup repair
       // never retries a delete this call already made (or gave up on). Best-effort: a failed
       // write here must never surface past this point.
-      this.deps.state.removeRequest(this.channelId, this.threadId, messageTs);
+      this.deps.state.removeRequest(this.channelId, this.threadId, messageId);
     } catch (error) {
       logger.warning(
         `could not clear a deleted request from state.json in ${this.where}: ${errorName(error)}`,

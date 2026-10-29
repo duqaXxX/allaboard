@@ -3,16 +3,15 @@
  * whose first message the chat no longer has, and a thread whose session is gone. Run once on
  * start and then every `CLEAN_EVERY_SECONDS`, so a daemon that stays up for weeks cleans too.
  *
- * Only a certain answer removes anything. For a channel that is Slack's `channel_not_found` from
- * `conversations.info` (its reference, read 2026-10-01; measured the same day on deleted
- * channels), which is also what a private channel the bot was removed from answers: the two cannot
+ * Only a certain answer removes anything. A channel is certainly gone when the chat says it does
+ * not exist, which a chat may also answer for a channel the bot was removed from: the two cannot
  * be told apart, and a channel forgotten by mistake is bound again with `!bind`. A rate limit, a
  * server error or the network is no answer and removes nothing. A thread is asked about only in
- * a channel that answered `there` in the same pass (the token of another workspace must never
- * wipe threads), and its certain answer is `thread_not_found` from `conversations.replies` on its
- * root, or the root returned as a tombstone, which is what a root deleted while replies remain
- * becomes. A thread whose session is gone is dropped by `StateStore.prune`'s rule. The chat provider
- * supplies the lookups that turn Slack's answers into a `Presence`.
+ * a channel that answered `there` in the same pass (the credentials of another account of the
+ * chat must never wipe threads), and its certain answer is the chat saying its first message does
+ * not exist, or has been replaced by a placeholder that keeps the replies. A thread whose session
+ * is gone is dropped by `StateStore.prune`'s rule. The chat provider supplies the lookups that
+ * turn its own answers into a `Presence` (the Slack mapping is in `docs/slack-provider.md`).
  */
 import type { Presence, ThreadRef } from "../chat/seam.ts";
 import { getLogger, type Logger } from "../log.ts";
@@ -73,7 +72,7 @@ export interface CleanOptions {
  * the ids it forgot and those it `found` (answered `there`): the channels whose threads may be
  * asked about. A channel with a live session is left for the next pass. When the chat finds
  * none of the bound channels (a channel it gave no answer about is not one it found), nothing is
- * removed: that is what the token of another workspace, or an app removed from every channel,
+ * removed: that is what the credentials of another account of the chat, or an app removed from every channel,
  * looks like, and forgetting every binding would be the wrong repair. `chat` is the chat's
  * name, for the log lines. Once `stopping` says a stop has begun no further channel is asked
  * about and nothing is forgotten: the channels left for the next start.
@@ -111,7 +110,7 @@ export async function forgetGoneChannels(
   if (found.length === 0) {
     log.warning(
       `${chat} finds none of the ${bound.length} bound channels: nothing is forgotten (check the ` +
-        "workspace of the bot token, and that the bot is still in its channels)",
+        "account the credentials belong to, and that the bot is still in its channels)",
     );
     return { forgotten: [], found };
   }

@@ -36,7 +36,8 @@ test("the provider names itself and supports every part of the seam", () => {
   assert.equal(chat.name, "Slack");
   assert.deepEqual(chat.capabilities, {
     nativeStreaming: true,
-    reactions: true,
+    rootStatus: true,
+    acknowledgement: true,
     activityLine: true,
     fileUpload: true,
     commandSuggestions: true,

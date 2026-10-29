@@ -366,7 +366,7 @@ test("a variable a check sets is written and its question is not asked", async (
   const { home, output, asked } = setupOf("");
   const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
   const chat = chatOf([
-    question("USER", () => ({ set: { WHO: "U000ALICE" } }), {
+    question("USER", () => ({ set: { WHO: "alice" } }), {
       optional: true,
       sets: ["WHO"],
     }),
@@ -374,7 +374,7 @@ test("a variable a check sets is written and its question is not asked", async (
   ]);
   await answerWizard(DEFAULT_INSTANCE, chat, output, hostOf(home, ["tok", projects], asked));
   assert.ok(!asked.some((a) => a.message === "Ask WHO:"));
-  assert.equal(parseEnv(readFileSync(envOf(home), "utf8")).WHO, "U000ALICE");
+  assert.equal(parseEnv(readFileSync(envOf(home), "utf8")).WHO, "alice");
 });
 
 test("without a terminal it refuses before asking anything", async () => {
@@ -605,7 +605,7 @@ test("the file is never replaced: an .env that appears while the owner answers s
 
 test("envText quotes what a bare value would not read back, and refuses what cannot be written", () => {
   const values = {
-    PLAIN: "xoxb-1-abc",
+    PLAIN: "plain-1-abc",
     SPACED: "a b",
     HASH: "a#b",
     QUOTED: 'say "hi" now',
@@ -705,7 +705,7 @@ test("the summary lists the file in order: a secret masked, a set value in clear
   const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
   const chat = chatOf(
     [
-      question("T", () => ({ set: { WHO: "U000ALICE" } }), { secret: true, sets: ["WHO"] }),
+      question("T", () => ({ set: { WHO: "alice" } }), { secret: true, sets: ["WHO"] }),
       question("WHO", accept),
       question("SKIPPED", accept, { optional: true }),
     ],
@@ -727,7 +727,7 @@ test("the summary lists the file in order: a secret masked, a set value in clear
       "  ALLABOARD_AGENT=alpha",
       "  ALLABOARD_CHAT=beta",
       "  T=********",
-      "  WHO=U000ALICE",
+      "  WHO=alice",
       `  ALLOWED_ROOT=${projects}`,
       "  N=7",
       "",

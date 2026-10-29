@@ -10,6 +10,24 @@ function naming(template: string): Named {
   return new Named(template);
 }
 
+// The status line under a thread's last message. A client shows the loading message
+// (`THREAD_WORKING`, `THREAD_COMPACTING`, `RESTART_WAITS`) while a prompt of the owner's is owed
+// its answer and while the agent says it works; the `_STATUS` forms say the same after the app's
+// name, which is what a client that draws `<app name> <status>` shows (measured 2026-10-02,
+// desktop and iOS). An emoji draws large and grey in a status line (seen on desktop, 2026-10-02),
+// so none is used. `RESTART_WAITS` is the line while a restart waits for background tasks only:
+// never a message, which would notify and stay in the thread after the restart.
+export const THREAD_WORKING = "Working…";
+// The terminal's words while it compacts (`Compacting conversation`, read in the CLI 2.1.292).
+export const THREAD_COMPACTING = "Compacting conversation…";
+export const THREAD_COMPACTING_STATUS = "is compacting the conversation…";
+export const THREAD_WORKING_STATUS = "is working…";
+export const RESTART_WAITS = "Restart waits for {counts} · !stop ends {them} now";
+export const RESTART_WAITS_STATUS = "is waiting to restart: {counts} still running";
+
+// Slack drops plain spaces at the start of a line; no-break spaces stay and make the indent.
+export const NESTED = `${"\u00a0".repeat(4)}⎿ `;
+
 export const CHANNEL_REFUSED =
   "allaboard does not work in this channel: {reason}. It answers only in a private " +
   "channel whose only members are you and the bot.";

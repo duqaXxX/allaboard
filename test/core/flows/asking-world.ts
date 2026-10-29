@@ -26,7 +26,7 @@ import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import type { ThreadSession } from "../../../src/core/sessions/session.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import { namesOf } from "../../../src/core/texts.ts";
-import { AsyncEvent, FakeClock } from "../../support/fake-slack.ts";
+import { AsyncEvent, FakeClock } from "../../support/fake-clock.ts";
 import {
   type MemoryChat,
   memoryChat,

@@ -2,8 +2,8 @@
  * The memory chat: a second chat provider held in memory, for the tests of the seam. Its
  * capabilities are all false (no native streaming, no reactions, no activity line, no session
  * index, no file upload, no line for the owner alone) unless a test asks for command suggestions,
- * and it implements every required member of the chat seam for real. It is written against the seam and the core's port alone: the port
- * gives it the rule that places the footer and the list (`tails`, `isLast`, `isOvertaken`).
+ * and it implements every required member of the chat seam for real. It is written against the seam and the core's port alone, and places the
+ * footer and the list by a rule of its own model.
  *
  * `memoryChat()` is a registry entry that is also the handle on what the provider it builds
  * holds, and on the people a test plays:
@@ -35,7 +35,7 @@ export type {
   Sent,
   ShownMessage,
 } from "./memory-chat/room.ts";
-export { DAEMON, OWNER, SOMEONE } from "./memory-chat/room.ts";
+export { DAEMON, ELSEWHERE, HOME, OWNER, SOMEONE } from "./memory-chat/room.ts";
 
 export interface MemoryChatOptions {
   /** The owner's user id; `OWNER` when absent. */
@@ -44,6 +44,16 @@ export interface MemoryChatOptions {
   readonly identities?: readonly string[];
   /** The provider declares `commandSuggestions` and shows a suggestion as a message. */
   readonly suggestions?: boolean;
+  /**
+   * How a thread is named: by a name of its own (the default, never the id of the message that
+   * opened it), or by the id of its opening message (`opening`).
+   */
+  readonly threadIds?: "own" | "opening";
+  /**
+   * False for a chat that cannot rewrite a message once its reply ended: the list of what still
+   * runs is not drawn, and the session's footer is a message of its own.
+   */
+  readonly edits?: boolean;
 }
 
 /** The identity of a memory chat given none. */
@@ -53,12 +63,19 @@ export const MEMORY_IDENTITY = "memory:daemon";
 export class MemoryChat extends Room implements ChatEntry {
   readonly required: readonly string[] = [];
   readonly optional: readonly string[] = [];
+  readonly limitsHeading = "Limits of the memory chat";
   readonly #identities: readonly string[];
   readonly #suggests: boolean;
   #built: MemoryProvider | null = null;
 
-  constructor(owner: string, identities: readonly string[], suggests = false) {
-    super(owner);
+  constructor(
+    owner: string,
+    identities: readonly string[],
+    suggests = false,
+    threadIds: "own" | "opening" = "own",
+    edits = true,
+  ) {
+    super(owner, threadIds, edits);
     this.#identities = identities;
     this.#suggests = suggests;
   }
@@ -82,5 +99,7 @@ export function memoryChat(options: MemoryChatOptions = {}): MemoryChat {
     options.owner ?? OWNER,
     options.identities ?? [MEMORY_IDENTITY],
     options.suggestions ?? false,
+    options.threadIds ?? "own",
+    options.edits ?? true,
   );
 }

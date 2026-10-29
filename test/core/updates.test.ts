@@ -13,7 +13,7 @@ import {
   Updates,
   whyUnknown,
 } from "../../src/core/updates.ts";
-import { AsyncEvent, FakeClock } from "../support/fake-slack.ts";
+import { AsyncEvent, FakeClock } from "../support/fake-clock.ts";
 import { COPY, FakeUpdatesHost } from "../support/updates.ts";
 
 function build(host = new FakeUpdatesHost()): { host: FakeUpdatesHost; updates: Updates } {

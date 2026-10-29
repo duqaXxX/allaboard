@@ -21,7 +21,12 @@ import {
   type RunningList,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
-import { type ChatContext, type Tail, type TailEntry, tails } from "../../../src/core/port.ts";
+import type { ChatContext } from "../../../src/core/port.ts";
+
+/** The tenant of a memory chat: the workspace the owner belongs to. */
+export const HOME = "memory-home";
+/** Another tenant of the same chat, where even the owner's user id is nobody the daemon serves. */
+export const ELSEWHERE = "memory-elsewhere";
 
 /** The owner of a memory chat unless a test names another. */
 export const OWNER = "alice";
@@ -178,6 +183,12 @@ export interface Placed {
 /** What a memory chat holds, and the test's side of it. */
 export class Room {
   readonly owner: string;
+  /**
+   * Whether a message can be rewritten once its reply ended. A room that cannot draws no list of
+   * what still runs and shows the session's footer as a message of its own, the push of which is
+   * that chat's.
+   */
+  readonly edits: boolean;
   #clock: ChatContext["clock"] | null = null;
   #inbound: ChatInbound | null = null;
   #sequence = 0;
@@ -193,7 +204,16 @@ export class Room {
   readonly #running = new Map<string, RunningList>();
   #lookupFails = false;
 
-  constructor(owner: string) {
+  readonly #threadIds: "own" | "opening";
+
+  /**
+   * `threadIds` says how a thread is named: `own` (the default) gives it a name of its own, which
+   * is not the id of the message that opened it; `opening` names it by that message's id, as a
+   * chat whose threads are its messages does.
+   */
+  constructor(owner: string, threadIds: "own" | "opening" = "own", edits = true) {
+    this.#threadIds = threadIds;
+    this.edits = edits;
     this.owner = owner;
   }
 
@@ -235,14 +255,16 @@ export class Room {
   }
 
   /** The person `user` plays: the owner, or anybody else. */
-  as(user: string): Person {
+  as(user: string, tenant: string = HOME): Person {
+    // Who the provider lets through: the owner of this chat, in this chat's own tenant.
+    const owns = user === this.owner && tenant === HOME;
     return {
-      says: (channel, text, options) => this.#says(user, channel, text, options),
-      answers: (requestId, answer) => this.#answers(user, requestId, answer),
-      picks: (list, row) => this.#picks(user, list, row),
-      types: (suggestion, text) => this.#types(user, suggestion, text),
-      picksOnPage: (version) => this.#picksOnPage(user, version),
-      deletes: (said) => this.#deletes(said),
+      says: (channel, text, options) => this.#says(user, owns, channel, text, options),
+      answers: (requestId, answer) => this.#answers(owns, requestId, answer),
+      picks: (list, row) => this.#picks(owns, list, row),
+      types: (suggestion, text) => this.#types(owns, suggestion, text),
+      picksOnPage: (version) => this.#picksOnPage(owns, version),
+      deletes: (said) => this.#deletes(said, tenant === HOME),
     };
   }
 
@@ -350,11 +372,12 @@ export class Room {
   }
 
   /**
-   * Hands every reply of the thread the list of what still runs when it holds it, with `tails` of
-   * the core: the lowest reply, once it rests. A reply never moves, so only its text changes.
+   * Hands every reply of the thread the list of what still runs when it holds it: this chat draws
+   * it under the newest reply of the thread, once that one rests. A reply never moves, so only its
+   * text changes.
    */
   place(ref: ThreadRef): void {
-    for (const [reply, tail] of this.#tails(ref, null)) reply.assign(this.#listOf(ref, tail));
+    for (const [reply, holds] of this.#tails(ref, null)) reply.assign(this.#listOf(ref, holds));
   }
 
   /** What still runs in the thread changed; null for nothing. */
@@ -366,28 +389,31 @@ export class Room {
 
   /** What `subject` would show if its end had landed now: what its end writes at once. */
   listIf(ref: ThreadRef, subject: Placed): RunningList | null {
-    const tail = this.#tails(ref, subject).get(subject);
-    return tail === undefined ? null : this.#listOf(ref, tail);
+    const holds = this.#tails(ref, subject).get(subject);
+    return holds === undefined ? null : this.#listOf(ref, holds);
   }
 
-  #listOf(ref: ThreadRef, tail: Tail): RunningList | null {
-    return tail.running ? (this.#running.get(key(ref.channel, ref.thread)) ?? null) : null;
+  #listOf(ref: ThreadRef, holds: boolean): RunningList | null {
+    return holds ? (this.#running.get(key(ref.channel, ref.thread)) ?? null) : null;
   }
 
-  #tails(ref: ThreadRef, subject: Placed | null): Map<Placed, Tail> {
-    const entries: TailEntry<Placed>[] = [];
+  /** The replies of the thread, each with whether it is the newest and rests: it holds the list. */
+  #tails(ref: ThreadRef, subject: Placed | null): Map<Placed, boolean> {
+    const here: { reply: Placed; at: number; resting: boolean }[] = [];
     for (const reply of this.#placed) {
       const message = reply.message;
       if (message === null && reply !== subject) continue;
       if (message !== null && (message.deleted || refOf(message).thread !== ref.thread)) continue;
       if (message !== null && message.channel !== ref.channel) continue;
-      entries.push({
-        key: reply,
+      here.push({
+        reply,
+        // A reply with no message yet is the newest: its end writes it below the others.
         at: message?.position ?? Number.POSITIVE_INFINITY,
         resting: reply.resting || reply === subject,
       });
     }
-    return tails(entries);
+    const newest = Math.max(...here.map((entry) => entry.at));
+    return new Map(here.map((entry) => [entry.reply, entry.resting && entry.at === newest]));
   }
 
   message(id: MessageId): StoredMessage | null {
@@ -413,7 +439,7 @@ export class Room {
     let name = thread;
     if (name === null && opens) {
       if (this.#clock === null) throw new Error("the memory chat is not built yet");
-      name = `thread-${this.#sequence}`;
+      name = this.#threadIds === "opening" ? id : `thread-${this.#sequence}`;
       this.#threads.set(key(channel, name), this.#clock.time());
     }
     const message: StoredMessage = {
@@ -480,6 +506,7 @@ export class Room {
 
   async #says(
     user: string,
+    owns: boolean,
     channel: string,
     text: string,
     options: SaysOptions = {},
@@ -490,9 +517,9 @@ export class Room {
     }
     const message = this.write(channel, thread, user, text, "message");
     const sent: Sent = { id: message.id, ref: refOf(message), topLevel: message.topLevel };
-    if (user === this.owner) this.place(sent.ref);
+    if (owns) this.place(sent.ref);
     // The owner check is this path's own: a message of somebody else is in the chat and nowhere else.
-    if (user === this.owner && this.#inbound !== null) {
+    if (owns && this.#inbound !== null) {
       await this.#inbound.message({
         ref: sent.ref,
         id: sent.id,
@@ -506,32 +533,32 @@ export class Room {
     return sent;
   }
 
-  async #answers(user: string, requestId: string, answer: OwnerAnswer): Promise<boolean | null> {
+  async #answers(owns: boolean, requestId: string, answer: OwnerAnswer): Promise<boolean | null> {
     const open = this.#requests.get(requestId);
     if (open === undefined) throw new Error(`no open request ${requestId}`);
     if (open.request.type !== answer.type) {
       throw new Error(`a ${open.request.type} request takes no ${answer.type} answer`);
     }
     // The owner check is this path's own, for a click and for a form alike.
-    if (user !== this.owner || this.#inbound === null) return null;
+    if (!owns || this.#inbound === null) return null;
     return this.#inbound.answer(open.ref, requestId, answer, open.message);
   }
 
-  async #picks(user: string, id: MessageId, row: string): Promise<boolean> {
+  async #picks(owns: boolean, id: MessageId, row: string): Promise<boolean> {
     const open = this.#lists.get(id);
     if (open === undefined) throw new Error(`no open list ${id}`);
     const pick = this.#pickOf(open, row);
     // The owner check is this path's own.
-    if (user !== this.owner || this.#inbound === null) return false;
+    if (!owns || this.#inbound === null) return false;
     await this.#inbound.picked(pick);
     return true;
   }
 
-  async #types(user: string, id: MessageId, text: string): Promise<boolean> {
+  async #types(owns: boolean, id: MessageId, text: string): Promise<boolean> {
     const open = this.#suggestions.get(id);
     if (open === undefined) throw new Error(`no open suggestion ${id}`);
     // The owner check is this path's own.
-    if (user !== this.owner || this.#inbound === null) return false;
+    if (!owns || this.#inbound === null) return false;
     this.remove(id);
     await this.#inbound.message({
       ref: open.ref,
@@ -545,7 +572,7 @@ export class Room {
     return true;
   }
 
-  async #deletes(said: { id: MessageId; ref: ThreadRef }): Promise<boolean> {
+  async #deletes(said: { id: MessageId; ref: ThreadRef }, home: boolean): Promise<boolean> {
     // The first message of a thread is named by its message id or by the thread's own name.
     const first = this.#messages.find(
       (m) => m.channel === said.ref.channel && m.thread === said.ref.thread && m.topLevel,
@@ -554,15 +581,16 @@ export class Room {
     const author = (root ? first : this.message(said.id))?.author ?? null;
     if (root) this.removeThread(said.ref);
     else this.remove(said.id);
-    // The owner check of this path is the author's: the event does not say who deleted.
-    if (!root || author !== this.owner || this.#inbound === null) return false;
+    // The owner check of this path is the author's, in the owner's workspace: the event does not
+    // say who deleted, and a deletion in another workspace is no event of this chat's.
+    if (!root || !home || author !== this.owner || this.#inbound === null) return false;
     if (!this.#kept.has(key(said.ref.channel, said.ref.thread))) return false;
     await this.#inbound.rootGone(said.ref);
     return true;
   }
 
-  async #picksOnPage(user: string, version: string): Promise<boolean> {
-    if (user !== this.owner || this.#inbound === null) return false;
+  async #picksOnPage(owns: boolean, version: string): Promise<boolean> {
+    if (!owns || this.#inbound === null) return false;
     await this.#inbound.picked({ type: "update", channel: null, version, list: null });
     return true;
   }

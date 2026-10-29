@@ -1,7 +1,12 @@
 /** Where a thread's list of what still runs sits, as a pure function of the order. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isLast, isOvertaken, type TailEntry, tails } from "../../../src/core/reply/tail.ts";
+import {
+  isLast,
+  isOvertaken,
+  type TailEntry,
+  tails,
+} from "../../../../src/chat/slack/reply/tail.ts";
 
 const entry = (key: string, at: number, resting: boolean): TailEntry<string> => ({
   key,

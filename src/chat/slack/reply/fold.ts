@@ -22,9 +22,8 @@
  * 2026-10-01), so a card that is reused keeps its text in its title, and each such call adds its
  * command line to what the card lists.
  */
-import type { Preview, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
-import type { Previews } from "./previews.ts";
-import { STOPPED } from "./words.ts";
+import { type Previews, STOPPED } from "../../../core/port.ts";
+import type { Preview, TaskStatus, TaskUpdate } from "../../seam.ts";
 
 export const ENDED: readonly TaskStatus[] = ["complete", "error"];
 export const SEPARATOR = ", ";

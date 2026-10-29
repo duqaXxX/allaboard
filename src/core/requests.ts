@@ -80,7 +80,7 @@ export interface Pending {
   /** Whether `decision` is settled. */
   decided: boolean;
   /** The message that shows the request, once it is known. */
-  messageTs: string | null;
+  messageId: string | null;
 }
 
 interface Entry {
@@ -117,7 +117,7 @@ export class Approvals {
       questions,
       decision,
       decided: false,
-      messageTs: null,
+      messageId: null,
     };
     this.entries.set(approvalId, { pending, settle });
     return [approvalId, pending];
@@ -204,10 +204,10 @@ export class Approvals {
    * Record the message that shows a request, so it can be removed once decided; false when the
    * request was decided before its message was known (`!stop` while posting).
    */
-  posted(approvalId: string, messageTs: string): boolean {
+  posted(approvalId: string, messageId: string): boolean {
     const entry = this.entries.get(approvalId);
     if (entry === undefined) return false;
-    entry.pending.messageTs = messageTs;
+    entry.pending.messageId = messageId;
     return true;
   }
 

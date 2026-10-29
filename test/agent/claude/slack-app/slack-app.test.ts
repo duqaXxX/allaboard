@@ -1105,7 +1105,7 @@ test("next with an answer moves to the next question", async (t) => {
 test("a complete submit answers claude and leaves the request to the session", async (t) => {
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  pending.messageTs = "1790000000.000009";
+  pending.messageId = "1790000000.000009";
   const values = {
     q1: {
       answer: { type: "checkboxes", selected_options: [{ value: "0" }, { value: "other" }] },

@@ -47,14 +47,7 @@
 import { isDeepStrictEqual } from "node:util";
 import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
-import {
-  cancellable,
-  Fold,
-  formatDuration,
-  Mutex,
-  type Previews,
-  shownPreview,
-} from "../../../core/port.ts";
+import { cancellable, formatDuration, Mutex, type Previews } from "../../../core/port.ts";
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, RunningList, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
@@ -111,6 +104,7 @@ import {
   unknownOutcome,
 } from "./errors.ts";
 import { mrkdwnEscape, quietMentions } from "./escape.ts";
+import { Fold, shownPreview } from "./fold.ts";
 import type { Limiter } from "./limiter.ts";
 import { bannerText, codeOutOfLists, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
 import { positionOf, ThreadPlaces } from "./places.ts";
@@ -524,7 +518,7 @@ export interface ReplySinkOptions {
 /**
  * One reply in a Slack thread, as a native stream: Claude's text as it is written, and task
  * cards for its tools, updated in place, in the order things happen: one per run of calls
- * (`core/reply/fold`), which a silent update folds into a line of counts once the stream has
+ * (`./fold.ts`), which a silent update folds into a line of counts once the stream has
  * stopped at the reply's end. The stream starts with the first content (never a placeholder) and
  * stops with the reply's end, the footer at the bottom.
  * It stops on its own at STREAM_SECONDS, since Slack closes a stream at 5 minutes, and when
@@ -772,7 +766,7 @@ export class ReplySink implements Sink {
 
   /**
    * A call's new state, on the cards that show it: a run of calls shares one card
-   * (`core/reply/fold`), a call with a view of its own has one.
+   * (`./fold.ts`), a call with a view of its own has one.
    */
   async task(update: TaskUpdate): Promise<void> {
     const cards = this.fold.task(update);

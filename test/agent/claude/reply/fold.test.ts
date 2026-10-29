@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Preview, TaskStatus, TaskUpdate } from "../../../../src/chat/seam.ts";
-import { Fold, shownPreview } from "../../../../src/core/reply/fold.ts";
+import { Fold, shownPreview } from "../../../../src/chat/slack/reply/fold.ts";
 import { STOPPED } from "../../../../src/core/reply/words.ts";
 import { CLAUDE_PREVIEWS } from "../../../support/claude-tools.ts";
 

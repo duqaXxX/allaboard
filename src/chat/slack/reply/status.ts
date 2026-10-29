@@ -26,9 +26,10 @@
 
 import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
-import { Mutex, texts } from "../../../core/port.ts";
+import { fill, Mutex } from "../../../core/port.ts";
 import { getLogger, type Logger } from "../../../log.ts";
-import type { RootStatus } from "../../seam.ts";
+import type { Activity, RootStatus } from "../../seam.ts";
+import * as slackTexts from "../texts.ts";
 import { describe, gone } from "./errors.ts";
 
 export const logger = getLogger("allaboard.chat.slack.reply.status");
@@ -279,6 +280,27 @@ interface Keeper {
 }
 
 /**
+ * An activity in Slack's words: the loading message, and the same after the app's name for a
+ * client that draws `<app name> <status>`.
+ */
+export function activityWords(activity: Activity): readonly [text: string, afterName: string] {
+  switch (activity.kind) {
+    case "working":
+      return [slackTexts.THREAD_WORKING, slackTexts.THREAD_WORKING_STATUS];
+    case "compacting":
+      return [slackTexts.THREAD_COMPACTING, slackTexts.THREAD_COMPACTING_STATUS];
+    case "restart-wait":
+      return [
+        fill(slackTexts.RESTART_WAITS, {
+          counts: activity.counts,
+          them: activity.single ? "it" : "them",
+        }),
+        fill(slackTexts.RESTART_WAITS_STATUS, { counts: activity.counts }),
+      ];
+  }
+}
+
+/**
  * Slack's status line under a thread's last message, saying what `show` was last given:
  * `Working…` as the sign that a prompt was received and that its turn runs, where a reply
  * that has written nothing yet, or nothing for a while, gives none, then what
@@ -304,7 +326,7 @@ export class ThreadStatus {
   readonly #afterWrite: number;
   readonly #log: Logger;
   #text = ""; // what it says; empty: nothing is shown
-  #fallback: string = texts.THREAD_WORKING_STATUS;
+  #fallback: string = slackTexts.THREAD_WORKING_STATUS;
   #shown = false; // whether Slack was last asked to show it
   #due = 0; // when it is next set, by the clock
   #woken = false; // asked for again since the task last looked
@@ -335,7 +357,7 @@ export class ThreadStatus {
    * again is a no-op. `fallback` says the same after the app's name, for a client that
    * draws `<app name> <status>` instead of the loading message.
    */
-  show(text: string, fallback: string = texts.THREAD_WORKING_STATUS): void {
+  show(text: string, fallback: string = slackTexts.THREAD_WORKING_STATUS): void {
     if (text === this.#text) return;
     this.#text = text;
     this.#fallback = fallback;

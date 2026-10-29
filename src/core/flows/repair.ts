@@ -40,7 +40,7 @@ export type RepairState = Pick<
  * starts, when a withdrawal the chat refused at the first start is rewritten at the second. The
  * setup form, the same-folder hold and an entry with no kind are always withdrawn: the owner's
  * message was never sent for them, and a line saying an answer stopped would be false. A root
- * left working or waiting gets the error status, only where the chat has `reactions`; one the
+ * left working or waiting gets the error status, only where the chat has `rootStatus`; one the
  * chat did not show keeps its word for the next start beside the error one as `ended`, which is
  * what a list of the sessions reads first. `ThreadChat.withdraw` and `endReply` answer whether
  * the chat did it; `rewrite` rejects when it did not. A failed `state.json` write is logged and
@@ -81,8 +81,8 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
         const told = thread.ended ?? status;
         const shown =
           ended === null ||
-          !chat.capabilities.reactions ||
-          (await chatThread.showStatus(ended, { notify: endsWork(told, ended) }));
+          !chat.capabilities.rootStatus ||
+          (await chatThread.showStatus?.(ended, { notify: endsWork(told, ended) })) === true;
         // Not shown: the word stays for the next start, and the ended one says meanwhile, to
         // whoever lists the sessions, that this one does not run.
         safe(() => state.setStatusPending(channelId, threadId, shown ? null : status, ended));

@@ -1,20 +1,14 @@
 /**
  * Where the messages of one thread sit, as far as the daemon saw them: the owner's, and the last
  * message of each reply. Kept in memory only (a restart forgets it), and decided by `isLast`,
- * `isOvertaken` and `tails` of the core. The session's footer is not placed here: the session
+ * `isOvertaken` and `tails` of `tail.ts`. The session's footer is not placed here: the session
  * names the reply it goes under. A reply the places let go of leaves its position behind
  * in `floor`, so that the answers do not change when it goes, and keeps showing what it showed.
  */
 
-import {
-  isLast,
-  isOvertaken,
-  Mutex,
-  type Tail,
-  type TailEntry,
-  tails,
-} from "../../../core/port.ts";
+import { Mutex } from "../../../core/port.ts";
 import type { RunningList } from "../../seam.ts";
+import { isLast, isOvertaken, type Tail, type TailEntry, tails } from "./tail.ts";
 
 /**
  * A Slack `ts` as an integer of microseconds: exact below 2^53, ordered as the thread is. Null
@@ -207,7 +201,7 @@ export class ThreadPlaces {
   }
 
   /**
-   * Work out every reply's tail with `tails` of the core and hand each its own. Sync: a reply
+   * Work out every reply's tail with `tails` and hand each its own. Sync: a reply
    * whose tail did not change does nothing. Called whenever a reply's position or its resting
    * changes. A reply that stops holding the list may be let go of from then on.
    *

@@ -1,17 +1,17 @@
 /**
  * `guideText`: the guide is made of parts, each shown only when the pair declares what it
- * describes. `FULL_GUIDE` is the guide with the plain agent's and Slack's names in it, written
+ * describes. `FULL_GUIDE` is the guide with the plain agent's and Memory chat's names in it, written
  * out; the parts are never used to build an expectation.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type GuideOffer, guideText } from "../../src/core/guide.ts";
 import { EVERYTHING_OFFERED } from "../support/guide-offer.ts";
-import { PLAIN_NAMES } from "../support/names.ts";
+import { MEMORY_NAMES } from "../support/names.ts";
 
 const FULL_GUIDE = [
   "**allaboard**",
-  "This channel runs Plain on your Mac, in one folder, and answers you alone. One Slack thread is one Plain session: a top-level message starts a new one, and a reply inside its thread continues it, even days later.",
+  "This channel runs Plain on your Mac, in one folder, and answers you alone. One Memory chat thread is one Plain session: a top-level message starts a new one, and a reply inside its thread continues it, even days later.",
   "",
   "**Get started**",
   "1. `!bind` lists the folders Plain trusts, with a Bind button each; `!bind <folder>` binds one by its path relative to your allowed root: `!bind my-project`. Plain must trust that folder first: open `plain` there once in the terminal and accept. `!bind` works only as a top-level message in the channel.",
@@ -28,7 +28,7 @@ const FULL_GUIDE = [
   "`!status` typed in the channel lists the folder and every session still live, each linked to its thread; inside a thread it shows that session's directory, mode and the footer's values. `!stop` typed in the channel stops every running session and its background tasks; inside a thread it stops only that one. `!resume`, typed in the channel only, lists this folder's twenty newest sessions, from the terminal too, each with the start of its id and a **Resume** button; `!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes it in the thread of your `!resume` message. Inside a thread, `!memory` lists the memory files its session loaded and `!skills` the skills it can use, read only. Inside a thread, `!fork <prompt>` copies its session into a new thread of the channel, which starts on the prompt while this one goes on, as the terminal's `/fork` does. To continue a session in the terminal, run the `Terminal:` command `!status` shows in its thread, or send `!terminal` there, which moves a running turn too. Write from one side at a time: a terminal left open does not see what you write here, and is reopened before you write there again.",
   "",
   "**Files**",
-  "`!open`, sent inside a session's thread, offers the files changed in that session and a search over the folder's files; choosing one shares it into the thread, where Slack opens it in its file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file whose path contains them, or lists the files that do. The search reads the folder from disk and leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
+  "`!open`, sent inside a session's thread, offers the files changed in that session and a search over the folder's files; choosing one shares it into the thread, where Memory chat opens it in its file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file whose path contains them, or lists the files that do. The search reads the folder from disk and leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
   "",
   "**Bypass**",
   "`!bypass on`, sent inside a session's thread, lets Plain run every tool without asking in that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ bypass while it is on.",
@@ -37,13 +37,13 @@ const FULL_GUIDE = [
   "`!plan`, sent inside a session's thread, makes Plain plan before it acts: it proposes a plan and asks you to approve it. `!plan off` leaves plan mode, and so does `!bypass on` or `!bypass off`. It belongs to the running session: a restart of allaboard or an idle close puts the session back in its normal mode.",
   "",
   "**Tags**",
-  "`!tag <name>`, sent inside a session's thread, marks it: Slack shows `[name]` at the start of the thread's first message and keeps the thread at hand, and where Plain can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose session has not started yet is marked in Slack alone.",
+  "`!tag <name>`, sent inside a session's thread, marks it: Memory chat shows `[name]` at the start of the thread's first message and keeps the thread at hand, and where Plain can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose session has not started yet is marked in Memory chat alone.",
   "",
   "**Shell commands**",
   "`!!command`, sent inside a session's thread, is the terminal's `!command`: allaboard shows it with **Run** and **Cancel**, then runs it with Bash in the session's folder and shows its output; Plain gets the command and its output, and answers. `!stop` stops a command that runs.",
   "",
   "**Deleting a thread**",
-  "`!delete-thread`, sent inside a session's thread, asks you to confirm, then deletes every message of the thread from Slack, yours and the bot's. The session stays in Plain: `!resume` lists it again. A thread that is working or waiting for you is not deleted: `!stop` it first.",
+  "`!delete-thread`, sent inside a session's thread, asks you to confirm, then deletes every message of the thread from Memory chat, yours and the bot's. The session stays in Plain: `!resume` lists it again. A thread that is working or waiting for you is not deleted: `!stop` it first.",
   "",
   "**Updates**",
   "`!allaboard` shows the version that runs and the latest one. `!allaboard update`, typed in the channel, offers the latest version with a button that installs it: running turns finish first, then allaboard restarts on the new version. `!allaboard restart` restarts it without installing anything. Both work only while allaboard runs as a service.",
@@ -56,7 +56,7 @@ const EVERYTHING = EVERYTHING_OFFERED;
 const FULL_LINES = FULL_GUIDE.split("\n");
 
 function linesOf(offer: Partial<GuideOffer>): string[] {
-  return guideText(PLAIN_NAMES, { ...EVERYTHING, ...offer }).split("\n");
+  return guideText(MEMORY_NAMES, { ...EVERYTHING, ...offer }).split("\n");
 }
 
 /** The lines the variant lost and the lines it gained, in their order, blank lines apart. */
@@ -93,7 +93,7 @@ const STEP_THREE_TAIL =
   "; **Start** sends your message with those choices, and `!stop` cancels it instead.";
 
 test("with everything offered the guide is the one the owner reads today", () => {
-  assert.equal(guideText(PLAIN_NAMES, EVERYTHING), FULL_GUIDE);
+  assert.equal(guideText(MEMORY_NAMES, EVERYTHING), FULL_GUIDE);
 });
 
 test("the guide never has two blank lines in a row, whatever is left out", () => {
@@ -106,7 +106,7 @@ test("the guide never has two blank lines in a row, whatever is left out", () =>
     );
   }
   const nothing = Object.fromEntries(Object.keys(EVERYTHING).map((key) => [key, false]));
-  const bare = guideText(PLAIN_NAMES, nothing as unknown as GuideOffer);
+  const bare = guideText(MEMORY_NAMES, nothing as unknown as GuideOffer);
   assert.ok(!bare.includes("\n\n\n"));
   assert.ok(bare.startsWith("**allaboard**\n") && bare.endsWith("`!guide` shows this text again."));
 });

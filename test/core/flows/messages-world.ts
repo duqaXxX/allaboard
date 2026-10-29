@@ -33,7 +33,7 @@ import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import { type Names, namesOf } from "../../../src/core/texts.ts";
 import { Updates } from "../../../src/core/updates.ts";
-import { FakeClock } from "../../support/fake-slack.ts";
+import { FakeClock } from "../../support/fake-clock.ts";
 import { type MemoryChat, memoryChat, OWNER } from "../../support/memory-chat.ts";
 import { NO_SYNC } from "../../support/no-sync.ts";
 import {
@@ -187,6 +187,8 @@ export class WithSessionTitle extends PlainAgent {
 interface Variant {
   readonly files: boolean;
   readonly reactions: boolean;
+  /** Where a member of a thread the memory chat lacks records its call (`Room.stray`). */
+  readonly stray: (call: string) => void;
   readonly openFails: boolean;
   readonly tags: boolean;
   readonly tagFails: boolean;
@@ -222,7 +224,8 @@ function variant(
   const capabilities: ChatCapabilities = {
     ...inner.capabilities,
     fileUpload: how.files,
-    reactions: how.reactions,
+    rootStatus: how.reactions,
+    acknowledgement: how.reactions,
     threadTags: how.tags,
     threadTitles: how.titles,
     threadDelete: how.deletes,
@@ -230,6 +233,28 @@ function variant(
   return new Proxy(inner, {
     get(target, property) {
       if (property === "capabilities") return capabilities;
+      // A chat with reactions has the members the memory chat leaves out; each records its call.
+      if (property === "thread" && how.reactions) {
+        return (ref: ThreadRef) => {
+          const thread = target.thread(ref);
+          const extra: Record<string, unknown> = {
+            showStatus: async (status: string) => {
+              how.stray(`showStatus ${status}`);
+              return true;
+            },
+            clearStatus: async () => how.stray("clearStatus"),
+            settleStatus: async () => how.stray("settleStatus"),
+            acknowledge: async (message: string) => how.stray(`acknowledge ${message}`),
+          };
+          return new Proxy(thread, {
+            get(inner, name) {
+              if (typeof name === "string" && name in extra) return extra[name];
+              const member = Reflect.get(inner, name, inner);
+              return typeof member === "function" ? member.bind(inner) : member;
+            },
+          });
+        };
+      }
       // A chat with reactions marks a line about a session as its root is marked.
       if (property === "statusMark" && how.reactions) return (status: string) => `<${status}>`;
       if (property === "openFile" && how.files) {
@@ -438,6 +463,7 @@ export class MessagesWorld {
       {
         files: options.files ?? false,
         reactions: options.reactions ?? false,
+        stray: (call) => chat.stray(call),
         openFails: options.openFails ?? false,
         tags: options.tags ?? false,
         tagFails: options.tagFails ?? false,

@@ -1,7 +1,7 @@
 # Architecture
 
 allaboard is one Node process. It drives one agent from one chat: with the modules that ship, a
-Slack Socket Mode connection and one Claude Code process per live thread session, across every
+chat connection (Slack's Socket Mode) and one Claude Code process per live thread session, across every
 bound channel, all on one event loop. The agent and the chat are modules chosen by name (see
 "Modules"); the rest of this page describes the two that ship, `claude` and `slack`.
 
@@ -51,8 +51,9 @@ The core talks to the two libraries through the seams alone. No type of the Agen
 `src/agent/seam.ts` and no type of a Slack package in `src/chat/seam.ts`. The same holds for
 words: `test/vocabulary.test.ts` fails on an identifier or a string outside the module directories
 (`src/agent/<name>/`, `src/chat/<name>/`, read from the disk) and `src/registry.ts` that names an
-agent, a chat or what only one of them has: the name of each module directory, and `anthropic`,
-`bolt`, `threadTs`, `mrkdwn`, `modal`, `ephemeral`, `emoji` (comments are exempt). A text of the core that names the agent or the chat takes the name from the
+agent, a chat or what only one of them has: the name of each module directory, and the words of
+`MODULE_WORDS` in that test (library names and what a chat calls a thread, a message or a
+workspace; comments are exempt). A text of the core that names the agent or the chat takes the name from the
 module (`texts.Named`, `texts.named`, `texts.namesOf`); the Slack provider's own words are in
 `src/chat/slack/texts.ts`.
 
@@ -70,7 +71,7 @@ What crosses the chat seam, in both directions:
 | Crossing | Direction | What |
 |---|---|---|
 | a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `rest`, `last`, `overtaken` and `showFooter`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
-| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the list of what still runs (`showRunning`), the loop card of scheduled runs (`showLoop`, `endLoop`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
+| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, which takes an `Activity` and leaves its words to the provider, `activityRefused`, `written`), the list of what still runs (`showRunning`), the loop card of scheduled runs (`showLoop`, `endLoop`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice` (which resolves with the id of the message posted, null when the chat cannot say), `say`, `open` (with `threadOpen`: a message that starts a thread, which `!fork` posts), `tell`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
 | the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `threadState`, `index`, `openFile`, `tagThread`, `titleThread` and `statusMark` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders, of sessions or the update of allaboard |
@@ -94,7 +95,7 @@ else of it.
 | `Translator` | turns the records of the SDK's stream into session events |
 | `TurnRenderer` | turns the session events into a model of one reply |
 | `SlackChat`, `SlackThread`, `SlackChannel` | the Slack provider as the seam sees it: the connection, what a session does to its thread outside a reply (the root's reaction, the status line, a notice, a request's message) and what the daemon says in a channel |
-| `ReplySink` (in `sinks`) | writes the model of a reply to Slack as a native stream, then by `chat.update`, and ends it with the footer |
+| `ReplySink` (in `sinks`) | writes the model of a reply into the thread (Slack: a native stream, then edits) and ends it with the footer |
 | `app.buildApp`, `guards` | the Slack listeners, one per inbound path (message, button, modal, Home control), in the classes of `src/chat/slack/app/`: they acknowledge, check the owner, the workspace and the channel, read the payload and call `ChatInbound`; `guards` holds the checks each path runs on its own |
 | `commands` | the `!word` parser and the daemon's own words |
 | `Approvals`, `Holds`, `setup` | the questions the daemon puts to the owner and keeps while it waits: tool permission, a same-folder hold, a session's setup, a shell command's confirmation |
@@ -103,18 +104,12 @@ else of it.
 
 One message's way from the chat to the agent and back, with Slack and Claude Code:
 
-1. Slack delivers the event over the Socket Mode connection, which Bolt's `SocketModeReceiver` holds
-   (`app.socketReceiver`). `app.buildApp` registered the listener for it when `SlackChat.start`
-   opened the connection.
-2. Bolt acknowledges an event before its listener runs. The listener then checks the owner and the
-   workspace (`guards.isOwner`, through `Answers.fromOwner`) and, in the message's place among its
-   thread's (`order.ThreadOrder`), the channel (`ChannelGuard.refusal`, through
-   `Answers.channelAllowed`), and reads the payload into an `InboundMessage`
-   (`messages.inboundMessage`). The place is taken before the channel check and left when the
-   listener has called `ChatInbound.message`, so two messages of one thread are handed over in the
-   order their listeners were called although the check takes longer for one than for the other.
-   A clip whose transcript is in the file's `vtt` is the exception: `Clips.takeClip` hands it over
-   after the download of that file, and a typed reply sent after it can be handed over first.
+1. The chat delivers the event to the provider's listener (Slack's arrives over the Socket Mode
+   connection, which Bolt's `SocketModeReceiver` holds: [Slack handlers](slack-provider.md#slack-handlers)).
+2. The listener acknowledges the event, checks that the owner acted, and reads the payload into an
+   `InboundMessage`. A provider hands over the messages of one thread in the order it received them,
+   although its checks take longer for one than for another. The steps of the Slack listener are in
+   [The message listener](slack-provider.md#the-message-listener).
 3. The listener calls `ChatInbound.message`. The message flow (`messages.messages`) reads a message
    that starts with `!` with `commands.parseBang`, as one of the daemon's words (`words.wordFlow`)
    or as a passthrough to a command of the agent. Anything else is a prompt. A top-level message
@@ -137,8 +132,8 @@ One message's way from the chat to the agent and back, with Slack and Claude Cod
 
 ```mermaid
 flowchart LR
-    Slack["Slack"] -->|"Socket Mode event"| App["buildApp listeners"]
-    App -->|"owner and channel checks"| Guards["guards"]
+    Chat["Chat"] -->|"event"| App["provider listeners"]
+    App -->|"owner checks"| Guards["guards"]
     App -->|"ChatInbound"| Flows["flows (src/core/flows/)"]
     Flows --> Manager["SessionManager"]
     Manager --> Thread["ThreadSession (one per thread)"]
@@ -146,10 +141,10 @@ flowchart LR
     Client -->|"SessionEvent"| Thread
     Thread --> Renderer["TurnRenderer"]
     Renderer --> Sink["ReplySink"]
-    Sink -->|"chat.startStream, chat.appendStream, chat.update"| Slack
+    Sink -->|"writes"| Chat
     Client -->|"RequestHandler"| Thread
-    Thread -->|"ThreadChat.ask"| Chat["SlackThread"]
-    Chat -->|"Approve and Deny buttons"| Slack
+    Thread -->|"ThreadChat.ask"| Provider["ThreadChat"]
+    Provider -->|"Approve and Deny buttons"| Chat
     Thread <--> Approvals["Approvals, Holds"]
     Thread <--> State["StateStore (state.json)"]
 ```
@@ -163,13 +158,13 @@ Terms used throughout:
 | capability | A way modules differ that the core adapts to, declared by the module (`Capabilities`, `ChatCapabilities`); a feature a module does not declare is not offered |
 | flow | Behaviour of the core outside a session's turns, in `src/core/flows/`: what a message, an answer or a pick means, and the repair after a crash. It reaches the owner through the chat seam |
 | port | The core as a provider reaches it: `CorePort` and the types under `src/core/port/` |
-| thread | A thread of the chat, named by a `ThreadRef` that only the provider can read. With Slack, a Slack thread; its root is the owner's top-level message, or the owner's `!resume` message |
+| thread | A thread of the chat, named by a `ThreadRef` that only the provider can read: what a top-level message opens, named when the provider delivers that message (`InboundMessage.topLevel`), and by the id of the opening message or by a name of its own. The core assumes neither, and the chat conformance suite runs a memory chat of each kind. With Slack, a Slack thread, named by its root's `ts`; its root is the owner's top-level message, or the owner's `!resume` message |
 | session | An agent conversation, named by a session id. `ThreadSession` is its live side in the daemon |
 | turn | One prompt sent to the agent, and what it does until its result arrives |
 | reply | What the daemon writes in the thread for a turn |
 | report turn | A turn the agent starts by itself to report a finished background task |
 | bypass | The permission mode that skips permission requests (`bypassPermissions` in Claude Code), kept per thread and set with `!bypass` |
-| root reaction | With Slack, the reaction on the thread's root message that shows the session's state: ⏳ working, ✋ waiting for the owner, ✅ ended, ❌ error, 🔄 a restart waits for it |
+| root status | The session's state as the chat shows it on the thread's root message: working, waiting for the owner, ended, error, or a restart waiting for it. Slack shows it as a reaction: ⏳, ✋, ✅, ❌, 🔄 |
 | drain | The wait at shutdown for the turns already sent to finish |
 | record | One object of the SDK's stream, as Claude Code wrote it |
 | event | A `SessionEvent` of the agent seam, which the back end makes from records and hook inputs |
@@ -229,8 +224,7 @@ of its own: the entry expands it (`~` is the home), refuses a relative path with
 `AgentConfigError`, which the daemon logs as it logs a `ConfigError`, and gives it to the trust,
 Chrome and listing code that read Claude Code's records. It also writes it into the daemon's own
 environment once, when it builds, because the Agent SDK's `listSessions` has no option for the
-folder and reads the environment alone; the Slack entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`
-and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`. A module reads each of its variables by
+folder and reads the environment alone. The variables of the Slack entry are in [Building the provider](slack-provider.md#building-the-provider). A module reads each of its variables by
 name: `loadConfig` gives them readable by lookup and not enumerable, so that nothing prints them.
 
 A capability names a feature that the core offers only when the module supports it. A module
@@ -262,15 +256,16 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `models` | `AgentInfo.models` is ignored: the setup has no Model select and `AgentSession.setModel` is never called |
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
 | `promptDuringTurn` | the next prompt is sent once the running turn has ended |
-| `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find. The Slack Home tab does not check it: it calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
+| `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find. A session index does not check it: the Slack provider's calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
 | `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root (`texts.BIND_LIST_ANY`; the notice of an unbound channel, `texts.UNBOUND_ANY`, and the `!bind` line of `!help`, `texts.HELP_WORDS_ANY`, say nothing of trust either), and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
 | `loadedContext` | `AgentSession.loaded` is absent: `!memory` and `!skills` answer that the agent does not list what a session loaded (`texts.LOADED_UNAVAILABLE`), and neither `!help`, the suggestions nor `!guide` offer them |
 
 | Chat capability | What the core does without it |
 |---|---|
 | `nativeStreaming` | the renderer holds the pieces of a text and hands the reply sink each text whole |
-| `reactions` | the session asks for no status on the root, a word that took effect is not marked, the crash repair sets no error status, `ChatProvider.statusMark` is absent and a channel's `!status` writes each session's status as a word |
-| `activityLine` | the session shows no activity line, and no message says that a restart waits |
+| `rootStatus` | the session asks for no status on the root, the crash repair sets no error status, `ChatProvider.statusMark` is absent and a channel's `!status` writes each session's status as a word |
+| `acknowledgement` | `ThreadChat.acknowledge` is absent and a word that took effect is not marked on the owner's message |
+| `activityLine` | `ThreadChat.showActivity` and `activityRefused` are absent, the session shows no activity line, and no message says that a restart waits |
 | `fileUpload` | `ChatProvider.openFile` is absent and `!open` answers that the chat cannot show a file (`texts.OPEN_UNAVAILABLE`) |
 | `threadTags` | `ChatProvider.tagThread` is absent, `!tag` and `!untag` answer that the chat cannot tag a thread (`texts.TAG_UNAVAILABLE`), and `!help` and `!guide` leave them out |
 | `threadTitles` | `ChatProvider.titleThread` is absent and the core reads no title for the root, whatever the agent declares |
@@ -302,7 +297,7 @@ A conformance suite per seam runs the same checks against both implementations o
 plain agent, `test/conformance/chat.ts` against the Slack provider (over its fake client) and the
 memory chat. The plain agent (`test/support/plain-agent.ts`) declares few capabilities: no
 subagents, background tasks, compaction, usage limits, model list, bypass mode or record of trust,
-and one permission mode. The memory chat (`test/support/memory-chat.ts`) declares none. A scenario under
+and one permission mode. The memory chat (`test/support/memory-chat.ts`) declares none unless a test asks for one (command suggestions). A scenario under
 `test/scenario/` runs the daemon with the two selected by name. The fake workspace reads a
 stopped stream back as Slack does for one run of plain words (the recording
 `api-conversations-replies-stream`); marks, cards and other chunk shapes read back no blocks, and
@@ -367,7 +362,7 @@ no capability: an agent whose sessions cannot message each other never emits it.
 
 | Subject | Rule | Checked by `test/conformance/chat.ts` |
 |---|---|---|
-| The owner check | Every inbound path checks that the owner acted before it calls `ChatInbound`, and the core never checks. What "the owner" means is the provider's: the Slack provider requires the configured user and the workspace it started in (`guards.isOwner`) | Three checks send a message, a click and a pick from somebody else. Nothing checks a second workspace |
+| The owner check | Every inbound path checks that the owner acted before it calls `ChatInbound`, and the core never checks. What "the owner" means is the provider's: the Slack provider requires the configured user and the workspace it started in (`guards.isOwner`) | The checks send a message, a click, a form and a pick from somebody else, and from the owner's own user id in another workspace (`ChatRig.ownerElsewhere`); the memory chat and the Slack provider both stop all of them |
 | Start and stop | `ChatProvider.start`, `stop` and `close` are called once each, in that order. Before `start` the daemon already calls `thread`, `endReply`, `withdraw`, `showStatus`, `channelState`, `threadState`, `openedAt` and the index's `refresh`, for the crash repair and the cleanup. `ChatEntry.build` must not read the core | `nothing arrives before start`, `nothing arrives after stop` |
 | A reply | `text` and `task` come while the turn runs. `finish` ends the body, and may come more than once for one reply, since a report turn writes into the reply that started its task when that reply is last. `rest` says the reply waits for work its turn started: from then on it changes by rewriting its message, so that the list of what still runs can show under it; its stream stops with no footer. A reply counts as at rest once `finish` ran and `rest` was called or its end landed, and not before. `closeOut` ends the reply once, with no footer, and answers whether the end landed. `Reply.showFooter` draws the session's footer under the reply once the session has ended, and answers whether it landed; a reply whose end did not land takes none, and drawing it again changes nothing. A reply that has another reply's message below it (`Reply.overtaken`), or that rested, is not `last` and got no text of the agent's since it rested, ends in the message it is in, by edit, and opens no message. `waitLanded` is asked only after a `closeOut` that answered false. `settle` brings the reply to its true form now, at a close. A signal given to any of the four releases the caller only: the write goes on | `carries text, a task line and a footer to its end`, `a reply at rest shows no footer; the session's footer goes under its report`, `the session's footer is drawn once, under the reply it is drawn on`, `a footer drawn earlier stays above the owner's later message`, `reports an end that did not land`, `a reply knows when the owner or another reply wrote below it`, `a reply with another reply below it ends where it is, by an edit, with no footer`, `an ended reply with the owner below it is not last` |
 | A task line | `task` with an id already sent updates that line | The same id is sent twice; nothing checks that one line results |
@@ -395,21 +390,15 @@ reaches an agent or a chat.
    Mode connection.
 3. It reads `state.json` (`StateStore`, given the names of the agent and the chat selected) and
    builds the selected agent from the registry (for Claude, the `ClaudeBackend`).
-4. It builds the selected chat from the registry (for Slack, `module.slackChat`, whose `build`
-   reads the core only once it is used): the two Slack clients (`module.makeClients`: `clients.sharedClient` for every call but a
-   reply's, `clients.repliesClient` for replies), `auth.test` for the workspace id and the bot
-   user id, the `SlackChat` with the shared `UpdateLimiter` and the channels' `ChannelLine` (see the Slack
-   provider's "Pushes and threads"), the `ThreadDeleter` when the owner's
-   user token is configured (`module.deleter`, which calls `auth.test` with that token), the
-   `Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
-   "Attached files"). The provider's `ChatProvider.identities` (for Slack two keys: the workspace and the bot,
-   `<team id>:<bot user id>`, and a SHA-256 of the app-level token, `app-token:<hex>`) are known
-   from here, and `daemon.run` takes the second lock on each of them (`lock.chatIdentityLocks`, see
-   "State and the single-instance lock") before anything else starts. A daemon that finds one held
-   lets go of what it built (`ChatProvider.stop` and `close`,
-   `AgentBackend.close`; nothing is connected yet, since `SlackChat.start` is what opens the
-   Socket Mode connection) and ends with `lock.ChatIdentityTaken`, the same status as
-   `lock.AlreadyRunning`, which it extends.
+4. It builds the selected chat from the registry (`ChatEntry.build`, which reads the core only once
+   it is used, since the sessions do not exist yet). The provider's `ChatProvider.identities` are
+   known from here, and `daemon.run` takes the second lock on each of them (`lock.chatIdentityLocks`,
+   see "State and the single-instance lock") before anything else starts. A daemon that finds one
+   held lets go of what it built (`ChatProvider.stop` and `close`, `AgentBackend.close`; nothing is
+   connected yet, since `ChatProvider.start` is what opens the chat's connection) and ends with
+   `lock.ChatIdentityTaken`, the same status as `lock.AlreadyRunning`, which it extends. What the
+   Slack provider builds, and its two keys, are in
+   [Building the provider](slack-provider.md#building-the-provider).
 5. It builds the `UsageCache` over `AgentBackend.usageLimits` when the back end has one (for Claude,
    `UsageProbe` is the back end's own and `AgentBackend.close` ends it), then `Approvals`, `Holds`
    and the `SessionManager`, and the flows over them (`flows.buildFlows`), whose `Inbound` the
@@ -425,10 +414,10 @@ reaches an agent or a chat.
    `cleanup.CLEAN_EVERY_SECONDS` until a stop begins (`daemon.cleanEvery`). Every pass is requested
    through `cleanup.Cleanups`, which the chat reaches as `CorePort.cleanup` (see "Cleaning `state.json`").
 8. It sets `StateStore.onSessionsChange` and, for a chat that has a session index
-   (`ChatProvider.index`), asks for the first one (for Slack `Home.request`, see "The session
-   index", and `ChannelLine.refresh`, which takes over each channel's line an earlier run left).
-9. It starts the chat (`ChatProvider.start`, given the `Inbound`). Slack opens the Socket Mode
-   connection there (`SlackChat.start`, which builds the Bolt app with `app.buildApp`). Once
+   (`ChatProvider.index`), asks for the first one (the Slack provider's, and the line it keeps in
+   each channel, are in [The session index](slack-provider.md#the-session-index)).
+9. It starts the chat (`ChatProvider.start`, given the `Inbound`), which opens the chat's connection
+   (Slack's is in [The Socket Mode connection](slack-provider.md#the-socket-mode-connection)). Once
    connected, the daemon posts the version 1 to version 2 upgrade notice to each channel that still
    owes one (`notices.postUpgradeNotices`), as a message of its own, not a reply.
 
@@ -439,29 +428,18 @@ rejected promise or an exception nobody handled is logged by its name
 exception stops it the way a `SIGINT` does, with the shutdown below and no drain, and the process
 exits with 1, so that launchd, which keeps the service alive, starts a clean daemon and the crash repair runs: Node documents the process as
 unsafe to resume after one, and letting Node end it there would skip the shutdown and leave open
-replies and a Claude Code process per session. One rejection leaves the daemon running and deaf.
-`@slack/socket-mode` 3.1.0 reconnects from its `close` listener without awaiting the call
-(`SocketModeClient.delayReconnectAttempt`), and when Slack refuses the app token for good
-(`invalid_auth` and the four other codes the client calls unrecoverable) the request for a new
-WebSocket URL is rejected there with no event for it. The log then holds
-`unhandled rejection: invalid_auth`, and the daemon needs a working token and a restart.
-
-When the network is gone the Socket Mode client asks Slack for a new WebSocket URL again and
-again until it gets one. `app.socketReceiver` sets how: the waits start at one second, grow by
-1.3 each time, stop growing at `app.RECONNECT_WAIT_SECONDS` (60), and the client never gives up,
-so a try follows the one that failed by a minute at most. Left to itself `@slack/socket-mode`
-3.1.0 lets the wait grow with no limit: with the network gone for two hours it tried 30 times,
-the last wait 26 minutes (run on mocked timers, 2026-10-10). The log holds
-`socket mode: reconnecting`, then one warning per failed try.
+replies and a Claude Code process per session. One rejection leaves the daemon running and deaf: a connection
+library can reject inside its own listener, where nothing awaits it, and the daemon then needs a
+working credential and a restart (Slack's case, with the log line it leaves, is in
+[The Socket Mode connection](slack-provider.md#the-socket-mode-connection)).
 
 Logs are lines on standard error (`log.getLogger`), which the LaunchAgent writes to
 `~/Library/Logs/allaboard/allaboard.log` (`~/Library/Logs/allaboard/<name>.log` for a named instance). A line reads `<time> <LEVEL> <name>: <message>`, the time
 local, the name that of the module (`allaboard.core.state`); lines below `INFO` are not written, and
 nothing in `src` calls `log.setLevel`, the only way to lower the threshold. A line carries ids, counts and error names, never the
-text of a prompt or of a reply. The Slack libraries are given loggers that never write their own
-text (`quiet-logger`), since it can quote a message and, at the debug level, the Socket Mode ticket
-in the WebSocket URL: the web clients write nothing, Bolt and the Socket Mode client one line per
-warning or error that names the library, and the daemon logs the states of the connection itself.
+text of a prompt or of a reply. A chat's libraries are given loggers that never write their own
+text, since it can quote a message; the daemon logs the states of the connection itself (how the
+Slack provider does it is in [The Socket Mode connection](slack-provider.md#the-socket-mode-connection)).
 
 ### Shutdown
 
@@ -477,13 +455,13 @@ warning or error that names the library, and the daemon logs the states of the c
   (`turn.notSent`, `N messages were not sent because allaboard restarted: send them again.`, with the
   start of each) is added to the end of the thread's running reply, or posted as a message of its
   own when nothing runs.
-- Approvals and questions stay open: the Socket Mode connection closes only after the drain. A
+- Approvals and questions stay open: the chat's connection closes only after the drain. A
   same-folder hold or a setup still open is cancelled, as `!stop` would.
-- A thread left with only background tasks says `texts.RESTART_WAITS` in its status line
-  (`ThreadSession.threadLine`, brought up to date by `ThreadSession.showRestartWait` at every poll
+- A thread left with only background tasks says that a restart waits in its activity line
+  (`ThreadSession.threadActivity`, an `Activity` of kind `restart-wait`, brought up to date by `ThreadSession.showRestartWait` at every poll
   of the drain), naming them by their counts (`1 shell`, `2 agents`), since the daemon cannot tell whether a task (a
   dev server, a watcher) ever ends. A status line does not notify and goes with the restart, where a
-  message would do both. Where Slack refuses the app a thread status (`ThreadChat.activityRefused`),
+  message would do both. Where the chat refuses the activity line (`ThreadChat.activityRefused`),
   one message says it (`texts.RESTART_WAITS_MESSAGE`). `!stop` while a turn runs interrupts
   it and ends the tasks with `AgentSession.stopTask`; Claude Code starts no turn to report a task
   stopped this way (measured: "Stopped task, no report turn"), so neither the drain nor the
@@ -520,30 +498,29 @@ warning or error that names the library, and the daemon logs the states of the c
   session with a turn running then gets `ThreadSession.mayHaveOrderedRestart`. A background task it
   starts after the signal, most likely its own wait for the new process, which could only end once
   this one has exited, is left out of `ThreadSession.restartReady` (the idle test the drain uses)
-  and of `texts.RESTART_WAITS`. The drain still waits for that session's turn and for every other
+  and of the restart wait line. The drain still waits for that session's turn and for every other
   task.
 
 When no session is working, after `daemon.DRAIN_LIMIT_SECONDS`, or on a second signal, the daemon
-stops the scheduled cleanup and stops the chat (`ChatProvider.stop`: Slack closes the connection,
-tells the listeners it is stopping and gives up the clips still waiting for a transcript, in
-`SlackChat.stop`), closes every session (`SessionManager.closeAll`), closes the chat
-(`ChatProvider.close`: Slack publishes the session index a last time), closes the agent
+stops the scheduled cleanup and stops the chat (`ChatProvider.stop`: the provider closes its connection and tells its
+listeners it is stopping; Slack's also gives up the clips still waiting for a transcript), closes
+every session (`SessionManager.closeAll`), closes the chat (`ChatProvider.close`: a provider with a
+session index publishes it a last time), closes the agent
 (`AgentBackend.close`: Claude ends its usage probe) and releases the lock. A step that fails is
 logged and the rest still runs.
 
 A listener or a flow that was in flight when the stop ended goes on at its next step, since Node
 does not cancel it with the loop. From `ChatProvider.stop` it does nothing the owner can see: the
-flows end silently (`Talk.stopped`), the Slack listeners' checks (`Answers.admitted`, or
-`Answers.fromOwner` and `Answers.channelAllowed` for a message) refuse, and nothing
-posts, reacts, opens a modal, submits a prompt or deletes a request. From the
+flows end silently (`Talk.stopped`), the provider's listeners refuse (Slack's checks are in
+[Stopping](slack-provider.md#stopping)), and nothing posts, sets a status, opens a form, submits a
+prompt or deletes a request. From the
 first line of `SessionManager.closeAll` the manager hands out no session (`get` answers null),
 and `open`, `resume` and `bind` throw `SessionClosed` before they read or write `state.json`;
 `release` answers false. A session started then would never be closed, and with the real back end
 its Claude Code process would keep Node alive after the lock was released. Once `daemon.run` has
 returned, `daemon.main` ends the process with the code `run` gave. Node would otherwise stay alive
-while anything holds its event loop, and the Socket Mode connection does after every stop:
-`@slack/socket-mode` 3.1.0 closed its WebSocket 5.9 seconds after the stop in each of three runs
-on 2026-10-10, with the lock already free. A shutdown that completes
+while anything holds its event loop, and a chat's connection can do that after a stop (Slack's does,
+for 5.9 seconds: [Stopping](slack-provider.md#stopping)), with the lock already free. A shutdown that completes
 no step for `daemon.SHUTDOWN_LIMIT_SECONDS` ends the process with 1, on a timer that does not keep it
 alive (`daemon.deferred`). For a signal's stop the limit starts once the drain is over, so the drain
 keeps its own limit, and it runs from the last step that completed: `daemon.run` reports through
@@ -595,8 +572,8 @@ registry's `defaults`. A name the registry does not hold stops the start with a 
 lists the valid ones. Each module names the variables it reads (`required` and `optional` on its
 entry), and `config.loadConfig` hands it their values when it is built (`Config.agentVariables`,
 `Config.chatVariables`); a required one that is missing stops the start. What a value must look like
-is the module's to check: the Slack module refuses a token of the wrong kind in
-`module.slackChat`, before it calls Slack.
+is the module's to check when it is built, before it calls the chat or the agent (the Slack module
+refuses a token of the wrong kind: [Building the provider](slack-provider.md#building-the-provider)).
 
 The file is parsed by Node's `util.parseEnv`, after a leading byte order mark is removed.
 `config.expandEnv` then expands `${NAME}` and `${NAME:-default}` in every value, quoted or not. A
@@ -631,7 +608,7 @@ notice; the session id and bypass switch, which belonged to the channel itself, 
 
 Each thread also carries three fields for crash repair, ids only, never message content:
 
-- `open_replies`: the id (with Slack, the ts) of every message of a reply that a crash would leave
+- `open_replies`: the id of every message of a reply that a crash would leave
   unfinished. More than
   one can be open at once, since a background task's own reply can outlive the turn that started it.
   Each `ReplySink` owns the entries of its own messages (`ReplySink.retrack`): one is added the
@@ -654,7 +631,7 @@ Each thread also carries three fields for crash repair, ids only, never message 
 All three are optional: a version 2 file without them reads as "nothing open", and a reader that
 does not know them ignores them, so they did not change the version. A graceful close (`ThreadSession.close`)
 clears all three for its thread once it is done, whatever the fields looked like partway through
-(`StateStore.clearRepair`). The exception is a close that could not land a reply's end on Slack: the
+(`StateStore.clearRepair`). The exception is a close that could not land a reply's end in the chat: the
 open replies and the status stay, with `ended` set to ❌, so the next start's repair closes the reply
 and says so. Otherwise only a crash leaves them set.
 
@@ -674,7 +651,7 @@ seam) repairs every thread `state.json` still shows as left open, in this way:
 - a request is withdrawn (`ThreadChat.withdraw`), or, when it is a question or an approval of a
   thread with no open reply, rewritten into the same stopped line (`ThreadChat.rewrite`, an edit
   that notifies nobody), so the thread does not show the owner's message alone;
-- a root left working or waiting gets the error status, only where the chat has `reactions`;
+- a root left working or waiting gets the error status, only where the chat has `rootStatus`;
 - an entry is cleared when its repair was made or the chat said its message is gone, and stays
   when the chat did not make it: the next start asks again, for as long as the thread is in
   `state.json`;
@@ -683,16 +660,11 @@ seam) repairs every thread `state.json` still shows as left open, in this way:
 Which request is rewritten and which withdrawn, the one-line limit per thread, and what a status
 the chat did not show keeps in the file are in the doc comment of `repair.repair`.
 
-The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's stream, reads the
-message back by its own ts and edits it: every card left running closed as an error, the list of
-what still runs taken off, and the stopped line appended (within Slack's 50 blocks). The stream's
-own stop is the one notification the reply owes; the edit notifies nobody and nothing is posted.
-A message that cannot be read back, or is gone, is left as it is. Its `withdraw` deletes the
-message, and `showStatus` goes through the same `StatusReaction` a live session uses. Each of the
-three answers false when Slack did not do it and the message is still there; `channel_not_found`,
-`message_not_found` or `thread_not_found` (`errors.GONE`) says the message is gone, which counts
-as done. The Slack calls, the cap and the cases that leave a message untouched are in the doc
-comment of `endReply`.
+`ThreadChat.endReply` ends a reply's message where it stands, `withdraw` removes a request's
+message and `showStatus` draws the status through the path a live session uses. Each answers false
+when the chat did not do it and the message is still there, and true when the message is gone, which
+counts as done; a message that cannot be read back is left as it is. How the Slack provider does
+each, with its calls and its cap, is in [Repairing a reply](slack-provider.md#repairing-a-reply).
 
 `lock.singleInstance` takes the lock of the instance's configuration folder by the mechanism of the
 platform, and a second process of the same instance fails to start with `AlreadyRunning`. Two
@@ -702,12 +674,9 @@ A second lock keeps two instances from sharing one chat app. Socket Mode spreads
 across its open connections, so two daemons on one app would each receive part of them, and an
 `.env` copied for a new instance with the old tokens in it would do it with no error. After the
 chat is built and before it starts, `daemon.run` takes `lock.chatIdentityLocks` on
-`ChatProvider.identities`, a list of strings opaque to the core, each stable for one app. Slack
-gives two, because it has two tokens and Slack documents no call that maps the app-level token to
-its app: the bot (`<team id>:<bot user id>`, from `auth.test` on the bot token) and the app-level
-token Socket Mode connects with (`app-token:` and the SHA-256 of the token, computed in
-`module.appTokenKey` so that the token itself never leaves the Slack module). A copied `.env` that
-keeps either token collides on that key. Each lock is the same mechanism of the platform
+`ChatProvider.identities`, a list of strings opaque to the core, each stable for one app (Slack's two
+keys are in [Building the provider](slack-provider.md#building-the-provider)). A copied `.env` that
+keeps a credential collides on its key. Each lock is the same mechanism of the platform
 (`lock.singleInstance`, table below) on the folder `lock.identityDirectory` names:
 `~/.config/allaboard_identities/` and the first 16 hexadecimal digits of the SHA-256 of the key,
 created at mode `700`. The keys are taken in order, and a refusal releases the ones already taken. The underscore keeps it apart from
@@ -731,7 +700,7 @@ same directory, and fails with `EAGAIN`.
 ### Cleaning `state.json`
 
 `cleanup.clean` runs on start, then every `cleanup.CLEAN_EVERY_SECONDS` (`daemon.cleanEvery`), and
-when the owner asks for it (the Slack Home tab's Refresh, through `CorePort.cleanup`). All three go
+when the owner asks for it (a session index's Refresh, through `CorePort.cleanup`). All three go
 through `cleanup.Cleanups.request`: one pass runs at a time, requests made while one runs share the
 single pass that follows, and nothing starts once a stop has begun (`sessions.draining` or a
 signal). A pass caught by a stop asks about no further channel (`cleanup.forgetGoneChannels`),
@@ -742,21 +711,16 @@ chat stops. It removes only what an answer makes certain:
   (`ChatProvider.channelState`), which answers `gone`, `there` or `no answer`
   (`seam.Presence`; a lookup that rejects counts as `no answer`, and the log names the
   reason), and removes, with `StateStore.removeChannel`, each one that is `gone`, threads included.
-  The lookup for Slack is `channels.channelLookup`: `gone` is `channel_not_found` from
-  `conversations.info`, and any other failure is no answer and removes nothing. A private channel the bot was removed from gives the
-  same answer as a deleted one, so it is forgotten too. When the chat finds none of the bound
+  How the Slack provider answers is in [Answering the cleanup](slack-provider.md#answering-the-cleanup). When the chat finds none of the bound
   channels (a channel it gave no answer about is not one it found), nothing is removed and a warning
   says so:
-  that is what the token of another workspace looks like.
+  that is what a credential of another tenant of the chat looks like.
 - `cleanup.forgetGoneThreads` then asks about each thread of the channels `forgetGoneChannels`
   found in the same pass (`ChatProvider.threadState`, answering as `channelState` does) and
   removes, with `StateStore.removeThread`, each one that is `gone`: its first message no longer
   exists, and its session shows in `!resume` again because no thread holds it. A channel that gave
   no answer or was just forgotten has none of its threads asked about, and a thread with a live
-  session is kept. The lookup for Slack is `channels.threadLookup`: `gone` is `thread_not_found`
-  from `conversations.replies` on the root with `limit=1`, or a root returned as a tombstone
-  (`subtype` `tombstone`, which is what a root deleted while replies remain becomes), and any other
-  failure is no answer.
+  session is kept. Slack's answer for a thread is in the same section.
 - `StateStore.prune` then drops a thread whose session id is no longer among its folder's sessions
   (`AgentBackend.aliveSessions`, which for Claude is `listing.aliveSessions`: the sessions the SDK
   lists, with every transcript file in the folder's transcript directory) and a no-session thread
@@ -777,7 +741,7 @@ tries again.
 
 The cleanup finds such a thread at its next pass; a chat that is told when it happens says so at
 once through `ChatInbound.rootGone(ref)`. The provider alone checks that the event is from the
-owner's workspace, that the ref is a thread `state.json` keeps, and that the deleted message was
+owner's own tenant of the chat, that the ref is a thread `state.json` keeps, and that the deleted message was
 the owner's (the event names its author and not who deleted it); a reply's deletion, a root the
 core does not keep and a root someone else wrote never reach the call, and the core checks nothing
 again. The core (`flows/gone.rootGone`)
@@ -788,9 +752,10 @@ took. A thread already held by a delete under way is
 left to that delete, which removes the entry and frees its own hold; the event is that delete's own
 deletion coming back. A thread whose turn is running (`hold` answers false) is left as it is,
 with one log line: the cleanup forgets it at its next pass, within 6 hours, since it finds the root
-gone. After a stop the call does the same. A root read back as a tombstone is refused for good by
-`RootEditor` (`channels.isTombstone`), so a turn that ends after the deletion neither stores the
-tombstone's text as the prompt nor edits it. Nothing the daemon wrote in the thread is deleted.
+gone. After a stop the call does the same. A root the chat reads back as a tombstone of its deleted
+message is refused for good by the provider's root edit, so a turn that ends after the deletion
+neither stores the tombstone's text as the prompt nor edits it (Slack's is described in
+[Titling a thread](slack-provider.md#titling-a-thread)). Nothing the daemon wrote in the thread is deleted.
 
 ### When a thread leaves `state.json`
 
@@ -809,37 +774,11 @@ and a restart keep it.
 The chat provider checks that it was the owner on every inbound path that acts (a message,
 including a `!word`, a button, a form), each path on its own, before it calls `ChatInbound`: the
 core is never told of an act of anyone else, and the chat conformance suite holds that for every
-provider (a message, a click and a form from someone else never arrive). The Slack listeners run
-two checks, through `Answers.admitted` (the `message` listener, and Answer opening a question's
-form, run the two halves themselves, in the order [Slack handlers](slack-provider.md#slack-handlers)
-gives), before anything reaches Claude Code:
-
-1. `guards.isOwner`: the Slack user is the configured owner AND the workspace is the one `auth.test`
-   reported at startup. A click from a user whose home workspace differs is refused
-   (`guards.interactionActor`).
-2. `ChannelGuard.refusal`: the channel is private, not shared with another workspace, and its
-   members are exactly the owner and the bot. It is read from Slack every time, so inviting a third
-   person stops the bot in that channel at once. A channel that cannot be read is refused.
-
-A payload is read field by field, and a field of the wrong type never passes a check. Messages with
-a subtype (edits, deletions, joins) and messages from bots are ignored (`guards.isPromptMessage`),
-except `file_share`, a message carrying files, and `thread_broadcast`, a thread reply sent with
-**Also send to #channel**, which is handled as any reply in its thread. Neither event has a `team`
-field (measured: "File share event has no team", "Thread broadcast event has no team"), so
-`guards.messageActor` reads the workspace elsewhere. For a `file_share` it comes from the files'
-`user_team`, which must be the same for every file, or the message is refused. For a
-`thread_broadcast` it is the `team_id` of the envelope the event came in, and only when the
-envelope's `is_ext_shared_channel` is `false`: that id names the workspace the event happened in,
-not the writer's own, so in a channel shared outside the workspace the message is ignored. The
-channel check refuses such a channel in any case. A `team` that is present and is no string names no
-workspace: the message is refused, and neither the files nor the envelope are read in its place. A
-`thread_broadcast` that carries files follows the files' rule; no such event has been recorded. The
-hidden `message_changed` that Slack sends after a `thread_broadcast` is ignored like any edit. A
-refusal reaches the owner as an ephemeral message; everyone else gets nothing.
-
-A control of the session index (the Home tab) runs the first check alone. Its payload names no
-channel, and all it does is choose what the owner's own page shows, or delete what the owner
-confirmed there: nothing reaches Claude Code.
+provider (a message, a click and a form from someone else, and from the owner's own user id in
+another tenant of the chat, never arrive). What "the owner" is, and what else a provider refuses
+before it calls the core, is the provider's. Slack's two checks (the owner and the workspace, then
+the channel and its members), how it reads a payload and where it tells a refusal are in
+[Who may talk to it](slack-provider.md#who-may-talk-to-it).
 
 Where the daemon's own answers go is decided in `words.wordFlow`. A word typed at the top
 level, or in a thread that holds no session, acts as a top-level word: its answer is a normal post
@@ -848,46 +787,34 @@ nor a thread reply, so it stays after a reload and never notifies. Three words a
 a thread that holds no session, where a word reads as being about that thread: `!stop`, `!resume`
 and `!bind` with a folder act on the whole channel, so there they change nothing and say where to
 send them, for the owner alone (`texts.STOP_OUTSIDE_SESSION`, `texts.WORD_IN_THREAD`). A word typed
-inside a session's thread is answered by `Talk.tell` or an ephemeral `Talk.say` under the
-owner's message (`chat.postEphemeral` with `thread_ts`), which Slack drops on reload; `!bypass` adds
-`Talk.acknowledge`, a ✅ reaction on the word, which stays; `!stop` there is answered by a post in
+inside a session's thread is answered by `Talk.tell` or by `Talk.say`, a line for the owner alone
+under the owner's message, which a chat may drop on reload (Slack's does:
+[Who may talk to it](slack-provider.md#who-may-talk-to-it)); `!bypass` adds `Talk.acknowledge` (a
+chat with `acknowledgement`: a mark on the word, which stays); `!stop` there is answered by a post in
 the thread, which stays: `texts.STOPPED_THREAD` when it stopped something,
 `texts.NOTHING_TO_STOP_THREAD` when nothing runs; `!open` posts its button in the thread.
 `messages.messages` chooses the same place for a word's failure, and `Talk.replyOnFailure` logs
 a report that itself fails instead of letting it throw, since a throw would reach the
 message flow's own failure path, which posts `texts.ERROR_REPLY` threaded under the word. The old-folder
 notice (`texts.OLD_THREAD_FOLDER`, shown on a prompt sent in a thread whose folder differs from the
-channel's current one) and `Not sent.` are ephemeral as well. A Resume button carries
-`<session id>@<thread ts>`, the thread of the owner's `!resume` message (`resume.parseResumeValue`);
+channel's current one) and `Not sent.` are lines for the owner alone as well. A Resume button carries
+`<session id>@<thread id>`, the thread of the owner's `!resume` message (`resume.parseResumeValue`);
 the click is checked like any other inbound path, and a value in any other shape answers
 `texts.RESUME_STALE`.
 
 ## Attached files
 
-`attachments` handles the files of a `file_share` message, in the Slack provider. The message
-reaches the core at once as an `InboundMessage` whose `content` downloads, checks and saves the
-files and makes the prompt; the message flow reads it when the message's turn among its thread's
-comes, so nothing of the files reaches Claude Code before that. Every file is checked first (`attachments.refusal`): its download URL must be
-`https://files.slack.com/...`, the only host that receives the bot token, and its type and size
-must be within the limits listed in [Files in a message](setup.md#files-in-a-message). The image
-limits are those of Claude's vision API; a non-image file must be a `text/*` type or one of
-`attachments.FILE_TYPES`. One message takes at most the images `attachments.imagesRefusal` allows,
-since images stay in the conversation and are sent again at every turn, and a request is capped at
-32 MB. Then the
-files are downloaded together, with the bot token and no redirect followed, each within
-`attachments.DOWNLOAD_TIMEOUT_MS`; `attachments.download` checks the host again before it sends the
-token. Slack answers 302 when the app lacks `files:read` (measured: "Download without files:read").
-An image becomes an image part, and the turn's prompt one user message of content parts
-(`attachments.promptFor`), which the back end sends through the SDK's streaming input
-(`prompt.userMessage`); any other file is saved to the instance's scratch folder (`ChatContext.scratchDir`, `$TMPDIR/allaboard/` for the default instance) and its path is appended to
-the prompt, but only once every file arrived, so a failed message leaves no copy. The folder must be
-a real directory of this user with no group or other permission bit set (it is created with mode 700),
-or nothing is written there; at each start the files older
-than 3 days are removed (`attachments.prepareUploads`), so a conversation resumed after a restart
-still finds its files. A refused file or a failed download sends nothing: `content` answers null after the provider told
-the owner which file and why. Prompts, messages with files and Claude Code commands enter the queue in the order
+A provider that takes files hands the core the message at once as an `InboundMessage` whose
+`content` downloads, checks and saves the files and makes the prompt; the message flow reads it when
+the message's turn among its thread's comes, so nothing of the files reaches the agent before that.
+A refused file or a failed download sends nothing: `content` answers null after the provider told the
+owner which file and why. What the Slack provider checks, downloads and saves is in
+[Attached files](slack-provider.md#attached-files); the limits the owner meets are in
+[Files in a message](setup.md#files-in-a-message).
+
+Prompts, messages with files and the agent's commands enter the queue in the order
 they were sent, although downloads take a while: the provider hands the messages of a thread over in the order
-its listeners were called (see [Slack handlers](slack-provider.md#slack-handlers)), and the arrival lock of `messages.messages` keeps that order from
+its listeners were called (see the provider's listeners, [Slack handlers](slack-provider.md#slack-handlers)), and the arrival lock of `messages.messages` keeps that order from
 there. A message that waited on its
 files is submitted to the thread's session as it is then; if that session closed meanwhile (an idle
 close, most likely), the submit is retried once against a freshly looked-up session for the same
@@ -1024,84 +951,21 @@ not a deny, so `ClaudeSession` catches it, logs the error's name and tells Claud
 request could not be shown. The request shows the tool's whole input, since Approve hands Claude
 Code the whole input: it runs over as many code blocks as it needs, and past one message it keeps
 the start and the end with a line saying how many characters are not shown
-(`requests.approvalBlocks`). Everything the model wrote (the title, the description, the input, a
-question's header) goes to Slack with `&`, `<` and `>` escaped and a zero-width space after each
-backtick (`escape.shownAsWritten`), so no `<url|label>` can hide what it links and no text can close
-its code block. A clarifying question (Claude Code's `AskUserQuestion` tool, 1 to 4 questions)
-arrives the same way and is posted as one line naming the questions, with **Answer** and **Skip**.
-Answer opens a modal (`requests.questionView`) that shows one question at a time: radio buttons, or checkboxes when several may be picked, each option with its description, and
-**Other** as the last option of the list, as the terminal's list ends with its own row for a typed
-answer. The choice is required (no `optional`, so Slack shows no `(optional)` beside the question).
-While Other is chosen an input block under the choice, **Your answer** (required, placeholder
-`Type your own answer`), takes the text; **Notes** (optional) shows while a real option is
-chosen, not for Other alone (with a multi-select, while at least one real box is ticked, Other
-ticked or not), and a note kept in the draft is sent only then. Slack caps an option object's text and description at 75
-characters each and gives it no place for the option's `preview`. When an option says more than
-that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
-in bold, its full description, and its preview in a preformatted element, which keeps its line
-breaks. Rich text shows its text as written, so nothing Claude wrote is read as markup. The choice
-under them keeps the labels alone, titled with the question's header. With
-several questions the terminal's tab row is drawn as one `context` line: each question's header
-with `☒` once answered and `☐` before, cut at 40 characters, a header left empty reading
-`Question 2`, the page on screen in bold, then `✔ Submit` (bold on the review page). The modal's
-own button reads `Next (1/3)` and moves to the next page (`response_action: update`) only once the
-question has an answer, otherwise the question gets an error (`response_action: errors`), and, before
-the review was reached, it moves on whether or not the other questions already have one. On the last question it reads
-`Review`: it opens one more page of the same form (its page number is the question count) when
-every question has an answer, else the first question without one, with no error text. That page
-holds the tab row, `Review your answers`, and per question a section `● question` and `→ answer`
-(a multi-select's joined with `, `) and, when a real option was chosen and the question has notes,
-a line `Notes: …` under it, with an `Edit` button as the section's accessory (`question_edit_{n}`,
-one action id per question, since Slack wants them unique in a view); each text goes through
-`escape.shownAsWritten`, which escapes `&`, `<`, `>` and backticks (so `*` and `_` still format),
-and a section is cut to 3,000 characters before the escape, never inside one. `Edit` opens that
-question's page with its answers as stored, through `views.update` on the click's view id and
-`hash` (`Requests.onQuestionEdit`); the review page has no field, so nothing is absorbed or
-validated. The draft records that the review was reached (`Draft.reviewed`): from then on, and on
-a page opened by `Edit`, the footer reads `Review` and Next goes back to the review page when
-every question has an answer, else to the first one without. `Submit answers` alone sends. The
-modal's close button reads `Close` on every page. No question page has a button in its body (the review page has `Edit`). One question
-has none of this and its `Submit` sends.
-What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
-request id, with the page on screen; the
-view's `private_metadata` holds only the request's id, channel and thread, the form's generation
-and the page it shows (`requests.FormIds`), so Other and Notes take 300 characters each
-(`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
-valid: every Answer opens a new generation (Close then Answer, a second click, a second device),
-and the older forms are stale (a form whose `views.open` fails does not count: the older one
-stays valid). A stale form's changes and its Edit are ignored, and its Next or Submit answers
-`response_action: errors` with `texts.QUESTION_STALE` on the question's block (on the review page,
-which has no field, the form is replaced by that sentence) and sends nothing; a change from a page Next has already left, or an Edit from a page that is not the review, is ignored too. Every field of the valid form
-reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
-`dispatch_action`), and the draft is updated from it. Only a change of the choice redraws the
-form with `views.update` (Other's field and Notes come and go with it); typing never does. A
-block keeps its `block_id` (`q0`, `o0`, `n0`) while it stays on screen, so Slack keeps what is
-typed in it. An entry goes when its request is answered, skipped or found gone, at
-the next Answer for a request that ended another way, and when the app closes. Answer after Close
-reopens the form on the page left, with the pages already submitted and what each field of the
-open page held at its last change. The picked labels,
+(`requests.approvalBlocks`, the Slack provider's cut).
+
+A clarifying question (Claude Code's `AskUserQuestion` tool, 1 to 4 questions)
+arrives the same way and is posted as one line naming the questions, with **Answer** and **Skip**
+(the Slack provider's drawing of the request and of the question form is in
+[Questions and the form](slack-provider.md#questions-and-the-form)).
+
+The picked labels,
 with the text typed under Other as the answer itself, go back as the tool's answers, a
 multi-select's as a list (measured: "Multi-select answer as a list"). In a single select Other
 is one option among the others, so an option and a text never stand together; a multi-select
-adds the text to the labels when Other is ticked. A text kept in the draft is sent only while
-Other is chosen, and the Review page shows it as the answer. With nothing chosen Next and Submit
-show `Choose an option or type your own answer.` under the question; Other chosen with only
-spaces is a field error on the Other block. Next and Submit also compare the input blocks the
-payload's `view.blocks` lists (what is on screen) with the ones the draft draws, and answer
-`response_action: update` with the form drawn again, sending nothing, in two cases only: Other is
-chosen on the page and its field `o{page}` is not on screen (Slack's required check could not run
-on it), or the draft holds a note for the page, the form draws its field `n{page}` and it is not on
-screen. Any other difference sends what the draft holds, so a Next clicked before the redraw that
-adds Notes lands passes at once, and a field left on screen that the choice no longer needs (Other
-unticked, the redraw refused) is read but its text is not used while its choice is not. The
-reference for `view.state.values` does not say whether an empty input is listed (read 2026-10-16),
-so the state is not used for this. A note kept in the
-draft is not sent without an answer, and the Review page does not show it either. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
+adds the text to the labels when Other is ticked. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
 the answers (`requests.questionResult`); with a single-select option that has a preview, the
 annotation carries the preview too, as the terminal does. The record of the answers does not
-show notes, as the terminal's does not. The modal carries no channel or thread: each click in it is checked against the
-owner, the workspace, and the channel and thread its request was posted in (`requests.FormIds` in its
-`private_metadata`; the draft is never in it). Each request has a random id that only its buttons carry
+show notes, as the terminal's does not. Each request has a random id that only its buttons carry
 (`Approvals.open`). The listener reads a click or a form into an `OwnerAnswer` and, after the
 identity and channel guards, gives it to `ChatInbound.answer`; the answers flow
 (`answers.answersFlow`) resolves the request once, only from the channel and thread it was posted
@@ -1109,10 +973,10 @@ in (`Approvals.resolve`), and tells the owner when the request is gone (`texts.A
 What the request shows and which controls it has are the provider's drawing of a
 `PermissionRequest` or a `QuestionRequest`; what an answer means is the core's. Once decided, the
 request message is deleted: the tool's line in the reply records the call. For an answered question that
-line is the record of the answers, as the terminal keeps it: one `context` block whose first line is
+line is the record of the answers, as the terminal keeps it: one block whose first line is
 `✓ User answered Claude's questions:` and whose next lines are `⎿ · question → answer`, one per
-question, cut at Slack's 3,000 characters (`previews.answered`, a `Preview.record`, drawn by
-`sinks.pieceBlocks`). There is no card, so no gap opens under the heading. The reply holds the
+question, (`previews.answered`, a `Preview.record`; Slack cuts it at 3,000 characters and draws it as a
+`context` block with `sinks.pieceBlocks`, with no card, so no gap opens under the heading). The reply holds the
 call's line while the question waits (`ToolVocabulary.askers`, as it holds an Edit or a Write), because a
 stream cannot take a card back: while the owner decides, the reply shows nothing for the call and
 the request message is the only sign. A call that ends with no answer kept (skipped, denied,
@@ -1122,7 +986,7 @@ session hands the answers to the reply itself (`ThreadSession.keepAnswers`,
 `TurnRenderer.answered`), keyed by the call id the permission request carries, and then deletes the
 request. When the reply has no line of its own for that call (a question asked inside a subagent
 shows on the subagent's line), the request is rewritten instead, with no buttons, into the same
-record, with the same `✓ ` first line (`ThreadChat.keepAnswers`, `requests.answeredBlocks`); if Slack refuses that rewrite, the
+record, with the same `✓ ` first line (`ThreadChat.keepAnswers`, `requests.answeredBlocks`); if the chat refuses that rewrite, the
 request is deleted, so no button is left that no longer works. `!stop` denies every request still
 pending in the session's own thread and deletes its message, and a request still waiting when the
 session closes or loses its process is answered as refused (`Approvals.denyAll`): a denial for a
@@ -1131,7 +995,7 @@ permission, a skip for a question. The back end passes the callback's `signal` t
 aborts it, the session refuses that one request (`Approvals.giveUp`) and deletes its message, with
 no text for the owner, and the root's status leaves `waiting` as after an answer. A signal that
 aborts after the answer does nothing, and one already aborted when the request arrives posts
-nothing. A request Slack does not accept is denied at once, with a message telling Claude Code that
+nothing. A request the chat does not accept is denied at once, with a message telling Claude Code that
 it could not be shown (`texts.APPROVAL_UNPOSTED`), and the tool's line records the denial.
 
 ## Footer
@@ -1161,8 +1025,8 @@ that never comes (a misattributed turn), the footer waits for `constants.INJECTE
 (`footer.formatFooter`): first the work it closes (`FooterFields.work`), from the prompt that began
 it, or the first turn of a report when no prompt did, to the moment the session ended everything,
 background reports included, written as the terminal writes a turn's length
-(`footer.formatWorkDuration`) and `done` with the end time as a Slack date, which each reader's
-client shows in its own time zone; the start is kept in memory only, so a daemon restart
+(`footer.formatWorkDuration`) and `done` with the end time (Slack draws it as a date, which each reader's
+client shows in its own time zone); the start is kept in memory only, so a daemon restart
 begins a new count at the next prompt or turn, and `!status` never has it. Then `⚡ bypass` when bypass is on, the model from `AgentSession.contextUsage`
 (the SDK's `getContextUsage()`, named by the display name of the agent's model list, `core/models.ts`;
 after a model switch, the id of the latest `model_changed` until a turn that went to the model ends
@@ -1353,7 +1217,7 @@ closed when the start returns (`ThreadSession.connect`).
   answer and the session stops counting as waiting for the owner: the idle close can fire and
   `!stop` has nothing left to deny. The open reply ends with an error line, every waiting message
   is told, and the next message starts a new process, once the lost process's reader has ended.
-  A Slack failure while a reply is written never stops the session or the running turn.
+  A failure of the chat while a reply is written never stops the session or the running turn.
 ### Messages, the same-folder hold and the setup
 
 - Messages are queued and run one at a time; each gets its own reply in the thread. `!stop`
@@ -1399,23 +1263,19 @@ closed when the start returns (`ThreadSession.connect`).
   `setup.setupFlow` starts the agent session, then puts a `SetupRequest` to the owner through
   `ThreadChat.ask`: the models the agent lists, each with the effort levels it takes, the effort
   levels to offer when it lists none, whether a bypass mode is offered, and what the controls show
-  at first. The Slack provider draws it as one message in the thread (`setup.setupBlocks`): a
-  header (`texts.SETUP_HEADER`) and one `actions` block (block_id `setup`, one row that Slack wraps
-  on a narrow screen) holding the controls the request offers. A Model select lists the
-  CLI's own models (the models of `AgentSession.info`, kept as `ThreadSession.models` and stored
-  with the pending setup, so a click reads its choice against the list the message was built from),
-  each option showing the model's `displayName` and, under it, the CLI's own `description` (cut to
-  Slack's 75 characters, left out when the entry has none); the select is left out when the agent
-  lists no model. An Effort select offers `Effort: default` (which passes nothing) and
+  at first. The provider draws it as controls in one message in the thread (Slack's is in
+  [The setup message](slack-provider.md#the-setup-message)). A model choice lists the CLI's own
+  models (the models of `AgentSession.info`, kept as `ThreadSession.models` and stored with the
+  pending setup, so a click reads its choice against the list the message was built from), each
+  with the model's `displayName` and the CLI's own `description`; it is left out when the agent
+  lists no model. An effort choice offers `Effort: default` (which passes nothing) and
   `Effort: <level>` for the chosen model's `supportedEffortLevels`, or for the agent's own
-  `effortLevels` when it lists no model (left out when the agent has none either). A Bypass
-  checkbox is shown only when the request offers a bypass mode, and is ticked when the folder's own Claude Code settings start the process in
-  bypassPermissions, so unticking is an explicit off, with `!bypass off`'s semantics. Start carries the setup id. `state.values` is keyed
-  by that block_id, then by each control's action_id (`setup.readSelection`). Changing the model
-  rewrites the message (`chat.update`, which never notifies, and is skipped once the setup is
-  decided) with the new model's levels, drawn from what the request said (`SlackChat.drawnSetup`,
-  kept for the last 64 setups posted). Start reads every control from the click's `state.values`
-  (`setup.readSelection`) into the selection of an `OwnerAnswer`, the core reads that against the
+  `effortLevels` when it lists no model (left out when the agent has none either). A bypass choice
+  is shown only when the request offers a bypass mode, and is ticked when the folder's own Claude
+  Code settings start the process in bypassPermissions, so unticking is an explicit off, with
+  `!bypass off`'s semantics. Changing the model redraws the message with the new model's levels,
+  drawn from what the request said. Start carries the setup id and the provider reads every control into the
+  selection of an `OwnerAnswer`; the core reads that against the
   models, efforts and bypass the request offered (`setup.chosen`), and `ThreadSession.applySetup` applies it, and Start is authoritative:
   effort and bypass are written from the choice whatever `state.json` held (a restart can have left
   either; `!bypass` in the thread is refused before Start, `ThreadSession.beforeStart` and
@@ -1457,10 +1317,10 @@ closed when the start returns (`ThreadSession.connect`).
 ### Status and the activity line
 
 - Each `ThreadSession` asks its `ThreadChat` for one of four statuses (`working`, `waiting`, `done`,
-  `error`; for a chat that declares `reactions` only), and the Slack provider keeps one `StatusReaction` (in `status`) on the thread's own root
-  message, which `thread_ts` always is: a top-level owner message, or the owner's own `!resume`
-  message. Every change of the status goes through `ThreadSession.setStatus`, which sets the
-  word asked last, its copy in `state.json` and the root together. `ThreadSession.react` asks for a status at once and does not await it, since a reaction
+  `error`; for a chat that declares `rootStatus` only), and the provider shows it on the thread's own root message: a
+  top-level owner message, or the owner's own `!resume` message (Slack keeps one `StatusReaction`
+  there: [The root's reaction](slack-provider.md#the-roots-reaction)). Every change of the status goes through `ThreadSession.setStatus`, which sets the
+  word asked last, its copy in `state.json` and the root together. `ThreadSession.react` asks for a status at once and does not await it, since a status
   must never delay a turn, and the chat makes the changes in the order asked; the one exception is
   `✅`, awaited right after the end of the reply it follows, so it never shows first. `⏳` working: a
   turn is submitted or sent, or a report turn starts. `✋` waiting: an approval or a question is
@@ -1476,23 +1336,19 @@ closed when the start returns (`ThreadSession.connect`).
   `❌` stands until new work
   starts (a submit or a report turn, both of which clear `ThreadSession.errorStanding`), never
   flipped back to `✅` by some unrelated task's own idle sweep in between
-  (`ThreadSession.reactDoneIfIdle` reads that flag, not `StatusReaction.current`, which only updates
-  once its own `reactions.add` call returns and can lag a quick turn). A change of the reaction is
-  two calls, `reactions.add` then `reactions.remove`, and a session reads idle before the second has
-  returned: a close of an idle session (the idle close, a restart's drain) aborts the reader's wait
-  there, and the call in flight still runs to its end. A `StatusReaction` whose change was aborted
-  reads as a fresh instance, so its next change strips every other name, and `ThreadSession.close`
-  calls `ThreadChat.settleStatus` (`StatusReaction.settle`), which makes the change asked for last
-  and makes no call when the root already shows it. A session rebuilt on the same root (a restart, a
-  resumed thread) starts a fresh `StatusReaction`, whose first successful `show` strips every other
-  reaction name already on the root, so an earlier session's leftover `✅` or `❌` never sits next to
-  the new one. A `missing_scope` failure (the workspace has not reinstalled the app for
-  `reactions:write`) is logged once for the whole process; every `StatusReaction` instance stops
-  calling Slack for reactions for the rest of the run. A top-level word (`!status`, `!stop`,
+  (`ThreadSession.reactDoneIfIdle` reads that flag, not the provider's record of what it drew,
+  which can lag a quick turn). A close of an idle session (the idle close, a
+  restart's drain) aborts the reader's wait for a change of the status, and the call in flight still
+  runs to its end; `ThreadSession.close` calls `ThreadChat.settleStatus`, which makes the change
+  asked for last and makes no call when the root already shows it. A session rebuilt on the same
+  root (a restart, a resumed thread) starts from a fresh state of the provider's, so an earlier
+  session's leftover status never sits next to the new one. A status the chat refuses for good (for
+  Slack, a missing scope) is logged once for the whole process and the provider stops asking for the
+  rest of the run. A top-level word (`!status`, `!stop`,
   `!bind`) is not a session and gets no reaction of its own.
 - Each `ThreadSession` also has the thread's activity line (`ThreadChat.showActivity`; for a chat
-  that declares `activityLine` only), which the Slack provider keeps as one `ThreadStatus` (in `status`): Slack's status line under the thread's
-  last message (`assistant.threads.setStatus`), which says `ThreadSession.threadLine`. `Working…`
+  that declares `activityLine` only), which the provider draws as the chat's line under the thread's last message, saying what
+  `ThreadSession.threadActivity` gives in the chat's own words (Slack's: [The status line](slack-provider.md#the-status-line)). `Working…`
   while a prompt of the owner's is owed its answer: being submitted, queued, taken, sent and not
   yet started, or its turn running (`ThreadSession.promptOwed`), and while the agent says it
   works (the event `state_changed`, for an agent that declares `declaredState`): a turn it
@@ -1506,30 +1362,19 @@ closed when the start returns (`ThreadSession.connect`).
   opens a compaction with a `status` system record that says `compacting`, repeats it while it
   lasts, and ends it with the `status` record that carries `compact_result`, and the back end says
   each once. The first event also starts the turn it belongs to, when one is due. During a stop
-  that only background tasks hold, the line says `texts.RESTART_WAITS` whatever the footer shows.
+  that only background tasks hold, the line says `RESTART_WAITS` whatever the footer shows.
   Nothing while an approval, a question or a hold waits on the owner, while `!stop` winds a turn
   down, and once the session is closed. `ThreadSession.showThreadStatus` brings the status to that
   line after anything that can change it (every `ThreadSession.react`, the start and the end of a
   turn, a failed or dropped prompt, `ThreadSession.abandon`, every change of the running tasks
-  through `ThreadSession.showRunning`). `ThreadStatus.show` never waits on Slack: one task per
-  instance makes the calls in order, so two quick changes end on the last one and a turn that ends
-  at once sets nothing. The line is sent as the one loading message, which is what a client shows,
-  with a `status` that says the same after the app's name (`is working…`,
-  `is compacting the conversation…`) for a client that draws that instead (with `status` alone, iOS showed
-  nothing: measured: "Thread status on iOS"). Slack removes a status two minutes after it was set
-  and clears it when the app replies (documented: "Status removal after two minutes"), so it is set
-  again every `status.THREAD_STATUS_REFRESH_SECONDS` and within
-  `status.THREAD_STATUS_AFTER_WRITE_SECONDS` of a write (`ThreadStatus.wrote`, which `SlackThread`
-  calls after every pass of a reply that made a Slack call and after every notice it posts), at most
-  one call per that interval. An answer to a word typed in the thread (`!status`, `!bypass`) is
-  posted outside the session: `Answers.deliver`, the one function those posts go through, tells
-  `SessionManager.wrote`, which reaches the live session's status the same way
-  (`ThreadChat.written`). `ThreadSession.close` clears the status after it has cancelled its tasks
-  (`ThreadChat.close`). A clearing call that fails is tried once more, and again at the close. A
-  refusal is logged once per error code in a row and swallowed; one that says the token cannot call
-  the method (`status.THREAD_STATUS_REFUSED`) stops every `ThreadStatus` from calling Slack for the
-  rest of the run. Nothing about it is stored, and a crash leaves at most a status Slack removes by
-  itself.
+  through `ThreadSession.showRunning`). `ThreadChat.showActivity` never waits on the chat: the provider makes its calls in order, so two
+  quick changes end on the last one and a turn that ends at once sets nothing. How Slack sends the
+  line, refreshes it and takes a refusal is in [The status line](slack-provider.md#the-status-line).
+  An answer to a word typed in the thread (`!status`, `!bypass`) is posted outside the session:
+  `Answers.deliver`, the one function those posts go through, tells `SessionManager.wrote`, which
+  reaches the live session's status the same way (`ThreadChat.written`). `ThreadSession.close`
+  clears the status after it has cancelled its tasks (`ThreadChat.close`). Nothing about it is
+  stored.
 ### Turns and background tasks
 
 - One reader task follows `AgentSession.events` for the life of the agent session
@@ -1714,7 +1559,7 @@ The order of replays, the cases above and what is released when are in the doc c
   the last. `LoopReply.last` stays false, so no other report (a Monitor's event, a task of an
   owner's turn) renders into the card.
 - One card per session, whatever the jobs. The first run posts it and each later run rewrites the
-  same message (`chat.update` in the Slack provider, which notifies nobody). Its label is
+  same message (an edit, which notifies nobody in Slack). Its label is
   `Scheduled run · <cadence> · run N` when exactly one job is believed and `Scheduled run · run N`
   with several, since a run names no job. `ThreadSession.loopRuns` counts the runs.
 - The card shows the run's final words (the result's text, else what was written), then the
@@ -1794,8 +1639,8 @@ change nothing. Reads of one thread queue behind one another.
 The title replaces the owner's own words in the root, so before the first replacement the core
 keeps them. When the thread has no `rootPrompt` yet (`root_prompt` in `state.json`) it passes
 `titleThread` a `keep` callback; the chat reads the root once, in one queued task, hands `keep` the
-words in the form the agent receives a message (the root's `text` with Slack's entities and links
-turned to plain text, the tag left out), waits for it to finish and only then edits. `keep` stores
+words in the form the agent receives a message (the root's text as plain text, the tag left out;
+Slack's entities and links are turned to text first), waits for it to finish and only then edits. `keep` stores
 the text (`StateStore.setRootPrompt`, which stores only if nothing is stored by then, so a second
 session object for the thread cannot overwrite it); when it throws nothing is edited. If the edit
 is then refused for good, the root still holds the words and the stored text is cleared
@@ -1820,10 +1665,7 @@ nothing waits for it.
 session was not closed meanwhile, the last await of `ThreadSession.status`) and shows it on a
 `Title:` line after the session lines. As the last line it shows `Prompt:` and the stored
 `rootPrompt`, as the owner wrote it in the form the agent receives a message; an empty one is left
-out. Each piece goes through `ChatProvider.escape` as `words`. Slack leaves it as written: its
-markdown block draws the owner's mentions as mentions and their code as code (an entity or a
-backslash escape would show literally inside a code span, measured 2026-10-20), and `!status`
-is a message only the owner sees, which never pushes, so a mention in it reaches no one. The text is
+out. Each piece goes through `ChatProvider.escape` as `words`. A chat escapes its control characters there and leaves the owner's marks live (Slack's reasons: [Titling a thread](slack-provider.md#titling-a-thread)). The text is
 wrapped first (`quote.quoted`, lines past 1000 characters, cut after the last whitespace of a
 piece, else at a grapheme boundary) and each piece is prefixed with `> `. The quote is last
 because a line after it would read as part of it, and every piece carries its own mark because
@@ -1870,8 +1712,8 @@ in the doc comments of `src/core/files/listing.ts` and `src/core/files/changed.t
 
 ## Updating allaboard
 
-The owner can update the copy the daemon runs from Slack (`!allaboard update`, the button of its
-offer, the button of the Home tab's update line) and from a terminal (`allaboard update`). The
+The owner can update the copy the daemon runs from the chat (`!allaboard update`, the button of its
+offer, the button of a session index's update line) and from a terminal (`allaboard update`). The
 owner's view is in `docs/setup.md`, "Updating allaboard"; the Slack drawing is in
 `docs/slack-provider.md`. This section is the machinery and the measurements it rests on.
 
@@ -2015,9 +1857,9 @@ updates, no update under way, a service runs this daemon, not the version `State
 then, so a second message sent right after finds it told, and so does a restart of the daemon. A
 message that is itself `!allaboard` records the version and adds nothing, since its answer says it.
 The line goes to the thread of the message through `ThreadChat.tell`; for a message of the channel,
-whose thread has no reply yet, to the channel through `ChannelChat.tell`, because Slack shows a
-message only the user sees in a thread only once that thread is active (`chat.postEphemeral` and
-the messaging page, docs.slack.dev, read 2026-10-17). Whether Slack notifies for one is not known.
+whose thread has no reply yet, to the channel through `ChannelChat.tell`, because a chat may show a
+line for the owner alone in a thread only once that thread is active (Slack does, and whether it
+notifies for one is not known: [Who may talk to it](slack-provider.md#who-may-talk-to-it)).
 A state that cannot be written, or a chat that refuses the line, holds nothing back: the message is handled as before.
 
 ### Measured on 2026-10-17
@@ -2061,46 +1903,31 @@ What the design takes from these:
 
 ## Measured platform behaviour
 
-What the sections above state about Slack, the SDK and Claude Code that no reference documents or
-that a reference leaves open, with how and when each was observed. The prose points to a row as
-`measured: "Name"`. "Not recorded" marks a date, version or method that was not written down when
-the observation was made. A documentation read has no version. A row names the client and the package it was observed through
-(`ClaudeSDKClient`, `claude-agent-sdk`, `slack-sdk`, `@anthropic-ai/claude-agent-sdk`); the
-behaviour is Claude Code's or Slack's own. A row observed through the Python SDK, which the daemon
-no longer uses, says so when it has not been measured again on the TypeScript SDK. The last two rows are documentation reads, not
-observations. Where `!open` relies on git's behaviour, its measurements are in the header of
-`src/core/files/listing.ts` and repeated by `test/core/files/changed.test.ts`.
+What the sections above state about the SDK, Claude Code and the machine that no reference
+documents or that a reference leaves open, with how and when each was observed. The prose points to
+a row as `measured: "Name"`. "Not recorded" marks a date, version or method that was not written
+down when the observation was made. A documentation read has no version. A row names the client and
+the package it was observed through (`ClaudeSDKClient`, `claude-agent-sdk`,
+`@anthropic-ai/claude-agent-sdk`); the behaviour is Claude Code's own. A row observed through the
+Python SDK, which the daemon no longer uses, says so when it has not been measured again on the
+TypeScript SDK. The last row is a documentation read, not an observation. Where `!open` relies on
+git's behaviour, its measurements are in the header of `src/core/files/listing.ts` and repeated by
+`test/core/files/changed.test.ts`. What a chat platform does is measured for its provider and kept
+on its page: the rows for Slack are in
+[Measured platform behaviour](slack-provider.md#measured-platform-behaviour).
 
 | Name | Observed | Method | Date | Version |
 |---|---|---|---|---|
 | Stopped task, no report turn | Claude Code starts no turn to report a task stopped with `ClaudeSDKClient.stop_task` of the Python SDK. Not measured again on the TypeScript SDK | not recorded | 2026-09-27 | Claude Code 2.1.283 |
-| File share event has no team | A `file_share` message event carries no `team` field | not recorded | 2026-09-25 | slack-bolt 1.30.0 |
-| Thread broadcast event has no team | A reply sent with **Also send to #channel** arrives as a `message` event of subtype `thread_broadcast` with `thread_ts`, a `root` copy of the thread's first message and no `team` or `parent_user_id`; its envelope has `team_id` and `is_ext_shared_channel`; a hidden `message_changed` wrapping the same reply follows | A reply recorded in Socket Mode, daemon stopped | 2026-10-09 | slack-bolt 1.30.0 |
-| Download without files:read | Slack answers 302 to a file download when the app lacks `files:read` | not recorded | 2026-09-25 | not recorded |
-| Card text is appended | Slack appends the `details` and the `output` of a `task_update` to what the card already holds | not recorded | 2026-10-01 | slack-sdk 3.44.1 |
-| Stream lifetime | `chat.appendStream` is refused 300.3 seconds after `chat.startStream` | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
-| Update after stop is silent | A stream stopped at 4 minutes 51 seconds, then ten `chat.update` calls on its message: no notification | not recorded | 2026-09-29 | not recorded |
-| Stream text under a later message on iOS | On Slack for iOS, the text of a reply that is a stream still open disappears once the app posts a message below it, and shows again when the stream stops. Same with the thread status line set before, during or cleared before the post; the text stays only with no status line, or when `chat.stopStream` runs on the reply before the post. `conversations.replies` held the full text throughout (`streaming_state` `in_progress`) | A probe on a dev app, the owner watching the thread live on iOS; one run per condition | 2026-10-25 | Slack for iOS, version not recorded |
-| Message limits | A message holds 12,000 characters and 50 blocks or task cards | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
-| Block cap after a stream stops | A post and an update are held to 50 items; a stream is not, but the update after its stop is | not recorded | 2026-10-08 | slack-sdk 3.45.0 |
-| Container text on update | A stream and a post count the text of a collapsed container toward the 12,000 characters; `chat.update` does not (50 containers of 10,000 characters accepted, nothing refused) | not recorded | 2026-10-06 | slack-sdk 3.44.1 |
 | Prompt replay | With `--replay-user-messages`, Claude Code re-emits each prompt as a `user` frame with the daemon's uuid: after the turn's `init` and before its first stream event for a prompt that gets its own turn, inside the running turn for one the CLI takes in, which then ends with one result of origin `task-notification` | Haiku, one run per scene | 2026-10-06 | claude-agent-sdk 0.2.163, bundled CLI 2.1.286 |
-| Card text cap | The text of a message's cards counts toward the cap of a streamed message by a formula Slack does not document | private test channel | 2026-10-01 | slack-sdk 3.44.1 |
-| Open card stored as error | A card left `in_progress` in a stopped message is stored as an error until it is updated | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
-| Push on stream stop | A stream in a thread the owner started notifies once, when it stops, with its first text as the banner, and never when it starts | iPhone locked, Slack open in a browser, channel on Just mentions | 2026-09-29 | not recorded |
-| Open stream cannot be deleted | A stream cannot be deleted while it is open | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
-| Stream needs a thread | `chat.startStream` answers `invalid_thread_ts` without `thread_ts` | not recorded | 2026-09-23 | not recorded |
 | Usage before first turn | `get_context_usage()` of the Python SDK answers before a session's first turn and during a turn. Not measured again on the TypeScript SDK (`getContextUsage()`) | not recorded | 2026-09-25 | claude-agent-sdk 0.2.158, bundled CLI 2.1.280 |
 | Version on init | Claude Code's version comes with a turn's `init` message and not with the connect (observed through the Python SDK). Not measured again on the TypeScript SDK | not recorded | 2026-09-26 | claude-agent-sdk 0.2.158, bundled CLI 2.1.280 |
 | Permission mode status | A `status` system message carries `permissionMode` after each `set_permission_mode` | not recorded | 2026-10-08 | claude-agent-sdk 0.2.164 |
 | Model survives resume | `set_model()` on a live client survives a resume and leaves the owner's default alone | not recorded | 2026-09-30 | Claude Code 2.1.285 |
 | Prompt sent before a notification | A prompt sent with no turn running, a moment before a background command's notification, gets its turn first: `init`, the notification, the prompt's replay, then its words and a result of its own. The turn that reports the command follows with a result of origin `task-notification` and no replay before its words. The same holds in every turn of the fixtures `prompt-replay-*`, `compact` and `auto-compact*`: a prompt of plain text is replayed before its turn's first words, and no replay precedes a report turn | Haiku, the prompt sent 19.5 s and 19.9 s after the call of a 20 s command, one run each | 2026-10-09 | claude-agent-sdk 0.2.164, bundled CLI 2.1.292 |
 | Report inside a queued turn | When a message was already sent and waits for its turn, that turn comes first and Claude Code reports the task inside it, with no turn of its own | not recorded | 2026-09-24 | Claude Code 2.1.280 |
-| Thread status on iOS | A thread status sent as `status` alone showed nothing on iOS; the loading message shows | Slack iOS and desktop, free plan, an app holding `assistant:write` | 2026-10-02 | slack-sdk 3.44.1 |
-| Permalink opens on the reply | Slack opens a thread on the reply that a permalink names | Mac app and iOS | 2026-10-05 | not recorded |
 | Built-in servers | In a non-interactive run the `init` message lists the user, plugin and claude.ai MCP servers. `computer-use` is absent though switched on for the folder through `/mcp`; `claude-in-chrome` is absent with `/chrome` set to "Enabled by default" and listed, connected, with `--chrome` | The SDK's bundled CLI run with `-p --output-format stream-json`, with and without `--chrome`, reading `mcp_servers` and `tools` | 2026-10-09 | Claude Code 2.1.292 |
 | Chrome in an SDK session | A client of the Python SDK started with `extra_args` `chrome` opened a page in the owner's Chrome, read it, took a screenshot (an `image` block in the tool result) and closed the tab. The permission callback was asked for `tabs_context_mcp`, `navigate`, `read_page` and `computer`, and not for `tabs_close_mcp`. Tried again by hand through the TypeScript daemon on 2026-10-11 (SDK 0.3.296, thread started with Chrome enabled by default): the page opened in Chrome. Which tools the callback was asked for was not measured again | `ClaudeSDKClient` with the daemon's options in `default` mode, Haiku, one run | 2026-10-09 | SDK 0.2.164, Claude Code 2.1.292 |
-| Clip transcript | A clip is a message with no text and one file of subtype `slack_audio` (`audio/mp4`, `media_display_type` `audio`); the same recording uploaded as a file has no subtype and gets a transcript too. No event follows its posting. After **Generate transcript**, `file_change` arrived four times in 15 seconds and `files.info` then gave `transcription` with `status` `complete`, a `locale` and `preview` (`content`, `has_more` false up to 67 characters); `vtt` on `files.slack.com` returned the transcript as WebVTT to the bot token. Slack chose the locale: `it-IT` once and `en-GB` twice for clips spoken in Italian, the two with wrong words. Not seen: a status other than `complete`, `has_more` true, the body of the `file_change` event (the log names it only) | Three clips from the iOS app, Slack free plan, a workspace set to English | 2026-10-09 | slack-sdk 3.45.0 |
 | Claude Code and audio | The Read tool refuses an `.m4a` file as binary, and `/voice` is not among the commands an SDK session is offered | The SDK's bundled CLI with `-p`, one run; `get_server_info()` of a client with the daemon's options | 2026-10-09 | Claude Code 2.1.292 |
 | Commands an SDK session is not offered | Of the 119 built-in commands in Claude Code's commands reference, `get_server_info()` lists 50. Each of 22 others sent as a prompt (`/rewind`, `/plan`, `/branch`, `/fork`, `/subtask`, `/btw`, `/background`, `/add-dir`, `/cd`, `/diff`, `/export`, `/copy`, `/permissions`, `/memory`, `/hooks`, `/skills`, `/tasks`, `/sandbox`, `/voice`, `/chrome`, `/status`, `/help`) got `/<name> isn't available in this environment.` as the turn's whole answer, with no output tokens | `ClaudeSDKClient`, Haiku, one session, each command once | 2026-10-09 | SDK 0.2.164, Claude Code 2.1.292 |
 | Initialization result | `initializationResult()` carries each command's `aliases` (9 of 55 commands had some) and `current_permission_mode`; `supportedCommands()` carries the same aliases | `node probe/live-agent.ts`, Haiku, the owner's login | 2026-10-10 | @anthropic-ai/claude-agent-sdk 0.3.296, Claude Code 2.1.296 |
@@ -2116,7 +1943,5 @@ observations. Where `!open` relies on git's behaviour, its measurements are in t
 | Two processes on one session | An SDK session kept alive between turns does not see a turn the terminal wrote meanwhile, and a terminal left open does not see a turn written from the SDK; the next message of either hangs off its own last one, a branch, and a later resume continues the newest branch. Opening the session in the terminal and closing it without writing leaves no branch. A background command of the SDK's process that ends after the terminal wrote opens a report turn of its own, a branch too | Eight scripted runs, SDK query with the daemon's options beside the interactive TUI in tmux, Haiku | 2026-10-27 | SDK 0.3.310 (Claude Code 2.1.310), TUI 2.1.311 |
 | Who holds a session | `claude agents --json` lists the SDK's process and the terminal's alike (`kind: interactive`), with `status` `idle` or `busy`, and drops each once it ends; the SDK's process is a child of the process that called `query()` | 38 samples over two rounds of idle, busy and closed, both sides | 2026-10-27 | Claude Code 2.1.310 and 2.1.311 |
 | A cut turn continued in the terminal | An SDK process closed during a turn (`query.close()`, no interrupt), then `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1 claude --resume <id>`: the TUI continues the turn by itself and runs the cut command again; without the variable it waits for a prompt. `/resume <id>` typed inside an open TUI answers `No conversations found to resume.` for a session created through the SDK | Two scripted runs and a control | 2026-10-27 | SDK 0.3.310, TUI 2.1.311 |
-| Thread status with desktop open | The iOS app can show no thread status for a thread that Slack on desktop already has open; with desktop closed, or with the thread opened on iOS first, it shows on both | Five runs read by eye, one per condition; the reference of `assistant.threads.setStatus` does not describe it | 2026-10-04 | slack-sdk 3.44.1 |
 | ExitTimeOut cap | launchd caps a LaunchAgent's `ExitTimeOut` at 60: `launchctl print` shows 60 for any larger value, and a job stopped with `launchctl bootout` was killed within 60 seconds | `launchctl print`, and a job stopped with `bootout` | 2026-09-26 | macOS 27.0 |
-| Status removal after two minutes | Slack removes a thread status two minutes after it was set and clears it when the app replies | `assistant.threads.setStatus` reference, read | 2026-10-02 | none, a documentation read |
 | Resume and bypass | Claude Code's own `--resume` never restores `bypassPermissions` | sessions reference, read | 2026-09-26 | none, a documentation read |

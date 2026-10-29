@@ -8,7 +8,8 @@ project's own.
 
 Each agent allaboard can drive has a section of its own, which lists every difference found
 between a session started from Slack and the same agent in its terminal, the small ones too.
-Claude Code is the only agent today. Elsewhere on the page, a limit that has an equivalent you
+Claude Code is the only agent today. Each chat has a section of its own too, with what its client
+or its platform limits: Slack is the only chat today. Elsewhere on the page, a limit that has an equivalent you
 would not notice is left out. `!status`, `!help` and
 `!resume` stand in for the terminal's `/status`, `/help` and `/resume`, `!stop` interrupts as
 Esc does, and a command of Claude Code is typed with `!` in place of `/`. The limits of a

@@ -968,7 +968,7 @@ export class TurnRenderer {
       ...entry,
       status: final,
       // The command line of a timed call that is still a call's card is the card's content, which
-      // a run lists once it has ended (`core/reply/fold`); any other details were progress.
+      // a run lists once it has ended (a provider that folds a run of calls); any other details were progress.
       details: entry.startedAt !== null && !entry.task ? entry.details : null,
       output: stopped ?? (summary ? oneLine(summary, OUTPUT_LIMIT) : null),
     });

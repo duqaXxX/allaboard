@@ -240,7 +240,7 @@ export function answeredBlocks(
   for (const q of questions) {
     const answer = Object.hasOwn(answers, q.text) ? (answers[q.text] as string | string[]) : "";
     const shown = typeof answer === "string" ? answer : answer.join(", ");
-    lines.push(`${texts.NESTED}· ${shownAsWritten(q.text)} → ${shownAsWritten(shown)}`);
+    lines.push(`${slackTexts.NESTED}· ${shownAsWritten(q.text)} → ${shownAsWritten(shown)}`);
   }
   // A context element holds at most 3,000 characters; long questions and answers are cut.
   return [context(cut(lines.join("\n"), SECTION_LIMIT))];

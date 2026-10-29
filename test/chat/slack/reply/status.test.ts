@@ -6,7 +6,7 @@ import {
   StatusReaction,
   ThreadStatus,
 } from "../../../../src/chat/slack/reply/status.ts";
-import * as texts from "../../../../src/core/texts.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import type { Logger } from "../../../../src/log.ts";
 import {
   AsyncEvent,
@@ -271,8 +271,8 @@ test("missing scope is logged once and stops further reactions", async () => {
 const SHOWN = {
   channel_id: CHANNEL,
   thread_ts: THREAD,
-  status: texts.THREAD_WORKING_STATUS,
-  loading_messages: [texts.THREAD_WORKING],
+  status: slackTexts.THREAD_WORKING_STATUS,
+  loading_messages: [slackTexts.THREAD_WORKING],
 };
 const CLEARED = { channel_id: CHANNEL, thread_ts: THREAD, status: "" };
 
@@ -312,7 +312,7 @@ test("the thread status is set with a loading message then cleared", async () =>
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   assert.deepEqual(statuses(slack), [SHOWN]);
   status.show("");
@@ -327,8 +327,8 @@ test("the same thread status again makes no call", async () => {
   status.show(""); // never shown: nothing to clear
   await beat(clock);
   assert.deepEqual(statuses(slack), []);
-  status.show(texts.THREAD_WORKING);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   assert.deepEqual(statuses(slack), [SHOWN]);
 });
@@ -337,7 +337,7 @@ test("a thread status asked for and dropped at once makes no call", async () => 
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   status.show("");
   await beat(clock);
   assert.deepEqual(statuses(slack), []);
@@ -347,7 +347,7 @@ test("the thread status is set again before slack removes it", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock, { refresh: 30 });
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   await clock.advance(30);
   await clock.advance(30);
@@ -367,7 +367,7 @@ test("a write sets the thread status again soon after", async () => {
   status.wrote(); // not shown: a write changes nothing
   await beat(clock);
   assert.deepEqual(statuses(slack), []);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   status.wrote();
   await beat(clock);
@@ -381,7 +381,7 @@ test("writes that keep coming do not put the thread status off", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock, { afterWrite: 2 });
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   for (let write = 0; write < 10; write += 1) {
     // a card updated again and again while its turn waits on it
@@ -397,7 +397,7 @@ test("a write right after the thread status is asked for does not delay it", asy
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock, { afterWrite: 10 });
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   status.wrote();
   await beat(clock);
   assert.deepEqual(statuses(slack), [SHOWN]);
@@ -408,7 +408,7 @@ test("a close that cuts the clearing call short clears the thread status itself"
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   // The clearing call is out when the session closes. A call cannot be cut short here, so the
   // close waits for it: the status ends cleared, by that call, and once.
@@ -431,7 +431,7 @@ test("a close that waits for a clearing call that fails clears the thread status
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock, undefined, new Lines());
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   const hold = new AsyncEvent();
   slack.gate = hold;
@@ -453,7 +453,7 @@ test("a thread status slack refuses is logged once and never raises", async () =
   const log = new Lines();
   slack.responses["assistant.threads.setStatus"] = rejected("ratelimited");
   const status = threadStatus(slack, clock, { refresh: 10 }, log);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   await clock.advance(10);
   await clock.advance(10);
@@ -477,12 +477,12 @@ test("a token that cannot set a thread status stops every instance", async () =>
   const clock = new FakeClock();
   slack.responses["assistant.threads.setStatus"] = rejected("missing_scope");
   const first = threadStatus(slack, clock, { refresh: 20 }, new Lines());
-  first.show(texts.THREAD_WORKING);
+  first.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   await clock.advance(100);
   assert.equal(ThreadStatus.refused(), true);
   const other = new ThreadStatus(slack, { channel: CHANNEL, threadTs: "1790000000.000002", clock });
-  other.show(texts.THREAD_WORKING);
+  other.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   assert.equal(statuses(slack).length, 1); // asked once, by the first: no retry can change the answer
   await first.close();
@@ -493,7 +493,7 @@ test("a thread status that changes its words says the new ones at once", async (
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   status.show("2 shells still running");
   await beat(clock);
@@ -501,7 +501,7 @@ test("a thread status that changes its words says the new ones at once", async (
   await beat(clock);
   assert.deepEqual(
     statuses(slack).map((call) => call.loading_messages),
-    [[texts.THREAD_WORKING], ["2 shells still running"], ["1 shell still running"]],
+    [[slackTexts.THREAD_WORKING], ["2 shells still running"], ["1 shell still running"]],
   );
   await status.close();
   assert.deepEqual(statuses(slack).at(-1), CLEARED);
@@ -517,7 +517,7 @@ test("a thread status that fails below Slack is logged by the name the rest of t
     code: "ECONNRESET",
   });
   const status = threadStatus(slack, clock, { refresh: 10 }, log);
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   await status.close();
   assert.deepEqual(
@@ -530,7 +530,7 @@ test("a clearing call that fails is tried once more", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock, { afterWrite: 3 }, new Lines());
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   slack.responses["assistant.threads.setStatus"] = [rejected("ratelimited"), { ok: true }];
   status.show("");
@@ -546,7 +546,7 @@ test("a status that could not be cleared is cleared when it closes", async () =>
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const status = threadStatus(slack, clock, { afterWrite: 1 }, new Lines());
-  status.show(texts.THREAD_WORKING);
+  status.show(slackTexts.THREAD_WORKING);
   await beat(clock);
   slack.responses["assistant.threads.setStatus"] = rejected("ratelimited");
   status.show("");

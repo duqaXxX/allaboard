@@ -130,6 +130,9 @@ with status 1: install a newer Node, beside the one you have if you like.
 
 ## Part 1: the Slack app
 
+This part and the `SLACK_*` variables of Part 2 are the Slack module's, the chat this release has;
+they are read only when `slack` is the selected chat.
+
 ### Create the app from the manifest
 
 2. Create the app from the manifest:
@@ -319,6 +322,9 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
    SLACK_OWNER_USER_ID=<member id>
    ALLOWED_ROOT=~/code
    ```
+
+The `SLACK_*` variables are the Slack module's, read only when it is the selected chat; the others
+belong to the daemon.
 
 | Variable | Value |
 |---|---|
@@ -918,7 +924,7 @@ The transcript is Slack's: allaboard does not listen to the audio and sends it n
 Slack chooses the language it hears by itself, clip by clip: of three clips spoken in Italian in
 a workspace set to English, it wrote one in Italian and two as English words that were not what
 was said, and those would have reached Claude as they were (row "Clip transcript" of
-[Measured platform behaviour](architecture.md#measured-platform-behaviour)). Read the transcript Slack shows under the clip before you rely on the answer. An audio
+[Measured platform behaviour](slack-provider.md#measured-platform-behaviour)). Read the transcript Slack shows under the clip before you rely on the answer. An audio
 file you upload is taken the same way: Slack shows it with the same player and transcript.
 
 ### Continuing a session in the terminal
@@ -1456,7 +1462,7 @@ the card of what still runs has ended. The line never counts what still runs: th
 does (`1 shell still running`), until the command ends.
 The line goes while an approval or a question waits for you. Slack's clients draw it, and the
 iOS app can show none for a thread that Slack on desktop already has open (row "Thread status
-with desktop open" of [Measured platform behaviour](architecture.md#measured-platform-behaviour)). The reply's cards and
+with desktop open" of [Measured platform behaviour](slack-provider.md#measured-platform-behaviour)). The reply's cards and
 its footer do not depend on it.
 
 What allaboard says on its own (the answer to `!bind`, `!bypass` or `!stop`, a notice that

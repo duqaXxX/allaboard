@@ -178,7 +178,7 @@ test("the thread shows how a run ended, then the command and its output in a cod
 });
 
 test("no output can close the code block it is shown in", () => {
-  const head = shellHead({ ...ENDED, stdout: "```\n<!channel>\n````\n" });
+  const head = shellHead({ ...ENDED, stdout: "```\n<b>\n````\n" });
   assert.ok(head.includes("\n`````\n$ git status"), head);
   assert.ok(head.endsWith("\n`````"));
 });

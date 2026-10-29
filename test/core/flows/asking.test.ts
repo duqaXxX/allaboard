@@ -1,7 +1,7 @@
 /**
  * The asking flows of the core, over the memory chat: what is asked of the owner, which choices
  * exist and what follows an answer. The chat only draws; it checks who acted before anything
- * reaches the core, and a second chat that draws gets the same behaviour as Slack.
+ * reaches the core, and a second chat that draws gets the same behaviour.
  */
 import assert from "node:assert/strict";
 import { join } from "node:path";

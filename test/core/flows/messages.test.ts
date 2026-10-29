@@ -1,7 +1,7 @@
 /**
  * The message flow of the core, over the memory chat: what a message of the owner's means by
  * where it was written and what it is, and how a prompt reaches its session. The chat only
- * draws; a second chat that draws gets the same behaviour as Slack.
+ * draws; a second chat that draws gets the same behaviour.
  */
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
@@ -10,7 +10,7 @@ import { type TestContext, test } from "node:test";
 import { logger } from "../../../src/core/flows/talk.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
-import { AsyncEvent } from "../../support/fake-slack.ts";
+import { AsyncEvent } from "../../support/fake-clock.ts";
 import { OWNER } from "../../support/memory-chat.ts";
 import { hold, type PlainAgent } from "../../support/plain-agent.ts";
 import { MessagesWorld, NoCommands, PLAIN_NAMES } from "./messages-world.ts";
@@ -277,7 +277,7 @@ test("a message that arrives while the daemon drains is refused and names what t
       texts.RESTARTING,
       texts.RESTART_WAITS_FOR,
       fill(texts.RESTART_WAIT_ROW, {
-        channel: `#${world.channel}`, // the memory chat's form, which is not Slack's
+        channel: `#${world.channel}`, // the memory chat's form
         link,
         hold: texts.RESTART_HOLD_TURN,
       }),

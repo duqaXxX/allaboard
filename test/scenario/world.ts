@@ -34,7 +34,7 @@ import {
   PlainStore,
   plainAgent,
 } from "../support/plain-agent.ts";
-import { heldByARunningDaemon, realWorkDone, SettledClock } from "../support/sessions.ts";
+import { heldByARunningDaemon, realWorkDone, SettledClock } from "../support/settle.ts";
 import { FakeMachine } from "../support/updates.ts";
 
 /** The names the registry holds the two modules under, and so the values of the `.env`. */
@@ -228,6 +228,7 @@ export class World {
     const chat: ChatEntry = {
       required: [],
       optional: [],
+      limitsHeading: "Limits of a test chat",
       build: async (context) => this.#watchStart(await this.chat.build(context)),
     };
     this.registry = {

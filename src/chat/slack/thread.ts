@@ -27,6 +27,7 @@ import {
 } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import {
+  type Activity,
   type ChannelChat,
   type ChatCapabilities,
   ChatError,
@@ -67,7 +68,7 @@ import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { positionOf, ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
-import { REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
+import { activityWords, REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import {
   answeredBlocks,
   approvalBlocks,
@@ -199,7 +200,8 @@ const LOOP_TEXT_LIMIT = 3000;
 /** What Slack draws of the chat seam whatever the configuration. */
 const CAPABILITIES = {
   nativeStreaming: true,
-  reactions: true,
+  rootStatus: true,
+  acknowledgement: true,
   activityLine: true,
   fileUpload: true,
   commandSuggestions: true,
@@ -681,8 +683,9 @@ export class SlackThread implements ThreadChat {
     return this.reaction.settle();
   }
 
-  showActivity(text: string, afterName: string): void {
-    this.line.show(text, afterName);
+  showActivity(activity: Activity | null): void {
+    if (activity === null) this.line.show("", "");
+    else this.line.show(...activityWords(activity));
   }
 
   get activityRefused(): boolean {

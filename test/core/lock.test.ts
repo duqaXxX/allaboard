@@ -371,7 +371,7 @@ test(
 
 // ---- the lock on a chat identity
 
-const IDENTITY = "T000ACME:U000BOT";
+const IDENTITY = "acme:bot-1";
 
 test("the identity's folder is the first 16 hex of its hash, under a name no instance can hold", () => {
   const home = `${"/ho"}me/alice`;
@@ -415,7 +415,7 @@ test("the instance lock's refusal is not the identity's", async () => {
 test("two identities are both held", async () => {
   const home = scratch();
   const first = await chatIdentityLock(IDENTITY, home);
-  const second = await chatIdentityLock("T000ACME:U000OTHER", home);
+  const second = await chatIdentityLock("acme:bot-2", home);
   await first.release();
   await second.release();
 });

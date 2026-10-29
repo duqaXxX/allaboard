@@ -58,7 +58,7 @@ test("with no target the sessions are listed newest first, with the thread they 
 
 test("the rows leave out the sessions a thread holds, and count them", async (t) => {
   const world = await withSessions(t);
-  world.state.openThread(world.channel, "1780000000.000009", SECOND);
+  world.state.openThread(world.channel, "thread-9", SECOND);
   await world.flows.resume.word(await world.word(), "");
   const [list] = world.chat.lists();
   assert.ok(list?.list.type === "sessions");
@@ -151,11 +151,11 @@ test("a pick of a session another thread took meanwhile is refused and leaves th
   const ref = await world.word();
   await world.flows.resume.word(ref, "");
   const [list] = world.chat.lists();
-  world.state.openThread(world.channel, "1780000000.000009", THIRD);
+  world.state.openThread(world.channel, "thread-9", THIRD);
   await world.chat.as(OWNER).picks(list?.message ?? "", THIRD);
   assert.equal(world.state.thread(ref.channel, ref.thread), null);
   assert.deepEqual(world.said().slice(-1), [
-    fill(texts.RESUME_ELSEWHERE, { link: linkTo("1780000000.000009") }),
+    fill(texts.RESUME_ELSEWHERE, { link: linkTo("thread-9") }),
   ]);
   assert.equal(world.chat.lists().length, 1);
   assert.equal(world.faulty.rewrites.length, 0);
@@ -206,15 +206,15 @@ test("a pick that names no thread is a list from before it did", async (t) => {
 test("a pick from a channel that is not bound is told how to bind", async (t) => {
   const world = await withSessions(t);
   const elsewhere = world.chat.openChannel("elsewhere");
-  await pick(world, { channel: elsewhere, thread: "1780000000.000009" }, elsewhere);
+  await pick(world, { channel: elsewhere, thread: "thread-9" }, elsewhere);
   assert.deepEqual(world.chat.texts(elsewhere), [fill(texts.UNBOUND_ANY, { root: world.root })]);
 });
 
 test("a pick is not trusted: the thread opens in the channel that was checked", async (t) => {
   const world = await withSessions(t);
   const elsewhere = world.chat.openChannel("elsewhere");
-  await pick(world, { channel: elsewhere, thread: "1780000000.000009" });
-  assert.equal(world.state.thread(world.channel, "1780000000.000009")?.sessionId, THIRD);
+  await pick(world, { channel: elsewhere, thread: "thread-9" });
+  assert.equal(world.state.thread(world.channel, "thread-9")?.sessionId, THIRD);
   assert.equal(world.state.channel(elsewhere), null);
 });
 
@@ -225,7 +225,7 @@ test("a pick of a session the folder does not hold finds it gone", async (t) => 
     type: "session",
     channel: world.channel,
     sessionId: "cccccccc-0000-4000-8000-000000000004",
-    thread: { channel: world.channel, thread: "1780000000.000009" },
+    thread: { channel: world.channel, thread: "thread-9" },
     list: "msg-none",
   });
   assert.deepEqual(world.said(), [texts.RESUME_GONE]);

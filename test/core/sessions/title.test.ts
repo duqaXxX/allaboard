@@ -9,8 +9,8 @@ import { ChatError, type ChatProvider } from "../../../src/chat/seam.ts";
 import { logger, ThreadTitle } from "../../../src/core/sessions/title.ts";
 import { StateStore } from "../../../src/core/state.ts";
 
-const CHANNEL = "C000CHAN";
-const THREAD = "1790000000.000001";
+const CHANNEL = "chan-1";
+const THREAD = "thread-1";
 
 type Keep = ((text: string) => void | Promise<void>) | undefined;
 

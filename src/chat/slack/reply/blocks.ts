@@ -5,11 +5,12 @@
  * `@slack/types` 3.2.0 declares them as `MarkdownBlock`, `ContextBlock`, `DividerBlock`,
  * `TaskCardBlock`, `ContainerBlock`, `RichTextBlock` and the chunks of `AnyChunk`.
  */
-import { formatDuration, NESTED, STOPPED, shownPreview } from "../../../core/port.ts";
+import { formatDuration, STOPPED } from "../../../core/port.ts";
 import type { RunningLine, RunningList, TaskStatus, TaskUpdate } from "../../seam.ts";
-import { RECORD_MARK } from "../texts.ts";
+import { NESTED, RECORD_MARK } from "../texts.ts";
 import { at, lastNewline, len, take } from "./chars.ts";
 import { quietMentions, shownAsWritten } from "./escape.ts";
+import { shownPreview } from "./fold.ts";
 import { markdownBlocks } from "./markdown.ts";
 
 // A message holds at most 12,000 characters and 50 blocks or task cards (measured 2026-09-28),

@@ -63,7 +63,7 @@ may find a seam that needs a change: open an issue before writing one.
    say a text, call a tool, ask a question, run its effort command or die, and reads the events. In
    `test/conformance/chat.test.ts`, call `chatConformance` with a function (`MakeRig` in
    `test/conformance/chat.ts`) that builds a rig (`ChatRig`): the provider, a channel and a thread,
-   the owner and somebody else as people who write and click, whether the chat can show a line to
+   the owner, somebody else and the owner's user id in another workspace (`ownerElsewhere`) as people who write and click, whether the chat can show a line to
    the owner alone, and a way to read what the chat shows. A check that needs a capability the module does not declare
    is skipped by name. A session is named by `session_started` only once a start that resumes its
    id would succeed (the core stores the id at once, and the setup's Start resumes it before any
@@ -73,10 +73,20 @@ may find a seam that needs a change: open an issue before writing one.
 5. Add the entry to `REGISTRY` in `src/registry.ts`.
 6. Name its variables in [docs/setup.md](docs/setup.md); `test/docs.test.ts` fails on a variable
    of any entry that the page does not name.
-7. Document it. An agent gives its entry a `limitsHeading` and writes that section of
-   [docs/limits.md](docs/limits.md) (`## Limits of ...`): every difference found between a session
-   started from the chat and the agent's own terminal, each measured or sourced, with the column
-   `Looked into`; `test/docs.test.ts` requires one such section for each agent in the registry.
+7. Document it. An agent or a chat gives its entry a `limitsHeading` and writes that section of
+   [docs/limits.md](docs/limits.md) (`## Limits of ...`): for an agent, every difference found
+   between a session started from the chat and the agent's own terminal, each measured or sourced,
+   with the column `Looked into`; for a chat, what its client or its platform limits;
+   `test/docs.test.ts` requires one such section for each agent and each chat in the registry.
+   A chat also writes its provider page, `docs/<name>-provider.md` with `<name>` the registry
+   name: how it draws a reply and the requests, what it checks on each inbound path, the platform
+   calls it relies on and what was measured about them, each with its date and version, as
+   [docs/slack-provider.md](docs/slack-provider.md) does. `docs/architecture.md` states the core
+   and the seams in words that fit any chat and links to the page; `test/docs.test.ts` fails
+   when a chat in the registry has no page or the architecture does not link to it. If the chat
+   needs an app or an account set up by hand, its part of [docs/setup.md](docs/setup.md) and
+   its manifest, when the platform takes one, are part of the module, and its `setup` entry
+   asks for the variables that part names.
    An agent whose SDK or protocol the source depends on adds a surface document like
    [docs/sdk-surface.md](docs/sdk-surface.md) (every type, field, option and value used, with its
    source) and a probe that checks it on each release, or says in its section of the limits that
@@ -94,12 +104,22 @@ support file or a source file (`src/registry.ts` imports the modules). A test th
 `src/chat/` equal to any name in the entry's `toolNames` or its vocabulary, but in a constant it
 lists by name in `LABELS` (a task kind's label, a button's).
 
+The same line holds for the chat (invariant 9): nothing under `src/core/` holds what only one
+chat does. A test under `test/core/` or `test/scenario/` uses the memory chat and neutral ids (`chan-1`,
+`thread-1`, `msg-1` from `test/support/ids.ts`, the owner `alice`) and never reaches
+`src/chat/<module>/`, directly or through a support file such as `test/support/fake-slack.ts`;
+the helpers that are not a chat's (`FakeClock`, `AsyncEvent`) come from their own files. A test
+of the core through a provider lives under `test/chat/<module>/`. `test/vocabulary.test.ts`
+enforces the imports. A new chat adds its rig to `test/conformance/chat.test.ts`, with the
+owner's user id in another tenant of the chat (`ownerElsewhere`), so that the suite sends a
+message, a click and a form from each person who is not the owner through it.
+
 `test/support/plain-agent.ts` and `test/support/memory-chat.ts` are the worked examples: each is
 written against its seam and `src/core/port.ts` alone and declares few capabilities, and the
 scenario under `test/scenario/` runs the daemon with the two selected by name. The memory chat
-shows the part of a chat that the port carries: it keeps the order of its own messages and asks
-`tails`, `isLast` and `isOvertaken` which reply shows the list of what still runs and which reply
-is last or overtaken. The footer goes under the reply the session names.
+shows the part of a chat that the seam asks of it: it keeps the order of its own messages and
+decides by its own rule which reply shows the list of what still runs and which reply is last or
+overtaken. The footer goes under the reply the session names.
 
 Two tests refuse what a module must not do, by layer, so that they hold for a module that is not
 there yet. `test/imports.test.ts` fails when the core imports a module, when a module imports

@@ -7,10 +7,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionEvent } from "../../../src/agent/seam.ts";
 import type { TaskUpdate } from "../../../src/chat/seam.ts";
-import { Fold } from "../../../src/core/reply/fold.ts";
 import { Previews } from "../../../src/core/reply/previews.ts";
 import { type Sink, TurnRenderer } from "../../../src/core/reply/renderer.ts";
-import { PLAIN_NAMES } from "../../support/names.ts";
+import { MEMORY_NAMES } from "../../support/names.ts";
 import { call, PLAIN_TOOLS, PlainAgent, say } from "../../support/plain-agent.ts";
 
 const PREVIEWS = new Previews(PLAIN_TOOLS);
@@ -36,7 +35,7 @@ async function cardsOf(...steps: Parameters<PlainAgent["next"]>): Promise<TaskUp
     waitLanded: async () => true,
     settle: async () => true,
   };
-  const renderer = new TurnRenderer(sink, PLAIN_NAMES, PREVIEWS);
+  const renderer = new TurnRenderer(sink, MEMORY_NAMES, PREVIEWS);
   await session.send({ id: "00000000-0000-4000-8000-000000000001", content: "go" });
   for await (const event of session.events as AsyncIterable<SessionEvent>) {
     await renderer.feed(event);
@@ -87,31 +86,4 @@ test("a finished edit of a file previews as the tool's declared title", async ()
 test("a failed call ends its card in error", async () => {
   const cards = await cardsOf(say("Trying."), call("run", { command: "false" }, { isError: true }));
   assert.equal(cards.at(-1)?.status, "error");
-});
-
-function update(id: string, name: string, status: TaskUpdate["status"]): TaskUpdate {
-  return {
-    id,
-    title: `${name}: ${id}`,
-    status,
-    details: null,
-    output: null,
-    name,
-    task: false,
-    message: false,
-    calls: 0,
-    preview: null,
-    folded: null,
-    startedAt: null,
-  };
-}
-
-test("finished calls of a tool fold into the words the agent declares, one and many", () => {
-  const fold = new Fold(PREVIEWS);
-  fold.task(update("a", "run", "in_progress"));
-  const [one] = fold.task(update("a", "run", "complete"));
-  assert.equal(one?.title, "Executed 1 job");
-  fold.task(update("b", "run", "in_progress"));
-  const [two] = fold.task(update("b", "run", "complete"));
-  assert.equal(two?.title, "Executed 2 jobs");
 });

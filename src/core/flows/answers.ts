@@ -58,7 +58,7 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
       await talk.tell(ref, texts.APPROVAL_GONE);
       return false;
     }
-    await talk.removeRequest(ref, resolved.messageTs ?? message);
+    await talk.removeRequest(ref, resolved.messageId ?? message);
     return true;
   }
 
@@ -127,7 +127,7 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
           await talk.tell(ref, texts.HOLD_GONE);
           return false;
         }
-        await talk.removeRequest(ref, resolved.messageTs ?? message);
+        await talk.removeRequest(ref, resolved.messageId ?? message);
         return true;
       }
 
@@ -152,7 +152,7 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
           await talk.tell(ref, texts.HOLD_GONE);
           return false;
         }
-        await talk.removeRequest(ref, resolved.messageTs ?? message);
+        await talk.removeRequest(ref, resolved.messageId ?? message);
         return true;
       }
 

@@ -8,10 +8,9 @@ import { test } from "node:test";
 import type { FileChange, SessionEvent } from "../../../src/agent/seam.ts";
 import { NO_TOOL_WORDS } from "../../../src/agent/seam.ts";
 import type { TaskUpdate } from "../../../src/chat/seam.ts";
-import { Fold } from "../../../src/core/reply/fold.ts";
 import { Previews } from "../../../src/core/reply/previews.ts";
 import { type Sink, TurnRenderer } from "../../../src/core/reply/renderer.ts";
-import { PLAIN_NAMES } from "../../support/names.ts";
+import { MEMORY_NAMES } from "../../support/names.ts";
 import { PLAIN_TOOLS } from "../../support/plain-agent.ts";
 
 const PLAIN = new Previews(PLAIN_TOOLS);
@@ -59,7 +58,7 @@ function ended(callId: string, fileChange: FileChange | null = null): SessionEve
 
 async function drawn(events: readonly SessionEvent[]): Promise<Recording> {
   const sink = new Recording();
-  const renderer = new TurnRenderer(sink, PLAIN_NAMES, PLAIN, "/work/notes");
+  const renderer = new TurnRenderer(sink, MEMORY_NAMES, PLAIN, "/work/notes");
   for (const event of events) await renderer.feed(event);
   await renderer.close();
   return sink;
@@ -97,32 +96,6 @@ test("a tool the vocabulary does not name stays generic", async () => {
   const sink = await drawn([started("c1", "Edit", {}), ended("c1", CHANGE)]);
   assert.equal(sink.tasks.at(-1)?.preview, null);
   assert.equal(sink.tasks.at(-1)?.status, "complete");
-});
-
-function line(id: string, name: string, status: TaskUpdate["status"]): TaskUpdate {
-  return {
-    id,
-    title: id,
-    status,
-    details: null,
-    output: null,
-    name,
-    task: false,
-    message: false,
-    calls: 0,
-    preview: null,
-    folded: null,
-    startedAt: null,
-  };
-}
-
-test("finished calls of a declared tool fold into its declared words", () => {
-  const fold = new Fold(PLAIN);
-  fold.task(line("a", "run", "complete"));
-  const [card] = fold.task(line("b", "run", "complete"));
-  assert.equal(card?.title, "Executed 2 jobs");
-  const [other] = new Fold(PLAIN).task(line("a", "Bash", "complete"));
-  assert.equal(other?.title, "Bash");
 });
 
 test("a failed call is counted only for a tool that declares it", () => {

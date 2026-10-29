@@ -2,9 +2,8 @@
  * Commands typed as messages: `!word`. A few words are allaboard's own; any other
  * `!name args` is a Claude Code command, so a command a new Claude Code release adds works at once.
  *
- * Slack never delivers a message that starts with `/` to the bot (measured 2026-09-23), so
- * Claude Code's own slash is replaced by `!`, as the official Claude app for Slack does with its
- * `@Claude !word` commands.
+ * `!` is the product's own prefix in every chat: it leaves the agent's own command prefix free
+ * (`AgentWords.commandPrefix`) and works in a chat that never delivers a `/` message to a bot.
  */
 import type { CommandInfo } from "../agent/seam.ts";
 import type { CommandCandidate } from "../chat/seam.ts";
@@ -160,10 +159,12 @@ export const WORD = {
   untag: "untag",
   "delete-thread": "delete-thread",
   allaboard: "allaboard",
-  // Typed `!!`: Slack's `!` stands for the terminal's `/`, so `!!` stands for its `!`.
+  // Typed `!!`: the `!` of the owner's words stands for the terminal's `/`, so `!!` stands for its `!`.
   shell: "!",
 } as const satisfies Record<Exclude<Word["kind"], "invalid">, string>;
 
+// The most of a command's description `!help` shows on its line: the core's own choice since
+// `!help` listed the agent's commands, not a limit of any chat.
 export const DESCRIPTION_LIMIT = 100;
 
 /**

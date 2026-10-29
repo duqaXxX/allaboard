@@ -134,8 +134,8 @@ export class Talk {
 
   /** The mark that a word took effect, on the owner's own message, where the chat has one. */
   async acknowledge(ref: ThreadRef, message: MessageId): Promise<void> {
-    if (this.stopped || !this.deps.chat.capabilities.reactions) return;
-    await this.thread(ref).acknowledge(message);
+    if (this.stopped || !this.deps.chat.capabilities.acknowledgement) return;
+    await this.thread(ref).acknowledge?.(message);
   }
 
   /**
