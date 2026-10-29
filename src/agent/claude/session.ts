@@ -248,11 +248,20 @@ const SESSION_SIGNALS: Readonly<Record<string, string>> = {
   CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: "1",
 };
 
-// The name Claude Code writes on each line of the transcript, which tells the session's own lines
-// from a terminal's (`transcript.ts`). The SDK's default, which it applies only when the
-// environment it is given has none (`sdk.mjs` 0.3.312): the daemon's own may carry an editor's.
-// The session's alone: a `claude` the owner runs with `!!` is his own, as in a terminal.
-const ENTRYPOINT: Readonly<Record<string, string>> = { CLAUDE_CODE_ENTRYPOINT: OWN_ENTRYPOINT };
+// What the daemon's reading of the transcript stands on (`transcript.ts`); the session's alone, so
+// a `claude` the owner runs with `!!` is his own, as in a terminal.
+// - The name Claude Code writes on each line, which tells the session's own lines from a
+//   terminal's: the SDK's default, which it applies only when the environment it is given has
+//   none (`sdk.mjs` 0.3.312), and the daemon's own may carry an editor's.
+// - The transcript on disk before each `result`: Claude Code writes it through a queue it drains
+//   every 100 ms, and flushes that queue before it yields a turn's result only with
+//   `CLAUDE_CODE_EAGER_FLUSH` (Claude Code 2.1.312's own source; no page documents it). Without
+//   it a goal's or the stop hooks' lines could reach the next turn; 13 results of 13 had them on
+//   disk anyway (measured 2026-10-29).
+const TRANSCRIPT_ENVIRONMENT: Readonly<Record<string, string>> = {
+  CLAUDE_CODE_ENTRYPOINT: OWN_ENTRYPOINT,
+  CLAUDE_CODE_EAGER_FLUSH: "1",
+};
 
 /**
  * The environment a thread's session runs in: the terminal's defaults, under the daemon's own
@@ -319,9 +328,11 @@ export class ClaudeSession implements AgentSession {
   #command: CommandTurn | null = null;
   // An error result arrived before the process answered the start: a resume it refused.
   #startRefused = false;
-  // The transcript read of the record in hand: a hook's events wait for it, so they come after
-  // that record as they did before the pump awaited anything.
-  #reading: Promise<void> = Promise.resolve();
+  // The work on each record, in the order the records came: what the transcript holds before it,
+  // then its own events (`#handle`). A hook joins the same line when it runs, so its events come
+  // after every record that came before it: the SDK runs a hook from the loop that queues the
+  // records (`readMessages`, `sdk.mjs` 0.3.312) and does not wait for the stream to be read.
+  #work: Promise<void> = Promise.resolve();
   // The last read of the transcript failed: the next failure is not logged again.
   #transcriptFailed = false;
 
@@ -382,7 +393,7 @@ export class ClaudeSession implements AgentSession {
         // the daemon reads from the stream is not the owner's to turn off.
         env: {
           ...sessionEnvironment(variables),
-          ...ENTRYPOINT,
+          ...TRANSCRIPT_ENVIRONMENT,
           ...(resume !== null && forkOf !== undefined && forkSource(resume, forkOf)),
         },
       }),
@@ -419,21 +430,20 @@ export class ClaudeSession implements AgentSession {
     };
   }
 
+  /**
+   * A hook's events, in line behind the records that came before it; the hook answers at once, so
+   * Claude Code never waits on the daemon's reading. One of the hidden command's turn (Stop,
+   * PostToolUse) is as much the command's as its records: nothing of it reaches the core.
+   */
   #hook(events: (input: unknown) => SessionEvent[]): HookCallback {
     return async (input) => {
-      await this.#reading;
-      for (const event of events(input)) this.#deliver(event);
+      const hidden = this.#command !== null;
+      this.#inLine(() => {
+        if (hidden) return;
+        for (const event of events(input)) this.#queue.push(event);
+      }, "a hook's input");
       return {};
     };
-  }
-
-  /**
-   * An event that comes beside the stream (a hook, the transcript). One of the hidden command's
-   * turn (Stop, PostToolUse) is as much the command's as its records: nothing of it reaches the
-   * core.
-   */
-  #deliver(event: SessionEvent): void {
-    if (this.#command === null) this.#queue.push(event);
   }
 
   /**
@@ -456,54 +466,83 @@ export class ClaudeSession implements AgentSession {
   }
 
   /**
-   * Hands on what the process wrote to its transcript before `record`, so that it comes first
-   * (`transcript.ts`). A partial stream event passes by: what is written comes with whole records.
+   * Puts `work` in line after all the work before it. A failure of it is logged by `what` and
+   * stops nothing behind it: the line never rejects, so the stream's end always gets through.
    */
-  async #readTranscript(record: unknown): Promise<void> {
+  #inLine(work: () => Promise<void> | void, what: string): void {
+    this.#work = this.#work.then(work).catch((error: unknown) => {
+      logger.error(`could not read ${what}: ${errorName(error)}`);
+    });
+  }
+
+  /**
+   * Where the transcript reached when `record` came (`Transcript.mark`), for a record its read
+   * goes with; undefined for one it does not (a partial stream event: what is written comes with
+   * whole records). Taken as the record comes, before any later record is.
+   */
+  #markOf(record: unknown): number | null | undefined {
     const transcript = this.#config.transcript;
     if (transcript === undefined || !isRecord(record) || record.type === "stream_event") return;
     if (typeof record.session_id === "string") transcript.locate(record.session_id);
+    return transcript.mark();
+  }
+
+  /**
+   * The events of what the process wrote to its transcript up to `until` (`#markOf`), the lines
+   * before the record it was taken for; never rejects.
+   */
+  async #readTranscript(until: number | null | undefined): Promise<SessionEvent[]> {
+    const transcript = this.#config.transcript;
+    if (transcript === undefined || until === undefined) return [];
     let events: SessionEvent[];
     try {
-      events = transcriptEvents(await transcript.read());
+      events = transcriptEvents(await transcript.read(until));
     } catch (error) {
       // An unread transcript loses a goal's lines, not the session; it is read again at the next
       // record, and a failure that lasts is logged once.
       if (!this.#transcriptFailed)
         logger.error(`could not read the transcript: ${errorName(error)}`);
       this.#transcriptFailed = true;
-      return;
+      return [];
     }
     this.#transcriptFailed = false;
-    for (const event of events) this.#deliver(event);
+    return events;
+  }
+
+  /**
+   * What the transcript held when `record` came (up to `until`), then `record`'s own events;
+   * nothing of either for a record of the hidden command's turn.
+   */
+  async #handle(record: unknown, until: number | null | undefined, hidden: boolean): Promise<void> {
+    const written = await this.#readTranscript(until);
+    if (hidden) return;
+    for (const event of written) this.#queue.push(event);
+    // One record that fails to read must not end the session: its line logs it (`#inLine`).
+    for (const event of this.#translator.translate(record)) this.#queue.push(event);
   }
 
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
   async #pump(): Promise<void> {
     let reason = PROCESS_EXITED;
     try {
+      // Each record is taken as it comes and its work put in line: the loop never waits on a read,
+      // so a hook the SDK runs later is always put in line after it. Whether a record is the
+      // hidden command's is decided as it comes, when the command is.
       for await (const record of this.#query) {
-        this.#reading = this.#readTranscript(record);
-        await this.#reading;
         if (!this.#started && isRecord(record) && record.type === "result") {
           this.#startRefused = record.is_error === true;
         }
-        if (this.#command !== null) {
-          this.#readCommand(this.#command, record);
-          continue;
-        }
-        try {
-          for (const event of this.#translator.translate(record)) this.#queue.push(event);
-        } catch (error) {
-          // One record that fails to read must not end the session.
-          logger.error(`could not read a record: ${errorName(error)}`);
-        }
+        const until = this.#markOf(record);
+        const command = this.#command;
+        if (command !== null) this.#readCommand(command, record);
+        this.#inLine(() => this.#handle(record, until, command !== null), "a record");
       }
     } catch (error) {
       reason = lostName(error);
     }
     this.#ended = true;
     this.#command?.settle(new SessionClosedError());
+    await this.#work;
     if (!this.#closing) {
       logger.error(`session stopped: ${reason}`);
       this.#queue.push({ type: "process_lost", reason });

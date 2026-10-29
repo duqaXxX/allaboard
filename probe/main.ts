@@ -7,16 +7,18 @@
  *                                   run otherwise does when its scenes find a difference, the
  *                                   SDK's message types changed, or the last one is a week old
  *     node probe/main.ts --latest   run on the newest release on npm, in a temporary worktree
- *     node probe/main.ts --surface  check docs/sdk-surface.md alone and list its rows: no
- *                                   tokens
+ *     node probe/main.ts --surface  check docs/sdk-surface.md and the bundled CLI's variables
+ *                                   (CLI_VARIABLES), and list the table's rows: no tokens
  *     node probe/main.ts --commands list the commands that are new or gone on this release: no tokens
  *     node probe/main.ts --surface --from <sdk.d.ts>
  *                                   also list what this release adds to or removes from the
  *                                   declarations in that file, and the rows that rest on it
  *
  * It uses the owner's Claude Code login and real tokens (Haiku), which is why it is not part of
- * the test suite. Exit status: 0 certified, 3 a claim is BROKEN, 4 the stream carries a shape the
- * fixtures do not, 2 not every gesture claim could be proven; 1 is Node's own, for a crash.
+ * the test suite. Exit status: 0 certified, 3 a claim or a row of the SDK surface is BROKEN, or
+ * the bundled CLI no longer names a variable the daemon sets or cannot be read, 4 the stream
+ * carries a shape the fixtures do not, 2 not every gesture claim could be proven; 1 is Node's own,
+ * for a crash.
  *
  * Each claim is also sorted against the facts stored for the newest certified release below the
  * probed one (`probe/observations/<version>.json`): changed, no longer supported, newly supported,
@@ -61,9 +63,11 @@ import { runScenes } from "./scenes.ts";
 import { differences, fixtureRecords, loadAccepted, shapesReport } from "./shapes.ts";
 import {
   check as checkSurface,
+  cliReport,
   installedDeclarations,
   loadSurface,
   messageTypes,
+  missingFromCli,
   readReference,
   setAside,
   report as surfaceReport,
@@ -451,6 +455,16 @@ async function run(options: RunOptions): Promise<number> {
     console.log("Not certified: the package no longer defines a symbol the daemon uses.");
     return 3;
   }
+  const unread = missingFromCli();
+  console.log(`${cliReport(unread)}\n`);
+  if (unread === null || unread.length > 0) {
+    console.log(
+      unread === null
+        ? "Not certified: the bundled CLI could not be read for the variables the daemon sets."
+        : "Not certified: the bundled CLI no longer names a variable the daemon sets.",
+    );
+    return 3;
+  }
   // The commands of this release against the recorded list: a new one is typed in Slack from
   // the day the SDK is pinned. Read before the scenes, like the surface, and printed after the
   // claims: it asks for a look, and stops no certificate.
@@ -524,12 +538,14 @@ async function run(options: RunOptions): Promise<number> {
 async function showSurface(from: string | undefined): Promise<number> {
   const mapped = checkSurface(loadSurface(), await readReference(), setAside());
   console.log(surfaceReport(mapped, true));
+  const unread = missingFromCli();
+  console.log(cliReport(unread));
   if (from !== undefined) {
     // No session is started, so the commands of the release are not part of it.
     const added = addedToSdk(from, { new: [], gone: [] });
     if (added !== null) console.log(`\n${added || "The declarations are the same."}`);
   }
-  return mapped.broken ? 3 : 0;
+  return mapped.broken || unread === null || unread.length > 0 ? 3 : 0;
 }
 
 /**

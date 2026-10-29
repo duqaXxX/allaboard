@@ -12,7 +12,7 @@
  * starts a native binary that ships as a per-platform optional package, which the tests on every
  * platform could not rely on. `diff.ts` reads the surface of two releases with these readers.
  */
-import { readFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from "node:fs";
 import { basename, join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -641,6 +641,88 @@ export function report(result: Check, full = false): string {
     );
   }
   return lines.join("\n");
+}
+
+// The variables a thread's session is given that no page documents and only Claude Code's own
+// source reads (the transcript entry of `docs/sdk-surface.md`). A release whose bundled CLI no
+// longer names one, or whose CLI cannot be read, stops the run, as a symbol the package no longer
+// defines does.
+export const CLI_VARIABLES: readonly string[] = ["CLAUDE_CODE_EAGER_FLUSH"];
+
+/**
+ * The CLI the installed SDK bundles for `platform` (this machine's by default), or null when none
+ * is installed: its package is named for the platform, with a suffix for a libc variant
+ * (`claude-agent-sdk-linux-x64-musl`), and the exact name is preferred.
+ */
+export function bundledCli(
+  scope: string = join(ROOT, "node_modules", "@anthropic-ai"),
+  platform = `${process.platform}-${process.arch}`,
+): string | null {
+  if (!existsSync(scope)) return null;
+  const name = `claude-agent-sdk-${platform}`;
+  const packages = readdirSync(scope)
+    .filter((entry) => entry === name || entry.startsWith(`${name}-`))
+    .sort((a, b) => a.length - b.length);
+  for (const entry of packages) {
+    for (const file of ["claude", "claude.exe"]) {
+      const path = join(scope, entry, file);
+      if (existsSync(path)) return path;
+    }
+  }
+  return null;
+}
+
+/** How much of the CLI is read at a time: the binary is over 250 MB. */
+export const CLI_CHUNK = 4 * 1024 * 1024;
+
+/**
+ * Of `names`, those the CLI at `cli` no longer names anywhere; null when there is no CLI, or it
+ * cannot be read. Read a chunk at a time, keeping the end of each so that a name across two chunks
+ * is found, until every name is.
+ */
+export function missingFromCli(
+  names: readonly string[] = CLI_VARIABLES,
+  cli: string | null = bundledCli(),
+): string[] | null {
+  if (cli === null) return null;
+  const wanted = names.map((name) => Buffer.from(name));
+  const keep = Math.max(0, ...wanted.map((name) => name.length - 1));
+  const found = new Set<number>();
+  try {
+    const file = openSync(cli, "r");
+    try {
+      let carry = Buffer.alloc(0);
+      const chunk = Buffer.alloc(CLI_CHUNK);
+      while (found.size < wanted.length) {
+        const read = readSync(file, chunk, 0, chunk.length, null);
+        if (read === 0) break;
+        const window = Buffer.concat([carry, chunk.subarray(0, read)]);
+        wanted.forEach((name, index) => {
+          if (window.includes(name)) found.add(index);
+        });
+        carry = window.subarray(Math.max(0, window.length - keep));
+      }
+    } finally {
+      closeSync(file);
+    }
+  } catch {
+    return null;
+  }
+  return names.filter((_, index) => !found.has(index));
+}
+
+/**
+ * What the probe prints about `missingFromCli` of `names`, after the map's report. A name in the
+ * binary is not proof the CLI still acts on it: the release checklist asks for that look.
+ */
+export function cliReport(
+  missing: readonly string[] | null,
+  names: readonly string[] = CLI_VARIABLES,
+): string {
+  if (missing === null)
+    return "Bundled CLI: UNPROVEN, no bundled CLI of this platform could be read";
+  if (missing.length === 0) return `Bundled CLI: still names ${names.join(", ")}`;
+  return `Bundled CLI: BROKEN, no longer names ${missing.join(", ")}`;
 }
 
 /** The table of `docs/sdk-surface.md`. */

@@ -32,8 +32,8 @@ export function recordedEvents(name: string, sent: readonly string[] = []): Sess
 }
 
 /**
- * The events of `goal-lifecycle`, with the goal's changes its session store received, each where
- * it arrived: before the stream record the store's append came ahead of.
+ * The events of `goal-lifecycle`, with the goal's changes its transcript held, each where it was
+ * written: before the stream record its line came ahead of (recorded as a session store's appends).
  */
 export function goalLifecycleEvents(): SessionEvent[] {
   const appends = sdkJson("goal-lifecycle-store") as Array<{
