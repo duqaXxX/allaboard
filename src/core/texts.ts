@@ -512,6 +512,39 @@ export const FORK_COPY_LABEL = "the copy";
 export const FORK_OLD_FOLDER =
   "This session works in an earlier folder of the channel: a copy of it would start in the " +
   "channel's folder, where it does not exist.";
+// `!diff`'s answers.
+export const DIFF_TOP_LEVEL = "`!diff` works inside a session's thread, not in the channel.";
+export const DIFF_UNAVAILABLE = naming(
+  "`!diff` is not offered here: {chat} cannot show a list with controls and share a file in a " +
+    "thread, or {agent} keeps no record of the folders it trusts.",
+);
+export const DIFF_NOT_STARTED = "This session has not started yet: send it a message first.";
+// The terminal's `/diff` needs git as well.
+export const DIFF_NOT_A_REPOSITORY =
+  "This folder is not a git repository, so there is no diff to show.";
+// `{command}` is the line that asks {agent} for its trust, run in a terminal.
+export const DIFF_UNTRUSTED = naming(
+  "{agent} has not trusted this repository yet, so allaboard runs no git in it. Before you " +
+    "trust it, read its settings and hooks for {agent}: they run without asking once it is " +
+    "trusted. To trust it, run this line in the terminal, accept the trust dialog, then send " +
+    "`!diff` again: {command}",
+);
+export const DIFF_VIEW_CURRENT = "Current";
+// The view of what one turn edited, numbered from the first prompt of the process that runs.
+export const DIFF_VIEW_TURN = "T{turn}";
+export const DIFF_CLEAN = "No changes: the working tree matches HEAD.";
+export const DIFF_FAILED = "git could not list the changes, or took too long.";
+export const DIFF_TITLE = "Changed files";
+export const DIFF_STALE = "That list belongs to another session. Send `!diff` again.";
+// A file picked from a list. `{path}` is the file, shown as written.
+export const DIFF_FILE_GONE = "`{path}` no longer differs from HEAD.";
+export const DIFF_FILE_BINARY = "`{path}` is binary: git shows no text diff for it.";
+export const DIFF_FILE_TOO_LARGE = naming(
+  "The diff of `{path}` is over {limit} bytes, the most {chat} takes as one file.",
+);
+export const DIFF_FILE_FAILED = "git could not read the diff of `{path}`.";
+export const DIFF_FILE_REFUSED = naming("{chat} did not take the diff of `{path}`: {error}.");
+export const DIFF_VIEW_GONE = "That view is no longer available. Send `!diff` again.";
 export const TERMINAL_TOP_LEVEL =
   "`!terminal` works inside a session's thread, not in the channel.";
 // Shown only for an agent with no terminal to continue a session in.
@@ -650,6 +683,10 @@ export const HELP_WORDS: readonly Named[] = [
     "`/fork` does: the copy keeps this session's settings and starts on the prompt, or waits for " +
     "your first message there; this thread goes on as it was; inside a thread, refused in the " +
     "channel",
+  "`!diff` the files this session's repository has changed since HEAD, untracked files " +
+    "included, as the terminal's `/diff` lists them; a button per file shares its diff into the " +
+    "thread, and once the session edited files a selector shows a turn's edits; inside a " +
+    "thread, refused in the channel",
   "`!bind [folder]` the folders {agent} trusts, or bind this channel to one, its path " +
     "relative to the allowed root; in the channel, refused inside a thread",
   "`!bypass on|off` run every tool without asking, until `!bypass off`; it survives a " +
@@ -812,6 +849,14 @@ export const GUIDE_FILES = naming(
     "file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file " +
     "whose path contains them, or lists the files that do. The search reads the folder from disk and " +
     "leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
+);
+export const GUIDE_DIFF = naming(
+  "**Changes**\n" +
+    "`!diff`, sent inside a session's thread, lists the files that differ from HEAD in its git " +
+    "repository, untracked ones included, with the lines added and removed; **Diff** on a row " +
+    "shares that file's diff into the thread, where {chat} opens it in its file viewer. Once the " +
+    "session has edited files, a selector also shows the edits of one turn. It works in a " +
+    "repository you trusted.",
 );
 export const GUIDE_BYPASS = naming(
   "**Bypass**\n" +

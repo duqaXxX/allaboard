@@ -114,11 +114,15 @@ export class UsageCache {
  * `git` on `repository`: its output, or null when it fails. The caller holds the time limit
  * (`gitState` here, `openfile` for `!open`) through `signal`, which kills the process and
  * rejects with its reason, and chooses commands that never write the index (see `changesOf`).
+ * With `maxBytes`, the process is killed once it has written more than that, and what was read
+ * so far (more than `maxBytes` bytes) is the answer: a caller that bounds what it keeps needs
+ * no more.
  */
 export function runGit(
   repository: Repository,
   args: readonly string[],
   signal?: AbortSignal,
+  maxBytes?: number,
 ): Promise<string | null> {
   if (repository.gitDir === null) {
     return Promise.resolve(null);
@@ -153,14 +157,24 @@ export function runGit(
       reject(signal?.reason);
     };
     signal?.addEventListener("abort", onAbort, { once: true });
-    child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+    let collected = 0;
+    let capped = false;
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (capped) return;
+      chunks.push(chunk);
+      collected += chunk.length;
+      if (maxBytes !== undefined && collected > maxBytes) {
+        capped = true;
+        child.kill("SIGKILL");
+      }
+    });
     child.once("error", () => {
       signal?.removeEventListener("abort", onAbort);
       resolve(null);
     });
     child.once("close", (code) => {
       signal?.removeEventListener("abort", onAbort);
-      resolve(code === 0 ? Buffer.concat(chunks).toString("utf8") : null);
+      resolve(code === 0 || capped ? Buffer.concat(chunks).toString("utf8") : null);
     });
   });
 }

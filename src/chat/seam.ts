@@ -180,8 +180,10 @@ export interface ChatCapabilities {
   readonly acknowledgement: boolean;
   /** `ThreadChat.showActivity` and `activityRefused`. */
   readonly activityLine: boolean;
-  /** `ChatProvider.openFile`. */
+  /** `ChatProvider.openFile` and `ThreadChat.share`. */
   readonly fileUpload: boolean;
+  /** `ThreadChat.offer`: a list with a control per row, posted in a session's thread. */
+  readonly threadLists: boolean;
   /** `ChatProvider.tagThread`. */
   readonly threadTags: boolean;
   /** `ChatProvider.titleThread`. */
@@ -375,6 +377,24 @@ export interface ThreadChat {
    * when the chat did not remove it and it still shows.
    */
   withdraw(request: MessageId): Promise<boolean>;
+  /**
+   * Posts a list in the thread, each row with its control; `title` is the list in one line.
+   * With `replacing`, the message of an earlier list is drawn again as this one, in place.
+   * Resolves with the message that shows it; rejects with `ChatError` when the chat refused.
+   * Present with `threadLists`.
+   */
+  offer?(list: ThreadList, title: string, replacing?: MessageId): Promise<MessageId>;
+  /**
+   * Shares a file into the thread: `name` is its file name, `title` what the chat shows for it.
+   * Nothing is posted by the daemon on success. Rejects with a `ChatError` whose name is the
+   * reason when the chat refused (a file over its own size limit, a missing permission). Present
+   * with `fileUpload`.
+   */
+  share?(file: {
+    readonly name: string;
+    readonly title: string;
+    readonly content: Uint8Array;
+  }): Promise<void>;
   /**
    * Rewrites an answered question into the record of its answers, with nothing left to press.
    * Rejects with `ChatError` when the chat refuses the rewrite.
@@ -589,6 +609,32 @@ export type OwnerList =
       readonly sharing: readonly (string | null)[];
     };
 
+/** One changed file of a diff list: its path from the repository's root, and its line counts. */
+export interface DiffRow {
+  readonly path: string;
+  readonly added: number;
+  readonly removed: number;
+  /** It has no text diff: the row shows its counts as unknown and offers no control. */
+  readonly binary: boolean;
+}
+
+/** A list a word posts in a session's thread (`ThreadChat.offer`), each row with a control of its own. */
+export type ThreadList =
+  /**
+   * The changed files of a session (`!diff`), one view of them: `view` is the id of the view
+   * shown, one of `views` (a list of one or more, the first being the files as they are now).
+   * Each row has a control that shares that file's diff. `session` is the session the list was
+   * made for, which a pick hands back. The provider decides how many rows it draws and how it
+   * says that more exist.
+   */
+  {
+    readonly type: "diff";
+    readonly view: string;
+    readonly views: readonly { readonly id: string; readonly label: string }[];
+    readonly files: readonly DiffRow[];
+    readonly session: string;
+  };
+
 /** What the owner picked from an `OwnerList`. `list` is the message that showed it. */
 export type ListPick =
   | {
@@ -615,6 +661,23 @@ export type ListPick =
       readonly channel: string | null;
       readonly version: string;
       readonly list: MessageId | null;
+    }
+  /** The control of a file of a diff list: `path` as the row carried it, which is untrusted. */
+  | {
+      readonly type: "diff-file";
+      readonly ref: ThreadRef;
+      readonly session: string;
+      readonly view: string;
+      readonly path: string;
+      readonly list: MessageId;
+    }
+  /** The selector of a diff list: `view` as the option carried it, which is untrusted. */
+  | {
+      readonly type: "diff-view";
+      readonly ref: ThreadRef;
+      readonly session: string;
+      readonly view: string;
+      readonly list: MessageId;
     };
 
 /**
@@ -792,6 +855,11 @@ export interface ChatProvider {
    * `target` names, into the thread. Present with `fileUpload`.
    */
   openFile?(ref: ThreadRef, folder: string, target: string): Promise<void>;
+  /**
+   * The most bytes `ThreadChat.share` takes as one file; the core shares nothing larger and tells
+   * the owner. Present with `fileUpload`.
+   */
+  readonly fileLimit?: number;
   /**
    * `!tag` and `!untag` typed in a session's thread: shows `tag` on the thread where the owner
    * looks at the channel and keeps the thread at hand; null takes both away. Rejects with a

@@ -24,8 +24,10 @@ allaboard runs Claude Code on the owner's machine on behalf of one Slack user. I
 - a reply that notifies anyone: a mention sequence (`<!here>`, `<!channel>`, `<@…>`) in Claude's
   words that reaches Slack as a mention;
 - a session started in a folder the owner has not trusted in Claude Code;
-- the daemon's own git (the footer, `!status`, `!open`) run in a repository the owner has not
-  trusted in Claude Code.
+- the daemon's own git (the footer, `!status`, `!open`, `!diff`) run in a repository the owner has not
+  trusted in Claude Code, or `!diff` run git with an external diff or a text conversion filter: it
+  reads the repository with plumbing commands, `--no-ext-diff` and `--no-textconv`, and never
+  writes its index.
 - a version of the npm package `allaboard` that the Release workflow
   (`.github/workflows/release.yml`) did not publish from a tag of this repository, apart from the
   first, published by hand (see CONTRIBUTING.md, Releases), or a way to publish one without the

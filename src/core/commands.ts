@@ -58,6 +58,11 @@ export interface Fork {
   readonly prompt: string;
 }
 
+/** `!diff`: the files the session changed in its repository, each with a control that shares its diff. */
+export interface Diff {
+  readonly kind: "diff";
+}
+
 /** `!terminal`: the session moves to a terminal on the host, a running turn with it. */
 export interface Terminal {
   readonly kind: "terminal";
@@ -130,6 +135,7 @@ export type Word =
   | Skills
   | Terminal
   | Fork
+  | Diff
   | Resume
   | Open
   | Tag
@@ -153,6 +159,7 @@ export const WORD = {
   skills: "skills",
   terminal: "terminal",
   fork: "fork",
+  diff: "diff",
   resume: "resume",
   open: "open",
   tag: "tag",
@@ -242,6 +249,9 @@ export function parseBang(text: string): Command | null {
       break;
     case "fork":
       return { kind: "fork", prompt: rest };
+    case "diff":
+      // The terminal's `/diff` takes no argument; anything after the word is a mistake.
+      return rest === "" ? { kind: "diff" } : { kind: "invalid" };
     case "resume":
       return { kind: "resume", target: rest };
     case "open":

@@ -620,7 +620,7 @@ The bot answers one person, and the rest of this list protects what that person 
 - With Chrome enabled by default in Claude Code, a session from Slack acts in your browser with
   your sign-ins, and a thread in bypass may do so without asking. Leave it off in `/chrome` if
   you do not want that reachable from Slack.
-- The footer, `!status` and `!open` run git only in a repository you trusted in Claude Code by
+- The footer, `!status`, `!open` and `!diff` run git only in a repository you trusted in Claude Code by
   itself, since a repository's config can name filters git would run outside the approval prompt.
   Accept the dialog only for a repository whose config you know ([How trust applies to
   git](#how-trust-applies-to-git)).
@@ -1260,6 +1260,7 @@ a `!` is never a command.
 | `!help [text]` | Lists allaboard's own words | Lists them and the session's commands |
 | `!open` | Refused | Opens a file picker |
 | `!open <path or words>` | Refused | Shares that file into the thread |
+| `!diff` | Refused | Lists the files that differ from HEAD in the session's git repository, with a **Diff** button each |
 | `!tag <name>` | Refused | Puts `[name]` at the start of the thread's first message, pins it, and tags the session in Claude Code |
 | `!untag` | Refused | Takes the tag and the pin away |
 | `!delete-thread` | Refused | Asks you to confirm, then deletes the thread |
@@ -1318,6 +1319,9 @@ command the agent does not list is not offered.
 - `!open <path or words>`
   - At the top level: Refused, as above
   - In a thread: Shares the file at that path, relative to the session's folder, into the thread. Words that are no path open the file whose path contains them, in the same listing as the search, ignoring case; several matches post ``N files match `<words>` `` with the `Choose a file` button, which opens the modal with the words in its field. ``No file matches `<words>`.`` when none does. A path outside the folder, one that is no regular file, an empty file and a file over 1 MB are refused with a line only you see; `files:write` missing says so, and any other refusal by Slack shows Slack's error code
+- `!diff`
+  - At the top level: Refused, in a post in the channel: ``!diff` works inside a session's thread, not in the channel.``
+  - In a thread: The terminal's `/diff`, `Current` view. Posts a message listing the files that differ between the working tree and HEAD in the git repository that holds the session's folder, untracked files that `.gitignore` does not exclude included: the path, `+added −removed`, and a **Diff** button that shares that file's unified diff into the thread as `<name>.diff`, where Slack opens it in its file viewer. A binary file, or an untracked one over 1 MB, is listed as `binary` with no button. Past 45 files the message says how many more there are. Once the session has edited files with Claude's Write and Edit tools, a selector adds a view per turn (`T1`, `T2`, ...) that lists what that turn edited, from the hunks Claude Code reports for those calls, and shares only that turn's hunks; the turns are those this daemon ran since it started or the session's process last started, and a change made by a shell command appears under `Current` only. The list is read when you send the word and the diff when you press the button, so a file committed meanwhile answers ``<path>` no longer differs from HEAD.` A list made for another session answers ``That list belongs to another session. Send `!diff` again.`` Refused with ``This folder is not a git repository, so there is no diff to show.`` outside git; for a repository you have not trusted in Claude Code, with the line that asks for the trust; ``No changes: the working tree matches HEAD.`` when nothing differs. A diff over 1,048,576 bytes (Slack's limit for a snippet) is not collected: the line says ``The diff of `<path>` is over 1048576 bytes, the most Slack takes as one file.`` A path the list did not hold shares nothing. A refusal by Slack (`files:write` missing) shows Slack's code in the line
 - `!tag <name>`
   - At the top level: Refused, in a post in the channel: ``A tag belongs to one session: send `!tag <name>` or `!untag` inside its thread.``
   - In a thread: Puts `[name]`, in inline code, and a space at the start of the thread's first message, replacing a tag already there, and pins that message to the channel. The name is 1 to 40 letters, digits, `.`, `_` or `-`, kept as typed; a missing or refused name shows the list of words. The first message is yours, so the edit and the pin are made with `SLACK_USER_TOKEN` (user scopes `chat:write` and `pins:write`): Slack shows `Pinned by you`, adds `(edited)` to the message and posts nothing else. When the thread's session has an id, Claude Code's own tag for it is set to the same name too (its `/resume` picker prints it as `#name`); a thread whose session has not started yet is tagged in Slack alone. The answer is ✅ on your word and no line of text. The Home tab shows the tag and the pin on the session's row after the word ("Finding a session again: the Home tab"). A refusal by Slack reaches you in the error line of any failed word, with Slack's code; if only Claude Code's tag fails, ``Slack shows the change, but Claude Code's own tag for this session did not change.`` follows, and the tag in Slack stays. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot tag a thread here, so `!tag` and `!untag` do nothing.`` and `!help` and `!guide` leave it out
@@ -1990,11 +1994,11 @@ uses.
 
 A worktree is covered by its main checkout while git registers it there: after moving a
 worktree's folder by hand, run `git worktree repair` in it. The footer and `!status` show the
-branch and the uncommitted lines, and `!open` lists the changed files, only where git may run: in
+branch and the uncommitted lines, `!open` lists the changed files and `!diff` their diffs, only where git may run: in
 a repository you trusted in Claude Code. A trusted folder does not stand for a repository inside
 it. A bound folder that is not a repository itself and holds one a level or two below it shows
 them for that repository once you open `claude` in it and accept the trust dialog. Without that
-trust the footer leaves the branch and the lines out, `!open` lists no changed files there, and
+trust the footer leaves the branch and the lines out, `!open` lists no changed files there, `!diff` is refused, and
 its search reads that repository from disk, the files its `.gitignore` names included.
 
 The answer to `!bind`, and `!status` inside a thread, name the repositories one or two levels

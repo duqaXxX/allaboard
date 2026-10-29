@@ -48,6 +48,7 @@ import type {
   Question,
   QuestionAnswer,
   QuestionRequest,
+  Repository,
   RequestHandler,
   SavedMessage,
   ScheduledJob,
@@ -799,6 +800,15 @@ export interface PlainAgentOptions {
   readonly noTerminal?: true;
   /** Each session is named when it starts, not with its first prompt. */
   readonly namedAtStart?: true;
+  /**
+   * The agent keeps a record of trust (`folderTrust`): every folder may hold a session, and the
+   * repository of a folder is what `repository` answers while `trusted` says the folder is
+   * trusted. Its line to ask for trust is `trust {directory}`.
+   */
+  readonly trust?: {
+    readonly repository: (folder: string) => Promise<Repository | null>;
+    readonly trusted: (folder: string) => boolean;
+  };
 }
 
 /** How the plain agent is told of a shell command: one text, which a test reads back. */
@@ -827,6 +837,9 @@ export class PlainAgent implements AgentBackend {
   readonly foreign = new Map<string, ForeignTurns>();
   /** Every `turnsAfter` asked, as `session after-id`. */
   readonly foreignAsked: string[] = [];
+  folderTrusted?: (folder: string) => Promise<boolean>;
+  trustedRepository?: (folder: string) => Promise<Repository | null>;
+  untrustedRepository?: (folder: string) => Promise<Repository | null>;
   sessionHolders?: (session: string) => Promise<readonly SessionHolder[] | null>;
   turnsAfter?: (folder: string, session: string, after: SavedMessage) => Promise<ForeignTurns>;
   /** What each live session answers to `loaded`, with `loadedContext`. */
@@ -835,10 +848,12 @@ export class PlainAgent implements AgentBackend {
   readonly #namedAtStart: boolean;
 
   constructor(options: PlainAgentOptions = {}) {
-    this.words =
+    const words =
       options.noTerminal === true
         ? Object.freeze({ ...PLAIN_WORDS, terminal: null, terminalContinue: null })
         : PLAIN_WORDS;
+    this.words =
+      options.trust === undefined ? words : Object.freeze({ ...words, trust: "trust {directory}" });
     this.store = options.store ?? new PlainStore();
     this.turns = options.turns ?? [];
     this.capabilities = PLAIN_CAPABILITIES;
@@ -850,6 +865,13 @@ export class PlainAgent implements AgentBackend {
     }
     if (this.loaded !== null) {
       this.capabilities = Object.freeze({ ...this.capabilities, loadedContext: true });
+    }
+    if (options.trust !== undefined) {
+      const { repository, trusted } = options.trust;
+      this.capabilities = Object.freeze({ ...this.capabilities, folderTrust: true });
+      this.folderTrusted = async () => true;
+      this.trustedRepository = async (folder) => (trusted(folder) ? repository(folder) : null);
+      this.untrustedRepository = async (folder) => (trusted(folder) ? null : repository(folder));
     }
     if (options.shell !== undefined) {
       this.capabilities = Object.freeze({ ...this.capabilities, shellCommands: true });

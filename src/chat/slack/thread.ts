@@ -47,6 +47,7 @@ import {
   type SessionStatus,
   type StatusOptions,
   type ThreadChat,
+  type ThreadList,
   type ThreadRef,
 } from "../seam.ts";
 import type { AppConfig, Fetch } from "./app/answers.ts";
@@ -60,7 +61,9 @@ import type { ThreadDeletion } from "./delete.ts";
 import { formatFooter, slackTime } from "./footer.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
+import { diffBlocks } from "./lists.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
+import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
 import { contextBlock, footerBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
@@ -204,6 +207,7 @@ const CAPABILITIES = {
   acknowledgement: true,
   activityLine: true,
   fileUpload: true,
+  threadLists: true,
   commandSuggestions: true,
   loopCard: true,
   threadOpen: true,
@@ -213,6 +217,8 @@ const CAPABILITIES = {
 export class SlackChat implements ChatProvider {
   readonly name = "Slack";
   readonly capabilities: ChatCapabilities;
+  /** Slack's limit for a snippet, the most a shared file may hold. */
+  readonly fileLimit = SNIPPET_LIMIT;
   /**
    * The bot of the workspace, and the app-level token of the connection when there is one: the
    * two things a copied `.env` can leave the same, each of which makes Socket Mode spread events
@@ -874,6 +880,55 @@ export class SlackThread implements ThreadChat {
   private nameWaiting(request: OwnerRequest, ts: string): void {
     if (!waitsOnOwner(request)) return;
     void this.options.line?.show(this.channel, this.threadTs, "waiting", ts);
+  }
+
+  async offer(list: ThreadList, title: string, replacing?: MessageId): Promise<MessageId> {
+    // Built to Block Kit's reference by the module that makes them: opaque to the library's types.
+    const blocks = diffBlocks(list, title) as unknown as KnownBlock[];
+    try {
+      if (replacing !== undefined) {
+        // One more chat.update against the app's budget, which every reply draws from.
+        await this.options.limiter.acquire();
+        await this.slack.chat.update({ channel: this.channel, ts: replacing, text: title, blocks });
+        return replacing;
+      }
+      const posted = await this.slack.chat.postMessage({
+        channel: this.channel,
+        thread_ts: this.threadTs,
+        text: title,
+        blocks,
+        unfurl_links: false,
+        unfurl_media: false,
+      });
+      // The message is the only handle on its buttons: one Slack did not name cannot be redrawn.
+      if (typeof posted.ts !== "string" || posted.ts === "") throw new ChatError("no_ts");
+      this.postedOwn(posted.ts);
+      this.written();
+      return posted.ts;
+    } catch (error) {
+      if (error instanceof Cancelled || error instanceof ChatError) throw error;
+      throw new ChatError(describe(error), { cause: error });
+    }
+  }
+
+  async share(file: {
+    readonly name: string;
+    readonly title: string;
+    readonly content: Uint8Array;
+  }): Promise<void> {
+    try {
+      await shareFile(
+        this.slack,
+        this.channel,
+        this.threadTs,
+        Buffer.from(file.content),
+        file.name,
+        file.title,
+      );
+    } catch (error) {
+      // Slack's own code, never the file or its path.
+      throw new ChatError(describe(error), { cause: error });
+    }
   }
 
   async withdraw(request: MessageId): Promise<boolean> {

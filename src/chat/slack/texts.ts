@@ -168,6 +168,11 @@ export const RESUME_NONE_LEFT = "No session to resume in `{directory}`.";
 // Under the list: the sessions a thread already holds, counted and not listed.
 export const RESUME_OPEN_ONE = "1 more is open in its own thread.";
 export const RESUME_OPEN_MANY = "{count} more are open in their own threads.";
+// A diff list (`!diff`): a button per file and a selector of views.
+export const DIFF_BUTTON = "Diff";
+export const DIFF_VIEW_PLACEHOLDER = "View";
+export const DIFF_BINARY = "binary";
+export const DIFF_MORE = "Only the first {rows} of {count} files are shown.";
 export const RESUME_BUTTON = "Resume";
 export const RESUME_MORE =
   "Only the newest {rows} are shown: `!resume <id>`, or `!resume <title>` for a session that " +

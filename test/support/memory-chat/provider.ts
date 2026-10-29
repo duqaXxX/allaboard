@@ -30,6 +30,7 @@ import {
   type RunningList,
   type TaskUpdate,
   type ThreadChat,
+  type ThreadList,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
 import { DAEMON, type MessageKind, type Placed, type Room, type StoredMessage } from "./room.ts";
@@ -40,6 +41,7 @@ const CAPABILITIES: ChatCapabilities = {
   acknowledgement: false,
   activityLine: false,
   fileUpload: false,
+  threadLists: false,
   threadTags: false,
   threadTitles: false,
   threadDelete: false,
@@ -290,13 +292,55 @@ function answered(
 // The loop card of each thread, by room: a thread object is made afresh for every lookup.
 const loopCards = new WeakMap<Room, Map<string, StoredMessage>>();
 
+/** A list as one message: its title, then a line per file with its counts. */
+function listText(list: ThreadList, title: string): string {
+  const rows = list.files.map((file) =>
+    file.binary ? `${file.path} binary` : `${file.path} +${file.added} -${file.removed}`,
+  );
+  const views = list.views.map((view) => (view.id === list.view ? `[${view.label}]` : view.label));
+  return [title, views.join(" "), ...rows].join("\n");
+}
+
 class MemoryThread implements ThreadChat {
   readonly #room: Room;
   readonly #ref: ThreadRef;
+  /** Present with `threadLists`. */
+  readonly offer?: (list: ThreadList, title: string, replacing?: MessageId) => Promise<MessageId>;
+  /** Present with `fileUpload`. */
+  readonly share?: (file: {
+    readonly name: string;
+    readonly title: string;
+    readonly content: Uint8Array;
+  }) => Promise<void>;
 
-  constructor(room: Room, ref: ThreadRef) {
+  constructor(room: Room, ref: ThreadRef, lists: boolean, files: boolean) {
     this.#room = room;
     this.#ref = ref;
+    if (lists) {
+      this.offer = async (list, title, replacing) => {
+        const text = listText(list, title);
+        const held = replacing === undefined ? null : room.message(replacing);
+        let message: StoredMessage;
+        if (held === null) {
+          message = room.write(ref.channel, ref.thread, DAEMON, text, "list");
+        } else {
+          room.edit(held, text);
+          message = held;
+        }
+        room.addThreadList({ message: message.id, ref, list, title }, replacing);
+        return message.id;
+      };
+    }
+    if (files) {
+      this.share = async (file) => {
+        room.addShared({
+          ref,
+          name: file.name,
+          title: file.title,
+          content: Buffer.from(file.content).toString("utf8"),
+        });
+      };
+    }
   }
 
   openReply(onOpenMessage: OpenMessageChange): Reply {
@@ -458,15 +502,34 @@ export class MemoryProvider implements ChatProvider {
   readonly name = "Memory chat";
   readonly identities: readonly string[];
   readonly capabilities: ChatCapabilities;
+  /** Present with `fileUpload`. */
+  readonly fileLimit?: number;
   /** Present with `commandSuggestions`: the suggestion is a message the owner sends a text from. */
   readonly suggestCommands?: (ref: ThreadRef, suggestion: CommandSuggestion) => Promise<void>;
   readonly #room: Room;
+  readonly #lists: boolean;
+  readonly #files: boolean;
   #inbound: ChatInbound | null = null;
 
-  constructor(room: Room, identities: readonly string[], suggests = false) {
+  constructor(
+    room: Room,
+    identities: readonly string[],
+    suggests = false,
+    lists = false,
+    files = false,
+    fileLimit = 1 << 20,
+  ) {
     this.#room = room;
     this.identities = identities;
-    this.capabilities = { ...CAPABILITIES, commandSuggestions: suggests };
+    this.#lists = lists;
+    this.#files = files;
+    if (files) this.fileLimit = fileLimit;
+    this.capabilities = {
+      ...CAPABILITIES,
+      commandSuggestions: suggests,
+      threadLists: lists,
+      fileUpload: files,
+    };
     if (suggests) {
       this.suggestCommands = async (ref, suggestion) => {
         const lines = suggestion.candidates.map((c) => `${c.text} ${c.description}`.trim());
@@ -485,7 +548,7 @@ export class MemoryProvider implements ChatProvider {
   thread(ref: ThreadRef): ThreadChat {
     // A thread is a name the chat gave out: the core builds none from something else (a message id).
     if (this.#room.openedAt(ref) === null) this.#room.stray(`thread ${ref.channel}/${ref.thread}`);
-    return new MemoryThread(this.#room, ref);
+    return new MemoryThread(this.#room, ref, this.#lists, this.#files);
   }
 
   channel(channel: string): ChannelChat {

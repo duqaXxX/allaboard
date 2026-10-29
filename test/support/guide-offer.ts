@@ -14,6 +14,7 @@ export const EVERYTHING_OFFERED: GuideOffer = {
   loadedContext: true,
   forks: true,
   fileUpload: true,
+  diff: true,
   threadTags: true,
   threadDelete: true,
   shell: true,

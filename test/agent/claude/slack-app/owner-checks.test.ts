@@ -34,6 +34,12 @@ import {
   TODAY,
 } from "../../../../src/chat/slack/home.ts";
 import {
+  DIFF_FILE_ACTION,
+  DIFF_VIEW_ACTION,
+  fileValue,
+  viewValue,
+} from "../../../../src/chat/slack/lists.ts";
+import {
   QUESTION_EDIT,
   SHELL_CANCEL,
   SHELL_RUN,
@@ -55,6 +61,7 @@ import {
 } from "../../../../src/chat/slack/suggest.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { UPDATE_ACTION } from "../../../../src/chat/slack/update.ts";
+import * as coreTexts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import { BOT, CHANNEL, OTHER_TEAM, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
 import { NAMES } from "../../../support/names.ts";
@@ -87,6 +94,7 @@ import {
   respondedTo,
   resumeClick,
   SESSION_A,
+  selectIn,
   setupState,
   submitOn,
   submitted,
@@ -444,6 +452,44 @@ const CASES: readonly Case[] = [
       return {
         body: sentBy(resumeClick(SESSION_A, THREAD), sender),
         acted: () => world.state.thread(CHANNEL, THREAD) !== null,
+      };
+    },
+  },
+  {
+    // The session is not the thread's: the core answers a stale list with a line only the owner
+    // reads, which is what shows the pick reached it.
+    listener: `action ${DIFF_FILE_ACTION}`,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          clickIn(
+            DIFF_FILE_ACTION,
+            fileValue("other-session", "current", "a.txt"),
+            CHANNEL,
+            THREAD,
+            {
+              messageTs: THREAD,
+            },
+          ),
+          sender,
+        ),
+        acted: () => world.ephemerals().includes(coreTexts.DIFF_STALE),
+      };
+    },
+  },
+  {
+    listener: `action ${DIFF_VIEW_ACTION}`,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          selectIn(DIFF_VIEW_ACTION, viewValue("other-session", "current"), CHANNEL, THREAD, {
+            messageTs: THREAD,
+          }),
+          sender,
+        ),
+        acted: () => world.ephemerals().includes(coreTexts.DIFF_STALE),
       };
     },
   },

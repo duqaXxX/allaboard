@@ -2,6 +2,7 @@
 import type { ListPick } from "../../chat/seam.ts";
 import { asking } from "./asking.ts";
 import type { OtherFlows } from "./contract.ts";
+import { diffFlow } from "./diff.ts";
 import { rootGone } from "./gone.ts";
 import { Inbound } from "./inbound.ts";
 import { lists } from "./lists.ts";
@@ -18,6 +19,7 @@ export function buildFlows(deps: FlowDeps): Built {
   const talk = new Talk(deps);
   const { setup, hold, terminal, answers } = asking(deps, talk);
   const { resume, bind, picks } = lists(deps, talk);
+  const diff = diffFlow(deps, talk);
   const allaboard = deps.updates === undefined ? undefined : updating(deps, deps.updates, talk);
   const flows: OtherFlows = {
     setup,
@@ -25,6 +27,7 @@ export function buildFlows(deps: FlowDeps): Built {
     terminal,
     resume,
     bind,
+    diff,
     ...(allaboard ? { allaboard } : {}),
   };
   const all = messages(deps, talk, flows);
@@ -48,7 +51,11 @@ export function buildFlows(deps: FlowDeps): Built {
         await Promise.all([told, all.message(message)]);
       },
       answer: (ref, requestId, answer, message) => answers.answer(ref, requestId, answer, message),
-      picked: (pick) => (pick.type === "update" ? updatePicked(pick) : picks.picked(pick)),
+      picked: (pick) => {
+        if (pick.type === "update") return updatePicked(pick);
+        if (pick.type === "diff-file" || pick.type === "diff-view") return diff.picked(pick);
+        return picks.picked(pick);
+      },
       unbound: (channel) => talk.unbound(channel),
       rootGone: rootGone(deps),
     }),

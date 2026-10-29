@@ -15,6 +15,12 @@ import { ChannelGuard } from "../../src/chat/slack/app/guards.ts";
 import { BIND_ACTION } from "../../src/chat/slack/bind.ts";
 import { HOLD_CANCEL, HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
 import {
+  DIFF_FILE_ACTION,
+  DIFF_VIEW_ACTION,
+  fileValue,
+  viewValue,
+} from "../../src/chat/slack/lists.ts";
+import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
   QUESTION_OPEN,
@@ -49,6 +55,7 @@ import {
   message,
   picked,
   reply,
+  selectIn,
   setupState,
   submitOn,
   type World,
@@ -82,6 +89,12 @@ function memoryPerson(
     picks: async (listed, row) => {
       await person.picks(listed.message, row);
     },
+    picksFile: async (listed, path) => {
+      await person.picksFile(listed.message, path);
+    },
+    picksView: async (listed, view) => {
+      await person.picksView(listed.message, view);
+    },
     deletes: async (said) => {
       await person.deletes(said);
     },
@@ -93,7 +106,7 @@ function memoryPerson(
 }
 
 async function memoryRig(threadIds: "own" | "opening" = "own"): Promise<ChatRig> {
-  const chat = memoryChat({ suggestions: true, threadIds });
+  const chat = memoryChat({ suggestions: true, threadIds, lists: true });
   const provider = await chat.build({
     variables: {},
     allowedRoot: "/work",
@@ -299,6 +312,28 @@ function slackPerson(
           return;
         }
       }
+    },
+    picksFile: async (listed, path): Promise<void> => {
+      await dispatch(
+        clickIn(
+          DIFF_FILE_ACTION,
+          fileValue(listed.list.session, listed.list.view, path),
+          listed.ref.channel,
+          listed.ref.thread,
+          { messageTs: listed.message, user: userOf(user, world) },
+        ),
+      );
+    },
+    picksView: async (listed, view): Promise<void> => {
+      await dispatch(
+        selectIn(
+          DIFF_VIEW_ACTION,
+          viewValue(listed.list.session, view),
+          listed.ref.channel,
+          listed.ref.thread,
+          { messageTs: listed.message, user: userOf(user, world) },
+        ),
+      );
     },
     // The event names no actor: a deletion by someone outside the owner's workspace is the one
     // that must change nothing.

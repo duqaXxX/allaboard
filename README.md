@@ -97,6 +97,7 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!bypass on` / `off` | Switches a session to `bypassPermissions` and back |
 | `!plan` / `!plan off` | Switches a session to plan mode and back |
 | `!open` | Shares a file of the session's folder into the thread |
+| `!diff` | Lists the files the session's git repository changed since HEAD, with a Diff button each |
 | `!tag <name>` | Tags and pins the thread's first message |
 | `!untag` | Takes the tag and the pin away |
 | `!delete-thread` | Deletes the thread, once you confirm |

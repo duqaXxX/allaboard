@@ -19,6 +19,7 @@ import {
   type OwnerList,
   type OwnerRequest,
   type RunningList,
+  type ThreadList,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
 import type { ChatContext } from "../../../src/core/port.ts";
@@ -93,6 +94,22 @@ export interface OpenList {
   readonly title: string;
 }
 
+/** A list posted in a thread, the owner can pick from. */
+export interface OpenThreadList {
+  readonly message: MessageId;
+  readonly ref: ThreadRef;
+  readonly list: ThreadList;
+  readonly title: string;
+}
+
+/** A file shared into a thread. */
+export interface SharedFile {
+  readonly ref: ThreadRef;
+  readonly name: string;
+  readonly title: string;
+  readonly content: string;
+}
+
 /** A suggestion of commands the owner can send a text from. */
 export interface OpenSuggestion {
   readonly message: MessageId;
@@ -134,6 +151,16 @@ export interface Person {
    * the daemon. A list of an update has one row: the version it installs.
    */
   picks(list: MessageId, row: string): Promise<boolean>;
+  /**
+   * Uses the control of a file's row in the open thread list `list`. Throws when the list is not
+   * open or has no such row. Resolves with whether the pick reached the daemon.
+   */
+  picksFile(list: MessageId, path: string): Promise<boolean>;
+  /**
+   * Uses the selector of the open thread list `list` to show the view `view`. Throws when the list
+   * is not open or has no such view. Resolves with whether the pick reached the daemon.
+   */
+  picksView(list: MessageId, view: string): Promise<boolean>;
   /**
    * Sends `text` from the field of the open suggestion `suggestion`, the way its Enter does: it
    * reaches the daemon as a message of the thread, with the id of the message that typed the
@@ -198,6 +225,8 @@ export class Room {
   readonly #messages: StoredMessage[] = [];
   readonly #requests = new Map<string, OpenRequest>();
   readonly #lists = new Map<MessageId, OpenList>();
+  readonly #threadLists = new Map<MessageId, OpenThreadList>();
+  readonly #shared: SharedFile[] = [];
   readonly #suggestions = new Map<MessageId, OpenSuggestion>();
   readonly #strays: string[] = [];
   readonly #placed = new Set<Placed>();
@@ -262,6 +291,8 @@ export class Room {
       says: (channel, text, options) => this.#says(user, owns, channel, text, options),
       answers: (requestId, answer) => this.#answers(owns, requestId, answer),
       picks: (list, row) => this.#picks(owns, list, row),
+      picksFile: (list, path) => this.#picksFile(owns, list, path),
+      picksView: (list, view) => this.#picksView(owns, list, view),
       types: (suggestion, text) => this.#types(owns, suggestion, text),
       picksOnPage: (version) => this.#picksOnPage(owns, version),
       deletes: (said) => this.#deletes(said, tenant === HOME),
@@ -297,6 +328,16 @@ export class Room {
   /** The lists the owner can still pick from. */
   lists(): readonly OpenList[] {
     return [...this.#lists.values()];
+  }
+
+  /** The thread lists the owner can still pick from. */
+  threadLists(): readonly OpenThreadList[] {
+    return [...this.#threadLists.values()];
+  }
+
+  /** The files shared into threads, in order. */
+  shared(): readonly SharedFile[] {
+    return [...this.#shared];
   }
 
   /** The suggestions of commands the owner can still send a text from. */
@@ -478,6 +519,18 @@ export class Room {
     this.#lists.set(list.message, list);
   }
 
+  /** Records a list of a thread; `replacing` is the message of the list it takes the place of. */
+  addThreadList(list: OpenThreadList, replacing?: MessageId): void {
+    if (replacing !== undefined) this.#threadLists.delete(replacing);
+    const message = this.message(list.message);
+    if (message !== null) message.pressable = true;
+    this.#threadLists.set(list.message, list);
+  }
+
+  addShared(file: SharedFile): void {
+    this.#shared.push(file);
+  }
+
   addSuggestion(suggestion: OpenSuggestion): void {
     const message = this.message(suggestion.message);
     if (message !== null) message.pressable = true;
@@ -492,6 +545,7 @@ export class Room {
       if (open.message === id) this.#requests.delete(requestId);
     }
     this.#lists.delete(id);
+    this.#threadLists.delete(id);
     this.#suggestions.delete(id);
   }
 
@@ -551,6 +605,42 @@ export class Room {
     // The owner check is this path's own.
     if (!owns || this.#inbound === null) return false;
     await this.#inbound.picked(pick);
+    return true;
+  }
+
+  async #picksFile(owns: boolean, id: MessageId, path: string): Promise<boolean> {
+    const open = this.#threadLists.get(id);
+    if (open === undefined) throw new Error(`no open thread list ${id}`);
+    if (!open.list.files.some((file) => file.path === path)) {
+      throw new Error(`no file ${path} in the list`);
+    }
+    // The owner check is this path's own.
+    if (!owns || this.#inbound === null) return false;
+    await this.#inbound.picked({
+      type: "diff-file",
+      ref: open.ref,
+      session: open.list.session,
+      view: open.list.view,
+      path,
+      list: id,
+    });
+    return true;
+  }
+
+  async #picksView(owns: boolean, id: MessageId, view: string): Promise<boolean> {
+    const open = this.#threadLists.get(id);
+    if (open === undefined) throw new Error(`no open thread list ${id}`);
+    if (!open.list.views.some((offered) => offered.id === view)) {
+      throw new Error(`no view ${view} in the list`);
+    }
+    if (!owns || this.#inbound === null) return false;
+    await this.#inbound.picked({
+      type: "diff-view",
+      ref: open.ref,
+      session: open.list.session,
+      view,
+      list: id,
+    });
     return true;
   }
 

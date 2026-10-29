@@ -565,6 +565,30 @@ the doc comments of the symbols named here.
   the bytes with `files.uploadV2` (`files:write`): the basename as the name, the path from the
   folder as the title, and nothing posted on success.
 
+## Lists in a thread
+
+`!diff` posts a list in the session's thread and shares a file when one of its controls is used.
+The core decides what is listed and what a control does ([Changed files of `!diff`](architecture.md#changed-files-of-diff));
+the provider declares `threadLists` and draws.
+
+- **Drawing.** `SlackThread.offer` posts `lists.diffBlocks` with `chat.postMessage`, or, given the
+  message of an earlier list, draws it again with `chat.update` under the app's budget. The blocks
+  are one context line (the title), a `static_select` of the views when there is more than one,
+  one section per file with a **Diff** button, and a context line counting the rest past
+  `lists.DIFF_ROWS` (45 files, so that the message stays within Block Kit's 50 blocks). A binary
+  file has no button. A button's value is `[session, view, path]` as JSON and a view option's
+  `[session, view]`; one over the element's limit (2,000 and 150 characters) is left out: a row
+  with no button, a list with no selector.
+- **Hearing.** `ThreadLists.onDiffFile` and `onDiffView` acknowledge, check the owner and the
+  workspace and the thread (`Answers.admitted`), read the value, which is untrusted, and call
+  `ChatInbound.picked` with a `diff-file` or `diff-view` pick. A value of another shape reaches
+  nothing. The core checks the session of the pick against the thread's own.
+- **Sharing.** `SlackThread.share` uploads the bytes with `files.uploadV2` through
+  `read.shareFile`, the name and title the core gave; `uploadFile` of `!open` is the same call with
+  the basename and path of a file of the folder. Slack's error code becomes the `ChatError` the
+  core puts in its line (`missing_scope`, for one). The size is held before that: `SlackChat.fileLimit` is `read.SNIPPET_LIMIT`, and the core collects no more than that from git
+  and shares nothing larger (`texts.DIFF_FILE_TOO_LARGE`).
+
 ## The session index
 
 `Home` (in `home`) publishes the owner's Home tab with `views.publish`, which takes no scope and
@@ -940,7 +964,7 @@ payload, calls the core through `ChatInbound`, and draws what the core asks to b
 the deleted-first-message listener (below, "A deleted first message"), the `file_change` event (below, "An audio clip"), the Approve, Deny, Answer and Skip buttons, the
 question form's Next and Submit, the same-folder hold's two buttons, a shell command's Run and Cancel, the setup's Model select and
 Start (its Effort select and Bypass checkbox are only acknowledged, since Start reads every
-control), the Bind and Resume buttons of the two lists, the Update button of the update offer, `!open`'s Choose a file button with its
+control), the Bind and Resume buttons of the two lists, the Diff button and the view selector of a list in a thread, the Update button of the update offer, `!open`'s Choose a file button with its
 modal's search field and Open, and the session index's controls (its filters, Show all, Edit, Refresh, Delete,
 Clean up and Update, and its New thread link button, which is only acknowledged). The listeners are methods
 of the classes of `src/chat/slack/app/` (`Requests`, `Open`, `ResumeBind`, `Clips`,

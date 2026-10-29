@@ -223,6 +223,7 @@ test("the guide and the help explain every word of the daemon", () => {
     "stop",
     "resume",
     "open",
+    "diff",
     "tag",
     "untag",
     "delete-thread",
@@ -239,6 +240,12 @@ test("the guide and the help explain every word of the daemon", () => {
     assert.ok(guide.includes(`\`!${word}`), word);
     assert.ok(helpLines.includes(`\`!${word}`), word);
   }
+});
+
+test("diff parses alone and refuses a request after it", () => {
+  assert.deepEqual(parseBang("!diff"), { kind: "diff" });
+  assert.deepEqual(parseBang("!DIFF"), { kind: "diff" });
+  assert.deepEqual(parseBang("!diff src/a.ts"), { kind: "invalid" });
 });
 
 test("guide parses", () => {

@@ -30,6 +30,9 @@ const FULL_GUIDE = [
   "**Files**",
   "`!open`, sent inside a session's thread, offers the files changed in that session and a search over the folder's files; choosing one shares it into the thread, where Memory chat opens it in its file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file whose path contains them, or lists the files that do. The search reads the folder from disk and leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
   "",
+  "**Changes**",
+  "`!diff`, sent inside a session's thread, lists the files that differ from HEAD in its git repository, untracked ones included, with the lines added and removed; **Diff** on a row shares that file's diff into the thread, where Memory chat opens it in its file viewer. Once the session has edited files, a selector also shows the edits of one turn. It works in a repository you trusted.",
+  "",
   "**Bypass**",
   "`!bypass on`, sent inside a session's thread, lets Plain run every tool without asking in that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ bypass while it is on.",
   "",
@@ -81,6 +84,7 @@ const COMMANDS = ["**Commands**", line("Plain's commands start")];
 const APPROVALS = line("When Plain asks permission");
 const SESSIONS = line("`!status` typed in the channel");
 const FILES = ["**Files**", line("`!open`, sent inside")];
+const CHANGES = ["**Changes**", line("`!diff`, sent inside")];
 const BYPASS = ["**Bypass**", line("`!bypass on`")];
 const PLAN = ["**Plan mode**", line("`!plan`, sent inside")];
 const TAGS = ["**Tags**", line("`!tag <name>`, sent inside")];
@@ -208,6 +212,12 @@ test("without updates the Updates section is gone", () => {
 test("without fileUpload the Files section is gone", () => {
   const { removed, added } = difference(linesOf({ fileUpload: false }));
   assert.deepEqual(removed, FILES);
+  assert.deepEqual(added, []);
+});
+
+test("without diff the Changes section is gone", () => {
+  const { removed, added } = difference(linesOf({ diff: false }));
+  assert.deepEqual(removed, CHANGES);
   assert.deepEqual(added, []);
 });
 
