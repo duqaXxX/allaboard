@@ -288,9 +288,16 @@ values of the core that a provider's own code works with.
 Two tests hold the boundary. `test/imports.test.ts` allows a chat provider to import the chat seam,
 the agent seam's types and the core's port, and refuses any other import of the core, an import of
 any other module, of the registry or of `src/daemon.ts`, and an import of a package outside the
-module that lists it. `test/vocabulary.test.ts` refuses a word of one module outside it. A new
-module adds its package to `LIBRARIES` in the first test, and the words only it has (not its
-name, which comes from its directory) to `MODULE_WORDS` in the second.
+module that lists it. `test/vocabulary.test.ts` refuses a word of one module outside it: the module's name, which comes
+from its directory, and the `words` its registry entry declares (`ModuleWords`: `names` matched
+anywhere in an identifier or a string, whole-string `literals`, and `patterns` for a family of
+names such as the chat's Web API methods). A new module adds its package to `LIBRARIES` in the
+first test and declares its `words`, a required field of its entry (`src/agent/claude/words.ts`,
+`src/chat/slack/words.ts`). The same test fails on a name of the agent's SDK in the core, the chat
+or the entry files (every name of `docs/sdk-surface.md` that is not a plain English word, apart
+from the seam's own), on a model alias of the recorded model list, and on a string of
+`AgentWords` behind the command prefix (`/clear`, `/compact`) there; the entry files are `src/host/`
+and the files at the top of `src/` but the registry.
 
 A conformance suite per seam runs the same checks against both implementations of that seam:
 `test/conformance/agent.ts` against the Claude back end (over the recorded SDK streams) and the
@@ -303,16 +310,21 @@ stopped stream back as Slack does for one run of plain words (the recording
 `api-conversations-replies-stream`); marks, cards and other chunk shapes read back no blocks, and
 the tests of the provider's own `endReply` cover them with recorded reads.
 
-Tests keep to the same layers. `test/core/` and `test/chat/` use the plain agent and the memory
-chat and never reach `src/agent/<module>/`, directly or through a file of `test/support/` or of `src/` (`src/registry.ts`
-imports the modules); `test/vocabulary.test.ts` follows every relative import, bare ones included.
+Tests keep to the same layers. `test/core/` and `test/scenario/` use the plain agent and the memory
+chat and never reach `src/agent/<module>/` or `src/chat/<module>/`, directly or through a file of
+`test/support/` or of `src/` (`src/registry.ts` imports the modules; a scenario reaches it only
+through the daemon, with a registry of its own); `test/chat/` never reaches `src/agent/<module>/`
+and uses the plain agent, while `test/chat/<module>/` is where a chat module's provider is run
+through the core. `test/vocabulary.test.ts` follows every relative import, bare ones included, and
+fails on a Slack timestamp or a Slack-shaped id in `test/core/` and `test/scenario/`.
 A test of the configuration the daemon ships (`test/config.test.ts`) names the registry and lives at
 the top of `test/`. A test that runs the core or the Slack provider
 over Claude's recorded streams, tool vocabulary, trust record or model list is a test of the Claude
 module and lives under `test/agent/claude/`: the sessions (`sessions/`), the Slack app handlers
 (`slack-app/`), the reply over the recordings and the golden files (`reply/`), the folder trust
-under the footer's git and `!open` (`files/`, `footer-git.test.ts`). `test/conformance/` and
-`test/scenario/` run every module the registry names.
+under the footer's git and `!open` (`files/`, `footer-git.test.ts`). `test/conformance/` runs every
+module the registry names against the checks of its seam; the scenarios run the plain agent and
+the memory chat.
 
 Not tested: a module other than these. No second real agent or chat ships, and the seams were
 shaped on the two test modules, so a first real one may need a seam change. With Claude and Slack

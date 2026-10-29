@@ -344,6 +344,7 @@ test("setup hands the wizard the service of the instance, and the manager the pr
     required: [],
     optional: [],
     limitsHeading: "Limits of a test chat",
+    words: { names: [], literals: [], patterns: [] },
     build: () => assert.fail("built"),
     setup: () => ({ intro: [], questions: [] }),
   };

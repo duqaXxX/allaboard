@@ -64,6 +64,7 @@ export class MemoryChat extends Room implements ChatEntry {
   readonly required: readonly string[] = [];
   readonly optional: readonly string[] = [];
   readonly limitsHeading = "Limits of the memory chat";
+  readonly words = { names: [], literals: [], patterns: [] };
   readonly #identities: readonly string[];
   readonly #suggests: boolean;
   #built: MemoryProvider | null = null;

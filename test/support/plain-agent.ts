@@ -956,6 +956,7 @@ export function plainAgent(options: PlainAgentOptions = {}): PlainEntry {
     tools: PLAIN_TOOLS,
     toolNames: Object.freeze(["run", "look", "change", "ask", "delegate", "propose"]),
     limitsHeading: "Limits of the plain agent",
+    words: { names: [], literals: [], patterns: [] },
     built,
     build: (_context: AgentContext) => {
       const agent = new PlainAgent(options);

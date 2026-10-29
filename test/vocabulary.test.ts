@@ -3,7 +3,14 @@
  * `src/agent/` or `src/chat/`) and the registry, no identifier and no string of the source names
  * an agent, a chat or what only one of them has: the core and the seams are written for any agent
  * and any chat. A module's own name is one of the words, and its directory one of the homes, from
- * the directories themselves. Comments are exempt: they may say what was measured, and on what.
+ * the directories themselves; the rest it declares itself, as the `words` of its registry entry.
+ * Comments are exempt: they may say what was measured, and on what.
+ *
+ * The scans by what they catch: `named` (a module's names, anywhere in `src/` outside the
+ * modules); the tool names, the module's whole-string `literals`, the SDK's names read from
+ * `docs/sdk-surface.md`, the model aliases and the `AgentWords` literals (the core, the chat seam
+ * and the entry files); the `patterns` of the Web API's methods (all of `src/` outside the
+ * modules); the ids of Slack in the core's tests and the scenarios.
  */
 import assert from "node:assert/strict";
 import {
@@ -17,7 +24,10 @@ import {
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { test } from "node:test";
-import type { ToolVocabulary } from "../src/agent/seam.ts";
+import { loadSurface, type Row, setAside } from "../probe/surface.ts";
+import type { AgentWords, ToolVocabulary } from "../src/agent/seam.ts";
+import { systemClock } from "../src/clock.ts";
+import type { ModuleWords } from "../src/module-setup.ts";
 import { REGISTRY } from "../src/registry.ts";
 import { blank } from "./support/source-scan.ts";
 
@@ -35,23 +45,20 @@ export function moduleDirectories(src: string): string[] {
   );
 }
 
-// What only one module has, besides its name: its libraries and what its chat or agent calls things.
-const MODULE_WORDS = [
-  "anthropic",
-  "bolt",
-  "threadTs",
-  "messageTs",
-  "workspace",
-  "mrkdwn",
-  "modal",
-  "ephemeral",
-  "emoji",
-];
+/** The `words` each module of the registry declares. */
+function declaredWords(): ModuleWords[] {
+  return [...Object.values(REGISTRY.agents), ...Object.values(REGISTRY.chats)].map(
+    (entry) => entry.words,
+  );
+}
 
-/** The words of the modules under `src`: the name of each, and `MODULE_WORDS`. */
-export function wordsOf(src: string): string[] {
+/**
+ * The words of the modules under `src`: the name of each, and the `names` the modules declare
+ * (`declared`, those of the registry by default).
+ */
+export function wordsOf(src: string, declared: readonly ModuleWords[] = declaredWords()): string[] {
   const names = moduleDirectories(src).map((home) => home.split("/")[1] as string);
-  return [...names, ...MODULE_WORDS];
+  return [...names, ...declared.flatMap((words) => words.names)];
 }
 
 // Matched whatever the case, anywhere in an identifier or a string.
@@ -262,13 +269,21 @@ test("the scan follows an import through a source file and finds a bare import",
 });
 
 // The rule (#119, invariant 8): a test under `test/core/` or `test/chat/` never reaches
-// `src/agent/<module>/`, directly or through `test/support/`. Where a support file that reaches a
-// module is used today decides what is allowed: only by tests under `test/agent/<that module>/`,
-// by `test/conformance/` and `test/scenario/` (which run every module the registry names), and by
-// the top-level tests of the daemon, none of which is under a guarded layer. A test of the core
-// that needs a stream or a vocabulary of one agent therefore lives under `test/agent/<module>/`.
+// `src/agent/<module>/`, directly or through `test/support/`, and nor does a scenario. Where a
+// support file that reaches a module is used today decides what is allowed: only by tests under
+// `test/agent/<that module>/`, by `test/conformance/` (which runs every module the registry names)
+// and by the top-level tests of the daemon, none of which is under a guarded layer. The scenarios
+// run the plain agent and the memory chat. A test of the core that needs a stream or a vocabulary
+// of one agent therefore lives under `test/agent/<module>/`.
 test("no test of the core or the chat reaches an agent module, directly or through a support file", () => {
   assert.deepEqual(importingModules("agent", TESTS, SRC, ["core", "chat"]), []);
+});
+
+// The scenarios run the daemon, which imports the registry: as for the chat, that path is the
+// wiring, since `test/scenario/world.ts` passes its own registry built from the plain agent and
+// the memory chat. A scenario that imports the registry itself, or a module, is a reach.
+test("no scenario reaches an agent module", () => {
+  assert.deepEqual(importingModules("agent", TESTS, SRC, ["scenario"], WIRING), []);
 });
 
 test("the scan keeps the two kinds of module apart, whatever their names", () => {
@@ -381,17 +396,30 @@ export function toolNames(tools: ToolVocabulary): string[] {
   ];
 }
 
-/** Each of `names` that `source` holds as a whole string literal outside a comment, as `line: name`. */
-export function literalsNamed(source: string, names: readonly string[]): string[] {
-  const found: string[] = [];
+/** The string literals of `source` outside a comment, as `line: text`. */
+function stringLiterals(source: string): { line: number; text: string }[] {
+  const found: { line: number; text: string }[] = [];
   const lines = blank(source, { keepText: true }).split("\n");
   for (const [index, line] of lines.entries()) {
     for (const match of line.matchAll(/(["'`])((?:\\.|(?!\1).)*)\1/g)) {
-      const text = match[2] as string;
-      if (names.includes(text)) found.push(`${index + 1}: ${text}`);
+      found.push({ line: index + 1, text: match[2] as string });
     }
   }
   return found;
+}
+
+/** Each of `names` that `source` holds as a whole string literal outside a comment, as `line: name`. */
+export function literalsNamed(source: string, names: readonly string[]): string[] {
+  return stringLiterals(source)
+    .filter(({ text }) => names.includes(text))
+    .map(({ line, text }) => `${line}: ${text}`);
+}
+
+/** Each string literal of `source` that one of `patterns` matches whole, as `line: text`. */
+export function literalsMatching(source: string, patterns: readonly RegExp[]): string[] {
+  return stringLiterals(source)
+    .filter(({ text }) => patterns.some((pattern) => pattern.test(text)))
+    .map(({ line, text }) => `${line}: ${text}`);
 }
 
 test("the scan finds a tool name as a whole literal and not inside a longer word", () => {
@@ -466,7 +494,70 @@ test("a tool name in a labelled constant passes and the same name elsewhere in t
   );
 });
 
-test("no source of the core or the chat holds a tool name an agent module knows", () => {
+/**
+ * The source files of `src` the guards below read: those under the `layers` (`core`, `chat`), and
+ * with `entry` the entry files above the layers. A layer is read whole, a module's folder
+ * included: a chat module holds no word of an agent either.
+ */
+export function filesOf(src: string, layers: readonly string[], entry: boolean): string[] {
+  const files = layers.flatMap((layer) =>
+    existsSync(join(src, layer)) ? sources(join(src, layer)) : [],
+  );
+  if (entry) files.push(...entryFiles(src));
+  return files.toSorted();
+}
+
+/**
+ * The entry files: `src/host/` and the files at the top of `src/`, except the registry, which
+ * names the modules by design. The daemon, the command line and the host's tooling are written
+ * for any agent and any chat as much as the core.
+ */
+export function entryFiles(src: string): string[] {
+  const top = readdirSync(src, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".ts") && entry.name !== "registry.ts")
+    .map((entry) => join(src, entry.name));
+  return [...top, ...(existsSync(join(src, "host")) ? sources(join(src, "host")) : [])];
+}
+
+/**
+ * What `read` finds in each of `files`, as `file:hit`, without the hits `allowed` lists. A hit is
+ * `line: name`; an allowlist key is `file:name` (every hit of that name in that file), and its
+ * value says why the name is not a leak.
+ */
+export function leaks(
+  src: string,
+  files: readonly string[],
+  read: (source: string) => string[],
+  allowed: Readonly<Record<string, string>> = {},
+): string[] {
+  const found: string[] = [];
+  for (const path of files) {
+    const file = relative(src, path).split(sep).join("/");
+    for (const hit of read(readFileSync(path, "utf8"))) {
+      const name = hit.slice(hit.indexOf(": ") + 2);
+      if (!(`${file}:${name}` in allowed)) found.push(`${file}:${hit}`);
+    }
+  }
+  return found;
+}
+
+/** The tool-name literals of the core, the chat and the entry files that `labels` does not list. */
+export function toolLeaks(
+  src: string,
+  names: readonly string[],
+  labels: ReadonlySet<string>,
+): string[] {
+  const found: string[] = [];
+  for (const path of filesOf(src, ["core", "chat"], true)) {
+    const file = relative(src, path).split(sep).join("/");
+    for (const hit of unlabelled(file, readFileSync(path, "utf8"), names, labels)) {
+      found.push(`${file}:${hit}`);
+    }
+  }
+  return found;
+}
+
+test("no source of the core, the chat or the entry files holds a tool name an agent module knows", () => {
   const names = [
     ...new Set(
       Object.values(REGISTRY.agents).flatMap((entry) => [
@@ -480,13 +571,427 @@ test("no source of the core or the chat holds a tool name an agent module knows"
     assert.ok(names.includes(banned), banned);
   }
   assert.ok(names.includes("WebSearch") && names.includes("AskUserQuestion"));
+  assert.deepEqual(toolLeaks(SRC, names, LABELS), []);
+});
+
+// ---- the module's own literals, the Web API's methods
+
+/** The whole-string `literals` of every module, for the core and the entry files. */
+export function moduleLiteralLeaks(src: string, literals: readonly string[]): string[] {
+  return leaks(src, filesOf(src, ["core"], true), (source) => literalsNamed(source, literals));
+}
+
+/** The string literals of any file outside the modules and the registry that a `pattern` matches. */
+export function patternLeaks(src: string, patterns: readonly RegExp[]): string[] {
+  const homes = [...moduleDirectories(src), "registry.ts"];
+  const outside = sources(src).filter((path) => {
+    const file = relative(src, path).split(sep).join("/");
+    return !homes.some((home) => file === home || file.startsWith(home));
+  });
+  return leaks(src, outside, (source) => literalsMatching(source, patterns));
+}
+
+test("a module's literals and patterns are found in the core, an entry file and the host", () => {
+  const src = mkdtempSync(join(tmpdir(), "allaboard-literals-"));
+  for (const directory of ["agent/codex", "chat/discord", "core", "host"]) {
+    mkdirSync(join(src, directory), { recursive: true });
+  }
+  writeFileSync(
+    join(src, "core", "a.ts"),
+    'const x = { type: "blocks" }; const y = "chat.update";\n',
+  );
+  writeFileSync(join(src, "daemon.ts"), 'const y = "team_id"; const z = "Block Kit";\n');
+  writeFileSync(join(src, "host", "h.ts"), "const t = `ts`; const u = 'channel_not_found';\n");
+  // The registry, a module and a longer string are not the literal.
+  writeFileSync(join(src, "registry.ts"), 'const r = "blocks";\n');
+  writeFileSync(
+    join(src, "chat", "discord", "m.ts"),
+    'const r = "blocks"; const c = "chat.update";\n',
+  );
+  writeFileSync(join(src, "core", "b.ts"), 'const r = "three blocks"; const f = "tsc";\n');
+  const slack = REGISTRY.chats.slack?.words as ModuleWords;
+  assert.deepEqual(moduleLiteralLeaks(src, slack.literals), [
+    "core/a.ts:1: blocks",
+    "core/a.ts:1: chat.update",
+    "daemon.ts:1: team_id",
+    "daemon.ts:1: Block Kit",
+    "host/h.ts:1: ts",
+    "host/h.ts:1: channel_not_found",
+  ]);
+  // A Web API method is caught anywhere outside the modules, the seams and the core's strings too.
+  assert.deepEqual(patternLeaks(src, slack.patterns), ["core/a.ts:1: chat.update"]);
+  writeFileSync(
+    join(src, "chat", "seam.ts"),
+    'const m = "views.open"; const f = "files.json5x";\n',
+  );
+  assert.deepEqual(patternLeaks(src, slack.patterns), [
+    "chat/seam.ts:1: views.open",
+    "chat/seam.ts:1: files.json5x",
+    "core/a.ts:1: chat.update",
+  ]);
+});
+
+test("the core and the entry files hold no literal a module declares", () => {
+  const literals = declaredWords().flatMap((words) => words.literals);
+  for (const audited of ["chat.update", "blocks", "team_id", "ts", "channel_not_found"]) {
+    assert.ok(literals.includes(audited), audited);
+  }
+  assert.ok(literals.includes("reaction_added") && literals.includes("Block Kit"));
+  assert.deepEqual(moduleLiteralLeaks(SRC, literals), []);
+});
+
+test("no source outside the modules names a method of a chat's Web API", () => {
+  const patterns = declaredWords().flatMap((words) => words.patterns);
+  assert.ok(patterns.length > 0);
+  assert.deepEqual(patternLeaks(SRC, patterns), []);
+});
+
+test("a module declares its words, and they are lists", () => {
+  for (const entry of [...Object.values(REGISTRY.agents), ...Object.values(REGISTRY.chats)]) {
+    assert.ok(Array.isArray(entry.words.names));
+    assert.ok(Array.isArray(entry.words.literals));
+    assert.ok(Array.isArray(entry.words.patterns));
+  }
+  // The libraries and the vendor's name moved from the central list into the modules.
+  assert.ok(REGISTRY.agents.claude?.words.names.includes("anthropic"));
+  assert.ok(REGISTRY.chats.slack?.words.names.includes("threadTs"));
+});
+
+// ---- the agent's SDK: its names, its model aliases, its commands
+
+const IDENTIFIER = /^[A-Za-z_][\w-]*$/;
+
+/** The identifiers of `source` outside a comment, hyphenated ones (`task-notification`) whole. */
+function tokens(source: string): { line: number; token: string }[] {
+  const found: { line: number; token: string }[] = [];
+  for (const [index, line] of blank(source, { keepText: true }).split("\n").entries()) {
+    for (const match of line.matchAll(/[A-Za-z_$][\w$-]*/g)) {
+      found.push({ line: index + 1, token: match[0] });
+    }
+  }
+  return found;
+}
+
+/**
+ * The names of the SDK that no plain English word could be: those of `rows` (the member, a
+ * quoted value without its quotes) with an underscore, a hyphen, a capital inside or two capitals
+ * at the start, and the SDK types `aside` sets aside. A name the agent seam also holds (`contract`:
+ * `sessionId`, `task_started`) is the seam's own word and is left out. `SDK` followed by a capital
+ * is forbidden whatever the table lists (`isSdkType`).
+ */
+export function sdkNames(
+  rows: readonly Row[],
+  aside: readonly string[],
+  contract: string,
+): Set<string> {
+  const seam = new Set(tokens(contract).map(({ token }) => token));
+  const names = new Set<string>(aside);
+  for (const row of rows) {
+    const member = /^"(.*)"$/.exec(row.member)?.[1] ?? row.member;
+    const distinct =
+      /[_-]/.test(member) || /[a-z0-9][A-Z]/.test(member) || /^[A-Z]{2,}/.test(member);
+    if (IDENTIFIER.test(member) && distinct) names.add(member);
+  }
+  return new Set([...names].filter((name) => !seam.has(name)));
+}
+
+function isSdkType(token: string): boolean {
+  return /^SDK[A-Z]/.test(token);
+}
+
+/** Each token of `source` that is in `forbidden`, or an SDK type by its name, as `line: token`. */
+export function sdkNamed(source: string, forbidden: ReadonlySet<string>): string[] {
+  return tokens(source)
+    .filter(({ token }) => forbidden.has(token) || isSdkType(token))
+    .map(({ line, token }) => `${line}: ${token}`);
+}
+
+/** The SDK names held by the core, the chat and the entry files, outside `allowed`. */
+export function sdkLeaks(
+  src: string,
+  forbidden: ReadonlySet<string>,
+  allowed: Readonly<Record<string, string>>,
+): string[] {
+  return leaks(src, filesOf(src, ["core", "chat"], true), (s) => sdkNamed(s, forbidden), allowed);
+}
+
+// A name of the SDK's table that the core or a chat module holds and that is not the SDK's, by
+// file and name: every hit of that name in that file passes.
+const SDK_ALLOWED: Readonly<Record<string, string>> = {
+  "core/state.ts:session_id": "the key of `state.json` (invariant 3), the core's own file format",
+  "chat/slack/reply/blocks.ts:task_id": "the field of Slack's `task_card` block",
+  "chat/slack/repair.ts:task_id":
+    "the field of Slack's `task_card` block, read back from a message",
+};
+
+function claudeSdkNames(): Set<string> {
+  return sdkNames(loadSurface(), setAside(), readFileSync(join(SRC, "agent", "seam.ts"), "utf8"));
+}
+
+test("the SDK's names are read from the surface table, minus the seam's own and plain words", () => {
+  const rows: Row[] = ["session_id", '"stream_event"', "plan", '"high"', "toolUseID"].map(
+    (member) => ({
+      owner: "Owner",
+      member,
+      kind: "key",
+      usedIn: [],
+      source: "package",
+      claims: [],
+    }),
+  );
+  const names = sdkNames(rows, ["SDKOddMessage"], "interface S { session_id: string }");
+  assert.deepEqual([...names].toSorted(), ["SDKOddMessage", "stream_event", "toolUseID"]);
+  // The real table gives the names the audit put in the core without a guard noticing.
+  const real = claudeSdkNames();
+  for (const audited of ["bypassPermissions", "compact_boundary", "parent_tool_use_id"]) {
+    assert.ok(real.has(audited), audited);
+  }
+  // A seam word and plain English are not in it.
+  for (const plain of ["sessionId", "text", "plan", "default", "high", "user", "result"]) {
+    assert.ok(!real.has(plain), plain);
+  }
+});
+
+test("an SDK name in the core, the chat or an entry file is found, and an allowed one is not", () => {
+  const src = mkdtempSync(join(tmpdir(), "allaboard-sdk-"));
+  for (const directory of ["core", "chat/discord", "host", "agent/codex"]) {
+    mkdirSync(join(src, directory), { recursive: true });
+  }
+  const forbidden = new Set(["bypassPermissions", "compact_boundary", "parent_tool_use_id"]);
+  writeFileSync(join(src, "core", "a.ts"), 'const m = "bypassPermissions";\nlet SDKMessage;\n');
+  writeFileSync(join(src, "core", "b.ts"), "const e = { parent_tool_use_id: null };\n");
+  writeFileSync(join(src, "chat", "discord", "c.ts"), 'if (kind === "compact_boundary") {}\n');
+  writeFileSync(
+    join(src, "cli.ts"),
+    "// parent_tool_use_id in a comment\nconst k = 'compact_boundary';\n",
+  );
+  writeFileSync(join(src, "host", "h.ts"), "const k = parent_tool_use_id;\n");
+  writeFileSync(join(src, "agent", "codex", "m.ts"), 'const a = "bypassPermissions";\n');
+  assert.deepEqual(sdkLeaks(src, forbidden, {}), [
+    "chat/discord/c.ts:1: compact_boundary",
+    "cli.ts:2: compact_boundary",
+    "core/a.ts:1: bypassPermissions",
+    "core/a.ts:2: SDKMessage",
+    "core/b.ts:1: parent_tool_use_id",
+    "host/h.ts:1: parent_tool_use_id",
+  ]);
+  assert.deepEqual(sdkLeaks(src, forbidden, { "core/b.ts:parent_tool_use_id": "test" }).length, 5);
+});
+
+test("the core, the chat and the entry files hold no name of the agent's SDK", () => {
+  assert.deepEqual(sdkLeaks(SRC, claudeSdkNames(), SDK_ALLOWED), []);
+  // Every allowance is used: a name that left the file takes its line out of the list.
+  const names = claudeSdkNames();
+  const withoutAllowance = sdkLeaks(SRC, names, {});
+  for (const key of Object.keys(SDK_ALLOWED)) {
+    const [file, name] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+    assert.ok(
+      withoutAllowance.some((hit) => hit.startsWith(`${file}:`) && hit.endsWith(`: ${name}`)),
+      key,
+    );
+  }
+});
+
+/** The model aliases a recorded model list of the agent holds, but for the default one. */
+export function modelAliases(list: { value: string }[]): string[] {
+  return list
+    .map((model) => model.value)
+    .filter((v) => v !== "default" && !v.startsWith("claude-"));
+}
+
+test("the core, the chat and the entry files hold no model alias of the agent", () => {
+  const recorded = JSON.parse(
+    readFileSync(join(TESTS, "fixtures", "sdk", "server-info.json"), "utf8"),
+  ) as { models: { value: string }[] };
+  const aliases = modelAliases(recorded.models);
+  assert.ok(aliases.includes("opus"), "the recording lists the alias the audit used");
+  const found = leaks(SRC, filesOf(SRC, ["core", "chat"], true), (s) => literalsNamed(s, aliases));
+  assert.deepEqual(found, []);
+  const src = mkdtempSync(join(tmpdir(), "allaboard-alias-"));
+  mkdirSync(join(src, "core"), { recursive: true });
+  writeFileSync(join(src, "core", "m.ts"), 'const model = "opus";\n');
+  assert.deepEqual(
+    leaks(src, filesOf(src, ["core"], false), (s) => literalsNamed(s, aliases)),
+    ["core/m.ts:1: opus"],
+  );
+});
+
+/**
+ * The strings of an agent's `AgentWords` that no file of the core or the chat holds whole: the
+ * names of its commands behind its prefix (`/compact`, `/clear`), and the bare names of the
+ * commands it has a word of its own for. The bare names of `notOffered` are not listed: they are
+ * plain English (`memory`, `diff`) and several are the core's own `!` words. `offered` are the
+ * names of the commands the agent's recorded session lists, which `AgentWords` does not: they
+ * too are held only behind the prefix.
+ */
+export function agentLiterals(words: AgentWords, offered: readonly string[] = []): string[] {
+  const named = [
+    ...offered,
+    ...words.newSession,
+    ...(words.login === null ? [] : [words.login]),
+    ...(words.logout === null ? [] : [words.logout]),
+    ...Object.keys(words.notOffered),
+    ...(words.goalClear === null ? [] : [words.goalClear]),
+  ];
+  const bare = [
+    ...words.newSession,
+    ...(words.login === null ? [] : [words.login]),
+    ...(words.logout === null ? [] : [words.logout]),
+    ...(words.goalClear === null ? [] : [words.goalClear]),
+  ];
+  return [...new Set([...named.map((name) => words.commandPrefix + name), ...bare])];
+}
+
+/** The `AgentWords` literals held by the core and the chat, outside `allowed`. */
+export function agentWordLeaks(
+  src: string,
+  literals: readonly string[],
+  allowed: Readonly<Record<string, string>>,
+): string[] {
+  return leaks(
+    src,
+    filesOf(src, ["core", "chat"], true),
+    (s) => literalsNamed(s, literals),
+    allowed,
+  );
+}
+
+// A bare word of the agent's commands that the core also uses as plain English or as its own
+// field name, by file and word: every literal of that word in that file passes.
+const WORDS_ALLOWED: Readonly<Record<string, string>> = {
+  "core/sessions/session.ts:new": "the status line's placeholder for a session with no id yet",
+  "core/texts.ts:login":
+    "a field name of the texts filled with the agent's words (`AgentWords.login`)",
+  "core/texts.ts:logout":
+    "a field name of the texts filled with the agent's words (`AgentWords.logout`)",
+};
+
+function registeredAgentWords(): AgentWords[] {
+  return Object.values(REGISTRY.agents).map(
+    (entry) => entry.build({ variables: {}, clock: systemClock }).words,
+  );
+}
+
+test("the strings of an agent's AgentWords are found in the core and the chat", () => {
+  const words = {
+    newSession: ["clear"],
+    login: "login",
+    logout: null,
+    goalClear: "goal clear",
+    commandPrefix: "/",
+    notOffered: { rewind: null, memory: null },
+  } as unknown as AgentWords;
+  assert.deepEqual(agentLiterals(words).toSorted(), [
+    "/clear",
+    "/goal clear",
+    "/login",
+    "/memory",
+    "/rewind",
+    "clear",
+    "goal clear",
+    "login",
+  ]);
+  const src = mkdtempSync(join(tmpdir(), "allaboard-agent-words-"));
+  for (const directory of ["core", "chat"]) mkdirSync(join(src, directory), { recursive: true });
+  writeFileSync(
+    join(src, "core", "c.ts"),
+    'const a = "/compact"; const b = "/clear"; const c = "clear";\n',
+  );
+  writeFileSync(join(src, "chat", "seam.ts"), "const d = `/rewind`; const e = '!clear';\n");
+  const literals = agentLiterals(words, ["compact"]);
+  assert.ok(literals.includes("/compact") && !literals.includes("compact"));
+  assert.deepEqual(agentWordLeaks(src, literals, {}), [
+    "chat/seam.ts:1: /rewind",
+    "core/c.ts:1: /compact",
+    "core/c.ts:1: /clear",
+    "core/c.ts:1: clear",
+  ]);
+  assert.deepEqual(agentWordLeaks(src, literals, { "core/c.ts:clear": "test" }).length, 3);
+});
+
+test("the core and the chat hold none of the strings an agent's AgentWords declare", () => {
+  const recorded = JSON.parse(
+    readFileSync(join(TESTS, "fixtures", "sdk", "server-info.json"), "utf8"),
+  ) as { commands: { name: string; aliases?: string[] }[] };
+  const offered = recorded.commands.flatMap((c) => [c.name, ...(c.aliases ?? [])]);
+  const literals = registeredAgentWords().flatMap((words) => agentLiterals(words, offered));
+  for (const audited of ["/compact", "/clear", "/login", "clear", "logout"]) {
+    assert.ok(literals.includes(audited), audited);
+  }
+  assert.deepEqual(agentWordLeaks(SRC, literals, WORDS_ALLOWED), []);
+  // Every allowance is used: a word that left the file takes its line out of the list.
+  const unallowed = agentWordLeaks(SRC, literals, {});
+  for (const key of Object.keys(WORDS_ALLOWED)) {
+    const at = key.indexOf(":");
+    assert.ok(
+      unallowed.some(
+        (h) => h.startsWith(`${key.slice(0, at)}:`) && h.endsWith(`: ${key.slice(at + 1)}`),
+      ),
+      key,
+    );
+  }
+});
+
+test("the scan reaches an agent module from a scenario, except through the daemon's registry", () => {
+  const root = mkdtempSync(join(tmpdir(), "allaboard-scenario-"));
+  for (const directory of ["src/agent/codex", "src/chat", "tests/scenario"]) {
+    mkdirSync(join(root, directory), { recursive: true });
+  }
+  writeFileSync(join(root, "src/registry.ts"), 'import { c } from "./agent/codex/module.ts";');
+  writeFileSync(join(root, "src/daemon.ts"), 'import { r } from "./registry.ts";');
+  writeFileSync(
+    join(root, "tests/scenario/world.ts"),
+    'import { run } from "../../src/daemon.ts";',
+  );
+  writeFileSync(
+    join(root, "tests/scenario/own.ts"),
+    'import { c } from "../../src/agent/codex/module.ts";',
+  );
+  const wiring = { "registry.ts": ["daemon.ts"] };
+  const tests = join(root, "tests");
+  const src = join(root, "src");
+  assert.deepEqual(importingModules("agent", tests, src, ["scenario"], wiring), [
+    "scenario/own.ts",
+  ]);
+  assert.deepEqual(importingModules("agent", tests, src, ["scenario"]), [
+    "scenario/own.ts",
+    "scenario/world.ts",
+  ]);
+});
+
+// ---- Slack-shaped ids in the tests of the core and the scenarios
+
+// A message timestamp (`1700000000.000100`) and an id of a user, channel, team, workspace or bot
+// (`U000ALICE`, `C000CHAN`): the tests of the core use the neutral ids of `test/support/ids.ts`.
+const SLACK_IDS = [/\b\d{10}\.\d{6}\b/, /\b[UCTWB]0[0-9A-Z]{6,}\b/];
+
+/** Each Slack-shaped id in `source` outside a comment, as `line: id`. */
+export function slackIds(source: string): string[] {
   const found: string[] = [];
-  for (const layer of ["core", "chat"]) {
-    for (const path of sources(join(SRC, layer))) {
-      const file = relative(SRC, path).split(sep).join("/");
-      for (const hit of unlabelled(file, readFileSync(path, "utf8"), names, LABELS)) {
-        found.push(`${file}:${hit}`);
-      }
+  for (const [index, line] of blank(source, { keepText: true }).split("\n").entries()) {
+    for (const pattern of SLACK_IDS) {
+      const match = new RegExp(pattern, "g");
+      for (const hit of line.matchAll(match)) found.push(`${index + 1}: ${hit[0]}`);
+    }
+  }
+  return found;
+}
+
+test("a Slack timestamp and a Slack id are found, and the neutral ids are not", () => {
+  assert.deepEqual(slackIds('const t = "1700000000.000100"; const u = "U000ALICE";'), [
+    "1: 1700000000.000100",
+    "1: U000ALICE",
+  ]);
+  assert.deepEqual(slackIds("const c = `C000CHAN`; // T000TEAM"), ["1: C000CHAN"]);
+  assert.deepEqual(slackIds('const c = "chan-1"; const m = "msg-1"; const v = "1.2.3.4";'), []);
+});
+
+test("no test of the core or the scenarios holds a Slack timestamp or id", () => {
+  const found: string[] = [];
+  for (const layer of ["core", "scenario"]) {
+    for (const path of sources(join(TESTS, layer))) {
+      const file = relative(TESTS, path).split(sep).join("/");
+      for (const hit of slackIds(readFileSync(path, "utf8"))) found.push(`${file}:${hit}`);
     }
   }
   assert.deepEqual(found, []);

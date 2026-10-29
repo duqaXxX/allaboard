@@ -46,3 +46,17 @@ export interface ModuleSetup {
   readonly intro: readonly string[];
   readonly questions: readonly SetupQuestion[];
 }
+
+/**
+ * What only one module has, declared by the module so that no other file of `src/` holds it:
+ * `test/vocabulary.test.ts` fails on each outside the module. A module with nothing to declare
+ * says so with empty lists; the entry field is required, so that a new module has to decide.
+ */
+export interface ModuleWords {
+  /** Matched anywhere in an identifier or a string, whatever the case: libraries, its own terms. */
+  readonly names: readonly string[];
+  /** Matched as a whole string literal, where a substring would hit plain English (`ts`, `blocks`). */
+  readonly literals: readonly string[];
+  /** Matched against a whole string literal: the shape of a family of names (API methods). */
+  readonly patterns: readonly RegExp[];
+}
