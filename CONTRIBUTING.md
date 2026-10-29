@@ -39,9 +39,9 @@ may find a seam that needs a change: open an issue before writing one.
    (`rootGone`), where the chat's event does not say who deleted it, it checks that the deleted
    message's author is the owner. It reaches the core through
    `src/core/port.ts` alone. An agent also gives its words (`AgentWords`): what it is called,
-   and the names of its own commands that start a new session, log in and log out, which the core
-   answers itself, the shell lines that continue a session and open the agent to trust a folder,
-   and the commands of its terminal that a session does not offer, which the core answers too. The rules the core relies on beside the types, and which of them a conformance
+   the prefix of its commands (`commandPrefix`), and the names of its own commands that start a new session, log in and log out, which the core
+   answers itself, the shell lines that continue a session (null with no terminal) and open the agent to trust a folder,
+   and the commands of its terminal that a session does not offer, which the core answers too, and the tools its terminal shows in words or a preview of its own (`ToolVocabulary`, on the back end and the entry as `tools`; `NO_TOOL_WORDS` when it has none). The rules the core relies on beside the types, and which of them a conformance
    check holds, are in [docs/architecture.md](docs/architecture.md), under "What an agent must do
    that the types do not say" and "What a chat must do that the types do not say".
 2. Declare the capabilities truthfully (`Capabilities`, `ChatCapabilities`). A capability left
@@ -73,6 +73,26 @@ may find a seam that needs a change: open an issue before writing one.
 5. Add the entry to `REGISTRY` in `src/registry.ts`.
 6. Name its variables in [docs/setup.md](docs/setup.md); `test/docs.test.ts` fails on a variable
    of any entry that the page does not name.
+7. Document it. An agent gives its entry a `limitsHeading` and writes that section of
+   [docs/limits.md](docs/limits.md) (`## Limits of ...`): every difference found between a session
+   started from the chat and the agent's own terminal, each measured or sourced, with the column
+   `Looked into`; `test/docs.test.ts` requires one such section for each agent in the registry.
+   An agent whose SDK or protocol the source depends on adds a surface document like
+   [docs/sdk-surface.md](docs/sdk-surface.md) (every type, field, option and value used, with its
+   source) and a probe that checks it on each release, or says in its section of the limits that
+   it has no probe. Its `tools` vocabulary (`ToolVocabulary`) is part of the module, declared on
+   the back end and the entry.
+
+The core and the chat hold nothing that only one agent does: no tool name or input key, no command
+prefix, no status or end word of an SDK, no settings layer, no list sentinel, no turn shape or
+event order measured on one agent. Each is a field of the seam, a `Capabilities` flag or an
+`AgentWords` entry that the module fills, and a seam member that a capability gates is optional.
+The tests follow the same line: those under `test/core/` and `test/chat/` use the plain agent
+(`test/support/plain-agent.ts`) and never reach `src/agent/<module>/`, directly or through a
+support file or a source file (`src/registry.ts` imports the modules). A test that runs the core over one module's recorded stream lives under
+`test/agent/<module>/`. `test/vocabulary.test.ts` enforces both, and fails on a string literal in `src/core/` or
+`src/chat/` equal to any name in the entry's `toolNames` or its vocabulary, but in a constant it
+lists by name in `LABELS` (a task kind's label, a button's).
 
 `test/support/plain-agent.ts` and `test/support/memory-chat.ts` are the worked examples: each is
 written against its seam and `src/core/port.ts` alone and declares few capabilities, and the
@@ -110,7 +130,7 @@ npm run check
 `npm run check` runs Biome (`biome check .`), `tsc --noEmit` and the tests. They need Node 22.19 or
 later, the `engines` of `package.json` that the installed package needs too. Node runs the tests
 from the sources, with the types stripped, so they need no build; they start no Claude Code process
-and open no connection. One file: `node --test test/core/config.test.ts`. `npm run format` applies
+and open no connection. One file: `node --test test/config.test.ts`. `npm run format` applies
 Biome's fixes, and `npm run build` compiles `src/` to `dist/`.
 
 CI runs the tests on Linux, macOS and Windows, and it is the judge for the systems you do not

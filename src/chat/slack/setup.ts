@@ -38,7 +38,8 @@ function modelOptions(models: readonly ModelInfo[]): Block[] {
   return models.map((m) =>
     option(
       m.displayName,
-      m.value,
+      // The agent's default entry is the choice `DEFAULT`, which the core passes on as nothing.
+      m.isDefault ? DEFAULT : m.value,
       // The CLI's own words, shown under the name (plain_text, at most 75 characters).
       m.description === null
         ? null

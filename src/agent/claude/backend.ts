@@ -25,14 +25,15 @@ import type {
   StartOptions,
   UsageLimits,
 } from "../seam.ts";
-import type { ResolveSettings } from "./advisor.ts";
+import type { ResolveSettings, SettingsSource } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
 import { chromeEnabled } from "./chrome.ts";
 import { GOAL_CLEAR } from "./goals.ts";
 import { type RunOutput, sessionHolders } from "./holders.ts";
 import { aliveSessions, byLastActivity, directorySessions, projectsDir } from "./listing.ts";
-import { ClaudeSession, type QueryFunction } from "./session.ts";
+import { ClaudeSession, type QueryFunction, THREAD_SETTINGS_SOURCES } from "./session.ts";
 import { shellMode } from "./shell.ts";
+import { TOOLS } from "./tools.ts";
 import { trustedRepository, untrustedRepository, workspaceTrusted } from "./trust.ts";
 import { type GetSessionMessages, turnsAfter } from "./turns.ts";
 import { type BareStart, UsageProbe } from "./usage-probe.ts";
@@ -97,6 +98,7 @@ export const WORDS: AgentWords = Object.freeze({
   author: "Claude",
   command: "claude",
   examples: "`!compact`, `!model opus`",
+  commandPrefix: "/",
   // `/clear` starts a new session under any of its names (aliases `/reset` and `/new`: commands
   // reference, code.claude.com/docs/en/commands, read 2026-10-02, and the list SDK 0.2.163
   // reports); `/login` and `/logout` act on the host's own login.
@@ -154,9 +156,18 @@ export interface ClaudeBackendOptions {
   readonly resolveSettings?: ResolveSettings;
 }
 
+/**
+ * `StartOptions` and the settings layers to read, which only a probe sets: a thread's session
+ * reads all three, so the owner's own settings apply (`THREAD_SETTINGS_SOURCES`).
+ */
+export interface ClaudeStartOptions extends StartOptions {
+  readonly settingsSources?: readonly SettingsSource[];
+}
+
 export class ClaudeBackend implements AgentBackend {
   readonly name = NAME;
   readonly words: AgentWords;
+  readonly tools = TOOLS;
   readonly capabilities = CAPABILITIES;
   readonly #query: QueryFunction | undefined;
   readonly #home: string;
@@ -190,11 +201,16 @@ export class ClaudeBackend implements AgentBackend {
    * refuses to resume `options.resume`, and with the failure itself when it cannot start.
    * Whether the owner trusted the folder is the caller's to check first (`folderTrusted`).
    */
-  async start(options: StartOptions, requests: RequestHandler): Promise<AgentSession> {
+  async start(options: ClaudeStartOptions, requests: RequestHandler): Promise<ClaudeSession> {
     // Read at every start, so a change in `/chrome` holds from a session's next start.
     const chrome = await chromeEnabled(this.#home, this.#configDir);
     const session = new ClaudeSession(
-      { ...options, chrome, variables: this.#variables },
+      {
+        ...options,
+        settingsSources: options.settingsSources ?? THREAD_SETTINGS_SOURCES,
+        chrome,
+        variables: this.#variables,
+      },
       requests,
       this.#query,
       this.#resolveSettings,

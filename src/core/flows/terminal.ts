@@ -27,6 +27,8 @@ export const TERMINAL_POLL_SECONDS = 2.0;
 export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
   const { agent, chat } = deps;
   const clock = deps.clock ?? systemClock;
+  // Null for an agent with no terminal to continue in: nothing here is offered then.
+  const terminal = agent.words.terminal;
 
   function sessionIdOf(session: ThreadSession): string | null {
     return deps.state.thread(session.channelId, session.threadId)?.sessionId ?? null;
@@ -38,7 +40,12 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
    */
   async function terminals(session: ThreadSession): Promise<readonly SessionHolder[] | null> {
     const id = sessionIdOf(session);
-    if (id === null || !agent.capabilities.sessionHolders || agent.sessionHolders === undefined) {
+    if (
+      id === null ||
+      terminal === null ||
+      !agent.capabilities.sessionHolders ||
+      agent.sessionHolders === undefined
+    ) {
       return [];
     }
     let found: readonly SessionHolder[] | null;
@@ -103,7 +110,7 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
   }
 
   /** The line that opens the session in the terminal, as `!status` gives it, or `template`. */
-  function commandLine(session: ThreadSession, template = agent.words.terminal): string {
+  function commandLine(session: ThreadSession, template: string): string {
     return fill(template, {
       directory: shellQuote(session.directory),
       session: sessionIdOf(session) ?? "",
@@ -111,6 +118,10 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
   }
 
   async function move(ref: ThreadRef, session: ThreadSession): Promise<void> {
+    if (terminal === null) {
+      await talk.tell(ref, named(texts.TERMINAL_UNAVAILABLE, deps.names));
+      return;
+    }
     if (sessionIdOf(session) === null) {
       await talk.tell(ref, texts.TERMINAL_NOT_STARTED);
       return;
@@ -118,9 +129,13 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
     const shown = (command: string) => commandShown(command, (text) => chat.escape(text, "notice"));
     const continuing = agent.words.terminalContinue;
     if (session.busy && continuing === null) {
-      await talk.tell(ref, fill(texts.TERMINAL_WAIT, { command: shown(commandLine(session)) }), {
-        stays: true,
-      });
+      await talk.tell(
+        ref,
+        fill(texts.TERMINAL_WAIT, { command: shown(commandLine(session, terminal)) }),
+        {
+          stays: true,
+        },
+      );
       return;
     }
     const running = session.stillRunning;
@@ -149,7 +164,7 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
         ? fill(named(texts.TERMINAL_CUT, deps.names), {
             command: shown(commandLine(session, continuing)),
           })
-        : fill(texts.TERMINAL_IDLE, { command: shown(commandLine(session)) });
+        : fill(texts.TERMINAL_IDLE, { command: shown(commandLine(session, terminal)) });
     await talk.tell(ref, text, { stays: true });
   }
 
@@ -176,13 +191,13 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
     for (;;) {
       if (talk.stopped) return false;
       const found = await terminals(session);
-      if (found === null || found.length === 0) break;
+      if (found === null || found.length === 0 || terminal === null) break;
       if (found.some((holder) => holder.busy)) {
         if (!(await waitForTurn(ref, session))) return false;
         continue;
       }
       if (found.every((holder) => session.terminalsAllowed.has(holder.id))) break;
-      const command = commandLine(session);
+      const command = commandLine(session, terminal);
       const answer = await askOwner(deps, talk, ref, session, {
         kind: "terminal",
         title: texts.TERMINAL_OPEN_TITLE,

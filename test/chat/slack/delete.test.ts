@@ -16,7 +16,7 @@ import {
   rejected,
 } from "../../support/fake-slack.ts";
 import type { JsonObject } from "../../support/fixtures.ts";
-import { NAMES } from "../../support/names.ts";
+import { PLAIN_NAMES } from "../../support/names.ts";
 
 const ROOT = "1790000000.000001";
 const OWNER = "U000ALICE";
@@ -82,7 +82,7 @@ class World {
       botUserId: BOT,
       ownerUserId: OWNER,
       state: this.state,
-      names: () => NAMES,
+      names: () => PLAIN_NAMES,
       release: async (channelId, threadTs) => {
         this.released.push([channelId, threadTs]);
         return this.free;
@@ -373,16 +373,16 @@ test("a pin added after the question is caught by the next delete", async () => 
 
 test("the three pinned lines are worded for what is pinned", () => {
   assert.equal(
-    pinnedLine({ reason: "pinned", where: "tagged-root" }, NAMES),
+    pinnedLine({ reason: "pinned", where: "tagged-root" }, PLAIN_NAMES),
     slackTexts.DELETE_PINNED_TAGGED,
   );
   assert.equal(
-    pinnedLine({ reason: "pinned", where: "root" }, NAMES),
-    named(slackTexts.DELETE_PINNED_BY_HAND, NAMES),
+    pinnedLine({ reason: "pinned", where: "root" }, PLAIN_NAMES),
+    named(slackTexts.DELETE_PINNED_BY_HAND, PLAIN_NAMES),
   );
   assert.equal(
-    pinnedLine({ reason: "pinned", where: "reply" }, NAMES),
-    named(slackTexts.DELETE_PINNED_REPLY, NAMES),
+    pinnedLine({ reason: "pinned", where: "reply" }, PLAIN_NAMES),
+    named(slackTexts.DELETE_PINNED_REPLY, PLAIN_NAMES),
   );
 });
 
@@ -541,7 +541,7 @@ test("a clean up counts what slack refuses and deletes the rest", async () => {
   world.owner.responses["chat.delete"] = rejected("cant_delete_message");
   assert.equal(
     await world.deleter.clean(CHANNEL),
-    fill(named(slackTexts.HOME_CLEAN_REFUSED, NAMES), { count: 1 }),
+    fill(named(slackTexts.HOME_CLEAN_REFUSED, PLAIN_NAMES), { count: 1 }),
   );
   assert.deepEqual(world.deleted(world.bot), ["1790000011.000001"]);
 });

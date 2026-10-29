@@ -1,10 +1,9 @@
 /**
  * The Resume picker's blocks and the Resume button's value. How a session is dated from Claude
- * Code's transcript files is tested with the Claude back end (`test/agent/claude/listing.test.ts`).
+ * Code's transcript files is tested with the Claude back end (`test/agent/claude/listing.test.ts`), which also holds that its row count is the picker's.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { RESUME_ROWS as DATED_ROWS } from "../../../src/agent/claude/listing.ts";
 import type { ListedSession } from "../../../src/agent/seam.ts";
 import {
   parseResumeValue,
@@ -120,9 +119,6 @@ test("only the newest sessions are listed", () => {
   const listed = rows(blocks);
   assert.equal(listed.length, RESUME_ROWS);
   assert.equal(RESUME_ROWS, 20); // the maintainer, 2026-09-25: ten were too few
-  // The Claude back end dates only the sessions that can enter that many rows, and the two
-  // modules cannot share the number: one changed alone sorts the rows past it by another key.
-  assert.equal(DATED_ROWS, RESUME_ROWS);
   const first = parseResumeValue(listed[0]?.accessory.value);
   assert.ok(first?.[0].endsWith("000000000000"));
   assert.equal(

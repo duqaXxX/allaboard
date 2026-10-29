@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { readLimits } from "../../probe/limits.ts";
+import { LIMITS_HEADING } from "../../src/agent/claude/module.ts";
 
 function pageAt(text: string): string {
   const path = join(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")), "limits.md");
@@ -16,7 +17,7 @@ const HEAD =
 
 test("every table of the Agent SDK section is read, subsections included", () => {
   const path = pageAt(
-    "# Limits\n\n## Limits of the Claude Agent SDK\n\nText.\n\n" +
+    `# Limits\n\n## ${LIMITS_HEADING}\n\nText.\n\n` +
       `${HEAD}| A | x | Not offered | \`P23\` | none |\n| B | y | Stopped | \`L1\`, \`L2\` | none |\n\n` +
       `### More\n\n${HEAD}| C | z | Hidden | by hand: Slack draws it | none |\n\n` +
       `## Limits of Slack\n\n${HEAD}| D | w | not read | \`L9\` | none |\n`,
@@ -52,8 +53,7 @@ test("every table of the Agent SDK section is read, subsections included", () =>
 test("a Rests on column is read, and an unreadable cell is an error", () => {
   const head =
     "| What differs | In the terminal | From Slack | Checked by | Looked into | Rests on |\n|---|---|---|---|---|---|\n";
-  const page = (row: string) =>
-    pageAt(`# Limits\n\n## Limits of the Claude Agent SDK\n\n${head}${row}\n`);
+  const page = (row: string) => pageAt(`# Limits\n\n## ${LIMITS_HEADING}\n\n${head}${row}\n`);
   assert.deepEqual(
     readLimits(page("| A | x | y | `L1` | none | `Query.stopTask`, `/rewind` |")).map(
       (l) => l.restsOn,
@@ -80,7 +80,7 @@ const BAD: [string, string][] = [
 
 for (const [name, row] of BAD) {
   test(`a Checked by cell that cannot be read is an error [${name}]`, () => {
-    const path = pageAt(`## Limits of the Claude Agent SDK\n\n${HEAD}${row}\n`);
+    const path = pageAt(`## ${LIMITS_HEADING}\n\n${HEAD}${row}\n`);
     assert.throws(() => readLimits(path));
   });
 }
@@ -89,11 +89,11 @@ test("a page with no section, no row or no Checked by column is an error", () =>
   assert.throws(() =>
     readLimits(pageAt(`## Limits of Slack\n\n${HEAD}| A | x | y | \`L1\` | none |\n`)),
   );
-  assert.throws(() => readLimits(pageAt("## Limits of the Claude Agent SDK\n\nNo table.\n")));
+  assert.throws(() => readLimits(pageAt(`## ${LIMITS_HEADING}\n\nNo table.\n`)));
   assert.throws(() =>
     readLimits(
       pageAt(
-        "## Limits of the Claude Agent SDK\n\n| What differs | In the terminal | From Slack | Looked into |\n|---|---|---|---|\n| A | x | y | none |\n",
+        `## ${LIMITS_HEADING}\n\n| What differs | In the terminal | From Slack | Looked into |\n|---|---|---|---|\n| A | x | y | none |\n`,
       ),
     ),
   );

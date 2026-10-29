@@ -22,7 +22,6 @@ const LIMIT = { timeout: 10_000 };
 const START: StartOptions = {
   folder: "/srv/alice/app",
   resume: null,
-  settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
 };
@@ -220,7 +219,7 @@ test("the trust and Chrome records are the folder's, not the home's", LIMIT, asy
     variables: { CLAUDE_CONFIG_DIR: config },
     clock: systemClock,
   });
-  assert.equal(await backend.folderTrusted(project), true);
+  assert.equal(await backend.folderTrusted?.(project), true);
   await backend.close();
 });
 
@@ -232,7 +231,7 @@ test("with no folder set anywhere the records are the home's", LIMIT, async () =
     JSON.stringify({ projects: { [project]: { hasTrustDialogAccepted: true } } }),
   );
   const backend = claudeAgent({ home }).build({ variables: {}, clock: systemClock });
-  assert.equal(await backend.folderTrusted(project), true);
+  assert.equal(await backend.folderTrusted?.(project), true);
   await backend.close();
 });
 
@@ -247,6 +246,6 @@ test("the environment's folder serves when the file sets none", LIMIT, async () 
   );
   process.env.CLAUDE_CONFIG_DIR = config;
   const backend = claudeAgent({ home }).build({ variables: {}, clock: systemClock });
-  assert.equal(await backend.folderTrusted(project), true);
+  assert.equal(await backend.folderTrusted?.(project), true);
   await backend.close();
 });

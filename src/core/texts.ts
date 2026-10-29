@@ -519,6 +519,10 @@ export const FORK_OLD_FOLDER =
   "channel's folder, where it does not exist.";
 export const TERMINAL_TOP_LEVEL =
   "`!terminal` works inside a session's thread, not in the channel.";
+// Shown only for an agent with no terminal to continue a session in.
+export const TERMINAL_UNAVAILABLE = naming(
+  "{agent} has no terminal to move a session to, so `!terminal` does nothing.",
+);
 export const TERMINAL_NOT_STARTED = "This session has not started yet: send it a message first.";
 export const TERMINAL_CUT = naming(
   "Stopped here. The terminal continues this turn by itself: the command that was running is " +

@@ -25,7 +25,7 @@ import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { named } from "../../../src/core/texts.ts";
 import { slackPayload } from "../../support/fixtures.ts";
-import { NAMES } from "../../support/names.ts";
+import { PLAIN_NAMES } from "../../support/names.ts";
 
 const WINDOWS = { skip: process.platform === "win32" && "a folder's mode is POSIX" };
 const TOKEN = "xox" + "b-fake";
@@ -55,7 +55,7 @@ function folderIn(t: TestContext): string {
 
 test("recorded images and snippets are accepted", () => {
   assert.deepEqual(
-    (["image", "screenshot", "snippet"] as const).map((kind) => refusal(shared(kind), NAMES)),
+    (["image", "screenshot", "snippet"] as const).map((kind) => refusal(shared(kind), PLAIN_NAMES)),
     [null, null, null],
   );
 });
@@ -69,18 +69,22 @@ const IMAGE_REFUSALS: [
   [
     "heic",
     { mimetype: "image/heic" },
-    () => texts.fill(named(slackTexts.UPLOAD_IMAGE_TYPE, NAMES), { mimetype: "image/heic" }),
+    () => texts.fill(named(slackTexts.UPLOAD_IMAGE_TYPE, PLAIN_NAMES), { mimetype: "image/heic" }),
   ],
   [
     "size",
     { size: IMAGE_LIMIT + 1 },
-    () => texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, NAMES), { size: "7.2MB", limit: "7.2MB" }),
+    () =>
+      texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, PLAIN_NAMES), {
+        size: "7.2MB",
+        limit: "7.2MB",
+      }),
   ],
   [
     "side",
     { original_w: 8001 },
     (file) =>
-      texts.fill(named(slackTexts.UPLOAD_IMAGE_SIDE, NAMES), {
+      texts.fill(named(slackTexts.UPLOAD_IMAGE_SIDE, PLAIN_NAMES), {
         width: 8001,
         height: String(file.original_h),
       }),
@@ -100,13 +104,13 @@ const IMAGE_REFUSALS: [
 for (const [name, fields, reason] of IMAGE_REFUSALS) {
   test(`an image past claude s limits is refused with the reason [${name}]`, () => {
     const file = shared("image", fields);
-    assert.equal(refusal(file, NAMES), reason(file));
+    assert.equal(refusal(file, PLAIN_NAMES), reason(file));
   });
 }
 
 test("a file past the limit is refused", () => {
   assert.equal(
-    refusal(shared("snippet", { size: FILE_LIMIT + 1 }), NAMES),
+    refusal(shared("snippet", { size: FILE_LIMIT + 1 }), PLAIN_NAMES),
     texts.fill(slackTexts.UPLOAD_FILE_SIZE, { size: "100.0MB", limit: "100.0MB" }),
   );
 });
@@ -208,24 +212,27 @@ test("the token never leaves for another host", async () => {
 test("a message takes at most five images and fifteen megabytes", () => {
   // the maintainer, 2026-09-25: images stay in the history and are sent again at every turn.
   const image = shared("image", { size: 1_000_000 });
-  assert.equal(imagesRefusal(Array(IMAGES_PER_MESSAGE).fill(image), NAMES), null);
+  assert.equal(imagesRefusal(Array(IMAGES_PER_MESSAGE).fill(image), PLAIN_NAMES), null);
   assert.equal(
-    imagesRefusal(Array(IMAGES_PER_MESSAGE + 1).fill(image), NAMES),
-    texts.fill(named(slackTexts.UPLOAD_TOO_MANY, NAMES), {
+    imagesRefusal(Array(IMAGES_PER_MESSAGE + 1).fill(image), PLAIN_NAMES),
+    texts.fill(named(slackTexts.UPLOAD_TOO_MANY, PLAIN_NAMES), {
       count: IMAGES_PER_MESSAGE + 1,
       limit: IMAGES_PER_MESSAGE,
     }),
   );
   const big = shared("image", { size: IMAGE_LIMIT });
   assert.equal(
-    imagesRefusal([big, big, big], NAMES),
-    texts.fill(named(slackTexts.UPLOAD_TOO_HEAVY, NAMES), {
+    imagesRefusal([big, big, big], PLAIN_NAMES),
+    texts.fill(named(slackTexts.UPLOAD_TOO_HEAVY, PLAIN_NAMES), {
       size: "21.5MB",
       limit: `${(IMAGES_LIMIT / 1024 / 1024).toFixed(1)}MB`,
     }),
   );
   // files are paths
-  assert.equal(imagesRefusal(Array(9).fill(shared("snippet", { size: FILE_LIMIT })), NAMES), null);
+  assert.equal(
+    imagesRefusal(Array(9).fill(shared("snippet", { size: FILE_LIMIT })), PLAIN_NAMES),
+    null,
+  );
 });
 
 test("saved files last three days", async (t) => {
@@ -268,7 +275,7 @@ const READABLE = [
 ];
 for (const mimetype of READABLE) {
   test(`common readable files pass [${mimetype}]`, () => {
-    assert.equal(refusal(shared("snippet", { mimetype }), NAMES), null);
+    assert.equal(refusal(shared("snippet", { mimetype }), PLAIN_NAMES), null);
   });
 }
 
@@ -287,7 +294,7 @@ for (const [name, mimetype] of OTHERS) {
     // the maintainer, 2026-09-25: the most common files only, those Claude reads.
     const shown = mimetype || "unknown";
     assert.equal(
-      refusal(shared("snippet", { mimetype }), NAMES),
+      refusal(shared("snippet", { mimetype }), PLAIN_NAMES),
       texts.fill(slackTexts.UPLOAD_FILE_TYPE, { mimetype: shown }),
     );
   });
@@ -385,11 +392,11 @@ test("a cancel is not a failed download", async () => {
 test("a size shown in megabytes rounds a tie to even, as Python does", () => {
   // 0.25 MB is exact in binary: Python writes 0.2, `toFixed` would write 0.3.
   assert.equal(
-    refusal(shared("image", { size: IMAGE_LIMIT + 1 }), NAMES),
-    texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, NAMES), { size: "7.2MB", limit: "7.2MB" }),
+    refusal(shared("image", { size: IMAGE_LIMIT + 1 }), PLAIN_NAMES),
+    texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, PLAIN_NAMES), { size: "7.2MB", limit: "7.2MB" }),
   );
   assert.equal(
-    refusal(shared("snippet", { size: FILE_LIMIT + 262144 }), NAMES),
+    refusal(shared("snippet", { size: FILE_LIMIT + 262144 }), PLAIN_NAMES),
     texts.fill(slackTexts.UPLOAD_FILE_SIZE, { size: "100.2MB", limit: "100.0MB" }),
   );
 });
@@ -418,15 +425,15 @@ const UNREADABLE_SIZES: Array<[string, unknown]> = [
 
 for (const [label, size] of UNREADABLE_SIZES) {
   test(`a size that is not a whole number of bytes is refused [${label}]`, () => {
-    assert.equal(refusal(shared("image", { size }), NAMES), slackTexts.UPLOAD_NOT_SHARED);
-    assert.equal(refusal(shared("snippet", { size }), NAMES), slackTexts.UPLOAD_NOT_SHARED);
+    assert.equal(refusal(shared("image", { size }), PLAIN_NAMES), slackTexts.UPLOAD_NOT_SHARED);
+    assert.equal(refusal(shared("snippet", { size }), PLAIN_NAMES), slackTexts.UPLOAD_NOT_SHARED);
   });
 
   test(`a size that is not a whole number of bytes refuses the images together [${label}]`, () => {
     const image = shared("image", { size, name: "photo & co.png" });
     assert.equal(
-      imagesRefusal([image], NAMES),
-      texts.fill(named(slackTexts.UPLOAD_FAILED, NAMES), {
+      imagesRefusal([image], PLAIN_NAMES),
+      texts.fill(named(slackTexts.UPLOAD_FAILED, PLAIN_NAMES), {
         name: "photo &amp; co.png",
         reason: slackTexts.UPLOAD_NOT_SHARED,
       }),
@@ -438,8 +445,8 @@ test("one unreadable size among images is refused whatever the others weigh", ()
   const small = shared("image", { size: 1_000 });
   const odd = shared("image", { size: "abc", name: "odd.png" });
   assert.equal(
-    imagesRefusal([small, odd], NAMES),
-    texts.fill(named(slackTexts.UPLOAD_FAILED, NAMES), {
+    imagesRefusal([small, odd], PLAIN_NAMES),
+    texts.fill(named(slackTexts.UPLOAD_FAILED, PLAIN_NAMES), {
       name: "odd.png",
       reason: slackTexts.UPLOAD_NOT_SHARED,
     }),
@@ -449,8 +456,8 @@ test("one unreadable size among images is refused whatever the others weigh", ()
 test("a file whose size is unreadable and has no name is called by its id", () => {
   const { name: _name, ...image } = shared("image", { size: "abc", id: "F000FILE" });
   assert.equal(
-    imagesRefusal([image], NAMES),
-    texts.fill(named(slackTexts.UPLOAD_FAILED, NAMES), {
+    imagesRefusal([image], PLAIN_NAMES),
+    texts.fill(named(slackTexts.UPLOAD_FAILED, PLAIN_NAMES), {
       name: "F000FILE",
       reason: slackTexts.UPLOAD_NOT_SHARED,
     }),
@@ -473,9 +480,12 @@ for (const [label, size, shown] of READABLE_SIZES) {
     const expected =
       shown === null
         ? null
-        : texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, NAMES), { size: shown, limit: "7.2MB" });
-    assert.equal(refusal(shared("image", { size }), NAMES), expected);
-    assert.equal(refusal(shared("snippet", { size }), NAMES), null);
+        : texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, PLAIN_NAMES), {
+            size: shown,
+            limit: "7.2MB",
+          });
+    assert.equal(refusal(shared("image", { size }), PLAIN_NAMES), expected);
+    assert.equal(refusal(shared("snippet", { size }), PLAIN_NAMES), null);
   });
 }
 
@@ -484,11 +494,11 @@ test("a size too large for a double keeps its digits, as Python shows them", () 
   const shown = "953674316406250018963456.0MB";
   for (const size of ["9".repeat(30), 1e30]) {
     assert.equal(
-      refusal(shared("image", { size }), NAMES),
-      texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, NAMES), { size: shown, limit: "7.2MB" }),
+      refusal(shared("image", { size }), PLAIN_NAMES),
+      texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, PLAIN_NAMES), { size: shown, limit: "7.2MB" }),
     );
     assert.equal(
-      refusal(shared("snippet", { size }), NAMES),
+      refusal(shared("snippet", { size }), PLAIN_NAMES),
       texts.fill(slackTexts.UPLOAD_FILE_SIZE, { size: shown, limit: "100.0MB" }),
     );
   }

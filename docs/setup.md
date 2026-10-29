@@ -331,13 +331,19 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
 | `ALLABOARD_CHAT` | optional: the chat allaboard is driven from; `slack` when absent, the only one this release has |
 | `ALLABOARD_SHELL` | optional: `on` or `off`, whether `!!<command>` runs your shell commands; `on` when absent |
 | `SLACK_MENTION_OWNER` | optional: `on` or `off`, whether the messages that need you mention you, out of sight; `off` when absent; see [Fewer notifications](#fewer-notifications) |
-| `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
-| `CLAUDE_CONFIG_DIR` | optional: Claude Code's own variable, the folder of a login of its own, for an instance that drives a second account; see [Part 6](#an-instance-with-its-own-claude-code-login) |
 
 `ALLABOARD_AGENT` and `ALLABOARD_CHAT` can be set or left out: `claude` and `slack` are the only
 agent and chat this release has, and a file without them works as one with them. A value allaboard does not know
 stops the start, and the message lists the valid ones. A variable that belongs to a module you did
 not select is not read.
+
+The variables of the Claude Code module, the agent this release has, are read only when it is the
+selected agent:
+
+| Variable | Value |
+|---|---|
+| `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
+| `CLAUDE_CONFIG_DIR` | optional: Claude Code's own variable, the folder of a login of its own, for an instance that drives a second account; see [Part 6](#an-instance-with-its-own-claude-code-login) |
 
 `BASH_DEFAULT_TIMEOUT_MS` is a variable of Claude Code, which allaboard hands to every session as
 you wrote it. In a session started through the Agent SDK, Claude Code stops a command left
@@ -1262,6 +1268,13 @@ a `!` is never a command.
 | `!` alone | Opens a session and asks its setup, then sends `!` as written | Shows every command (below) |
 | a message, or one with files | Opens a session, asks its setup, and after **Start** sends the message; the reply grows in the thread | Continues that session |
 | a question from Claude | One line with **Answer** and **Skip** | Same |
+
+A word that depends on what the agent can do exists when the agent declares that capability, and
+the word's meaning is the agent's mapping. In this release the agent is the Claude Code module:
+`!bypass on` sets its `bypassPermissions` mode, `!plan` sets its plan mode, and the words `/effort`
+and `/advisor` are its commands, sent as `!effort` and `!advisor`. An agent without a mode that
+skips permission requests refuses `!bypass`, one without a plan mode refuses `!plan`, and a
+command the agent does not list is not offered.
 
 #### Answers and limits of the words
 

@@ -12,8 +12,8 @@ import type { ThreadSession } from "../../../src/core/sessions/session.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill } from "../../../src/core/texts.ts";
 import { shellQuote } from "../../../src/text.ts";
-import { PlainAgent } from "../../support/plain-agent.ts";
-import { settledTurn } from "../../support/sessions.ts";
+import { PLAIN_WORDS, PlainAgent } from "../../support/plain-agent.ts";
+import { settledTurn } from "../../support/settle.ts";
 import { AskingWorld } from "./asking-world.ts";
 
 const SESSION = "plain-terminal-1";
@@ -48,6 +48,7 @@ test("a terminal left open is asked about once, and Send here sends", async (t) 
   agent.holders.set(SESSION, [own, idle("77")]);
   const sent = world.flows.terminal.beforeSending(ref, session);
   const open = await world.asked(ref, "terminal");
+  assert.ok(agent.words.terminal !== null);
   const command = fill(agent.words.terminal, {
     directory: shellQuote(world.folder),
     session: SESSION,
@@ -234,11 +235,31 @@ test("!terminal on a session that has not started says so", async (t) => {
 test("!terminal on an idle session gives the line that continues it", async (t) => {
   const { world, agent, ref, session } = await makeWorld(t);
   await world.flows.terminal.move(ref, session);
+  assert.ok(agent.words.terminal !== null);
   const command = fill(agent.words.terminal, {
     directory: shellQuote(world.folder),
     session: SESSION,
   });
   assert.deepEqual(after(world, ref), [fill(texts.TERMINAL_IDLE, { command: `\`${command}\`` })]);
+});
+
+/** An agent with a way to hold a session open elsewhere but no terminal to continue it in. */
+class NoTerminal extends PlainAgent {
+  override readonly words = { ...PLAIN_WORDS, terminal: null, terminalContinue: null };
+}
+
+test("an agent with no terminal offers no move, and a holder stops no message", async (t) => {
+  const agent = new NoTerminal({ terminal: true });
+  const world = await AskingWorld.make(t, { agent });
+  const { ref, session } = world.thread();
+  world.state.setSession(ref.channel, ref.thread, SESSION);
+  agent.holders.set(SESSION, [idle("77")]);
+  assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
+  assert.deepEqual(world.open(ref), []);
+  await world.flows.terminal.move(ref, session);
+  assert.deepEqual(after(world, ref), [
+    "Plain has no terminal to move a session to, so `!terminal` does nothing.",
+  ]);
 });
 
 test("a stop during a terminal's question removes it and says Not sent.", async (t) => {

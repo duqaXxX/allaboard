@@ -15,7 +15,7 @@ import {
   TooLarge,
   titleOf,
 } from "../../../src/core/files/read.ts";
-import { POSIX, scratch, write } from "./support.ts";
+import { POSIX, scratch, write } from "../../support/files.ts";
 
 // The cap the callers give: any size works, this one is what the tests below cross.
 const CAP = 1 << 20;

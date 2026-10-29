@@ -44,9 +44,18 @@ All notable changes to this project are documented here. The format follows
   connect. Slack draws the footer as written, so the email is not a link.
 - `!memory` and `!skills` list, inside a thread, the memory files and the skills its session
   loaded, read only, as the terminal's `/memory` and `/skills` panels do (#15).
+- Each agent module gives its entry a `limitsHeading`, the `## Limits of ...` section of
+  `docs/limits.md` it owns; `test/docs.test.ts` and the probe read the heading from there.
+  `docs/setup.md` groups the Claude Code module's variables and the meaning of the words that
+  map to its modes, `docs/features.md` lists the rows a capability gates, and `CONTRIBUTING.md`
+  lists the documents a new agent adds (#119).
+- The tests of the core and the chat no longer reach an agent module (the file index, the changed files, `!open`'s reader, the footer's git calls and the reply's character cuts are tested again with no agent, beside the Claude module's own layout cases): those that run the core
+  over Claude's recorded streams moved under `test/agent/claude/`, the rest use the plain agent,
+  and `test/vocabulary.test.ts` follows relative imports through `test/support/` and `src/`, bare ones included; `test/config.test.ts` moved out of `test/core/` since it loads the registry the daemon ships (#119).
 
 ### Changed
 
+- The names of the agent's tools the terminal shows in words or a preview of its own (`Bash`, `Edit`, `ExitPlanMode`...) leave `src/core/` for the agent module: the agent seam gains `ToolVocabulary` (`AgentBackend.tools`, `AgentEntry.tools`), the chat seam an `ApprovalRequest` that carries the plan, and `test/vocabulary.test.ts` fails on a tool name of the agent (`AgentEntry.toolNames`, the vocabulary included) held as a string in the core or the chat, apart from the labelled constants it lists (#119).
 - A copy `!fork` makes starts at once, told it was forked from a session that still runs, as the
   terminal's `/fork` starts its copy (`CLAUDE_CODE_RESUME_SOURCE_ALIVE`): it no longer reads that a
   command the original left running in the background stopped, and it can message the original.
@@ -65,6 +74,10 @@ All notable changes to this project are documented here. The format follows
   the model. The release still offers `/plugin-authoring`, which the recorded `server-info.json`
   does not list. It works from a thread; a mod that is a pane, a band, a status line entry or a
   toast shows only in the terminal, which `docs/limits.md` now says.
+- The prefix of the agent's commands (`/` for Claude Code) is declared by the agent as `AgentWords.commandPrefix`; the message flow and the session read it instead of assuming a slash (#119).
+- The status of a task's end is a closed `TaskOutcome` of the agent seam (`completed`, `failed`, `stopped`, `killed`) instead of a free string; the Claude translator maps an unknown word of a notification to `completed`, so such an end now shows as `finished` and no longer as the word itself (#119).
+- The agent's default model entry is marked on the seam (`ModelInfo.isDefault`, filled by the Claude module from the list's `default` entry); the core no longer compares a model's value to that word (#119).
+- The agent seam makes the members a capability serves optional, present exactly when it is declared: `listSessions`, `datedSessions`, `aliveSessions` (`sessionListing`), `folderTrusted`, `trustedRepository`, `untrustedRepository` (`folderTrust`), `AgentSession.setEffort` (`liveEffort`) and `AgentSession.stopTask` (`subagents` or `backgroundTasks`). A module that declares `folderTrust` with no `folderTrusted` has no folder trusted. `AgentWords.terminal` is null for an agent with no terminal to continue in: `!terminal` then answers that it does nothing, `!status` shows no terminal line, and no terminal's hold on a session stops a message (#119).
 
 ### Fixed
 
@@ -1545,10 +1558,10 @@ All notable changes to this project are documented here. The format follows
   seven tool names (a built-in tool, an MCP-style name and a name nobody has seen) and checks
   that `RequestHandler.permission` is called once and that the callback returns the owner's allow
   or deny, so a back end that approves a tool by itself fails.
-  `test/core/sessions/capabilities.test.ts` checks that a stored bypass on an agent whose `permissionModes.bypass` is null makes the connect
+  `test/agent/claude/sessions/capabilities.test.ts` checks that a stored bypass on an agent whose `permissionModes.bypass` is null makes the connect
   fail with `BypassUnavailable`, with no `setPermissionMode` call and the client closed
-  (`modeFor`). `test/core/config.test.ts` checks that a `.env` owned by another user is refused.
-  `test/chat/slack/app/no-content-in-logs.test.ts` sends a prompt, the agent's reply, a thread
+  (`modeFor`). `test/config.test.ts` checks that a `.env` owned by another user is refused.
+  `test/agent/claude/slack-app/no-content-in-logs.test.ts` sends a prompt, the agent's reply, a thread
   reply, a stranger's message, `!bind`, `!help` and a form's free text through the app, captures
   every log line at `DEBUG`, and fails on a line that holds any of them. No file under `src/`
   changes.
@@ -1701,9 +1714,9 @@ All notable changes to this project are documented here. The format follows
   changes for the owner; the golden files did not move. Not changed: the unbound notice that
   the Slack provider sends for an audio clip still speaks of trust, since the provider cannot read
   the agent's capabilities.
-- The test helper `repoUnder` (`test/core/sessions/helpers.ts`) runs its `git init` without the
+- The test helper `repoUnder` (`test/agent/claude/sessions/helpers.ts`) runs its `git init` without the
   variables an outer git sets (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`), through
-  `git-layouts.gitEnv`, now exported and shared with `test/core/footer-git.test.ts`. A git hook
+  `git-layouts.gitEnv`, now exported and shared with `test/agent/claude/footer-git.test.ts`. A git hook
   that runs the suite from a linked worktree gives every git it starts an absolute `GIT_DIR`, and
   `git init` then re-initialises that repository and makes no new one (git warns of a re-init and ignores
   the branch it was asked for; git 2.54.0, 2026-10-11). One test of invariant 1 is gone:

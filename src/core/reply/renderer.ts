@@ -8,25 +8,13 @@
  * unsaid is settled before they get here, by the back end: a text arrives once, as pieces or
  * whole, and a call's result arrives as its text and as what it did to a file.
  */
-import type { Question, SessionEvent } from "../../agent/seam.ts";
+import type { Question, SessionEvent, TaskOutcome } from "../../agent/seam.ts";
 import type { Preview, ReplySink, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
 import { monotonicClock } from "../../clock.ts";
 import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
-import {
-  ASKERS,
-  answered,
-  commandLine,
-  continued,
-  described,
-  LAUNCHERS,
-  type Launch,
-  launchedTogether,
-  PREVIEWED,
-  preview,
-  resuming,
-} from "./previews.ts";
+import { answered, type Launch, type Previews, resuming } from "./previews.ts";
 import { BACKGROUND, oneLine, quoted, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
 
 export const OUTPUT_LIMIT = 200;
@@ -138,7 +126,7 @@ export function goalAchievedLine(
  */
 export function endedLine(
   summary: string,
-  status: string,
+  status: TaskOutcome,
   durationMs: number | null,
   marked = true,
 ): string {
@@ -146,7 +134,7 @@ export function endedLine(
   return durationMs === null ? said : `${said} · ${formatDuration(durationMs / 1000)}`;
 }
 
-export function terminalStatus(status: string): [status: TaskStatus, output: string | null] {
+export function terminalStatus(status: TaskOutcome): [status: TaskStatus, output: string | null] {
   if (status === "failed") return ["error", null];
   if (status === "stopped" || status === "killed") return ["complete", STOPPED];
   return ["complete", null];
@@ -160,6 +148,8 @@ export class TurnRenderer {
   readonly #cwd: string | null;
   /** The names the texts that name the agent or the chat take. */
   readonly #names: texts.Names;
+  /** The agent's tools the terminal shows in words of its own. */
+  readonly #previews: Previews;
   readonly #lines = new Map<string, TaskUpdate>();
   /** The lines the sink has been given: a held call's line is in `#lines` before it is drawn. */
   readonly #drawn = new Set<string>();
@@ -251,6 +241,7 @@ export class TurnRenderer {
   constructor(
     sink: Sink,
     names: texts.Names,
+    previews: Previews,
     cwd: string | null = null,
     streaming = true,
     startedBefore: (taskId: string) => boolean = () => false,
@@ -261,6 +252,7 @@ export class TurnRenderer {
   ) {
     this.#sink = sink;
     this.#names = names;
+    this.#previews = previews;
     this.#cwd = cwd;
     this.#streaming = streaming;
     this.#startedBefore = startedBefore;
@@ -612,7 +604,7 @@ export class TurnRenderer {
     const launches = this.#launches;
     this.#launches = [];
     this.#awaiting.clear(); // written as it stands: a result that comes later changes nothing
-    await this.#line(launchedTogether(launches));
+    await this.#line(this.#previews.launchedTogether(launches));
   }
 
   /** The running tasks that have a line of their own, each with its line's id. */
@@ -690,7 +682,9 @@ export class TurnRenderer {
   }
 
   async #callStarted(event: EventOf<"call_started">): Promise<void> {
-    const title = described(event.toolName, event.input) ?? taskTitle(event.toolName, event.input);
+    const title =
+      this.#previews.described(event.toolName, event.input) ??
+      taskTitle(event.toolName, event.input);
     const parent = event.parentCallId;
     const root = parent === null ? null : (this.#rootOf.get(parent) ?? parent);
     if (root !== null && (this.#lines.has(root) || this.#launched.has(root))) {
@@ -703,17 +697,15 @@ export class TurnRenderer {
         event.callId,
         line(event.callId, title, "in_progress", { name: event.toolName }),
       );
-      await this.feedLine(resuming(continued(event.toolName, event.input) as string));
-    } else if (
-      PREVIEWED.has(event.toolName) ||
-      ASKERS.has(event.toolName) ||
-      LAUNCHERS.has(event.toolName)
-    ) {
+      await this.feedLine(
+        resuming(this.#previews.continued(event.toolName, event.input) as string),
+      );
+    } else if (this.#previews.holds(event.toolName)) {
       // Kept from the sink until it ends: what shows it then is its preview with no card (a
       // question's record, once answered), or a card that says why it failed. An approval has a
       // message of its own. A call that starts an agent is kept until its task starts
       // (`#taskStarted`).
-      if (LAUNCHERS.has(event.toolName)) this.#undecided.add(event.callId);
+      if (this.#previews.launches(event.toolName)) this.#undecided.add(event.callId);
       this.#lines.set(
         event.callId,
         line(event.callId, title, "in_progress", { name: event.toolName }),
@@ -729,7 +721,7 @@ export class TurnRenderer {
    * to word (2026-10-16); a message to one that still runs keeps its card.
    */
   #continues(event: EventOf<"call_started">): boolean {
-    const task = continued(event.toolName, event.input);
+    const task = this.#previews.continued(event.toolName, event.input);
     if (task === null) return false;
     return this.#lineOfTask.has(task) ? !this.#running.has(task) : this.#endedBefore(task);
   }
@@ -738,7 +730,7 @@ export class TurnRenderer {
    * A call's fields: its name, and for a call the terminal times, when it began and its command.
    */
   #timed(event: EventOf<"call_started">): Partial<TaskUpdate> {
-    const command = commandLine(event.toolName, event.input);
+    const command = this.#previews.commandLine(event.toolName, event.input);
     if (command === null) return { name: event.toolName };
     return { name: event.toolName, details: command, startedAt: this.#now() };
   }
@@ -793,12 +785,14 @@ export class TurnRenderer {
       this.#answers.delete(event.callId);
       const shown = event.isError
         ? null
-        : (kept ?? preview(entry.name, event.fileChange, this.#cwd));
+        : (kept ?? this.#previews.preview(entry.name, event.fileChange, this.#cwd));
       await this.#set({
         ...entry,
         // The terminal names a subagent's model on its call line; a card has the title.
         title:
-          model === null || !LAUNCHERS.has(entry.name) ? entry.title : `${entry.title} · ${model}`,
+          model === null || !this.#previews.launches(entry.name)
+            ? entry.title
+            : `${entry.title} · ${model}`,
         status: event.isError ? "error" : "complete",
         output: resultSummary(event.output),
         preview: shown,
@@ -896,7 +890,7 @@ export class TurnRenderer {
       model: null,
     });
     // The result of the call carries the model, and comes after the task starts.
-    if (LAUNCHERS.has(line.name)) this.#awaiting.add(call);
+    if (this.#previews.launches(line.name)) this.#awaiting.add(call);
     await this.#settleLaunches();
   }
 
@@ -949,7 +943,7 @@ export class TurnRenderer {
     }
   }
 
-  async #taskEnded(taskId: string, status: string, summary: string | null): Promise<void> {
+  async #taskEnded(taskId: string, status: TaskOutcome, summary: string | null): Promise<void> {
     if (this.#inside.has(taskId)) {
       this.#aside.delete(taskId); // dropped: it ended before its call's result
       return;

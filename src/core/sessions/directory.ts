@@ -12,10 +12,14 @@ import { DirectoryMissing, DirectoryUnreadable, DirectoryUntrusted } from "./err
 
 /**
  * `agent`'s record of trust as `checkDirectory` and the folder list read it. An agent that
- * keeps none (`folderTrust`) has no gate to start a session behind: every folder counts.
+ * keeps none (`folderTrust` false) has no gate to start a session behind: every folder counts.
+ * An agent that declares the record but not the lookup trusts no folder: the gate fails closed.
  */
 export function trustedBy(agent: AgentBackend): (folder: string) => Promise<boolean> {
-  return async (folder) => !agent.capabilities.folderTrust || agent.folderTrusted(folder);
+  return async (folder) => {
+    if (!agent.capabilities.folderTrust) return true;
+    return agent.folderTrusted === undefined ? false : agent.folderTrusted(folder);
+  };
 }
 
 /**
@@ -25,7 +29,9 @@ export function trustedBy(agent: AgentBackend): (folder: string) => Promise<bool
  */
 export function repositoryBy(agent: AgentBackend): (folder: string) => Promise<Repository | null> {
   return async (folder) =>
-    agent.capabilities.folderTrust ? agent.trustedRepository(folder) : null;
+    agent.capabilities.folderTrust && agent.trustedRepository !== undefined
+      ? agent.trustedRepository(folder)
+      : null;
 }
 
 /**
@@ -40,10 +46,9 @@ export async function untrustedNotice(
   escapeMarkup: (text: string) => string,
 ): Promise<string[]> {
   const template = agent.words.trust;
-  if (!agent.capabilities.folderTrust || template === null) return [];
-  const found = await untrustedRepositories(folder, repositoryBy(agent), (directory) =>
-    agent.untrustedRepository(directory),
-  );
+  const untrusted = agent.untrustedRepository?.bind(agent);
+  if (!agent.capabilities.folderTrust || template === null || untrusted === undefined) return [];
+  const found = await untrustedRepositories(folder, repositoryBy(agent), untrusted);
   return untrustedLines(
     template,
     found.map((repository) => repository.key),

@@ -25,11 +25,13 @@ import {
   type query,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import { ClaudeBackend } from "../src/agent/claude/backend.ts";
+import { ClaudeBackend, type ClaudeStartOptions } from "../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../src/agent/claude/capabilities.ts";
 import { directorySessions, projectKey, projectsDir } from "../src/agent/claude/listing.ts";
 import { recordPath } from "../src/agent/claude/record.ts";
+import type { ClaudeSession } from "../src/agent/claude/session.ts";
 import { AsyncQueue } from "../src/agent/claude/session.ts";
+import { TOOLS } from "../src/agent/claude/tools.ts";
 import { Translator } from "../src/agent/claude/translate.ts";
 import { locate } from "../src/agent/claude/trust.ts";
 import type {
@@ -42,19 +44,21 @@ import type {
   Repository,
   RequestHandler,
   SessionEvent,
-  StartOptions,
 } from "../src/agent/seam.ts";
 import { ResumeRefused } from "../src/agent/seam.ts";
 import { promptFor } from "../src/chat/slack/attachments.ts";
 import { resumeBlocks } from "../src/chat/slack/resume.ts";
 import * as slackTexts from "../src/chat/slack/texts.ts";
 import { gitState } from "../src/core/footer.ts";
-import { commandLine, preview, resuming } from "../src/core/reply/previews.ts";
+import { Previews, resuming } from "../src/core/reply/previews.ts";
 import * as texts from "../src/core/texts.ts";
 import { isRecord, records } from "../src/values.ts";
 import { CLAIMS, type Observation, observation } from "./claims.ts";
 import { notOffered, UNAVAILABLE } from "./commands.ts";
 import { type Records, tappedQuery } from "./tap.ts";
+
+// What the daemon draws a Claude session's tools with, as the daemon builds it.
+const CLAUDE_PREVIEWS = new Previews(TOOLS);
 
 // The model the fixture recorder uses: the cheapest that runs every scene. The alias, as the
 // daemon's own sessions name a model.
@@ -208,12 +212,12 @@ interface Turn {
 
 /** A session and everything it said, in order, with the waits a scene needs. */
 export class Live {
-  readonly session: AgentSession;
+  readonly session: ClaudeSession;
   readonly events: SessionEvent[] = [];
   ended = false;
   readonly #wake: (() => void)[] = [];
 
-  constructor(session: AgentSession) {
+  constructor(session: ClaudeSession) {
     this.session = session;
     void (async () => {
       for await (const event of session.events) {
@@ -314,7 +318,7 @@ export class Stage {
     this.backend = new ClaudeBackend({ home, query: this.query });
   }
 
-  options(folder: string, over: Partial<StartOptions> = {}): StartOptions {
+  options(folder: string, over: Partial<ClaudeStartOptions> = {}): ClaudeStartOptions {
     return {
       folder,
       resume: null,
@@ -326,7 +330,7 @@ export class Stage {
   }
 
   /** Starts a session; rejects with ResumeRefused when Claude Code will not resume one. */
-  async open(folder: string, over: Partial<StartOptions> = {}): Promise<Live> {
+  async open(folder: string, over: Partial<ClaudeStartOptions> = {}): Promise<Live> {
     const live = new Live(await this.backend.start(this.options(folder, over), this.owner));
     this.lives.push(live);
     return live;
@@ -515,7 +519,7 @@ export function judgeShellCard(
   finished: boolean,
   detail: string,
 ): Observation {
-  const line = call === undefined ? null : commandLine(call.toolName, call.input);
+  const line = call === undefined ? null : CLAUDE_PREVIEWS.commandLine(call.toolName, call.input);
   const shown = line !== null && line.includes("probe-ran.txt");
   const said =
     detail || (call !== undefined && finished && !shown ? "the call's input names no command" : "");
@@ -556,7 +560,7 @@ async function previews(s: Stage): Promise<Seen> {
   const shownBy = (tool: string) =>
     ofType(turn.events, "call_ended")
       .filter((event) => names.get(event.callId) === tool)
-      .map((event) => preview(tool, event.fileChange, s.workdir))
+      .map((event) => CLAUDE_PREVIEWS.preview(tool, event.fileChange, s.workdir))
       .find((found) => found !== null) ?? null;
   const write = shownBy("Write");
   const edit = shownBy("Edit");

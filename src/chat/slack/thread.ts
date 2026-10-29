@@ -22,6 +22,7 @@ import {
   type Listings,
   type Names,
   named,
+  Previews,
   texts,
 } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
@@ -142,7 +143,7 @@ export interface SlackChatOptions {
    * The agent the texts name. Read when a text that names it is first needed, never in `build`:
    * the core, and with it the agent, exists only after the provider was built.
    */
-  readonly agent: () => Pick<AgentBackend, "name" | "words">;
+  readonly agent: () => Pick<AgentBackend, "name" | "words" | "tools">;
   /** `sinks.DEBOUNCE_SECONDS`, unless a test shortens it. */
   readonly debounceSeconds?: number;
   /** `sinks.FINAL_RETRY_SECONDS`, unless a test shortens it. */
@@ -590,6 +591,7 @@ export class SlackThread implements ThreadChat {
       userId: identity.ownerUserId,
       botUserId: identity.botUserId,
       limiter: this.options.limiter,
+      previews: new Previews(this.options.agent().tools),
       clock: this.clock,
       ...(this.options.steady !== undefined && { steady: this.options.steady }),
       onOpenReply: onOpenMessage,

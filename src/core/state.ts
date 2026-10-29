@@ -67,7 +67,7 @@ export interface ThreadState {
   readonly sessionId: string | null;
   // The owner's last word on bypass, kept across restarts (a restart is the daemon's doing, not
   // the owner's): true after `!bypass on` or a ticked setup, false after `!bypass off` or an
-  // unticked one, null when never chosen, which leaves Claude Code's own mode alone. On disk,
+  // unticked one, null when never chosen, which leaves the agent's own mode alone. On disk,
   // `bypass` keeps its old meaning (`true` on, `false` not on) and an explicit off adds
   // `bypass_off: true`, written for that alone. A file from before reads as never chosen where
   // it held `false`; old code ignores the extra key and reads an off as not on.

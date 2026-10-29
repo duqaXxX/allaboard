@@ -1,28 +1,28 @@
 /**
  * `guideText`: the guide is made of parts, each shown only when the pair declares what it
- * describes. `FULL_GUIDE` is the guide of `main` with Claude and Slack's names in it, written
+ * describes. `FULL_GUIDE` is the guide with the plain agent's and Slack's names in it, written
  * out; the parts are never used to build an expectation.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type GuideOffer, guideText } from "../../src/core/guide.ts";
 import { EVERYTHING_OFFERED } from "../support/guide-offer.ts";
-import { NAMES } from "../support/names.ts";
+import { PLAIN_NAMES } from "../support/names.ts";
 
 const FULL_GUIDE = [
   "**allaboard**",
-  "This channel runs Claude Code on your Mac, in one folder, and answers you alone. One Slack thread is one Claude Code session: a top-level message starts a new one, and a reply inside its thread continues it, even days later.",
+  "This channel runs Plain on your Mac, in one folder, and answers you alone. One Slack thread is one Plain session: a top-level message starts a new one, and a reply inside its thread continues it, even days later.",
   "",
   "**Get started**",
-  "1. `!bind` lists the folders Claude Code trusts, with a Bind button each; `!bind <folder>` binds one by its path relative to your allowed root: `!bind my-project`. Claude Code must trust that folder first: open `claude` there once in the terminal and accept. `!bind` works only as a top-level message in the channel.",
-  "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its own, growing as Claude works, with a line for each tool it uses. Reply inside that thread to continue the same session. Attach images or files to a message: Claude sees a JPEG, PNG, GIF or WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML or notebook file from a copy saved on this Mac; other files are refused.",
-  "3. Before that first message is sent, the thread asks for the **Model**, the **Effort** (`Default` leaves Claude Code's own choice) and **Bypass permissions**; **Start** sends your message with those choices, and `!stop` cancels it instead.",
+  "1. `!bind` lists the folders Plain trusts, with a Bind button each; `!bind <folder>` binds one by its path relative to your allowed root: `!bind my-project`. Plain must trust that folder first: open `plain` there once in the terminal and accept. `!bind` works only as a top-level message in the channel.",
+  "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its own, growing as Plain works, with a line for each tool it uses. Reply inside that thread to continue the same session. Attach images or files to a message: Plain sees a JPEG, PNG, GIF or WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML or notebook file from a copy saved on this Mac; other files are refused.",
+  "3. Before that first message is sent, the thread asks for the **Model**, the **Effort** (`Default` leaves Plain's own choice) and **Bypass permissions**; **Start** sends your message with those choices, and `!stop` cancels it instead.",
   "",
   "**Commands**",
-  "Claude Code's commands start with `!` instead of `/`: `!compact`, `!model opus`. They run inside a session's thread, where `!help` lists every command that session offers, and `!help <text>` filters the list; typed in the channel, `!help` lists allaboard's own words instead. `!clear` (`!reset`, `!new`) is refused inside a thread (one thread is one session): start a fresh session with a new top-level message instead.",
+  "Plain's commands start with `!` instead of `/`: `!echo hello`, `!count one two`. They run inside a session's thread, where `!help` lists every command that session offers, and `!help <text>` filters the list; typed in the channel, `!help` lists allaboard's own words instead. `!restart` is refused inside a thread (one thread is one session): start a fresh session with a new top-level message instead.",
   "",
   "**Approvals and questions**",
-  "When Claude Code asks permission, the request shows what will run, with **Approve** and **Deny**; a very long one shows its start and its end and says how much it leaves out. A question from Claude comes with **Answer**, which opens a short form, and **Skip**.",
+  "When Plain asks permission, the request shows what will run, with **Approve** and **Deny**; a very long one shows its start and its end and says how much it leaves out. A question from Plain comes with **Answer**, which opens a short form, and **Skip**.",
   "",
   "**Sessions**",
   "`!status` typed in the channel lists the folder and every session still live, each linked to its thread; inside a thread it shows that session's directory, mode and the footer's values. `!stop` typed in the channel stops every running session and its background tasks; inside a thread it stops only that one. `!resume`, typed in the channel only, lists this folder's twenty newest sessions, from the terminal too, each with the start of its id and a **Resume** button; `!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes it in the thread of your `!resume` message. Inside a thread, `!memory` lists the memory files its session loaded and `!skills` the skills it can use, read only. Inside a thread, `!fork <prompt>` copies its session into a new thread of the channel, which starts on the prompt while this one goes on, as the terminal's `/fork` does. To continue a session in the terminal, run the `Terminal:` command `!status` shows in its thread, or send `!terminal` there, which moves a running turn too. Write from one side at a time: a terminal left open does not see what you write here, and is reopened before you write there again.",
@@ -31,19 +31,19 @@ const FULL_GUIDE = [
   "`!open`, sent inside a session's thread, offers the files changed in that session and a search over the folder's files; choosing one shares it into the thread, where Slack opens it in its file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file whose path contains them, or lists the files that do. The search reads the folder from disk and leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
   "",
   "**Bypass**",
-  "`!bypass on`, sent inside a session's thread, lets Claude Code run every tool without asking in that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ bypass while it is on.",
+  "`!bypass on`, sent inside a session's thread, lets Plain run every tool without asking in that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ bypass while it is on.",
   "",
   "**Plan mode**",
-  "`!plan`, sent inside a session's thread, makes Claude Code plan before it acts: it proposes a plan and asks you to approve it. `!plan off` leaves plan mode, and so does `!bypass on` or `!bypass off`. It belongs to the running session: a restart of allaboard or an idle close puts the session back in its normal mode.",
+  "`!plan`, sent inside a session's thread, makes Plain plan before it acts: it proposes a plan and asks you to approve it. `!plan off` leaves plan mode, and so does `!bypass on` or `!bypass off`. It belongs to the running session: a restart of allaboard or an idle close puts the session back in its normal mode.",
   "",
   "**Tags**",
-  "`!tag <name>`, sent inside a session's thread, marks it: Slack shows `[name]` at the start of the thread's first message and keeps the thread at hand, and where Claude Code can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose session has not started yet is marked in Slack alone.",
+  "`!tag <name>`, sent inside a session's thread, marks it: Slack shows `[name]` at the start of the thread's first message and keeps the thread at hand, and where Plain can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose session has not started yet is marked in Slack alone.",
   "",
   "**Shell commands**",
-  "`!!command`, sent inside a session's thread, is the terminal's `!command`: allaboard shows it with **Run** and **Cancel**, then runs it with Bash in the session's folder and shows its output; Claude Code gets the command and its output, and answers. `!stop` stops a command that runs.",
+  "`!!command`, sent inside a session's thread, is the terminal's `!command`: allaboard shows it with **Run** and **Cancel**, then runs it with Bash in the session's folder and shows its output; Plain gets the command and its output, and answers. `!stop` stops a command that runs.",
   "",
   "**Deleting a thread**",
-  "`!delete-thread`, sent inside a session's thread, asks you to confirm, then deletes every message of the thread from Slack, yours and the bot's. The session stays in Claude Code: `!resume` lists it again. A thread that is working or waiting for you is not deleted: `!stop` it first.",
+  "`!delete-thread`, sent inside a session's thread, asks you to confirm, then deletes every message of the thread from Slack, yours and the bot's. The session stays in Plain: `!resume` lists it again. A thread that is working or waiting for you is not deleted: `!stop` it first.",
   "",
   "**Updates**",
   "`!allaboard` shows the version that runs and the latest one. `!allaboard update`, typed in the channel, offers the latest version with a button that installs it: running turns finish first, then allaboard restarts on the new version. `!allaboard restart` restarts it without installing anything. Both work only while allaboard runs as a service.",
@@ -56,7 +56,7 @@ const EVERYTHING = EVERYTHING_OFFERED;
 const FULL_LINES = FULL_GUIDE.split("\n");
 
 function linesOf(offer: Partial<GuideOffer>): string[] {
-  return guideText(NAMES, { ...EVERYTHING, ...offer }).split("\n");
+  return guideText(PLAIN_NAMES, { ...EVERYTHING, ...offer }).split("\n");
 }
 
 /** The lines the variant lost and the lines it gained, in their order, blank lines apart. */
@@ -77,8 +77,8 @@ function line(startsWith: string): string {
 
 const STEP_ONE = line("1. `!bind`");
 const STEP_THREE = line("3. Before that first message");
-const COMMANDS = ["**Commands**", line("Claude Code's commands start")];
-const APPROVALS = line("When Claude Code asks permission");
+const COMMANDS = ["**Commands**", line("Plain's commands start")];
+const APPROVALS = line("When Plain asks permission");
 const SESSIONS = line("`!status` typed in the channel");
 const FILES = ["**Files**", line("`!open`, sent inside")];
 const BYPASS = ["**Bypass**", line("`!bypass on`")];
@@ -87,13 +87,13 @@ const TAGS = ["**Tags**", line("`!tag <name>`, sent inside")];
 const DELETE = ["**Deleting a thread**", line("`!delete-thread`, sent inside")];
 const SHELL = ["**Shell commands**", line("`!!command`, sent inside")];
 
-const EFFORT = "the **Effort** (`Default` leaves Claude Code's own choice)";
+const EFFORT = "the **Effort** (`Default` leaves Plain's own choice)";
 const STEP_THREE_HEAD = "3. Before that first message is sent, the thread asks for ";
 const STEP_THREE_TAIL =
   "; **Start** sends your message with those choices, and `!stop` cancels it instead.";
 
 test("with everything offered the guide is the one the owner reads today", () => {
-  assert.equal(guideText(NAMES, EVERYTHING), FULL_GUIDE);
+  assert.equal(guideText(PLAIN_NAMES, EVERYTHING), FULL_GUIDE);
 });
 
 test("the guide never has two blank lines in a row, whatever is left out", () => {
@@ -106,7 +106,7 @@ test("the guide never has two blank lines in a row, whatever is left out", () =>
     );
   }
   const nothing = Object.fromEntries(Object.keys(EVERYTHING).map((key) => [key, false]));
-  const bare = guideText(NAMES, nothing as unknown as GuideOffer);
+  const bare = guideText(PLAIN_NAMES, nothing as unknown as GuideOffer);
   assert.ok(!bare.includes("\n\n\n"));
   assert.ok(bare.startsWith("**allaboard**\n") && bare.endsWith("`!guide` shows this text again."));
 });
@@ -158,7 +158,7 @@ test("without questions the section is titled and worded for approvals alone", (
   assert.deepEqual(removed, ["**Approvals and questions**", APPROVALS]);
   assert.deepEqual(added, [
     "**Approvals**",
-    "When Claude Code asks permission, the request shows what will run, with **Approve** and **Deny**; a very long one shows its start and its end and says how much it leaves out.",
+    "When Plain asks permission, the request shows what will run, with **Approve** and **Deny**; a very long one shows its start and its end and says how much it leaves out.",
   ]);
   assert.ok(APPROVALS.startsWith(added[1] ?? ""), "the first sentence is the same");
 });

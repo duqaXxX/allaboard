@@ -1,15 +1,15 @@
 /**
- * The few tools the terminal shows in words of its own, and nothing else.
+ * The few tools the terminal shows in words of its own, drawn from what the agent declares.
  *
- * Rendering stays generic: a tool not named here shows as its name, counted when it ran more
- * than once, and its line, with no change anywhere. For the tools below, the terminal writes a
- * sentence or a preview instead, and this module reproduces it from what the agent's events
- * carry. What an `Edit` or a `Write` did to a file arrives as the seam's `FileChange`, which the
- * Claude back end reads from an undocumented shape and gives as null for any other: the generic
- * line is shown then. An answered question is the exception: its lines come from the questions
- * and answers the daemon itself sent back (`answered`), not from a result.
+ * Rendering stays generic: a tool the agent's `ToolVocabulary` does not name shows as its name,
+ * counted when it ran more than once, and its line, with no change anywhere. For the tools it
+ * names, the terminal writes a sentence or a preview instead, and `Previews` reproduces it from
+ * what the agent's events carry. What a changing tool did to a file arrives as the seam's
+ * `FileChange`, which a back end reads from the agent's own shape and gives as null for any
+ * other: the generic line is shown then. An answered question is the exception: its lines come
+ * from the questions and answers the daemon itself sent back (`answered`), not from a result.
  */
-import type { DiffHunk, FileChange, Question } from "../../agent/seam.ts";
+import type { DiffHunk, FileChange, Question, ToolVocabulary } from "../../agent/seam.ts";
 import type { Preview } from "../../chat/seam.ts";
 import {
   ANSWERED,
@@ -23,15 +23,6 @@ import {
 } from "../texts.ts";
 import { oneLine, spaced, splitLines, TITLE_LIMIT } from "./words.ts";
 
-// How the terminal folds finished calls of these tools. Captured from the terminal on Claude Code
-// 2.1.283 (2026-09-27), where Bash also does the searching (the CLI has no Grep or Glob tool):
-// `echo hi` read `Ran 1 shell command`, `ls` `Listed 1 directory`, a grep `Searched for 1
-// pattern`. That classification of the command is undocumented, so every Bash call reads here as
-// a shell command.
-export const WORDS: Readonly<Record<string, readonly [one: string, many: string]>> = {
-  Bash: ["Ran {n} shell command", "Ran {n} shell commands"],
-  Read: ["Read {n} file", "Read {n} files"],
-};
 // A diff line's colour where Slack draws none (mobile); an emoji is two columns wide, so a
 // context line gets two spaces and the numbers stay aligned.
 export const MARKS: Readonly<Record<string, string>> = {
@@ -41,34 +32,6 @@ export const MARKS: Readonly<Record<string, string>> = {
 };
 // The terminal shows a new file's first lines, then how many it leaves out.
 export const NEW_FILE_LINES = 10;
-// The tools `preview` reads. A reply shows a call of one only once it has ended: a stream cannot
-// take back a card, and a call that ended well is its preview alone.
-export const PREVIEWED: ReadonlySet<string> = new Set(["Edit", "Write"]);
-// The tools whose call a reply holds until it ends, as for `PREVIEWED`: a question the owner
-// answers leaves a record in place of its card (`answered`).
-export const ASKERS: ReadonlySet<string> = new Set(["AskUserQuestion"]);
-// The tools that start an agent. A reply holds a call of one until its task says how it runs: in
-// the background the terminal writes a line and no more (`launched`), and a stream cannot take
-// back a card.
-export const LAUNCHERS: ReadonlySet<string> = new Set(["Agent"]);
-// The type the terminal does not name in an agent's launch line: it reads `Agent(...)`, the
-// call's name, as for no type.
-const PLAIN_AGENT = "general-purpose";
-
-/**
- * The launch line of a task started in the background: the agent's type when it names one, else
- * the name of the call that started it, then what the task does.
- */
-export function launched(launch: Launch): string {
-  const { name, agentType, description, model } = launch;
-  const shown = agentType === null || agentType === PLAIN_AGENT ? name : agentType;
-  return fill(TASK_LAUNCHED, {
-    name: shown,
-    description: oneLine(description, TITLE_LIMIT),
-    model: model === null ? "" : ` ${model}`,
-  });
-}
-
 /** A task started in the background, as its launch line names it. */
 export interface Launch {
   /** The name of the call that started it. */
@@ -79,87 +42,14 @@ export interface Launch {
   readonly model: string | null;
 }
 
-/**
- * The lines for the tasks one message started in the background: one task's own line, or for
- * several a count and what each does, with no name.
- */
-export function launchedTogether(launches: readonly Launch[]): string {
-  const [only] = launches;
-  if (only !== undefined && launches.length === 1) return launched(only);
-  const lines = launches.map(({ description }, index) =>
-    fill(index === launches.length - 1 ? TASKS_LAUNCHED_LAST : TASKS_LAUNCHED_BRANCH, {
-      description: oneLine(description, TITLE_LIMIT),
-    }),
-  );
-  return [fill(TASKS_LAUNCHED, { n: launches.length }), ...lines].join("\n");
-}
-
-// The tools whose failed call the terminal counts with the others and says nothing more of: a
-// command that exits with an error was seen counted in `ran 4 shell commands` (captured on
-// Claude Code 2.1.296, 2026-10-13). No other tool's failure was captured.
-const FAILS_COUNTED: ReadonlySet<string> = new Set(["Bash"]);
-
-/** Whether a failed call of that tool is counted in its run with the calls that ended well. */
-export function failsCounted(name: string): boolean {
-  return FAILS_COUNTED.has(name);
-}
-
-// The input the terminal titles a running call by: a command's line reads its description
-// (`Sleeping 20 seconds then printing marker`), with the command itself under it.
-const DESCRIBED: Readonly<Record<string, string>> = { Bash: "description" };
-
-/** The terminal's title for a call that runs, where it has one of its own; null for any other. */
-export function described(name: string, input: Readonly<Record<string, unknown>>): string | null {
-  const said = Object.hasOwn(DESCRIBED, name) ? input[DESCRIBED[name] as string] : undefined;
-  return typeof said === "string" && said.trim() !== "" ? oneLine(said, TITLE_LIMIT) : null;
-}
-
-// The input a timed call shows under its title, after a prompt mark: a running command's line in
-// the terminal reads `$ <command> (5s)` (captured on Claude Code 2.1.301, 2026-10-16).
-const COMMANDED: Readonly<Record<string, string>> = { Bash: "command" };
-const COMMAND_LIMIT = 200;
-
-/**
- * The line a call the terminal times lists under its title (`$ sleep 20`); null for any other
- * call, and for one whose input holds no text there.
- */
-export function commandLine(name: string, input: Readonly<Record<string, unknown>>): string | null {
-  const said = Object.hasOwn(COMMANDED, name) ? input[COMMANDED[name] as string] : undefined;
-  return typeof said === "string" && said.trim() !== ""
-    ? `$ ${oneLine(said, COMMAND_LIMIT)}`
-    : null;
-}
-
-// The calls that continue an agent already started, and the input that names it: the terminal
-// draws no line for such a call, and writes `Resuming agent` under the agent (captured on
-// Claude Code 2.1.301, 2026-10-16).
-const CONTINUERS: Readonly<Record<string, string>> = { SendMessage: "to" };
 const RESUMING = "\u23bf Resuming agent {id}";
 // The terminal names an agent by the first characters of its id.
 const AGENT_ID_CHARS = 7;
-
-/** The task a call continues, when its tool is one that continues an agent; null otherwise. */
-export function continued(name: string, input: Readonly<Record<string, unknown>>): string | null {
-  const to = Object.hasOwn(CONTINUERS, name) ? input[CONTINUERS[name] as string] : undefined;
-  return typeof to === "string" && to !== "" ? to : null;
-}
+const COMMAND_LIMIT = 200;
 
 /** The line that says the task `taskId` is resumed. */
 export function resuming(taskId: string): string {
   return fill(RESUMING, { id: taskId.slice(0, AGENT_ID_CHARS) });
-}
-
-/**
- * How `n` finished calls of `name` read in a folded line. The terminal's words take a capital
- * only when they open the line (`Read 1 file, ran 4 shell commands`); a tool's name is its own.
- */
-export function folded(name: string, n: number, first = true): string {
-  const words = Object.hasOwn(WORDS, name) ? WORDS[name] : undefined;
-  if (words === undefined) {
-    return n === 1 ? name : `${name} ×${n}`;
-  }
-  const said = fill(n === 1 ? words[0] : words[1], { n });
-  return first ? said : said.charAt(0).toLowerCase() + said.slice(1);
 }
 
 function counted(n: number, noun = "line"): string {
@@ -266,61 +156,163 @@ export function answered(
   };
 }
 
-// The tool that asks the owner to approve a plan, and the two keys its input holds (measured on
-// SDK 0.3.303, 2026-10-20).
-const PLAN_TOOL = "ExitPlanMode";
-const PLAN_KEYS: ReadonlySet<string> = new Set(["plan", "planFilePath"]);
-
-/**
- * The plan an `ExitPlanMode` approval asks for, as the text the agent wrote, without the
- * path of the file it also names. Null for any other tool, and for an input that holds more or
- * less than the measured shape: Approve hands the agent the whole input, so an input that could
- * hide something behind the plan is shown whole, as any tool's is.
- */
-export function proposedPlan(
+/** Whether `input[key]` holds text, for a tool the vocabulary lists with that key. */
+function inputText(
+  keys: Readonly<Record<string, string>>,
   name: string,
   input: Readonly<Record<string, unknown>>,
 ): string | null {
-  if (name !== PLAN_TOOL) return null;
-  const { plan } = input;
-  if (typeof plan !== "string" || plan.trim() === "") return null;
-  return Object.keys(input).every((key) => PLAN_KEYS.has(key)) ? plan.trim() : null;
+  const said = Object.hasOwn(keys, name) ? input[keys[name] as string] : undefined;
+  return typeof said === "string" && said.trim() !== "" ? said : null;
 }
 
 /**
- * The terminal's view of a finished `Edit` or `Write` from what it did to a file, or null for
- * any other tool and for a call that reports no change. `cwd` is the session's folder.
+ * What an agent's `ToolVocabulary` makes of its tools: the terminal's words for a call, the
+ * calls a reply holds, the preview of a change and the plan an approval asks for. An agent that
+ * declares nothing gets the generic view for every tool.
  */
-export function preview(
-  name: string,
-  change: FileChange | null,
-  cwd: string | null,
-): Preview | null {
-  if (change === null) return null;
-  const path = shown(change.path, cwd);
-  if (name === "Write" && change.kind === "created") {
-    if (change.content === null) return null;
-    const lines = splitLines(change.content);
-    const width = String(Math.min(lines.length, NEW_FILE_LINES)).length;
-    const body = lines
-      .slice(0, NEW_FILE_LINES)
-      .map((line, index) => `${String(index + 1).padStart(width)} ${line}`);
-    if (lines.length > NEW_FILE_LINES) body.push(`… +${counted(lines.length - NEW_FILE_LINES)}`);
-    return {
-      title: `Write(${path})`,
-      summary: `Wrote ${counted(lines.length)} to ${path}`,
-      body: body.join("\n"),
-      language: "",
-      plain: false,
-      record: false,
-    };
+export class Previews {
+  readonly #tools: ToolVocabulary;
+
+  constructor(tools: ToolVocabulary) {
+    this.#tools = tools;
   }
-  if (PREVIEWED.has(name) && change.hunks.length > 0) {
+
+  /**
+   * Whether a reply holds a call of that tool until it ends: one that shows a preview of its
+   * change, or a question the owner answers, which leaves a record in place of its card. A stream
+   * cannot take back a card, and a call that ended well is its preview alone.
+   */
+  holds(name: string): boolean {
+    return (
+      Object.hasOwn(this.#tools.previews, name) ||
+      this.#tools.askers.includes(name) ||
+      this.launches(name)
+    );
+  }
+
+  /**
+   * Whether the tool starts a task. A reply holds a call of one until its task says how it runs:
+   * in the background the terminal writes a line and no more (`launched`).
+   */
+  launches(name: string): boolean {
+    return this.#tools.launchers.includes(name);
+  }
+
+  /**
+   * The launch line of a task started in the background: the agent's type when it names one, else
+   * the name of the call that started it, then what the task does.
+   */
+  launched(launch: Launch): string {
+    const { name, agentType, description, model } = launch;
+    const plain = agentType === null || agentType === this.#tools.plainAgentType;
+    return fill(TASK_LAUNCHED, {
+      name: plain ? name : (agentType as string),
+      description: oneLine(description, TITLE_LIMIT),
+      model: model === null ? "" : ` ${model}`,
+    });
+  }
+
+  /**
+   * The lines for the tasks one message started in the background: one task's own line, or for
+   * several a count and what each does, with no name.
+   */
+  launchedTogether(launches: readonly Launch[]): string {
+    const [only] = launches;
+    if (only !== undefined && launches.length === 1) return this.launched(only);
+    const lines = launches.map(({ description }, index) =>
+      fill(index === launches.length - 1 ? TASKS_LAUNCHED_LAST : TASKS_LAUNCHED_BRANCH, {
+        description: oneLine(description, TITLE_LIMIT),
+      }),
+    );
+    return [fill(TASKS_LAUNCHED, { n: launches.length }), ...lines].join("\n");
+  }
+
+  /** Whether a failed call of that tool is counted in its run with the calls that ended well. */
+  failsCounted(name: string): boolean {
+    return this.#tools.failsCounted.includes(name);
+  }
+
+  /** The terminal's title for a call that runs, where it has one of its own; null for any other. */
+  described(name: string, input: Readonly<Record<string, unknown>>): string | null {
+    const said = inputText(this.#tools.described, name, input);
+    return said === null ? null : oneLine(said, TITLE_LIMIT);
+  }
+
+  /**
+   * The line a call the terminal times lists under its title (`$ sleep 20`); null for any other
+   * call, and for one whose input holds no text there.
+   */
+  commandLine(name: string, input: Readonly<Record<string, unknown>>): string | null {
+    const said = inputText(this.#tools.commanded, name, input);
+    return said === null ? null : `$ ${oneLine(said, COMMAND_LIMIT)}`;
+  }
+
+  /** The task a call continues, when its tool is one that continues a task; null otherwise. */
+  continued(name: string, input: Readonly<Record<string, unknown>>): string | null {
+    const { continuers } = this.#tools;
+    const to = Object.hasOwn(continuers, name) ? input[continuers[name] as string] : undefined;
+    return typeof to === "string" && to !== "" ? to : null;
+  }
+
+  /**
+   * How `n` finished calls of `name` read in a folded line. The terminal's words take a capital
+   * only when they open the line (for example `Read 1 file, ran 4 shell commands`); a tool's name is its own.
+   */
+  folded(name: string, n: number, first = true): string {
+    const { words } = this.#tools;
+    const sentence = Object.hasOwn(words, name) ? words[name] : undefined;
+    if (sentence === undefined) {
+      return n === 1 ? name : `${name} ×${n}`;
+    }
+    const said = fill(n === 1 ? sentence[0] : sentence[1], { n });
+    return first ? said : said.charAt(0).toLowerCase() + said.slice(1);
+  }
+
+  /**
+   * The plan an approval for the plan tool asks for, as the text the agent wrote, without the
+   * path of the file it may also name. Null for any other tool, and for an input that holds more
+   * or less than the measured shape: Approve hands the agent the whole input, so an input that
+   * could hide something behind the plan is shown whole, as any tool's is.
+   */
+  plan(name: string, input: Readonly<Record<string, unknown>>): string | null {
+    const { plan } = this.#tools;
+    if (plan === null || name !== plan.tool) return null;
+    const text = input[plan.text];
+    if (typeof text !== "string" || text.trim() === "") return null;
+    return Object.keys(input).every((key) => plan.keys.includes(key)) ? text.trim() : null;
+  }
+
+  /**
+   * The terminal's view of a finished call of a tool that changes files, from what it did to a
+   * file, or null for any other tool and for a call that reports no change. `cwd` is the
+   * session's folder.
+   */
+  preview(name: string, change: FileChange | null, cwd: string | null): Preview | null {
+    if (change === null || !Object.hasOwn(this.#tools.previews, name)) return null;
+    const path = shown(change.path, cwd);
+    if (change.kind === "created") {
+      if (change.content === null) return null;
+      const lines = splitLines(change.content);
+      const width = String(Math.min(lines.length, NEW_FILE_LINES)).length;
+      const body = lines
+        .slice(0, NEW_FILE_LINES)
+        .map((line, index) => `${String(index + 1).padStart(width)} ${line}`);
+      if (lines.length > NEW_FILE_LINES) body.push(`… +${counted(lines.length - NEW_FILE_LINES)}`);
+      return {
+        title: `${name}(${path})`,
+        summary: `Wrote ${counted(lines.length)} to ${path}`,
+        body: body.join("\n"),
+        language: "",
+        plain: false,
+        record: false,
+      };
+    }
+    if (change.hunks.length === 0) return null;
     const numbered = diff(change.hunks);
     if (numbered === null) return null;
-    // The terminal names an edit `Update`, and a Write over an existing file keeps `Write`.
     return {
-      title: `${name === "Edit" ? "Update" : "Write"}(${path})`,
+      title: `${this.#tools.previews[name]}(${path})`,
       summary: changed(numbered.added, numbered.removed),
       body: numbered.body.join("\n"),
       language: "diff",
@@ -328,5 +320,4 @@ export function preview(
       record: false,
     };
   }
-  return null;
 }

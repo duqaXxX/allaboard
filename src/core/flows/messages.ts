@@ -293,7 +293,9 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
               if (inThread && !early && (await suggest(message, session, command, options.typed)))
                 return;
               const known = new Set(session.commands.map((offered) => offered.name));
-              prompt = known.has(firstWord(command)) ? `/${command.text}` : message.text;
+              prompt = known.has(firstWord(command))
+                ? `${agent.words.commandPrefix}${command.text}`
+                : message.text;
             }
             // (sync) Checked last, with no await before the submit: a stop can start while the
             // files are read. The daemon's words still work meanwhile (`!stop` shortens the

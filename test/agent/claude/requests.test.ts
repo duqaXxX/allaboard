@@ -15,7 +15,10 @@ import {
   questionResult,
   toRequest,
 } from "../../../src/agent/claude/requests.ts";
+import type { PermissionAnswer, QuestionAnswer } from "../../../src/agent/seam.ts";
+import { APPROVE, DENY, toAnswer } from "../../../src/core/requests.ts";
 import { type JsonObject, sdkJson, sdkRecords } from "../../support/fixtures.ts";
+import { PLAIN_NAMES } from "../../support/names.ts";
 
 const ASK = sdkJson("ask-can-use-tool") as JsonObject;
 const ASK_PREVIEW = sdkJson("ask-preview-can-use-tool") as JsonObject;
@@ -280,5 +283,28 @@ test("a skipped question denies the call with what the agent is told", () => {
   assert.deepEqual(questionResult({ answered: false, message }, ASK.input as JsonObject), {
     behavior: "deny",
     message,
+  });
+});
+
+test("the core's answers become the SDK's permission results", () => {
+  const toolInput = { command: "ls" };
+  const allow = toAnswer(APPROVE, null, PLAIN_NAMES) as PermissionAnswer;
+  assert.deepEqual(permissionResult(allow, toolInput), {
+    behavior: "allow",
+    updatedInput: toolInput,
+  });
+  assert.equal(
+    permissionResult(toAnswer(DENY, null, PLAIN_NAMES) as PermissionAnswer, toolInput).behavior,
+    "deny",
+  );
+  const questions = [{ question: "Q" }];
+  const answered = toAnswer(
+    { kind: "answer", answers: { Q: "A" }, notes: {} },
+    [{ text: "Q", header: "", options: [], multiSelect: false }],
+    PLAIN_NAMES,
+  ) as QuestionAnswer;
+  assert.deepEqual(questionResult(answered, { questions }), {
+    behavior: "allow",
+    updatedInput: { questions, answers: { Q: "A" } },
   });
 });

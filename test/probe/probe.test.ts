@@ -21,6 +21,7 @@ import {
 import { changes, notOffered, recorded, report } from "../../probe/commands.ts";
 import { baselineOf, certified, compared, pinnedTo, storedResults } from "../../probe/main.ts";
 import { writeObservations } from "../../probe/verdicts.ts";
+import { LIMITS_HEADING } from "../../src/agent/claude/module.ts";
 import { type JsonObject, sdkRecords } from "../support/fixtures.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
@@ -284,7 +285,7 @@ const PAGES: [string, string][] = [
   ],
   [
     "a table that names no command",
-    "# Limits\n\n## Limits of the Claude Agent SDK\n\n| a | b |\n|---|---|\n| x | words |\n",
+    `# Limits\n\n## ${LIMITS_HEADING}\n\n| a | b |\n|---|---|\n| x | words |\n`,
   ],
 ];
 

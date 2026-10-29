@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, beforeEach, test } from "node:test";
-import { aliveSessions } from "../../src/agent/claude/listing.ts";
 import type { Presence, ThreadRef } from "../../src/chat/seam.ts";
 import {
   type ChannelLookup,
@@ -24,12 +23,6 @@ const THREAD = "1789000000.000100";
 const GONE_THREAD = "1789000500.000100";
 const SESSION = "68da9311-0000-4000-8000-00000000000a";
 const NOBODY: readonly ThreadRef[] = [];
-const NEEDS_PERMISSIONS = {
-  skip:
-    (process.platform === "win32" || process.getuid?.() === 0) &&
-    "permission bits mean nothing on Windows, and root reads what a mode forbids",
-};
-
 /** A thread's name read as its opening time in epoch seconds, as a chat whose names are times does. */
 const opened = (ref: ThreadRef): number | null => Number(ref.thread);
 
@@ -333,44 +326,29 @@ test("a thread with no session is dropped for its age only when the chat dates i
   assert.ok(log.lines.join("\n").includes("pruned 1 stale thread"));
 });
 
-test(
-  "a pass over transcripts that cannot be searched prunes nothing",
-  NEEDS_PERMISSIONS,
-  async (t) => {
-    // The real `aliveSessions` over a config folder of the test: with the projects folder closed
-    // (EACCES) its listing is empty, and the thread's session is on disk all the same.
-    const root = realpathSync(mkdtempSync(join(tmpdir(), "awd-cleanup-")));
-    made.push(root);
-    const config = join(root, "config");
-    const project = join(root, "project");
-    mkdirSync(project);
-    const transcripts = join(config, "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
-    mkdirSync(transcripts, { recursive: true });
-    writeFileSync(join(transcripts, `${SESSION}.jsonl`), "");
-    const previous = process.env.CLAUDE_CONFIG_DIR;
-    process.env.CLAUDE_CONFIG_DIR = config;
-    t.after(() => {
-      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
-      else process.env.CLAUDE_CONFIG_DIR = previous;
-      chmodSync(join(config, "projects"), 0o755);
-    });
-    const closed = new StateStore(join(root, "state.json"), { warn: () => undefined });
-    closed.bind(CHANNEL, project);
-    closed.openThread(CHANNEL, THREAD, SESSION);
+test("a pass over sessions the agent cannot list prunes nothing", async () => {
+  // An agent that could not list a folder's sessions (null) says nothing of them: the thread's
+  // session may be on disk all the same. The Claude back end answers null on a closed projects
+  // folder (`test/agent/claude/listing.test.ts`).
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "awd-cleanup-")));
+  made.push(root);
+  const project = join(root, "project");
+  mkdirSync(project);
+  const unlisted = new StateStore(join(root, "state.json"), { warn: () => undefined });
+  unlisted.bind(CHANNEL, project);
+  unlisted.openThread(CHANNEL, THREAD, SESSION);
 
-    chmodSync(join(config, "projects"), 0o000);
-    await clean(channelsInSlack({}), closed, {
-      threadLookup: threadsInSlack({}),
-      alive: (folder) => aliveSessions(folder),
-      live: nothingLive,
-      chat: "Slack",
-      openedAt: opened,
-      logger: log,
-    });
-    assert.notEqual(closed.thread(CHANNEL, THREAD), null);
-    assert.deepEqual(log.lines, []);
-  },
-);
+  await clean(channelsInSlack({}), unlisted, {
+    threadLookup: threadsInSlack({}),
+    alive: async () => null,
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
+  assert.notEqual(unlisted.thread(CHANNEL, THREAD), null);
+  assert.deepEqual(log.lines, []);
+});
 
 test("forgetGoneChannels returns the channels it found as well as those it forgot", async () => {
   const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });

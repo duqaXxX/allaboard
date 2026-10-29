@@ -846,7 +846,7 @@ test("a task's change that is not its end is not terminal", () => {
   const updated = record("background", 45);
   const running = { ...updated, patch: { status: "running" } };
   assert.deepEqual(translator.translate(running), [
-    { type: "task_updated", taskId: "bny2rux7d", status: "running", terminal: false },
+    { type: "task_updated", taskId: "bny2rux7d", status: null, terminal: false },
   ]);
   const backgrounded = { ...updated, patch: { is_backgrounded: true } };
   assert.deepEqual(translator.translate(backgrounded), [
@@ -1318,6 +1318,18 @@ test("a hand-back with no text shows no words, never the note for Claude", () =>
   const agent = of(all, "task_started").find((event) => event.taskType === "local_agent");
   const own = of(all, "task_ended").find((event) => event.taskId === agent?.taskId);
   assert.equal(own?.report, null);
+});
+
+test("a notification with a status the seam has no word for ends the task as completed", () => {
+  const notification = sdkRecords("subagent-handback").find(
+    (found) => found.type === "system" && found.subtype === "task_notification",
+  );
+  assert.ok(notification);
+  const [ended] = of(
+    new Translator().translate({ ...notification, status: "paused" }),
+    "task_ended",
+  );
+  assert.equal(ended?.status, "completed");
 });
 
 test("a message from a peer that names no task of the session starts no report", () => {

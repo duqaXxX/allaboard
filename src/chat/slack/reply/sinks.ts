@@ -47,7 +47,14 @@
 import { isDeepStrictEqual } from "node:util";
 import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
-import { cancellable, Fold, formatDuration, Mutex, shownPreview } from "../../../core/port.ts";
+import {
+  cancellable,
+  Fold,
+  formatDuration,
+  Mutex,
+  type Previews,
+  shownPreview,
+} from "../../../core/port.ts";
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, RunningList, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
@@ -274,7 +281,7 @@ export class Tool {
   }
 
   /**
-   * Whether the tool is its preview alone: an Edit or a Write that reached the reply already
+   * Whether the tool is its preview alone: a change to a file that reached the reply already
    * ended well. A state that needs a card (running, failed, stopped, a preview with no body)
    * gives it one for good, since a stream cannot take a card back.
    */
@@ -481,6 +488,8 @@ export interface ReplySinkOptions {
   /** The daemon's own bot: whose messages are read back to find one a create left unknown. */
   readonly botUserId: string;
   readonly limiter: Limiter;
+  /** The agent's tools the terminal shows in words of its own, which fold the calls. */
+  readonly previews: Previews;
   /** Wall-clock seconds, and every pause of the sink. */
   readonly clock?: Clock;
   /**
@@ -555,7 +564,7 @@ export class ReplySink implements Sink {
   /** By the id of the card that shows them. */
   private readonly tools = new Map<string, Tool>();
   /** Which cards show the calls: one per run of calls. */
-  private readonly fold = new Fold();
+  private readonly fold: Fold;
   private readonly messages: Message[] = [];
   private pending: Task<void> | null = null;
   private retry: Task<void> | null = null;
@@ -633,6 +642,7 @@ export class ReplySink implements Sink {
     this.userId = options.userId;
     this.botUserId = options.botUserId;
     this.limiter = options.limiter;
+    this.fold = new Fold(options.previews);
     this.clock = options.clock ?? systemClock;
     this.steady = options.steady ?? this.clock;
     this.onOpenReply = options.onOpenReply ?? null;

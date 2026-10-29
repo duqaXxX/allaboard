@@ -139,7 +139,6 @@ export interface AgentHarness {
 }
 
 const LIMIT = { timeout: 15_000 };
-const SETTINGS: StartOptions["settingsSources"] = ["user", "project", "local"];
 
 // Reading a session.
 
@@ -205,7 +204,6 @@ function startOptions(world: AgentWorld, override: Partial<StartOptions> = {}): 
   return {
     folder: world.folder,
     resume: null,
-    settingsSources: SETTINGS,
     model: null,
     effort: null,
     ...override,
@@ -395,8 +393,11 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       assert.ok(backend.name.trim() !== "");
       assert.ok(backend.words.author.trim() !== "" && backend.words.command.trim() !== "");
       assert.ok(backend.words.examples.trim() !== "");
-      assert.ok(backend.words.terminal.includes("{directory}"));
-      assert.ok(backend.words.terminal.includes("{session}"));
+      assert.ok(backend.words.commandPrefix !== "", "commandPrefix is never empty");
+      const { terminal } = backend.words;
+      assert.ok(
+        terminal === null || (terminal.includes("{directory}") && terminal.includes("{session}")),
+      );
       // A command name is written after `!` in the chat and `/` in the agent: no slash, no space.
       const { newSession, login, logout } = backend.words;
       assert.ok(Array.isArray(newSession), "newSession is a list, empty when there is none");
@@ -774,9 +775,10 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         const { prompt: text, includes } = world.command();
         const { session, events } = await open(t, world);
         const listed = (await session.info()).commands;
-        const word = text.slice(1).split(/\s/)[0] ?? "";
+        const prefix = world.backend.words.commandPrefix;
+        const word = text.slice(prefix.length).split(/\s/)[0] ?? "";
         assert.ok(
-          text.startsWith("/") &&
+          text.startsWith(prefix) &&
             listed.some((entry) => entry.name === word || entry.aliases.includes(word)),
           "the prompt runs a command that info lists",
         );
@@ -990,6 +992,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       lacks(caps.liveEffort, "liveEffort"),
       async (world, t) => {
         const { session } = await open(t, world);
+        assert.ok(session.setEffort, "liveEffort declared, setEffort absent");
         await session.setEffort(caps.effortLevels[0] ?? "");
         await session.setEffort(null);
         await assert.rejects(session.setEffort("no-such-level"));
@@ -997,11 +1000,21 @@ export function agentConformance(name: string, harness: AgentHarness): void {
     );
 
     check(
-      "setEffort without liveEffort rejects (seam silent)",
-      { ...LIMIT, skip: caps.liveEffort ? `${name} declares liveEffort` : false },
+      "the members a capability gates are present exactly when it is declared",
+      LIMIT,
       async (world, t) => {
+        const { backend } = world;
+        const listing = [backend.listSessions, backend.datedSessions, backend.aliveSessions];
+        assert.ok(listing.every((member) => (member !== undefined) === caps.sessionListing));
+        const trust = [
+          backend.folderTrusted,
+          backend.trustedRepository,
+          backend.untrustedRepository,
+        ];
+        assert.ok(trust.every((member) => (member !== undefined) === caps.folderTrust));
         const { session } = await open(t, world);
-        await assert.rejects(session.setEffort(caps.effortLevels[0] ?? ""));
+        assert.equal(session.setEffort !== undefined, caps.liveEffort);
+        assert.equal(session.stopTask !== undefined, caps.subagents || caps.backgroundTasks);
       },
     );
 
@@ -1164,6 +1177,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         assert.ok(fork !== undefined);
         const copy = await fork.call(world.backend, world.folder, id, "a side problem");
         assert.notEqual(copy, id);
+        assert.ok(world.backend.listSessions, "sessionListing declared, listSessions absent");
         const listed = (await world.backend.listSessions(world.folder)).map((s) => s.id);
         assert.ok(listed.includes(id) && listed.includes(copy), listed.join(", "));
         world.say("Copy.");
@@ -1192,7 +1206,9 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         }
         assert.notEqual(ids[0], ids[1]);
         world.restart();
-        const listed = await world.backend.listSessions(world.folder);
+        const { backend } = world;
+        assert.ok(backend.listSessions && backend.aliveSessions && backend.datedSessions);
+        const listed = await backend.listSessions(world.folder);
         assert.deepEqual(
           listed.map((session) => session.id),
           [ids[1], ids[0]],
@@ -1200,10 +1216,10 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         for (const session of listed) {
           assert.ok(session.title !== "" && Number.isFinite(session.lastModified));
         }
-        assert.deepEqual(await world.backend.listSessions(world.otherFolder), []);
-        const alive = await world.backend.aliveSessions(world.folder);
+        assert.deepEqual(await backend.listSessions(world.otherFolder), []);
+        const alive = await backend.aliveSessions(world.folder);
         assert.ok(alive !== null && ids.every((id) => alive.has(id)));
-        const dated: ListedSession[] = await world.backend.datedSessions(world.folder, listed);
+        const dated: ListedSession[] = await backend.datedSessions(world.folder, listed);
         assert.deepEqual(
           dated.map((session) => session.id),
           [ids[1], ids[0]],
@@ -1222,9 +1238,13 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       async (world) => {
         assert.ok(world.trust, "the harness records trust");
         await world.trust(world.folder);
-        assert.equal(await world.backend.folderTrusted(world.folder), true);
-        assert.equal(await world.backend.folderTrusted(world.otherFolder), false);
-        assert.equal(await world.backend.trustedRepository(world.folder), null);
+        const { backend } = world;
+        assert.ok(
+          backend.folderTrusted && backend.trustedRepository && backend.untrustedRepository,
+        );
+        assert.equal(await backend.folderTrusted(world.folder), true);
+        assert.equal(await backend.folderTrusted(world.otherFolder), false);
+        assert.equal(await backend.trustedRepository(world.folder), null);
       },
     );
   });

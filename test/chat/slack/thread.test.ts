@@ -6,8 +6,13 @@
  */
 import assert from "node:assert/strict";
 import { beforeEach, mock, test } from "node:test";
-import type { PermissionRequest, QuestionRequest } from "../../../src/agent/seam.ts";
-import { ChatError, type OwnerRequest, type SessionStatus } from "../../../src/chat/seam.ts";
+import type { QuestionRequest } from "../../../src/agent/seam.ts";
+import {
+  type ApprovalRequest,
+  ChatError,
+  type OwnerRequest,
+  type SessionStatus,
+} from "../../../src/chat/seam.ts";
 import type { ChannelLine, LineKind } from "../../../src/chat/slack/channel-line.ts";
 import type { Limiter } from "../../../src/chat/slack/reply/limiter.ts";
 import type { ReplySink } from "../../../src/chat/slack/reply/sinks.ts";
@@ -38,7 +43,7 @@ import {
   TEAM,
   THREAD,
 } from "../../support/fake-slack.ts";
-import { NAMES } from "../../support/names.ts";
+import { PLAIN_NAMES } from "../../support/names.ts";
 
 beforeEach(() => resetStatusFlags());
 
@@ -93,13 +98,14 @@ async function settle(clock: FakeClock): Promise<void> {
   await clock.advance(0);
 }
 
-const PERMISSION: PermissionRequest = {
+const PERMISSION: ApprovalRequest = {
   type: "permission",
   callId: "toolu_1",
   toolName: "Bash",
   input: { command: "ls <here> & there" },
   title: null,
   description: null,
+  plan: null,
 };
 
 const QUESTION: QuestionRequest = {
@@ -501,7 +507,7 @@ test("a permission request is a message of its own and the core gets its ts", as
     channel: CHANNEL,
     thread_ts: THREAD,
     text: "Bash: ls",
-    blocks: JSON.parse(JSON.stringify(approvalBlocks("approval-1", PERMISSION, NAMES))),
+    blocks: JSON.parse(JSON.stringify(approvalBlocks("approval-1", PERMISSION, PLAIN_NAMES))),
     unfurl_links: false,
     unfurl_media: false,
   });
@@ -514,7 +520,7 @@ test("a question request is posted with the questions buttons", async () => {
   assert.equal(post?.text, "AskUserQuestion");
   assert.deepEqual(
     post?.blocks,
-    JSON.parse(JSON.stringify(questionBlocks("approval-2", QUESTION.questions, NAMES))),
+    JSON.parse(JSON.stringify(questionBlocks("approval-2", QUESTION.questions, PLAIN_NAMES))),
   );
 });
 
@@ -548,8 +554,8 @@ test("an answered question is rewritten on the budget every reply draws from", a
   assert.deepEqual(update, {
     channel: CHANNEL,
     ts,
-    text: named(texts.ANSWERED, NAMES),
-    blocks: JSON.parse(JSON.stringify(answeredBlocks(QUESTION.questions, answers, NAMES))),
+    text: named(texts.ANSWERED, PLAIN_NAMES),
+    blocks: JSON.parse(JSON.stringify(answeredBlocks(QUESTION.questions, answers, PLAIN_NAMES))),
   });
   // One token, taken before the update was sent.
   assert.equal(limiter.acquired, 1);

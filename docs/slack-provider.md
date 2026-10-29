@@ -74,12 +74,12 @@ A run of calls, the calls between two pieces of text, shares one card (`fold.Fol
 `ReplySink.task`), as the terminal draws one line for a run (captured on Claude Code 2.1.296).
 While a call of the run runs, the card is titled with it: the last call started that still runs,
 by the tool's name and its first argument, or by its description for a command
-(`previews.described`). Calls that run at the same time show one at a time, and nothing shows of
+(`Previews.described`). Calls that run at the same time show one at a time, and nothing shows of
 the calls before. With no call running, the card holds the counts of what ended, in the
-terminal's words where the terminal has words (`previews.folded`:
+terminal's words where the terminal has words (`Previews.folded`:
 `Ran 2 shell commands, read 1 file`): a comma between two counts, a capital on the first, no
 mark, and a failed command counted with the others. The card carries no `output`, and no
-`details` but one line per command of the run, `$ <command>` (`previews.commandLine`): Slack
+`details` but one line per command of the run, `$ <command>` (`Previews.commandLine`): Slack
 appends both fields to what a card already holds (measured: "Card text is appended"), so each
 command adds its line, and a card that is reused keeps the rest of its text in its title.
 
@@ -94,10 +94,10 @@ message.
 A call with a view of its own has a card of its own, keyed by its call id, and ends the run: a
 subagent the call waits for, whose title counts its calls and whose `details` say what it is doing
 now, a
-stopped call, and a failed call of any tool but a command (`previews.failsCounted`), whose card
+stopped call, and a failed call of any tool but a command (`Previews.failsCounted`), whose card
 says why. A subagent in the background has no card: the core writes its launch line as text
-of the reply (`TurnRenderer`, `previews.launched`). A message that continues a subagent that has
-ended (`previews.continued`) has no card either: the core writes `⎿ Resuming agent <id>` as a line
+of the reply (`TurnRenderer`, `Previews.launched`). A message that continues a subagent that has
+ended (`Previews.continued`) has no card either: the core writes `⎿ Resuming agent <id>` as a line
 about the work, with the first 7 characters of the id, as the terminal does
 (`previews.resuming`). A call that
 turns into one of these keeps the run's card when it was the run's only call. An `Edit` or a `Write` that
@@ -117,10 +117,10 @@ so the line is written by the `chat.update` that follows the stream's stop (`Rep
 which never notifies. The reply has ended with the stop: an update that fails is tried once more with the next
 write, and the cards stay if that fails too.
 
-The renderer keeps an `Edit` or a `Write` (`previews.PREVIEWED`) from the sink until its result
+The renderer keeps a call of a tool the agent previews (`ToolVocabulary.previews`) from the sink until its result
 arrives, since a stream cannot take back the card a running call would get. While the call runs the
 reply shows nothing for it; a call that waits for approval has the approval's message. One that
-ended well is a `blocks` chunk with no card (`previews.preview`): a collapsible, full-width
+ended well is a `blocks` chunk with no card (`Previews.preview`): a collapsible, full-width
 `container` block (`blocks.previewContainers`), closed until the owner opens it, whose title is the
 call's line (`Update(notes.txt)`), in code style through `rich_text_title` with the plain `title` as
 the fallback, and whose subtitle is the sentence (`Added 1 line, removed 1 line`). Inside a diff's
@@ -133,7 +133,7 @@ streamed or posted. One that failed joins its run as a call that ended, with the
 title; one that was stopped has a card of its own; one whose preview has no lines (an empty new
 file) has a card that says the sentence. A card the sink already drew for the call stays
 (`Tool.cardless`), and the diff under it is then titled with the sentence alone. An answered
-`AskUserQuestion` is held until it ends (`previews.ASKERS`) and shows its answers as a record
+`AskUserQuestion` is held until it ends (`ToolVocabulary.askers`) and shows its answers as a record
 (`Preview.record`, always with `Preview.plain`): one `context` block of words whose first line is
 the title behind `texts.RECORD_MARK` (`✓ `), with no card and no gap under the heading. The
 request message rewritten by `requests.answeredBlocks` has the same first line. Its lines come from the questions and answers the daemon sent back, so they depend on no

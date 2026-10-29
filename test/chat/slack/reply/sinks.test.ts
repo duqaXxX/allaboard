@@ -86,9 +86,9 @@ import {
   THREAD,
   timedOut,
 } from "../../../support/fake-slack.ts";
-import { golden, type Json, type JsonObject, sdkRecords } from "../../../support/fixtures.ts";
-import { NAMES } from "../../../support/names.ts";
-import { recordedEvents } from "../../../support/replay.ts";
+import type { Json, JsonObject } from "../../../support/fixtures.ts";
+import { PLAIN_NAMES } from "../../../support/names.ts";
+import { PLAIN_PREVIEWS } from "../../../support/plain-tools.ts";
 
 const WRITE_METHODS = [
   "chat.postMessage",
@@ -178,6 +178,7 @@ function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
     botUserId: BOT,
     // The default limiter paces on the wall clock; this one never makes a test wait.
     limiter: options.limiter ?? new UpdateLimiter({ clock: new SelfPacedClock() }),
+    previews: PLAIN_PREVIEWS,
     clock,
     ...(options.steady !== undefined && { steady: options.steady }),
     onOpenReply: options.onOpenReply,
@@ -203,7 +204,7 @@ const LIST_ID = "running-list";
 
 /** The list of what still runs, as a test says it. */
 const SHELL = running("1 shell still running", "Sleep for 5 seconds");
-const AGENT = running("1 agent still running", "Agent: Test background agent");
+const AGENT = running("1 agent still running", "delegate: Test background agent");
 
 /** A list of lines with no agent, as a test says it. */
 function running(title: string, ...texts: string[]): RunningList {
@@ -388,11 +389,11 @@ test("the first content starts the stream and nothing comes before it", async ()
 test("a turn that opens with a tool starts with its card", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("t1", "Bash", "in_progress"));
+  await sink.task(tool("t1", "run", "in_progress"));
   await settled();
   const start = only(slack.callsTo("chat.startStream"));
   assert.deepEqual(start.chunks, [
-    { type: "task_update", id: "fold:t1", title: "Bash: t1", status: "in_progress" },
+    { type: "task_update", id: "fold:t1", title: "run: t1", status: "in_progress" },
   ]);
 });
 
@@ -401,16 +402,16 @@ test("text grows the stream and a card updates in place", async () => {
   const sink = reply(slack);
   await sink.text("Let me look.\n\n");
   await settled();
-  await sink.task(tool("t1", "Bash", "in_progress"));
+  await sink.task(tool("t1", "run", "in_progress"));
   await settled();
-  await sink.task(tool("t1", "Bash", "complete"));
+  await sink.task(tool("t1", "run", "complete"));
   await sink.text("The tree is clean.");
   await settled();
   assert.deepEqual(methods(slack), ["chat.startStream", "chat.appendStream", "chat.appendStream"]);
   assert.deepEqual(slack.messageTexts(), ["Let me look.\n\nThe tree is clean."]);
   // one card, which the stream keeps updating where it first appeared
   assert.deepEqual(slack.messageCards(), [
-    [{ id: "fold:t1", title: "Ran 1 shell command", status: "complete" }],
+    [{ id: "fold:t1", title: "Executed 1 job", status: "complete" }],
   ]);
   const chunks = slack.callsTo("chat.appendStream").flatMap((a) => list(a.chunks));
   assert.deepEqual(
@@ -426,13 +427,13 @@ test("changes inside one debounce go in one append", async () => {
   await sink.text("A");
   await settled();
   for (const piece of ["B", "C", "D"]) await sink.text(piece);
-  await sink.task(tool("t1", "Bash", "in_progress"));
-  await sink.task(tool("t1", "Bash", "complete"));
+  await sink.task(tool("t1", "run", "in_progress"));
+  await sink.task(tool("t1", "run", "complete"));
   await settled();
   const append = only(slack.callsTo("chat.appendStream"));
   assert.deepEqual(append.chunks, [
     { type: "markdown_text", text: "BCD" },
-    { type: "task_update", id: "fold:t1", title: "Ran 1 shell command", status: "complete" },
+    { type: "task_update", id: "fold:t1", title: "Executed 1 job", status: "complete" },
   ]);
 });
 
@@ -577,7 +578,7 @@ test("the stream stops at 280 seconds and the message grows by update", async ()
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
   await sink.text("First words.\n\n");
-  await sink.task(tool("t1", "Bash", "complete"));
+  await sink.task(tool("t1", "run", "complete"));
   await settled();
   await clock.advance(STREAM_SECONDS - 1);
   assert.deepEqual(slack.callsTo("chat.stopStream"), []);
@@ -656,7 +657,7 @@ test("after a stop before a request the reply's end posts its ending as after an
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("First words.\n\n");
-  await sink.task(tool("t1", "Bash", "complete"));
+  await sink.task(tool("t1", "run", "complete"));
   await settled();
   await sink.beforeRequest();
   await sink.text("The answer.");
@@ -711,7 +712,7 @@ test("before a request, a reply that is already ending makes no call", async () 
 
 /** A command's call that began at `startedAt` on the test's clock. */
 function sleeping(status: TaskStatus = "in_progress", startedAt = 0): TaskUpdate {
-  return tool("t1", "Bash", status, {
+  return tool("t1", "run", status, {
     title: "Sleeping",
     details: "$ sleep 75",
     startedAt: status === "in_progress" ? startedAt : null,
@@ -756,7 +757,7 @@ test("nothing is written for a refresh that changes nothing visible", async () =
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Bash", "in_progress", { title: "Sleeping" }));
+  await sink.task(tool("t1", "run", "in_progress", { title: "Sleeping" }));
   await settled();
   await clock.advance(RUNNING_REFRESH_SECONDS * 3);
   await settled();
@@ -854,7 +855,7 @@ test("a stream stopped early with nothing changed needs no update", async () => 
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
   await sink.text("All of it.");
-  await sink.task(tool("t1", "Bash", "complete"));
+  await sink.task(tool("t1", "run", "complete"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await settled();
@@ -868,7 +869,7 @@ test("a card running at the switch is updated not left as an error", async () =>
   const sink = reply(slack, { clock });
   await sink.text("Started a server.");
   await sink.task(
-    tool("t1", "Bash", "in_progress", { task: true, details: "Running in background" }),
+    tool("t1", "run", "in_progress", { task: true, details: "Running in background" }),
   );
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
@@ -910,7 +911,7 @@ async function longReply(slack: FakeSlack, options: ReplyOptions = {}): Promise<
   const clock = new FakeClock();
   const sink = reply(slack, { ...options, clock });
   await sink.text("Let me check the build.");
-  await sink.task(tool("t1", "Edit"));
+  await sink.task(tool("t1", "change"));
   await sink.text("The build passed.\n\n- 214 tests\n- no failures");
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
@@ -936,7 +937,8 @@ test("a command that runs across the stop keeps the text before it and its own l
   const sink = reply(slack, { clock, debounceSeconds: DEBOUNCE_SECONDS });
   const renderer = new TurnRenderer(
     sink,
-    NAMES,
+    PLAIN_NAMES,
+    PLAIN_PREVIEWS,
     null,
     true,
     () => false,
@@ -956,15 +958,15 @@ test("a command that runs across the stop keeps the text before it and its own l
   const start = (callId: string, command: string): SessionEvent => ({
     type: "call_started",
     callId,
-    toolName: "Bash",
-    input: { command, description: command, run_in_background: false },
+    toolName: "run",
+    input: { command, summary: command, line: command },
     parentCallId: null,
   });
   const end = (callId: string): SessionEvent => ({
     type: "call_ended",
     callId,
     isError: false,
-    output: "(Bash completed with no output)",
+    output: "(run completed with no output)",
     fileChange: null,
     model: null,
     parentCallId: null,
@@ -1057,7 +1059,7 @@ test("an ending takes what follows it", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Edit"));
+  await sink.task(tool("t1", "change"));
   await sink.text("The edit is done.");
   await sink.text("_2 messages were not sent._", { notice: true });
   await settled();
@@ -1272,7 +1274,7 @@ test("a reply cut short after its stream stopped ends with the daemon s line", a
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text(`\n\n${ERROR_LINE}`, { ending: true });
@@ -1311,7 +1313,7 @@ test("a reply cut short while a task still counts ends with the daemon s line", 
   const clock = new FakeClock();
   const places = new ThreadPlaces();
   const sink = reply(slack, { clock, places });
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text(`\n\n${ERROR_LINE}`, { ending: true });
@@ -1359,7 +1361,7 @@ test("only the line on how the reply ended moves not a notice written before it"
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text(`\n\n${texts.COMPACTED_PLAIN}\n\n`, { notice: true });
@@ -1380,17 +1382,17 @@ test("a card that closes after the line on how the reply ended moves under it", 
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text(`\n\n${ERROR_LINE}`, { ending: true });
-  await sink.task(tool("t2", "Read"));
+  await sink.task(tool("t2", "look"));
   await sink.finish([]);
   await sink.closeOut();
   const closing = only(slack.callsTo("chat.postMessage"));
   assert.deepEqual(get(closing, "blocks", 0), { type: "markdown", text: ERROR_LINE });
   // folded, as a run that ended
-  assert.ok(JSON.stringify(list(closing.blocks).slice(1)).includes("Read 1 file"));
+  assert.ok(JSON.stringify(list(closing.blocks).slice(1)).includes("Looked at 1 file"));
   // the error, not the card's title, is what the notification says
   assert.equal(closing.text, bannerText(ERROR_LINE, { limit: BANNER_LIMIT }));
 });
@@ -1399,7 +1401,7 @@ test("a daemon line that does not say how the reply ended never moves", async ()
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text(`\n\n${texts.COMPACTED_PLAIN}`, { notice: true });
@@ -1438,7 +1440,7 @@ test("the line on how the reply ended is the ending posted, the footer drawn und
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text(`\n\n${ERROR_LINE}`, { ending: true });
@@ -1496,7 +1498,7 @@ test("a daemon line stays in the reply when nothing of Claude's is the ending", 
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text("\n\n_Stopped._", { notice: true });
@@ -1567,7 +1569,7 @@ test("cards past the limit continue in a new stream", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   for (let i = 0; i < 60; i += 1) {
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true })); // each has a card of its own
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true })); // each has a card of its own
   }
   await settled();
   await sink.finish([]);
@@ -1607,7 +1609,7 @@ test("a message never holds more blocks than slack allows", async () => {
   for (let i = 0; i < 80; i += 1) {
     // text and cards alternating: every one is a block of its own
     await sink.text(`step ${i}`);
-    await sink.task(tool(`t${i}`, "Read"));
+    await sink.task(tool(`t${i}`, "look"));
   }
   await sink.finish([]);
   await sink.closeOut();
@@ -1644,14 +1646,14 @@ test("a task that ends after the reply edits the stopped message", async () => {
   const sink = reply(slack);
   await sink.text("Started it.");
   await sink.task(
-    tool("t1", "Bash", "in_progress", { task: true, details: "Running in background" }),
+    tool("t1", "run", "in_progress", { task: true, details: "Running in background" }),
   );
   await settled();
   await sink.finish([]);
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
   assert.equal(slack.pushes(), 1);
-  await sink.task(tool("t1", "Bash", "complete", { task: true }));
+  await sink.task(tool("t1", "run", "complete", { task: true }));
   await settled();
   const update = last(slack.callsTo("chat.update"));
   assert.equal(update.ts, slack.streamTs[0]);
@@ -1778,7 +1780,7 @@ test("a slack failure never raises", async () => {
   slack.responses["chat.startStream"] = networkDown();
   const sink = reply(slack);
   await sink.text("hello");
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await settled();
   await sink.finish([]);
   assert.equal(await sink.closeOut(), false);
@@ -1872,7 +1874,7 @@ test("a refused rewrite never replaces a message that shows its body", async () 
   const places = new ThreadPlaces();
   const sink = reply(slack, { places });
   await sink.text("line of text\n".repeat(400));
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   await sink.finish([]);
   assert.ok(await sink.closeOut());
   assert.ok(await sink.showFooterFormatted("footer"));
@@ -2036,23 +2038,23 @@ test("a card says what the tool line said", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.task(
-    tool("a", "Agent", "in_progress", { details: "Read: x\nBash: ls", calls: 3, task: true }),
+    tool("a", "delegate", "in_progress", { details: "look: x\nBash: ls", calls: 3, task: true }),
   );
-  await sink.task(tool("b", "Bash", "error", { output: "exit 1" }));
-  await sink.task(tool("c", "Bash", "complete", { output: STOPPED }));
-  await sink.task(tool("d", "Bash", "complete", { output: "fine" })); // a success shows no output
+  await sink.task(tool("b", "run", "error", { output: "exit 1" }));
+  await sink.task(tool("c", "run", "complete", { output: STOPPED }));
+  await sink.task(tool("d", "run", "complete", { output: "fine" })); // a success shows no output
   await settled();
   assert.deepEqual(slack.messageCards()[0], [
     {
       id: "a",
-      title: "Agent: a · 3 calls",
+      title: "delegate: a · 3 calls",
       status: "in_progress",
-      details: "Read: x\nBash: ls",
+      details: "look: x\nBash: ls",
     },
-    // a failed Bash is counted with the other calls of its run: its card says no why
-    { id: "fold:b", title: "Ran 1 shell command", status: "error" },
-    { id: "c", title: "Bash: c", status: "complete", output: STOPPED },
-    { id: "fold:d", title: "Ran 1 shell command", status: "complete" },
+    // a failed run is counted with the other calls of its run: its card says no why
+    { id: "fold:b", title: "Executed 1 job", status: "error" },
+    { id: "c", title: "run: c", status: "complete", output: STOPPED },
+    { id: "fold:d", title: "Executed 1 job", status: "complete" },
   ]);
 });
 
@@ -2060,33 +2062,33 @@ test("an edit that ended well is one container with no card", async () => {
   // the call's line is the container's title, its sentence the subtitle.
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const view = preview("Update(a.txt)", "Added 1 line", "+🟩 1 x", "diff");
-  await sink.task(tool("e", "Edit", "complete", { preview: view }));
+  const view = preview("Modify(a.txt)", "Added 1 line", "+🟩 1 x", "diff");
+  await sink.task(tool("e", "change", "complete", { preview: view }));
   await settled();
   const start = only(slack.callsTo("chat.startStream"));
   const blocks = only(list(start.chunks));
   assert.equal(blocks.type, "blocks");
   const container = only(list(blocks.blocks));
   assert.ok(container.type === "container" && container.is_collapsible === true);
-  assert.deepEqual(container.title, { type: "plain_text", text: "Update(a.txt)" });
+  assert.deepEqual(container.title, { type: "plain_text", text: "Modify(a.txt)" });
   assert.deepEqual(container.subtitle, { type: "plain_text", text: "Added 1 line" });
   // The call's line in code style, as a tool line shows it; the plain title is the fallback.
   const section = only(list(get(container, "rich_text_title", "elements")));
   assert.deepEqual(section.elements, [
-    { type: "text", text: "Update(a.txt)", style: { code: true } },
+    { type: "text", text: "Modify(a.txt)", style: { code: true } },
   ]);
 });
 
 test("a new file that was written is one container with no card", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const view = preview("Write(new.txt)", "Wrote 2 lines to new.txt", "1 alpha\n2 beta");
-  await sink.task(tool("w", "Write", "complete", { preview: view }));
+  const view = preview("change(new.txt)", "Wrote 2 lines to new.txt", "1 alpha\n2 beta");
+  await sink.task(tool("w", "change", "complete", { preview: view }));
   await settled();
   const start = only(slack.callsTo("chat.startStream"));
   const blocks = only(list(start.chunks));
   const container = only(list(blocks.blocks));
-  assert.equal(get(container, "title", "text"), "Write(new.txt)");
+  assert.equal(get(container, "title", "text"), "change(new.txt)");
   assert.equal(get(container, "subtitle", "text"), "Wrote 2 lines to new.txt");
   assert.equal(container.default_collapsed, true);
   const pre = only(list(get(container, "child_blocks", 0, "elements")));
@@ -2099,14 +2101,14 @@ test("a diff under a card that already showed keeps the sentence as title", asyn
   // does not repeat the call's line.
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const view = preview("Update(a.txt)", "Added 1 line", "+x", "diff");
-  await sink.task(tool("e", "Edit", "in_progress"));
+  const view = preview("Modify(a.txt)", "Added 1 line", "+x", "diff");
+  await sink.task(tool("e", "change", "in_progress"));
   await settled();
-  await sink.task(tool("e", "Edit", "complete", { preview: view }));
+  await sink.task(tool("e", "change", "complete", { preview: view }));
   await settled();
   const append = only(slack.callsTo("chat.appendStream"));
   const [card, blocks] = list(append.chunks);
-  assert.ok(card?.type === "task_update" && card.title === "Update(a.txt)");
+  assert.ok(card?.type === "task_update" && card.title === "Modify(a.txt)");
   const container = only(list(blocks?.blocks));
   assert.ok(get(container, "title", "text") === "Added 1 line" && !("subtitle" in container));
   assert.ok(!("rich_text_title" in container));
@@ -2117,8 +2119,8 @@ test("a preview with no lines keeps its card", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.task(
-    tool("w", "Write", "complete", {
-      preview: preview("Write(e.txt)", "Wrote 0 lines to e.txt", ""),
+    tool("w", "change", "complete", {
+      preview: preview("change(e.txt)", "Wrote 0 lines to e.txt", ""),
     }),
   );
   await settled();
@@ -2130,10 +2132,10 @@ test("a preview with no lines keeps its card", async () => {
 test("a new file preview follows its card as a code block", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const view = preview("Write(new.txt)", "Wrote 2 lines to new.txt", "1 alpha\n2 beta");
-  await sink.task(tool("w", "Write", "in_progress"));
+  const view = preview("change(new.txt)", "Wrote 2 lines to new.txt", "1 alpha\n2 beta");
+  await sink.task(tool("w", "change", "in_progress"));
   await settled();
-  await sink.task(tool("w", "Write", "complete", { preview: view }));
+  await sink.task(tool("w", "change", "complete", { preview: view }));
   await settled();
   const append = only(slack.callsTo("chat.appendStream"));
   assert.deepEqual(
@@ -2150,10 +2152,10 @@ test("a new file preview follows its card as a code block", async () => {
 test("a preview is sent once however often the card changes", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const view = preview("Update(a.txt)", "Added 1 line", "+x", "diff");
-  await sink.task(tool("e", "Edit", "complete", { preview: view }));
+  const view = preview("Modify(a.txt)", "Added 1 line", "+x", "diff");
+  await sink.task(tool("e", "change", "complete", { preview: view }));
   await settled();
-  await sink.task(tool("e", "Edit", "complete", { preview: view, output: "again" }));
+  await sink.task(tool("e", "change", "complete", { preview: view, output: "again" }));
   await sink.text("after");
   await settled();
   assert.equal(allChunks(slack).filter((c) => c.type === "blocks").length, 1);
@@ -2162,75 +2164,29 @@ test("a preview is sent once however often the card changes", async () => {
 test("a failed call shows its error even if it carries a preview", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const view = preview("Update(a.txt)", "Added 1 line", "+x", "diff");
-  await sink.task(tool("e", "Edit", "error", { output: "File not found", preview: view }));
+  const view = preview("Modify(a.txt)", "Added 1 line", "+x", "diff");
+  await sink.task(tool("e", "change", "error", { output: "File not found", preview: view }));
   await settled();
   const start = only(slack.callsTo("chat.startStream"));
   assert.deepEqual(start.chunks, [
     {
       type: "task_update",
       id: "e",
-      title: "Edit: e",
+      title: "change: e",
       status: "error",
       output: "File not found",
     },
   ]);
 });
 
-test("an edit and a write show as the terminal shows them", async () => {
-  // edit-write.jsonl (CLI 2.1.286): Write a new file, Read, a failed Edit, an Edit, a Write over
-  // the file. The terminal showed each Edit and Write whole, with its sentence and its lines.
-  const slack = new FakeSlack();
-  const sink = reply(slack);
-  const renderer = new TurnRenderer(sink, NAMES, "/home/dev/project");
-  for (const event of recordedEvents("edit-write")) await renderer.feed(event);
-  await renderer.close();
-  const chunks = allChunks(slack);
-  // Each one that ended well is a container alone; no card ever named it.
-  const cards = chunks.filter((c) => c.type === "task_update");
-  assert.deepEqual(
-    cards.map((c) => str(c.title)).filter((t) => t.startsWith("Write") || t.startsWith("Update(")),
-    [],
-  );
-  assert.deepEqual(
-    cards.filter((c) => str(c.title).startsWith("Edit")).map((c) => [c.title, c.status]),
-    [["Edit: /home/dev/project/notes.txt", "error"]],
-  );
-  const shown = chunks.filter((c) => c.type === "blocks").flatMap((c) => list(c.blocks));
-  assert.deepEqual(
-    shown.map((b) => b.type),
-    ["container", "container", "container"],
-  );
-  assert.deepEqual(
-    shown.map((b) => [get(b, "title", "text"), get(b, "subtitle", "text")]),
-    [
-      ["Write(new.txt)", "Wrote 15 lines to new.txt"],
-      ["Update(notes.txt)", "Added 1 line, removed 1 line"],
-      ["Write(notes.txt)", "Added 2 lines, removed 3 lines"],
-    ],
-  );
-  const [newFile, ...diffs] = shown;
-  assert.deepEqual(
-    diffs.map((d) => blockText(d as unknown as Block)),
-    [
-      "    1 alpha\n-\u{1f7e5} 2 beta\n+\u{1f7e9} 2 gamma\n    3 delta",
-      "-\u{1f7e5} 1 alpha\n-\u{1f7e5} 2 gamma\n-\u{1f7e5} 3 delta\n" +
-        "+\u{1f7e9} 1 one\n+\u{1f7e9} 2 two",
-    ],
-  );
-  const lines = blockText(newFile as unknown as Block).split("\n");
-  assert.deepEqual(lines.slice(0, 2), [" 1 1", " 2 2"]);
-  assert.equal(lines.at(-1), "… +5 lines");
-});
-
 test("a stopped message shows its previews as blocks", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  const diff = preview("Update(a.txt)", "Added 1 line", "+x", "diff");
-  const fresh = preview("Write(b.txt)", "Wrote 1 line to b.txt", "1 hi");
-  await sink.task(tool("e", "Edit", "complete", { preview: diff }));
-  await sink.task(tool("w", "Write", "complete", { preview: fresh }));
+  const diff = preview("Modify(a.txt)", "Added 1 line", "+x", "diff");
+  const fresh = preview("change(b.txt)", "Wrote 1 line to b.txt", "1 hi");
+  await sink.task(tool("e", "change", "complete", { preview: diff }));
+  await sink.task(tool("w", "change", "complete", { preview: fresh }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text("more");
@@ -2242,60 +2198,13 @@ test("a stopped message shows its previews as blocks", async () => {
   );
   assert.deepEqual(
     blocks.slice(0, 2).map((b) => get(b, "title", "text")),
-    ["Update(a.txt)", "Write(b.txt)"],
+    ["Modify(a.txt)", "change(b.txt)"],
   );
   assert.equal(blockText(blocks[1] as unknown as Block), "1 hi");
 });
 
-test("an answered question shows in the reply where it was answered", async () => {
-  // ask-answered.jsonl (CLI 2.1.286). The terminal keeps `User answered Claude's questions:`
-  // and a line per answer where the question was asked, before what Claude says next.
-  const slack = new FakeSlack();
-  const sink = reply(slack);
-  const renderer = new TurnRenderer(sink, NAMES, "/home/dev/project");
-  // The answers the owner gave, as Claude Code echoed them in the result of the call: the
-  // session holds them itself, and no event carries them.
-  const echoed = sdkRecords("ask-answered").find(
-    (record) => record.type === "user" && record.tool_use_result !== undefined,
-  )?.tool_use_result;
-  let call: { callId: string; questions: { text: string }[] } | null = null;
-  for (const event of recordedEvents("ask-answered")) {
-    if (event.type === "call_started") {
-      const questions = list(event.input.questions as Json).map((q) => ({ text: str(q.question) }));
-      call = { callId: event.callId, questions };
-    }
-    if (event.type === "call_ended" && call !== null) {
-      // The session hands the answers over once the owner gave them, before the result.
-      const answers = get(echoed, "answers");
-      assert.ok(typeof answers === "object" && answers !== null && !Array.isArray(answers));
-      assert.ok(
-        renderer.answered(
-          call.callId,
-          call.questions,
-          answers as Record<string, string | string[]>,
-        ),
-      );
-    }
-    await renderer.feed(event);
-  }
-  await renderer.close();
-  assert.deepEqual(slack.messageCards()[0] ?? [], []); // the record is no card
-  const chunks = allChunks(slack);
-  const kinds = chunks.map((c) => c.type);
-  const answers = only(chunks.filter((c) => c.type === "blocks"));
-  assert.deepEqual(answers.blocks, [
-    contextBlock(
-      `✓ User answered Claude's questions:\n` +
-        `${texts.NESTED}· Which color do you prefer? → Blue\n` +
-        `${texts.NESTED}· Do you also like green? → Yes, Only in spring`,
-    ),
-  ]);
-  // Claude's next words come after the answers, in the same message.
-  assert.ok(kinds.slice(kinds.indexOf("blocks") + 1).includes("markdown_text"));
-});
-
 test("answers to a call the reply has no line for are not kept", () => {
-  const renderer = new TurnRenderer(reply(new FakeSlack()), NAMES);
+  const renderer = new TurnRenderer(reply(new FakeSlack()), PLAIN_NAMES, PLAIN_PREVIEWS);
   assert.ok(!renderer.answered("toolu_unseen", [{ text: "Colour?" }], { "Colour?": "blue" }));
 });
 
@@ -2311,7 +2220,7 @@ test("a stopped message shows the answers as one block", async () => {
     true,
     true,
   );
-  await sink.task(tool("q", "AskUserQuestion", "complete", { preview: answered }));
+  await sink.task(tool("q", "ask", "complete", { preview: answered }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text("more");
@@ -2336,7 +2245,7 @@ test("answers longer than a context block are cut", async () => {
     "\n",
   );
   await sink.task(
-    tool("q", "AskUserQuestion", "complete", {
+    tool("q", "ask", "complete", {
       preview: preview("User answered", "", body, "", true, true),
     }),
   );
@@ -2354,7 +2263,7 @@ test("answers longer than a message still show and the reply goes on", async () 
   const sink = reply(slack);
   const body = `· ${"q".repeat(MESSAGE_LIMIT + 4_000)} → yes`;
   await sink.task(
-    tool("q", "AskUserQuestion", "complete", {
+    tool("q", "ask", "complete", {
       preview: preview("User answered", "", body, "", true, true),
     }),
   );
@@ -2365,31 +2274,6 @@ test("answers longer than a message still show and the reply goes on", async () 
     ["blocks", "markdown_text"],
   );
   assert.equal(slack.createdTs.length, 1);
-});
-
-test("a subagent card counts its calls from a recorded turn", async () => {
-  // subagent-foreground.jsonl (CLI 2.1.286): the agent's task ends before the Agent call's
-  // result. The sink is given the calls the renderer makes for the recording (the reply golden),
-  // up to the turn's end.
-  const slack = new FakeSlack();
-  const sink = reply(slack);
-  const whole = get(golden("reply", "subagent-foreground"), "whole", "calls");
-  for (const call of list(whole)) {
-    if (call.call === "text") {
-      await sink.text(str(call.markdown), {
-        notice: call.notice === true,
-        ending: call.ending === true,
-      });
-    } else if (call.call === "task") {
-      await sink.task(call.update as unknown as TaskUpdate);
-    } else if (call.call === "finish") {
-      await sink.finish(list(call.closing) as unknown as TaskUpdate[]);
-      break;
-    }
-  }
-  const cards = slack.messageCards()[0] ?? [];
-  const card = only(cards.filter((c) => str(c.title).startsWith("Agent: ")));
-  assert.ok(str(card.title).endsWith(" · 1 call") && card.status === "complete");
 });
 
 // The limiter: appends and updates spend its budget, a start, a stop and a post do not.
@@ -2459,7 +2343,7 @@ test("a task update never blocks the caller", async () => {
   await sink.text("one");
   await settled();
   await soon(sink.text(" two"));
-  await soon(sink.task(tool("t1", "Bash", "in_progress")));
+  await soon(sink.task(tool("t1", "run", "in_progress")));
   await settled();
   assert.equal(limiter.acquired, 1); // the append is waiting its turn, and the caller is not
   limiter.release();
@@ -2614,13 +2498,13 @@ for (const [id, paragraph, banner] of [
 }
 
 test("a task card block reads back as the card it was", () => {
-  const update = tool("t1", "Bash", "error", {
+  const update = tool("t1", "run", "error", {
     output: "exit 1",
     details: "ignored while it ended",
   });
   const block = cardBlock(update);
   assert.ok(block.type === "task_card" && block.task_id === "t1");
-  assert.ok(block.status === "error" && block.title === "Bash: t1");
+  assert.ok(block.status === "error" && block.title === "run: t1");
   assert.ok(block.output?.type === "rich_text" && !("details" in block));
 });
 
@@ -2641,8 +2525,8 @@ test("a diff is titled with its sentence alone", () => {
 });
 
 test("a container with no card says the sentence under the calls line", () => {
-  const block = only(previewContainers("Update(a.txt)", "+x", { subtitle: "s".repeat(200) }));
-  assert.equal(block.title.text, "Update(a.txt)");
+  const block = only(previewContainers("Modify(a.txt)", "+x", { subtitle: "s".repeat(200) }));
+  assert.equal(block.title.text, "Modify(a.txt)");
   assert.deepEqual(block.subtitle, { type: "plain_text", text: "s".repeat(150) });
 });
 
@@ -2774,9 +2658,9 @@ export function context(text: string): ContextBlock {
 export async function runOfCalls(sink: ReplySink): Promise<void> {
   await sink.text("Let me look.\n\n");
   for (const [id, name, status, fields] of [
-    ["a", "Bash", "complete", {}],
-    ["b", "Read", "complete", {}],
-    ["c", "Bash", "error", { output: "Exit code 1" }],
+    ["a", "run", "complete", {}],
+    ["b", "look", "complete", {}],
+    ["c", "run", "error", { output: "Exit code 1" }],
   ] as const) {
     await sink.task(tool(id, name, "in_progress"));
     await settled();
@@ -2796,7 +2680,7 @@ export function marker(line: number): string {
 
 export function latePreview(lines = 40): Preview {
   const body = Array.from({ length: lines }, (_, i) => marker(i)).join("\n");
-  return preview("Write(big.txt)", `Wrote ${lines} lines to big.txt`, body);
+  return preview("change(big.txt)", `Wrote ${lines} lines to big.txt`, body);
 }
 
 export function previewOf(lines: number): Preview {
@@ -2828,7 +2712,7 @@ export function largeDiff(i: number, chars = 9_000): Preview {
     { length: Math.floor(chars / 96) },
     (_, n) => `+${String(n).padStart(4)} ${"x".repeat(90)}`,
   ).join("\n");
-  return preview(`Update(f${i}.txt)`, "Added lines", body, "diff");
+  return preview(`Modify(f${i}.txt)`, "Added lines", body, "diff");
 }
 
 export function containersOf(blocks: readonly JsonObject[]): JsonObject[] {
@@ -2845,10 +2729,10 @@ export async function continuationWithDiffs(
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   for (let i = 0; i < 50; i += 1) {
-    await sink.task(tool(`c${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`c${i}`, "delegate", "complete", { task: true }));
   }
   for (let i = 0; i < 3; i += 1) {
-    await sink.task(tool(`e${i}`, "Edit", "complete", { preview: largeDiff(i) }));
+    await sink.task(tool(`e${i}`, "change", "complete", { preview: largeDiff(i) }));
   }
   return sink;
 }
@@ -3012,7 +2896,7 @@ test("a refused append logs the method and the sizes without content", async () 
   const log = new Recorded();
   const sink = reply(slack, { logger: log });
   await sink.text("Hello. ");
-  await sink.task(tool("t1", "Bash", "in_progress"));
+  await sink.task(tool("t1", "run", "in_progress"));
   await settled();
   slack.responses["chat.appendStream"] = rejected("msg_too_long");
   await sink.text("World.");
@@ -3024,8 +2908,8 @@ test("a refused append logs the method and the sizes without content", async () 
   // what the message would hold: both texts, three elements (text, card, text), one card,
   // whose title was sent before and is not in the refused append
   assert.ok(line.includes("text 13, elements 3, cards 1"));
-  assert.ok(line.includes(`card text sent ${len("Bash: t1")} and 0 more`));
-  assert.ok(!log.text.includes("Bash") && !log.text.includes("Hello"));
+  assert.ok(line.includes(`card text sent ${len("run: t1")} and 0 more`));
+  assert.ok(!log.text.includes("run") && !log.text.includes("Hello"));
 });
 
 // A call whose outcome is unknown: Slack may have applied it. Stream calls are not idempotent.
@@ -3140,16 +3024,16 @@ test("a message stays tracked while its cards run after a roll over", async () =
   const [seen, onOpenReply] = tracking();
   const sink = reply(slack, { onOpenReply });
   await sink.task(
-    tool("t0", "Bash", "in_progress", { task: true, details: "Running in background" }),
+    tool("t0", "run", "in_progress", { task: true, details: "Running in background" }),
   );
   for (let i = 1; i < 60; i += 1)
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true }));
   await settled();
   const [first, second] = slack.streamTs;
   assert.ok(first !== undefined && second !== undefined);
   // a card still runs in the first
   assert.ok(sawTransition(seen, null, second) && !sawTransition(seen, first, null));
-  await sink.task(tool("t0", "Bash", "complete", { task: true }));
+  await sink.task(tool("t0", "run", "complete", { task: true }));
   await settled();
   assert.ok(sawTransition(seen, first, null)); // final now: nothing left for a repair to close
 });
@@ -3284,14 +3168,14 @@ test("a stop of unknown outcome past the streams life is taken as expired", asyn
 test("a late preview that does not fit its message is cut with a pointer", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("t0", "Write", "in_progress"));
+  await sink.task(tool("t0", "change", "in_progress"));
   for (let i = 1; i < 60; i += 1)
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true }));
   await settled();
   const first = slack.streamTs[0];
   const body = Array.from({ length: 100 }, (_, i) => marker(i)).join("\n"); // about 9,000 characters
-  const view = preview("Write(big.txt)", "Wrote 100 lines to big.txt", body);
-  await sink.task(tool("t0", "Write", "complete", { preview: view }));
+  const view = preview("change(big.txt)", "Wrote 100 lines to big.txt", body);
+  await sink.task(tool("t0", "change", "complete", { preview: view }));
   await settled();
   const updates = slack.callsTo("chat.update").filter((u) => u.ts === first);
   assert.ok(updates.length > 0);
@@ -3318,10 +3202,10 @@ test("a message whose span did not change is not rendered again", async () => {
   // first message does freeze with its preview.
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const view = preview("Write(a.txt)", "Wrote 1 line to a.txt", "1 hi");
-  await sink.task(tool("w", "Write", "complete", { preview: view }));
+  const view = preview("change(a.txt)", "Wrote 1 line to a.txt", "1 hi");
+  await sink.task(tool("w", "change", "complete", { preview: view }));
   for (let i = 0; i < 60; i += 1) {
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true }));
   }
   await settled();
   await sink.text("warm"); // the first pass over a message that just froze
@@ -3352,15 +3236,15 @@ test("a banner is cut before it is escaped", () => {
 test("many late previews in a full message get one note and stay in the limit", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  for (let w = 0; w < 10; w += 1) await sink.task(tool(`w${w}`, "Write", "in_progress"));
+  for (let w = 0; w < 10; w += 1) await sink.task(tool(`w${w}`, "change", "in_progress"));
   for (let i = 0; i < 60; i += 1)
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true }));
   await settled();
   const first = slack.streamTs[0];
   const body = Array.from({ length: 100 }, (_, i) => marker(i)).join("\n");
   for (let w = 0; w < 10; w += 1) {
-    const view = preview("Write(big.txt)", "Wrote 100 lines to big.txt", body);
-    await sink.task(tool(`w${w}`, "Write", "complete", { preview: view }));
+    const view = preview("change(big.txt)", "Wrote 100 lines to big.txt", body);
+    await sink.task(tool(`w${w}`, "change", "complete", { preview: view }));
   }
   await settled();
   const updates = slack.callsTo("chat.update").filter((u) => u.ts === first);
@@ -3390,8 +3274,8 @@ test("a start that holds only a container is adopted by its title", async () => 
   const slack = new ResetAfterApply();
   slack.resetNext = "chat.startStream";
   const sink = reply(slack);
-  const view = preview("Update(a.txt)", "Added 1 line", "+x", "diff");
-  await sink.task(tool("e", "Edit", "complete", { preview: view }));
+  const view = preview("Modify(a.txt)", "Added 1 line", "+x", "diff");
+  await sink.task(tool("e", "change", "complete", { preview: view }));
   await settled();
   await sink.text("Done.");
   await settled();
@@ -3422,7 +3306,7 @@ test("a run of calls streams as one card of counts", async () => {
   const sink = reply(slack);
   await runOfCalls(sink);
   assert.deepEqual(slack.messageCards(), [
-    [{ id: "fold:a", title: "Ran 2 shell commands, read 1 file", status: "complete" }],
+    [{ id: "fold:a", title: "Executed 2 jobs, looked at 1 file", status: "complete" }],
   ]);
   // No chunk carries text Slack would append to what a reused card holds.
   assert.ok(!allChunks(slack).some((c) => "details" in c || "output" in c));
@@ -3440,7 +3324,7 @@ test("the end folds the run into a line with a silent update", async () => {
   assert.equal(update.ts, slack.streamTs[0]);
   const folded = [
     { type: "markdown", text: "Let me look." },
-    context("Ran 2 shell commands, read 1 file"),
+    context("Executed 2 jobs, looked at 1 file"),
     { type: "markdown", text: "One test fails." },
   ];
   assert.deepEqual(update.blocks, folded);
@@ -3469,9 +3353,9 @@ async function runOfCommands(sink: ReplySink): Promise<void> {
     ["b", "git status"],
   ] as const) {
     const fields = { details: command, startedAt: 0 };
-    await sink.task(tool(id, "Bash", "in_progress", fields));
+    await sink.task(tool(id, "run", "in_progress", fields));
     await settled();
-    await sink.task(tool(id, "Bash", "complete", fields));
+    await sink.task(tool(id, "run", "complete", fields));
     await settled();
   }
 }
@@ -3488,7 +3372,7 @@ test("the end keeps a run of shell commands as the card that lists them (#29)", 
     [
       {
         id: "fold:a",
-        title: "Ran 2 shell commands",
+        title: "Executed 2 jobs",
         status: "complete",
         details: "npm test\ngit status",
       },
@@ -3514,7 +3398,7 @@ test("a run of shell commands keeps its card through the edit of the reply's end
     type: "task_card",
     block_id: "task-fold:a",
     task_id: "fold:a",
-    title: "Ran 2 shell commands",
+    title: "Executed 2 jobs",
     status: "complete",
     details: COMMANDS_TEXT,
   });
@@ -3529,7 +3413,7 @@ test("a reply written by edit lists a run's commands under its card of counts", 
   await clock.advance(STREAM_SECONDS + 1);
   await runOfCommands(sink);
   const card = list(last(slack.callsTo("chat.update")).blocks).find((b) => b.type === "task_card");
-  assert.equal(card?.title, "Ran 2 shell commands");
+  assert.equal(card?.title, "Executed 2 jobs");
   assert.deepEqual(card?.details, COMMANDS_TEXT);
 });
 
@@ -3539,7 +3423,7 @@ test("a card keeps the block id its stream gave it through every edit of its mes
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("a", "Agent", "in_progress", { task: true }));
+  await sink.task(tool("a", "delegate", "in_progress", { task: true }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text("More.");
@@ -3559,8 +3443,8 @@ test("a preview keeps one block id from its stream through every edit of its mes
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  const view = preview("Update(a.txt)", "Added 1 line", "+🟩 1 x", "diff");
-  await sink.task(tool("e", "Edit", "complete", { preview: view }));
+  const view = preview("Modify(a.txt)", "Added 1 line", "+🟩 1 x", "diff");
+  await sink.task(tool("e", "change", "complete", { preview: view }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.text("More.");
@@ -3593,8 +3477,8 @@ test("a reply with no run of calls gets no update at its end", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("Working.\n\n");
-  await sink.task(tool("t", "Agent", "in_progress", { task: true }));
-  await sink.task(tool("t", "Agent", "complete", { task: true, calls: 2 }));
+  await sink.task(tool("t", "delegate", "in_progress", { task: true }));
+  await sink.task(tool("t", "delegate", "complete", { task: true, calls: 2 }));
   await settled();
   await sink.finish([]);
   assert.equal(await sink.closeOut(), true);
@@ -3607,7 +3491,7 @@ test("a fold that cannot be written does not undo the end", async () => {
   const slack = new FakeSlack();
   const [seen, onOpenReply] = tracking();
   const sink = reply(slack, { onOpenReply });
-  await sink.task(tool("a", "Bash"));
+  await sink.task(tool("a", "run"));
   await settled();
   await sink.finish([]);
   slack.responses["chat.update"] = [rejected("ratelimited"), { ok: true }];
@@ -3619,7 +3503,7 @@ test("a fold that cannot be written does not undo the end", async () => {
   await settled(); // the fold Slack refused is tried again with the next write
   const updates = slack.callsTo("chat.update");
   assert.equal(updates.length, 2);
-  assert.deepEqual(get(last(updates), "blocks", 0), context("Ran 1 shell command"));
+  assert.deepEqual(get(last(updates), "blocks", 0), context("Executed 1 job"));
   assert.equal(slack.pushes(), 1); // no second stop, no closing message
   assert.deepEqual(slack.postedTs, []);
 });
@@ -3627,7 +3511,7 @@ test("a fold that cannot be written does not undo the end", async () => {
 test("a fold that keeps failing is given up and the cards stay", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a", "Bash"));
+  await sink.task(tool("a", "run"));
   await settled();
   await sink.finish([]);
   slack.responses["chat.update"] = rejected("ratelimited");
@@ -3641,13 +3525,13 @@ test("a fold that keeps failing is given up and the cards stay", async () => {
 test("a stream slack closed first is folded before its closing message", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a", "Bash"));
+  await sink.task(tool("a", "run"));
   await settled();
   await sink.finish([]);
   slack.expire(slack.streamTs[0] ?? "");
   assert.equal(await sink.closeOut(), true);
   const update = only(slack.callsTo("chat.update"));
-  assert.deepEqual(update.blocks, [context("Ran 1 shell command")]);
+  assert.deepEqual(update.blocks, [context("Executed 1 job")]);
   // A closing message, as for any stream Slack closed: posted with the footer.
   assert.equal(slack.postedTs.length, 0);
   assert.equal(await sink.showFooterFormatted("footer"), true);
@@ -3659,43 +3543,43 @@ test("past the window the run keeps its one card until the body ends", async () 
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("a", "Bash"));
+  await sink.task(tool("a", "run"));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
-  await sink.task(tool("b", "Read", "in_progress"));
+  await sink.task(tool("b", "look", "in_progress"));
   await settled();
   const blocks = list(last(slack.callsTo("chat.update")).blocks);
   assert.deepEqual(
     blocks.map((b) => [b.type, b.title, b.status]),
-    [["task_card", "Read: b", "in_progress"]],
+    [["task_card", "look: b", "in_progress"]],
   );
-  await sink.finish([tool("b", "Read")]);
+  await sink.finish([tool("b", "look")]);
   assert.deepEqual(last(slack.callsTo("chat.update")).blocks, [
-    context("Ran 1 shell command, read 1 file"),
+    context("Executed 1 job, looked at 1 file"),
   ]);
 });
 
 test("a task that outlives the turn keeps its card beside the folded line", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a", "Read"));
+  await sink.task(tool("a", "look"));
   await sink.task(
-    tool("t", "Bash", "in_progress", { task: true, details: "Running in background" }),
+    tool("t", "run", "in_progress", { task: true, details: "Running in background" }),
   );
   await settled();
   await sink.finish([]);
   assert.equal(await sink.closeOut(), true);
   const blocks = list(last(slack.callsTo("chat.update")).blocks);
-  assert.deepEqual(blocks[0], context("Read 1 file"));
+  assert.deepEqual(blocks[0], context("Looked at 1 file"));
   assert.ok(blocks[1]?.type === "task_card" && blocks[1].status === "in_progress");
 });
 
 test("a run in a message the reply has left is folded at the end too", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a", "Bash"));
+  await sink.task(tool("a", "run"));
   for (let i = 0; i < BLOCKS_LIMIT + 5; i += 1) {
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true }));
   }
   await settled();
   assert.equal(slack.streamTs.length, 2);
@@ -3704,7 +3588,7 @@ test("a run in a message the reply has left is folded at the end too", async () 
   await sink.finish([]);
   assert.equal(await sink.closeOut(), true);
   const first = slack.messageBlocks()[0] ?? [];
-  assert.deepEqual(first[0], context("Ran 1 shell command"));
+  assert.deepEqual(first[0], context("Executed 1 job"));
   assert.ok(first.every((block) => block.task_id !== "fold:a"));
 });
 
@@ -3729,13 +3613,13 @@ test("a late preview never opens a message after the footer", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
-  await sink.task(tool("t1", "Write", "in_progress", { task: true }));
+  await sink.task(tool("t1", "change", "in_progress", { task: true }));
   await settled();
   await sink.finish([]);
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
   const posted = slack.callsTo("chat.postMessage").length;
-  await sink.task(tool("t1", "Write", "complete", { preview: latePreview() }));
+  await sink.task(tool("t1", "change", "complete", { preview: latePreview() }));
   await settled();
   assert.equal(slack.callsTo("chat.postMessage").length, posted);
   const update = last(slack.callsTo("chat.update"));
@@ -3752,14 +3636,14 @@ test("a late preview never opens a message after the closing message", async () 
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
-  await sink.task(tool("t1", "Write", "in_progress", { task: true }));
+  await sink.task(tool("t1", "change", "in_progress", { task: true }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.finish([]);
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
   const closing = only(slack.callsTo("chat.postMessage")); // an answer of text alone: a closing message
-  await sink.task(tool("t1", "Write", "complete", { preview: latePreview() }));
+  await sink.task(tool("t1", "change", "complete", { preview: latePreview() }));
   await settled();
   assert.deepEqual(slack.callsTo("chat.postMessage"), [closing]);
   const update = last(slack.callsTo("chat.update"));
@@ -3774,7 +3658,7 @@ test("a late preview never opens a message after the ending", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("t1", "Read"));
+  await sink.task(tool("t1", "look"));
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
@@ -3783,8 +3667,8 @@ test("a late preview never opens a message after the ending", async () => {
   await sink.showFooterFormatted("footer");
   const ending = only(slack.callsTo("chat.postMessage"));
   const updates = slack.callsTo("chat.update").length;
-  await sink.task(tool("late", "Write", "in_progress"));
-  await sink.task(tool("late", "Write", "complete", { preview: latePreview() }));
+  await sink.task(tool("late", "change", "in_progress"));
+  await sink.task(tool("late", "change", "complete", { preview: latePreview() }));
   await settled();
   assert.deepEqual(slack.callsTo("chat.postMessage"), [ending]);
   // A late card with its preview does not fit the ending: left out whole, no note, and the
@@ -3799,14 +3683,14 @@ test("a late card never opens a message past the blocks limit", async () => {
   const places = new ThreadPlaces();
   const sink = reply(slack, { places });
   for (let i = 0; i < BLOCKS_LIMIT; i += 1) {
-    await sink.task(tool(`t${i}`, "Agent", "in_progress", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "in_progress", { task: true }));
   }
   await settled();
   await sink.finish([]);
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
   const posted = slack.callsTo("chat.postMessage").length;
-  await sink.task(tool("late", "Agent", "in_progress", { task: true }));
+  await sink.task(tool("late", "delegate", "in_progress", { task: true }));
   places.showRunning(AGENT);
   await settled();
   assert.equal(slack.callsTo("chat.postMessage").length, posted);
@@ -3824,7 +3708,7 @@ test("late words never remove a preview that was shown", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("w".repeat(6000));
-  await sink.task(tool("t1", "Write", "complete", { preview: previewOf(42) })); // about 4,000 characters
+  await sink.task(tool("t1", "change", "complete", { preview: previewOf(42) })); // about 4,000 characters
   await settled();
   await sink.finish([]);
   await sink.closeOut();
@@ -3844,14 +3728,14 @@ test("late cards never remove a preview that was shown", async () => {
   const sink = reply(slack);
   for (let i = 0; i < 44; i += 1) {
     // a preview each, with no card: 44 blocks
-    await sink.task(tool(`w${i}`, "Write", "complete", { preview: previewOf(1) }));
+    await sink.task(tool(`w${i}`, "change", "complete", { preview: previewOf(1) }));
   }
   await settled();
   await sink.finish([]);
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
   for (let i = 0; i < 3; i += 1) {
-    await sink.task(tool(`late${i}`, "Agent", "in_progress", { task: true }));
+    await sink.task(tool(`late${i}`, "delegate", "in_progress", { task: true }));
   }
   await settled();
   assert.equal(slack.createdTs.length, 1);
@@ -3869,15 +3753,15 @@ test("a late preview never removes the one a later call showed", async () => {
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
   await sink.text("w".repeat(9_000)); // b's container adds no characters to an update: the words do
-  await sink.task(tool("a", "Write", "in_progress", { task: true }));
+  await sink.task(tool("a", "change", "in_progress", { task: true }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
-  await sink.task(tool("b", "Write", "complete", { preview: previewOf(95) })); // about 9,000 characters
+  await sink.task(tool("b", "change", "complete", { preview: previewOf(95) })); // about 9,000 characters
   await settled();
   await sink.finish([]);
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
-  await sink.task(tool("a", "Write", "complete", { preview: previewOf(32) })); // about 3,000: no room left
+  await sink.task(tool("a", "change", "complete", { preview: previewOf(32) })); // about 3,000: no room left
   await settled();
   assert.ok(slack.streamTs.length === 1 && slack.postedTs.length === 1); // and the closing message
   const blocks = list(
@@ -3896,7 +3780,7 @@ test("a closing post that fails with the footer is tried once more", async () =>
   const clock = new FakeClock();
   const sink = reply(slack, { clock, finalRetrySeconds: 30 });
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
-  await sink.task(tool("t1", "Write", "complete", { task: true }));
+  await sink.task(tool("t1", "change", "complete", { task: true }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   await sink.finish([]);
@@ -3918,13 +3802,13 @@ test("a late card that is dropped leaves the sink caught up", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   for (let i = 0; i < BLOCKS_LIMIT; i += 1) {
-    await sink.task(tool(`t${i}`, "Agent", "in_progress", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "in_progress", { task: true }));
   }
   await settled();
   await sink.finish([]);
   assert.equal(await sink.closeOut(), true);
   assert.equal(await sink.showFooterFormatted("footer"), true);
-  await sink.task(tool("late", "Agent", "in_progress", { task: true }));
+  await sink.task(tool("late", "delegate", "in_progress", { task: true }));
   assert.equal(await sink.settle(), true); // nothing failed: no retry, no error
   const calls = slack.apiCalls.length;
   assert.equal(await sink.settle(), true);
@@ -3960,7 +3844,7 @@ test("the running list after the end edits the message that carries the footer",
   const places = new ThreadPlaces();
   const sink = reply(slack, { places });
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
-  await sink.task(tool("t1", "Write", "in_progress", { task: true }));
+  await sink.task(tool("t1", "change", "in_progress", { task: true }));
   await settled();
   await sink.finish([]);
   await sink.closeOut();
@@ -3983,9 +3867,9 @@ test("a reply still open splits into a new message as before", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
-  await sink.task(tool("t1", "Write", "in_progress", { task: true }));
+  await sink.task(tool("t1", "change", "in_progress", { task: true }));
   await settled();
-  await sink.task(tool("t1", "Write", "complete", { preview: latePreview() }));
+  await sink.task(tool("t1", "change", "complete", { preview: latePreview() }));
   await settled();
   assert.equal(slack.createdTs.length, 2); // the preview went on in a message of its own
 });
@@ -4015,14 +3899,14 @@ test("late content that fits is shown as the open path computes it", async () =>
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("Start.");
-  await sink.task(tool("t1", "Write", "in_progress", { task: true }));
+  await sink.task(tool("t1", "change", "in_progress", { task: true }));
   await settled();
   await sink.finish([]);
   await sink.closeOut();
   await sink.showFooterFormatted("footer");
-  await sink.task(tool("t1", "Write", "complete", { preview: previewOf(3) }));
+  await sink.task(tool("t1", "change", "complete", { preview: previewOf(3) }));
   await sink.text("And a late word.");
-  await sink.task(tool("t2", "Read", "complete", { task: true }));
+  await sink.task(tool("t2", "look", "complete", { task: true }));
   await settled();
   assert.equal(slack.createdTs.length, 1);
   const blocks = list(last(slack.callsTo("chat.update")).blocks);
@@ -4080,7 +3964,7 @@ test("a refused update logs the method and the sizes without content", async () 
   const places = new ThreadPlaces();
   const sink = reply(slack, { logger: log, places });
   await sink.text("Hello.");
-  await sink.task(tool("t1", "Agent", "complete", { task: true }));
+  await sink.task(tool("t1", "delegate", "complete", { task: true }));
   await sink.finish([]);
   assert.ok(await sink.closeOut());
   assert.ok(await sink.showFooterFormatted("footer"));
@@ -4091,7 +3975,7 @@ test("a refused update logs the method and the sizes without content", async () 
   assert.ok(line.includes("msg_too_long"));
   // the message sent: its words, the call's card, the list, and the footer under a divider
   assert.ok(line.includes("text 12, elements 5, cards 2"));
-  assert.ok(!log.text.includes("Agent") && !log.text.includes("Hello"));
+  assert.ok(!log.text.includes("delegate") && !log.text.includes("Hello"));
 });
 
 test("a refused post logs the method and the sizes without content", async () => {
@@ -4120,11 +4004,11 @@ test("a stopped message holds large diffs a stream would continue", async () => 
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("e0", "Edit", "complete", { preview: largeDiff(0) }));
+  await sink.task(tool("e0", "change", "complete", { preview: largeDiff(0) }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   for (let i = 1; i < 4; i += 1) {
-    await sink.task(tool(`e${i}`, "Edit", "complete", { preview: largeDiff(i) }));
+    await sink.task(tool(`e${i}`, "change", "complete", { preview: largeDiff(i) }));
   }
   await settled();
   assert.ok(slack.callsTo("chat.postMessage").length === 0 && slack.streamTs.length === 1);
@@ -4132,7 +4016,7 @@ test("a stopped message holds large diffs a stream would continue", async () => 
   assert.equal(update.ts, slack.streamTs[0]);
   assert.deepEqual(
     containersOf(list(update.blocks)).map((b) => get(b, "title", "text")),
-    Array.from({ length: 4 }, (_, i) => `Update(f${i}.txt)`),
+    Array.from({ length: 4 }, (_, i) => `Modify(f${i}.txt)`),
   );
 });
 
@@ -4140,7 +4024,7 @@ test("a stream still continues in a new message past the limit with diffs", asyn
   const slack = new FakeSlack();
   const sink = reply(slack); // no stop: the diffs go to a stream, which counts their text
   for (let i = 0; i < 4; i += 1) {
-    await sink.task(tool(`e${i}`, "Edit", "complete", { preview: largeDiff(i) }));
+    await sink.task(tool(`e${i}`, "change", "complete", { preview: largeDiff(i) }));
   }
   await settled();
   assert.ok(slack.streamTs.length >= 2);
@@ -4159,13 +4043,13 @@ test("a stream still continues in a new message past the limit with diffs", asyn
 test("a fixed span no longer cuts a late diff for its size", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("t0", "Edit", "in_progress"));
+  await sink.task(tool("t0", "change", "in_progress"));
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
   await settled();
   await sink.text("v".repeat(1_000)); // does not fit: the reply goes on in a second stream
   await settled();
   assert.equal(slack.streamTs.length, 2);
-  await sink.task(tool("t0", "Edit", "complete", { preview: largeDiff(0) }));
+  await sink.task(tool("t0", "change", "complete", { preview: largeDiff(0) }));
   await settled();
   const blocks = list(
     last(slack.callsTo("chat.update").filter((u) => u.ts === slack.streamTs[0])).blocks,
@@ -4176,12 +4060,12 @@ test("a fixed span no longer cuts a late diff for its size", async () => {
 test("a fixed span still cuts a late diff for the blocks limit", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("t0", "Edit", "in_progress"));
+  await sink.task(tool("t0", "change", "in_progress"));
   for (let i = 1; i < 60; i += 1)
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true }));
   await settled();
   const first = slack.streamTs[0];
-  await sink.task(tool("t0", "Edit", "complete", { preview: largeDiff(0) }));
+  await sink.task(tool("t0", "change", "complete", { preview: largeDiff(0) }));
   await settled();
   const blocks = list(last(slack.callsTo("chat.update").filter((u) => u.ts === first)).blocks);
   assert.ok(blocks.length <= 50);
@@ -4192,11 +4076,11 @@ test("a preview in markdown still counts toward the limit on an update", async (
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
-  await sink.task(tool("a", "Write", "in_progress"));
+  await sink.task(tool("a", "change", "in_progress"));
   await sink.text("w".repeat(6_000));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
-  await sink.task(tool("a", "Write", "complete", { preview: previewOf(95) })); // about 9,000 characters
+  await sink.task(tool("a", "change", "complete", { preview: previewOf(95) })); // about 9,000 characters
   await settled();
   assert.equal(slack.callsTo("chat.postMessage").length, 1); // it did not fit the first message
   for (const update of slack.callsTo("chat.update")) {
@@ -4251,12 +4135,12 @@ test("a refused update with containers counts them from then on", async () => {
   const clock = new FakeClock();
   const places = new ThreadPlaces();
   const sink = reply(slack, { clock, places });
-  await sink.task(tool("e0", "Edit", "complete", { preview: largeDiff(0) }));
+  await sink.task(tool("e0", "change", "complete", { preview: largeDiff(0) }));
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
   const refused = refusingContainers(slack);
   for (let i = 1; i < 3; i += 1) {
-    await sink.task(tool(`e${i}`, "Edit", "complete", { preview: largeDiff(i) }));
+    await sink.task(tool(`e${i}`, "change", "complete", { preview: largeDiff(i) }));
   }
   await settled();
   await sink.finish([]);
@@ -4269,10 +4153,10 @@ test("a refused update with containers counts them from then on", async () => {
     .flatMap((blocks) => containersOf(blocks).map((b) => get(b, "title", "text")));
   assert.deepEqual(
     titles,
-    Array.from({ length: 3 }, (_, i) => `Update(f${i}.txt)`),
+    Array.from({ length: 3 }, (_, i) => `Modify(f${i}.txt)`),
   );
   assert.ok(slack.messageBlocks().some((blocks) => includesBlock(blocks, footerBlock("footer"))));
-  await sink.task(tool("e3", "Edit", "complete", { preview: largeDiff(3) })); // a later diff, in the last message
+  await sink.task(tool("e3", "change", "complete", { preview: largeDiff(3) })); // a later diff, in the last message
   await settled();
   const tried = refused.length; // that message was refused once too, and counts from then on
   places.showRunning(AGENT); // a later change to it: no refused blocks again
@@ -4283,7 +4167,7 @@ test("a refused update with containers counts them from then on", async () => {
 test("a refused update of a fixed span cuts the late diff with the note", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("t0", "Edit", "in_progress"));
+  await sink.task(tool("t0", "change", "in_progress"));
   await sink.text("w".repeat(MESSAGE_LIMIT - 200));
   await settled();
   await sink.text("v".repeat(1_000));
@@ -4291,7 +4175,7 @@ test("a refused update of a fixed span cuts the late diff with the note", async 
   const first = slack.streamTs[0];
   slack.responses["chat.update"] = (args) =>
     containersOf(list(args.blocks)).length > 0 ? rejected("invalid_blocks") : { ok: true };
-  await sink.task(tool("t0", "Edit", "complete", { preview: largeDiff(0) }));
+  await sink.task(tool("t0", "change", "complete", { preview: largeDiff(0) }));
   await settled();
   const blocks = list(last(slack.callsTo("chat.update").filter((u) => u.ts === first)).blocks);
   assert.ok(containersOf(blocks).length === 0 && includesBlock(blocks, CUT_NOTE));
@@ -4351,10 +4235,12 @@ test("a subagent card is sent each of its lines once", async () => {
   // room for a write per line
   const limiter = new UpdateLimiter({ burst: 20, clock: new SelfPacedClock() });
   const sink = reply(slack, { limiter });
-  const lines = Array.from({ length: 12 }, (_, i) => `Bash: step ${i + 1}`);
+  const lines = Array.from({ length: 12 }, (_, i) => `run: step ${i + 1}`);
   for (let n = 1; n <= 12; n += 1) {
     const window = lines.slice(Math.max(0, n - 10), n).join("\n"); // the last ten, as the renderer keeps them
-    await sink.task(tool("a1", "Agent", "in_progress", { details: window, task: true, calls: n }));
+    await sink.task(
+      tool("a1", "delegate", "in_progress", { details: window, task: true, calls: n }),
+    );
     await settled();
   }
   // However the writes were batched, the chunks carry each line once, in order.
@@ -4370,25 +4256,25 @@ test("a subagent card is sent each of its lines once", async () => {
 test("a card whose title alone changes is sent no text again", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a1", "Agent", "in_progress", { details: "Read: notes.md", task: true }));
+  await sink.task(tool("a1", "delegate", "in_progress", { details: "look: notes.md", task: true }));
   await settled();
   await sink.task(
-    tool("a1", "Agent", "in_progress", { details: "Read: notes.md", task: true, calls: 1 }),
+    tool("a1", "delegate", "in_progress", { details: "look: notes.md", task: true, calls: 1 }),
   );
   await settled();
-  await sink.task(tool("b1", "Agent", "error", { output: "exit 2", task: true }));
+  await sink.task(tool("b1", "delegate", "error", { output: "exit 2", task: true }));
   await settled();
   await sink.task(
-    tool("b1", "Agent", "error", { title: "Agent: again", output: "exit 2", task: true }),
+    tool("b1", "delegate", "error", { title: "delegate: again", output: "exit 2", task: true }),
   );
   await settled();
   let [first, second] = cardChunks(slack, "a1");
-  assert.ok(first?.details === "Read: notes.md" && second !== undefined && !("details" in second));
+  assert.ok(first?.details === "look: notes.md" && second !== undefined && !("details" in second));
   [first, second] = cardChunks(slack, "b1");
   assert.ok(first?.output === "exit 2" && second !== undefined && !("output" in second));
   assert.deepEqual(
     (slack.messageCards()[0] ?? []).map((c) => c.details ?? c.output),
-    ["Read: notes.md", "exit 2"],
+    ["look: notes.md", "exit 2"],
   );
 });
 
@@ -4399,7 +4285,7 @@ test("cards whose text fills the message continue in a new stream", async () => 
   const sink = reply(slack);
   for (let i = 0; i < 6; i += 1) {
     await sink.task(
-      tool(`t${i}`, "Agent", "error", { output: `${i}`.repeat(CARD_TEXT_LIMIT), task: true }),
+      tool(`t${i}`, "delegate", "error", { output: `${i}`.repeat(CARD_TEXT_LIMIT), task: true }),
     );
     await settled();
   }
@@ -4417,7 +4303,7 @@ test("text after cards that fill the message continues in a new stream", async (
   const sink = reply(slack);
   for (let i = 0; i < 3; i += 1) {
     await sink.task(
-      tool(`t${i}`, "Agent", "error", { output: `${i}`.repeat(CARD_TEXT_LIMIT), task: true }),
+      tool(`t${i}`, "delegate", "error", { output: `${i}`.repeat(CARD_TEXT_LIMIT), task: true }),
     );
   }
   await settled();
@@ -4431,12 +4317,12 @@ test("text after cards that fill the message continues in a new stream", async (
 test("a running card in a full message keeps its title and gains no line", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a1", "Agent", "in_progress", { details: "Read: notes.md", task: true }));
+  await sink.task(tool("a1", "delegate", "in_progress", { details: "look: notes.md", task: true }));
   await sink.text("a line of text\n".repeat(700)); // 10,500 characters
   await settled();
   await sink.task(
-    tool("a1", "Agent", "in_progress", {
-      details: `Read: notes.md\n${"x".repeat(400)}`,
+    tool("a1", "delegate", "in_progress", {
+      details: `look: notes.md\n${"x".repeat(400)}`,
       task: true,
       message: false,
       calls: 2,
@@ -4445,34 +4331,34 @@ test("a running card in a full message keeps its title and gains no line", async
   await settled();
   const final = last(cardChunks(slack, "a1"));
   assert.ok(str(final.title).endsWith(" · 2 calls") && !("details" in final));
-  assert.equal(slack.messageCards()[0]?.[0]?.details, "Read: notes.md");
+  assert.equal(slack.messageCards()[0]?.[0]?.details, "look: notes.md");
   assert.equal(slack.streamTs.length, 1);
 });
 
 test("a card that ends is sent no text for the details it no longer says", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a1", "Agent", "in_progress", { details: "Read: notes.md", task: true }));
+  await sink.task(tool("a1", "delegate", "in_progress", { details: "look: notes.md", task: true }));
   await settled();
-  await sink.task(tool("a1", "Agent", "complete", { task: true }));
+  await sink.task(tool("a1", "delegate", "complete", { task: true }));
   await settled();
   const [, second] = cardChunks(slack, "a1");
   assert.deepEqual(second, {
     type: "task_update",
     id: "a1",
-    title: "Agent: a1",
+    title: "delegate: a1",
     status: "complete",
   });
-  assert.equal(slack.messageCards()[0]?.[0]?.details, "Read: notes.md"); // Slack keeps them
+  assert.equal(slack.messageCards()[0]?.[0]?.details, "look: notes.md"); // Slack keeps them
 });
 
 test("a card that fails in a full message still says why", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
-  await sink.task(tool("a1", "Agent", "in_progress", { task: true }));
+  await sink.task(tool("a1", "delegate", "in_progress", { task: true }));
   await sink.text("a line of text\n".repeat(720)); // 10,800 characters
   await settled();
-  await sink.task(tool("a1", "Agent", "error", { output: "x".repeat(400), task: true }));
+  await sink.task(tool("a1", "delegate", "error", { output: "x".repeat(400), task: true }));
   await settled();
   assert.equal(last(cardChunks(slack, "a1")).output, "x".repeat(400));
   assert.equal(slack.streamTs.length, 1);
@@ -4589,7 +4475,7 @@ test("cards and headings share the room of a message", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   for (let i = 0; i < 30; i += 1)
-    await sink.task(tool(`t${i}`, "Agent", "complete", { task: true }));
+    await sink.task(tool(`t${i}`, "delegate", "complete", { task: true }));
   await settled();
   await sink.text(sections(20)); // 40 blocks: 15 fit beside the 30 cards
   await settled();
@@ -4690,7 +4576,7 @@ test("a fold refused for too many blocks keeps the text the stream showed", asyn
     return items > 10 ? tooMany() : { ok: true };
   };
   const sink = reply(slack);
-  await sink.task(tool("t1", "Bash"));
+  await sink.task(tool("t1", "run"));
   const text = Array.from(
     { length: 20 },
     (_, i) => `- item ${i + 1}\n\n## Heading ${i + 1}\n\n`,
@@ -4828,7 +4714,7 @@ test("an ending posted from a stream that sent everything leaves the first messa
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
   await sink.text("Before.\n\n");
-  await sink.task(tool("t1", "Agent", "complete", { task: true }));
+  await sink.task(tool("t1", "delegate", "complete", { task: true }));
   await sink.text("The build passed.");
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
@@ -5762,14 +5648,14 @@ test("the list's card keeps its block id across three updates and a message neve
   const places = new ThreadPlaces();
   const sink = reply(slack, { places });
   await sink.text("Started it.");
-  await sink.task(tool("t1", "Agent", "in_progress", { task: true }));
+  await sink.task(tool("t1", "delegate", "in_progress", { task: true }));
   await sink.finish([]);
   sink.rest();
   await settled();
   const lists = [
-    running("1 agent still running", "Agent: one"),
-    running("2 agents still running", "Agent: one", "Agent: two"),
-    running("1 agent still running", "Agent: two"),
+    running("1 agent still running", "delegate: one"),
+    running("2 agents still running", "delegate: one", "delegate: two"),
+    running("1 agent still running", "delegate: two"),
   ];
   for (const shown of lists) {
     places.showRunning(shown);
@@ -5811,7 +5697,7 @@ test("nine lines draw six and the count of the rest, and the title is cut at 150
   const slack = new FakeSlack();
   const places = new ThreadPlaces();
   await endedReply(slack, places);
-  const lines = Array.from({ length: 9 }, (_, i) => `Agent: task number ${i + 1}`);
+  const lines = Array.from({ length: 9 }, (_, i) => `delegate: task number ${i + 1}`);
   places.showRunning(running(`9 agents still running ${"x".repeat(200)}`, ...lines));
   await settled();
   const card = list(last(slack.callsTo("chat.update")).blocks).find(isCard);
@@ -5855,7 +5741,7 @@ test("an agent's line ends with how long it has run and its count of calls, and 
     lines: [
       {
         text: "mechanical  Read files",
-        agent: { since: 460, calls: 7, step: "Read: docs/features.md" },
+        agent: { since: 460, calls: 7, step: "look: docs/features.md" },
       },
       { text: "Sleep for 5 seconds", agent: null },
     ],
@@ -5865,7 +5751,7 @@ test("an agent's line ends with how long it has run and its count of calls, and 
   assert.deepEqual(
     card?.details,
     datedCard([
-      ["mechanical  Read files", "Read: docs/features.md", "40s", "7 calls"],
+      ["mechanical  Read files", "look: docs/features.md", "40s", "7 calls"],
       "Sleep for 5 seconds",
     ]),
   );
@@ -5878,14 +5764,14 @@ test("one call reads 1 call", async () => {
   places.showRunning({
     title: "1 agent still running",
     lines: [
-      { text: "mechanical  Read files", agent: { since: 500, calls: 1, step: "Bash: sleep 15" } },
+      { text: "mechanical  Read files", agent: { since: 500, calls: 1, step: "run: sleep 15" } },
     ],
   });
   await settled();
   const card = list(last(slack.callsTo("chat.update")).blocks).find(isCard);
   assert.deepEqual(
     card?.details,
-    datedCard([["mechanical  Read files", "Bash: sleep 15", "0s", "1 call"]]),
+    datedCard([["mechanical  Read files", "run: sleep 15", "0s", "1 call"]]),
   );
 });
 
@@ -5894,8 +5780,8 @@ test("nine agents with steps draw six tasks and the count of the rest: a step li
   const places = new ThreadPlaces();
   await clockedReply(slack, places);
   const lines = Array.from({ length: 9 }, (_, i) => ({
-    text: `Agent: task number ${i + 1}`,
-    agent: { since: 500, calls: i + 1, step: "Read: a.md" },
+    text: `delegate: task number ${i + 1}`,
+    agent: { since: 500, calls: i + 1, step: "look: a.md" },
   }));
   places.showRunning({ title: "9 agents still running", lines });
   await settled();
@@ -5907,7 +5793,7 @@ test("nine agents with steps draw six tasks and the count of the rest: a step li
         (line) =>
           [
             line.text,
-            "Read: a.md",
+            "look: a.md",
             "0s",
             `${line.agent.calls} call${line.agent.calls > 1 ? "s" : ""}`,
           ] as const,
@@ -5921,7 +5807,7 @@ test("a changed step rewrites the card, and the same step does not", async () =>
   const slack = new FakeSlack();
   const places = new ThreadPlaces();
   await endedReply(slack, places);
-  const agent = { since: 100, calls: 1, step: "Read: a.md" };
+  const agent = { since: 100, calls: 1, step: "look: a.md" };
   places.showRunning({ title: "1 agent still running", lines: [{ text: "agent", agent }] });
   await settled();
   const written = slack.callsTo("chat.update").length;
@@ -5933,7 +5819,7 @@ test("a changed step rewrites the card, and the same step does not", async () =>
   assert.equal(slack.callsTo("chat.update").length, written);
   places.showRunning({
     title: "1 agent still running",
-    lines: [{ text: "agent", agent: { ...agent, calls: 2, step: "Read: b.md" } }],
+    lines: [{ text: "agent", agent: { ...agent, calls: 2, step: "look: b.md" } }],
   });
   await settled();
   assert.equal(slack.callsTo("chat.update").length, written + 1);
@@ -6321,7 +6207,7 @@ test("a card whose title grows back is charged once for its longest title", () =
   let sent: CardChunk | undefined;
   let held: CardHeld = {};
   let total = 0;
-  for (const title of [long, "Ran 1 shell command", long, "Ran 2 shell commands", long]) {
+  for (const title of [long, "Executed 1 job", long, "Executed 2 jobs", long]) {
     const chunk: CardChunk = { type: "task_update", id: "fold:a", title, status: "in_progress" };
     const [, after, cost] = cardAddition(chunk, sent, held, null);
     sent = chunk;

@@ -89,7 +89,7 @@ import {
 import { modelName, settingName } from "../models.ts";
 import { resolvePath } from "../paths.ts";
 import { LoopReply } from "../reply/loop-card.ts";
-import { described } from "../reply/previews.ts";
+import { Previews } from "../reply/previews.ts";
 import {
   endedLine,
   type TaskEvent,
@@ -525,6 +525,8 @@ export class ThreadSession {
   private readonly afterRestart = new Set<string>();
   /** The names the texts of this session take from its agent and its chat. */
   private readonly names: texts.Names;
+  /** The agent's tools the terminal shows in words of its own. */
+  private readonly previews: Previews;
   // Tasks whose start the agent had no capability for, by the capability: their later events
   // are ignored with them.
   private readonly refusedTasks = new Map<string, string>();
@@ -547,6 +549,7 @@ export class ThreadSession {
     this.deps = deps;
     this.title = new ThreadTitle(deps, channelId, threadId, directory, options.stopped);
     this.names = texts.namesOf(deps.agent, deps.chat);
+    this.previews = new Previews(deps.agent.tools);
     this.thread = deps.chat.thread({ channel: channelId, thread: threadId });
     this.predecessor = options.predecessor ?? null;
     this.settled.set();
@@ -587,8 +590,9 @@ export class ThreadSession {
    * and `ensureConnected` gives the next agent process the mode back through
    * `AgentSession.setPermissionMode`: on sets the bypass mode, an explicit off in a folder whose
    * own settings start in bypass sets the default one (so the folder's bypass does not return
-   * silently), never chosen leaves the agent's own mode. Claude Code's own `--resume` never
-   * restores `bypassPermissions` (documented: "Resume and bypass" in `docs/architecture.md`).
+   * silently), never chosen leaves the agent's own mode. Bypass is the product's word for the mode the
+   * agent declares as `permissionModes.bypass`; an agent may not restore it on resume (Claude
+   * Code does not: "Resume and bypass" in `docs/architecture.md`).
    * Bypass and the effort level belong to the thread, not to the agent's session id, so a
    * session `!resume` opens starts with both unset.
    */
@@ -1284,8 +1288,9 @@ export class ThreadSession {
         this.deps.state.setBypass(this.channelId, this.threadId, choice.bypass);
         let client = await this.ensureConnected();
         if (effort !== this.clientEffort) {
-          if (this.deps.agent.capabilities.liveEffort) await this.changeEffort(client, effort);
-          else client = await this.reconnect();
+          if (this.deps.agent.capabilities.liveEffort && client.setEffort !== undefined) {
+            await this.changeEffort(client.setEffort.bind(client), effort);
+          } else client = await this.reconnect();
         }
         if (choice.model !== DEFAULT && this.deps.agent.capabilities.models) {
           await client.setModel(choice.model);
@@ -1313,12 +1318,15 @@ export class ThreadSession {
    * Set the stored effort on the live client: what the session knows of the level is left as a
    * connect with that stored level leaves it.
    */
-  private async changeEffort(client: AgentSession, effort: string | null): Promise<void> {
+  private async changeEffort(
+    setEffort: (level: string | null) => Promise<void>,
+    effort: string | null,
+  ): Promise<void> {
     const level = this.validEffort(effort);
     if (effort !== null && level === null) {
       logger.warning(`dropped an unrecognized stored effort level in ${this.where}`);
     }
-    await client.setEffort(level);
+    await setEffort(level);
     this.clientEffort = effort;
     this.effortSetting = level;
     this.effort = null;
@@ -1579,7 +1587,7 @@ export class ThreadSession {
     for (const taskId of tasks) {
       this.stopped.add(taskId);
       try {
-        await client.stopTask(taskId);
+        await client.stopTask?.(taskId);
       } catch (error) {
         // it may have ended meanwhile; the others still stop
         logger.warning(`could not stop a task in ${this.where}: ${errorName(error)}`);
@@ -1891,9 +1899,10 @@ export class ThreadSession {
       texts.fill(texts.STATUS, { directory: this.directory, session: sessionId || "new" }),
     ];
     // Left out with a folder the line above cannot use: its `cd` would fail there.
-    if (sessionId && usable)
+    const terminal = this.deps.agent.words.terminal;
+    if (sessionId && usable && terminal !== null)
       head.push(
-        terminalLine(this.deps.agent.words.terminal, this.directory, sessionId, (text) =>
+        terminalLine(terminal, this.directory, sessionId, (text) =>
           this.deps.chat.escape(text, "reference"),
         ),
         ...this.terminalWarnings(),
@@ -2142,7 +2151,6 @@ export class ThreadSession {
         resume: sessionId,
         // A copy `!fork` made is started as the terminal starts its copy, every time.
         ...(forkOf != null && { forkOf }),
-        settingsSources: ["user", "project", "local"],
         model: null,
         // A model set by command survives a resume by itself (measured); the effort a command
         // set does not, so the daemon stores it per thread and passes it back here.
@@ -2694,10 +2702,10 @@ export class ThreadSession {
         if (!TURN_EVENTS.has(event.type) && !compaction) return;
         worded = !compaction;
         if (call) {
-          // A subagent's own event, whose call no reply holds: an agent continued with
-          // `SendMessage` in a daemon that never saw the call that first started it (recorded:
+          // A subagent's own event, whose call no reply holds: an agent continued by a
+          // message to it, in a daemon that never saw the call that first started it (recorded:
           // `report-turn-agent-resume.jsonl`, CLI 2.1.286, whose events name that first call,
-          // not the `SendMessage` one). It is no turn of the conversation's, so it starts none
+          // not the one that sent the message). It is no turn of the conversation's, so it starts none
           // and takes no owner prompt's.
           return;
         }
@@ -2854,7 +2862,9 @@ export class ThreadSession {
     const taskId = this.agentCalls.get(event.parentCallId);
     const before = taskId === undefined ? undefined : this.steps.get(taskId);
     if (taskId === undefined || before === undefined) return;
-    const words = described(event.toolName, event.input) ?? taskTitle(event.toolName, event.input);
+    const words =
+      this.previews.described(event.toolName, event.input) ??
+      taskTitle(event.toolName, event.input);
     this.steps.set(taskId, {
       ...before,
       words: oneLine(words, TITLE_LIMIT),
@@ -3019,9 +3029,10 @@ export class ThreadSession {
   /**
    * Whether a turn's end is all there is of a turn the agent started and nothing waits to be
    * said with it: no step taken, no text, no task's end line, no held task event, no notice.
-   * Claude Code gives a task's notification such a turn once the task's report was handed back
-   * (measured 2026-10-10, `subagent-handback.jsonl`). With an end line or a held event waiting,
-   * the turn is the report that says them.
+   * The seam defines it (`turn_ended.steps`, `startedBy`); Claude Code gives a task's
+   * notification such a turn once the task's report was handed back (measured 2026-10-10,
+   * `subagent-handback.jsonl`). With an end line or a held event waiting, the turn is the
+   * report that says them.
    */
   private saidNothing(event: TurnEnded): boolean {
     return (
@@ -3507,7 +3518,8 @@ export class ThreadSession {
     const first = this.sent[0];
     if (this.injectedExpected || first === undefined) return null;
     const head = first.prompt;
-    const plain = typeof head === "string" && !strip(head).startsWith("/");
+    const plain =
+      typeof head === "string" && !strip(head).startsWith(this.deps.agent.words.commandPrefix);
     if (worded && this.notificationWaits && plain) return null;
     this.sent.shift();
     return first;
@@ -3971,6 +3983,7 @@ export class ThreadSession {
     const renderer = new TurnRenderer(
       reply,
       this.names,
+      this.previews,
       this.directory,
       this.deps.chat.capabilities.nativeStreaming,
       // Recorded before any reply sees the start (`dispatch`), so a first start counts one.
@@ -4439,7 +4452,13 @@ export class ThreadSession {
     let decision: Decision;
     try {
       try {
-        messageTs = await this.thread.ask(approvalId, request, title);
+        messageTs = await this.thread.ask(
+          approvalId,
+          request.type === "permission"
+            ? { ...request, plan: this.previews.plan(request.toolName, request.input) }
+            : request,
+          title,
+        );
       } catch (error) {
         // Nobody can answer a request that was never shown: deny it, and say why.
         logger.error(`could not post an approval request in ${this.where}: ${errorName(error)}`);

@@ -326,8 +326,9 @@ export class SessionManager {
     directory: string,
     options: { readonly dated?: boolean } = {},
   ): Promise<readonly ListedSession[]> {
-    if (!this.deps.agent.capabilities.sessionListing) return [];
-    const found = await this.deps.agent.listSessions(directory);
+    const { agent } = this.deps;
+    if (!agent.capabilities.sessionListing || agent.listSessions === undefined) return [];
+    const found = await agent.listSessions(directory);
     return options.dated ? this.dated(directory, found) : found;
   }
 
@@ -336,8 +337,9 @@ export class SessionManager {
    * so a caller that shows only some of a folder's sessions passes those alone.
    */
   async dated(directory: string, found: readonly ListedSession[]): Promise<ListedSession[]> {
-    if (!this.deps.agent.capabilities.sessionListing) return [];
-    return this.deps.agent.datedSessions(directory, found);
+    const { agent } = this.deps;
+    if (!agent.capabilities.sessionListing || agent.datedSessions === undefined) return [];
+    return agent.datedSessions(directory, found);
   }
 
   /**

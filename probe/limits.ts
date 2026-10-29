@@ -9,10 +9,11 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { LIMITS_HEADING } from "../src/agent/claude/module.ts";
 import { readRests } from "./diff.ts";
 
 const LIMITS = join(import.meta.dirname, "..", "docs", "limits.md");
-const SECTION = "Limits of the Claude Agent SDK";
+const SECTION = LIMITS_HEADING;
 const NAME = "What differs";
 const SLACK = "From Slack";
 const CHECKED = "Checked by";

@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { ClaudeBackend } from "../src/agent/claude/backend.ts";
+import { ClaudeBackend, type ClaudeStartOptions } from "../src/agent/claude/backend.ts";
 import {
   LONG_PROJECT_KEY,
   projectFolder,
@@ -31,7 +31,6 @@ import type {
   QuestionRequest,
   RequestHandler,
   SessionEvent,
-  StartOptions,
 } from "../src/agent/seam.ts";
 import { ResumeRefused } from "../src/agent/seam.ts";
 
@@ -140,7 +139,7 @@ async function removeTranscripts(): Promise<void> {
   }
 }
 
-function options(directory: string, resume: string | null = null): StartOptions {
+function options(directory: string, resume: string | null = null): ClaudeStartOptions {
   return {
     folder: directory,
     resume,
@@ -334,6 +333,7 @@ async function main(): Promise<void> {
     // 5. Effort and permission mode.
     await section("effort", async () => {
       const began = Date.now();
+      if (session.setEffort === undefined) throw new Error("the session has no setEffort");
       await session.setEffort("low");
       const took = Date.now() - began;
       const run = await turn(session, recorder, "Reply with the single word ok.");

@@ -2,8 +2,8 @@
  * A run of tool calls as one card: the call that runs now, then the counts of what ended. The
  * terminal draws a run the same way (captured on Claude Code 2.1.296, 2026-10-13): one live line
  * for the call that runs, nothing for the calls before it, and when the run has ended one grey
- * line of counts with no mark, `Read 1 file, ran 4 shell commands`, a failed call counted with
- * the others. A stream can only append and a card is what Slack updates in place, so the line is
+ * line of counts with no mark (for example `Read 1 file, ran 4 shell commands`), a failed call
+ * counted with the others. A stream can only append and a card is what Slack updates in place, so the line is
  * a card whose title changes.
  *
  * A run is the calls between two pieces of text. Its card shows the last call started that
@@ -11,12 +11,11 @@
  * line that replaces the card once the reply's body has ended. A run that lists commands keeps
  * its card instead, as the terminal's folded line opens on them with ctrl+o.
  *
- * A call with a view of its own never folds: an Edit or a Write that ended well (its preview), a
+ * A call with a view of its own never folds: a call of a tool the agent previews that ended well (its preview), a
  * subagent the call waits for or a background command (its task card), a stopped call, and a
  * failed call of a tool the terminal was not seen to count (its card says why). It gets a card
  * of its own, or keeps the run's when it was the run's only call, and the run takes no new call
- * after it. An Edit or a Write reaches the fold only once it has ended (the renderer holds it
- * until then).
+ * after it. Such a call reaches the fold only once it has ended (the renderer holds it until then).
  *
  * The card carries no `output`, and no `details` but the command of each call the terminal
  * times (`startedAt` set): Slack appends both to what a card already holds (measured
@@ -24,7 +23,7 @@
  * command line to what the card lists.
  */
 import type { Preview, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
-import { failsCounted, folded } from "./previews.ts";
+import type { Previews } from "./previews.ts";
 import { STOPPED } from "./words.ts";
 
 export const ENDED: readonly TaskStatus[] = ["complete", "error"];
@@ -43,11 +42,11 @@ export function shownPreview(update: TaskUpdate): Preview | null {
 /**
  * Whether a call is drawn on its run's card rather than on a card of its own. A call that failed
  * is counted with the others only where the terminal was seen to count it so (a command that
- * exits with an error, `previews.failsCounted`); any other failed call keeps a card that says
+ * exits with an error, `Previews.failsCounted`); any other failed call keeps a card that says
  * why.
  */
-export function folds(update: TaskUpdate): boolean {
-  if (update.status === "error" && !failsCounted(update.name)) return false;
+export function folds(previews: Previews, update: TaskUpdate): boolean {
+  if (update.status === "error" && !previews.failsCounted(update.name)) return false;
   return (
     update.name !== "" && !update.task && shownPreview(update) === null && update.output !== STOPPED
   );
@@ -57,11 +56,13 @@ export function folds(update: TaskUpdate): boolean {
  * Ended calls as counts in the terminal's words, joined as it joins them: a comma between two
  * counts, and a capital on the first alone. A failed call is counted with the others.
  */
-export function counts(calls: readonly TaskUpdate[]): string {
+export function counts(previews: Previews, calls: readonly TaskUpdate[]): string {
   // In the order each name first ended, as the terminal lists them.
   const byName = new Map<string, number>();
   for (const call of calls) byName.set(call.name, (byName.get(call.name) ?? 0) + 1);
-  return [...byName].map(([name, n], index) => folded(name, n, index === 0)).join(SEPARATOR);
+  return [...byName]
+    .map(([name, n], index) => previews.folded(name, n, index === 0))
+    .join(SEPARATOR);
 }
 
 interface Run {
@@ -119,6 +120,12 @@ function remove(list: string[], item: string): void {
  * new state changes, in the order they are to appear; `text` ends the run.
  */
 export class Fold {
+  private readonly previews: Previews;
+
+  constructor(previews: Previews) {
+    this.previews = previews;
+  }
+
   /** Call id to its run. */
   private readonly runs = new Map<string, Run>();
   /** Call id to the card that is its own. */
@@ -136,7 +143,7 @@ export class Fold {
     if (own !== undefined) return this.changed([{ ...update, id: own }]);
     let run = this.runs.get(update.id);
     if (run === undefined) {
-      if (!folds(update)) {
+      if (!folds(this.previews, update)) {
         this.text();
         this.own.set(update.id, update.id);
         return this.changed([update]);
@@ -144,7 +151,7 @@ export class Fold {
       if (this.current === null || !this.current.open) this.current = newRun();
       run = this.current;
       this.runs.set(update.id, run);
-    } else if (!folds(update)) {
+    } else if (!folds(this.previews, update)) {
       return this.changed([this.leave(run, update), ...this.draw(run)]);
     }
     run.calls.set(update.id, update);
@@ -192,7 +199,7 @@ export class Fold {
       return [card(run.card, now.title, now.status, now.name, null, now.startedAt, details)];
     }
     const ended = run.ended.flatMap((id) => run.calls.get(id) ?? []);
-    const line = counts(ended);
+    const line = counts(this.previews, ended);
     const status: TaskStatus = ended.some((call) => call.status === "complete")
       ? "complete"
       : "error";

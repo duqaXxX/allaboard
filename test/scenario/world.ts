@@ -220,6 +220,9 @@ export class World {
     const agent: AgentEntry = {
       required: [],
       optional: [],
+      tools: this.entry.tools,
+      toolNames: [],
+      limitsHeading: "Limits of a test agent",
       build: (context) => watched(this.entry.build(context), this.undeclared, "agent"),
     };
     const chat: ChatEntry = {

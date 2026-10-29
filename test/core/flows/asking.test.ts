@@ -6,15 +6,15 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
-import type { HoldRequest, SetupRequest } from "../../../src/chat/seam.ts";
+import type { ApprovalRequest, HoldRequest, SetupRequest } from "../../../src/chat/seam.ts";
 import { logger } from "../../../src/core/flows/talk.ts";
 import { SessionClosed, SessionGone } from "../../../src/core/sessions/errors.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
 import { OWNER, SOMEONE } from "../../support/memory-chat.ts";
-import { call, type PlainAgent, question, say } from "../../support/plain-agent.ts";
-import { FakeAgentBackend, settledTurn } from "../../support/sessions.ts";
+import { call, PlainAgent, plainModel, question, say } from "../../support/plain-agent.ts";
+import { settledTurn } from "../../support/settle.ts";
 import { AskingWorld } from "./asking-world.ts";
 
 /** The lines the core's flows logged from here on. */
@@ -333,9 +333,7 @@ test("a setup holds bypass to what was offered: an agent with no bypass mode get
 
 test("an agent that lists models and gave none offers no effort, and takes none", async (t) => {
   // The capability says the agent lists models; this session's list came back empty.
-  const agent = new FakeAgentBackend([
-    { info: { models: [], commands: [], permissionMode: "default", account: null } },
-  ]);
+  const agent = new PlainAgent({ models: [] });
   const world = await AskingWorld.make(t, { agent });
   const { ref, session } = world.thread();
   const asked = world.flows.setup.beforeSending(ref, session);
@@ -353,8 +351,13 @@ test("an agent that lists models and gave none offers no effort, and takes none"
   assert.equal(agent.sessions.at(-1)?.options.effort ?? null, null);
 });
 
-test("a setup of an agent with models offers them with bypass, and checks the choice", async (t) => {
-  const agent = new FakeAgentBackend([]);
+test("a setup of an agent with models offers them, and checks the choice", async (t) => {
+  const agent = new PlainAgent({
+    models: [
+      plainModel("standard", { isDefault: true }),
+      plainModel("big", { efforts: ["brief", "full"] }),
+    ],
+  });
   const world = await AskingWorld.make(t, { agent });
   const { ref, session } = world.thread();
   const asked = world.flows.setup.beforeSending(ref, session);
@@ -362,7 +365,7 @@ test("a setup of an agent with models offers them with bypass, and checks the ch
   const request = open.request as SetupRequest;
   assert.ok(request.models.length > 1);
   assert.deepEqual(request.efforts, []);
-  assert.equal(request.bypassOffered, true);
+  assert.equal(request.bypassOffered, false);
   const withEffort = request.models.find((m) => m.supportsEffort);
   const without = request.models.find((m) => !m.supportsEffort);
   assert.ok(withEffort !== undefined && without !== undefined);
@@ -376,12 +379,12 @@ test("a setup of an agent with models offers them with bypass, and checks the ch
   await asked;
   const stored = world.state.thread(ref.channel, ref.thread);
   assert.equal(stored?.effort, null);
-  assert.equal(stored?.bypass, true);
+  assert.notEqual(stored?.bypass, true);
   assert.ok(
     world
       .shown(ref)
       .includes(
-        fill(texts.SETUP_SUMMARY, { model: without.displayName, effort: "Default", bypass: "on" }),
+        fill(texts.SETUP_SUMMARY, { model: without.displayName, effort: "Default", bypass: "off" }),
       ),
   );
 });
@@ -567,6 +570,19 @@ async function permissionAsked(world: AskingWorld) {
   const open = await world.asked(ref, "permission");
   return { ref, session, turn, open };
 }
+
+test("an approval for the plan tool carries the plan text under the agent's own key", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, session } = world.thread();
+  (world.agent as PlainAgent).next(
+    call("propose", { steps: "1. look\n2. change\n", scratch: "n" }, { permission: true }),
+    say("Done."),
+  );
+  await session.submit("plan it");
+  const open = await world.asked(ref, "permission");
+  assert.equal((open.request as ApprovalRequest).plan, "1. look\n2. change");
+  await world.answers(open.requestId, { type: "permission", allow: true });
+});
 
 test("an approved permission lets the call run and removes the request", async (t) => {
   const world = await AskingWorld.make(t);
@@ -834,9 +850,7 @@ test("a hold answer with a setup's id is refused, logged, and the setup stays an
 });
 
 test("a setup of an agent with no models is still told from a hold", async (t) => {
-  const agent = new FakeAgentBackend([
-    { info: { models: [], commands: [], permissionMode: "default", account: null } },
-  ]);
+  const agent = new PlainAgent({ models: [] });
   const world = await AskingWorld.make(t, { agent });
   const { ref, session } = world.thread();
   const asked = world.flows.setup.beforeSending(ref, session);

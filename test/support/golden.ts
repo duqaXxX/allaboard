@@ -17,6 +17,7 @@ import type { Preview, TaskStatus, TaskUpdate } from "../../src/chat/seam.ts";
 import { UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { ReplySink } from "../../src/chat/slack/reply/sinks.ts";
 import { type Sink, TurnRenderer } from "../../src/core/reply/renderer.ts";
+import { CLAUDE_PREVIEWS } from "./claude-tools.ts";
 import { BOT, CHANNEL, FakeClock, FakeSlack, OWNER, TEAM, THREAD } from "./fake-slack.ts";
 import type { Json, JsonObject } from "./fixtures.ts";
 import { NAMES } from "./names.ts";
@@ -90,6 +91,7 @@ async function replayReply(events: readonly SessionEvent[]): Promise<unknown> {
   const renderer = new TurnRenderer(
     sink,
     NAMES,
+    CLAUDE_PREVIEWS,
     null,
     true,
     () => false,
@@ -181,6 +183,7 @@ export async function slackGolden(name: string, reply: JsonObject): Promise<Json
     userId: OWNER,
     botUserId: BOT,
     limiter: new UpdateLimiter({ limit: 10 ** 9, burst: 10 ** 9, clock }),
+    previews: CLAUDE_PREVIEWS,
     clock,
   });
   const caused: number[] = [];

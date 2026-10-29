@@ -33,7 +33,7 @@ import {
   type SessionEvent,
   type StartOptions,
 } from "../seam.ts";
-import { advisorModel, type ResolveSettings } from "./advisor.ts";
+import { advisorModel, type ResolveSettings, type SettingsSource } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
 import { GOAL_CLEAR, goalStore } from "./goals.ts";
 import { postModelSwitchHookEvents, postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
@@ -112,8 +112,22 @@ export class SessionClosedError extends Error {
   }
 }
 
-/** What a session is started with: the seam's options, and whether Claude Code gets `--chrome`. */
+/**
+ * The settings layers of a thread's session: the owner's own settings apply, as in a terminal.
+ * A probe starts a session with another set (`ClaudeStartOptions`).
+ */
+export const THREAD_SETTINGS_SOURCES: readonly SettingsSource[] = Object.freeze([
+  "user",
+  "project",
+  "local",
+]);
+
+/**
+ * What a session is started with: the seam's options, the settings layers it reads, and whether
+ * Claude Code gets `--chrome`.
+ */
 export interface SessionConfig extends StartOptions {
+  readonly settingsSources: readonly SettingsSource[];
   readonly chrome: boolean;
   /**
    * A session the daemon starts for itself (the usage probe), not for a thread: it is not given

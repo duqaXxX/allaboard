@@ -20,13 +20,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClaudeBackend } from "../src/agent/claude/backend.ts";
+import { LIMITS_HEADING } from "../src/agent/claude/module.ts";
 import type { PermissionAnswer, QuestionAnswer, RequestHandler } from "../src/agent/seam.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const LIMITS = join(ROOT, "docs", "limits.md");
 const RECORDED = join(ROOT, "test", "fixtures", "sdk", "server-info.json");
 const RECORDED_SHOWN = "test/fixtures/sdk/server-info.json";
-const SDK_SECTION = "Limits of the Claude Agent SDK";
+const SDK_SECTION = LIMITS_HEADING;
 // Claude Code's whole answer to a command it does not offer a session (measured 2026-10-09,
 // Claude Code 2.1.292, on 22 commands).
 export const UNAVAILABLE = "isn't available in this environment";

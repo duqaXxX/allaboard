@@ -153,6 +153,7 @@ function permission(): OwnerRequest {
     input: { command: "ls" },
     title: "Run the listing",
     description: null,
+    plan: null,
   };
 }
 
@@ -192,6 +193,7 @@ function setup(requestId: string): OwnerRequest {
     models: [
       {
         value: "model-a",
+        isDefault: false,
         resolvedModel: null,
         displayName: "Model A",
         description: null,

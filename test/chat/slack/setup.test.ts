@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agentInfo } from "../../../src/agent/claude/info.ts";
 import type { ModelInfo } from "../../../src/agent/seam.ts";
 import {
   readChoice,
@@ -17,11 +16,10 @@ import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import { summaryLine as summary } from "../../../src/core/flows/setup.ts";
 import { type Choice, DEFAULT, DEFAULT_CHOICE, effortLevels } from "../../../src/core/setup.ts";
 import * as texts from "../../../src/core/texts.ts";
-import { sdkJson } from "../../support/fixtures.ts";
+import { PLAIN_MODELS } from "../../support/plain-agent.ts";
 
-// The CLI's own list (test/fixtures/sdk/server-info.json, Claude Code 2.1.286): the first entry
-// is `default`, and Haiku carries no effort fields at all.
-const MODELS: readonly ModelInfo[] = agentInfo(sdkJson("server-info")).models;
+// The plain agent's list: the default entry first, a model with both efforts, one with none.
+const MODELS: readonly ModelInfo[] = PLAIN_MODELS;
 
 // biome-ignore lint/suspicious/noExplicitAny: a Slack payload read in a test
 type Json = Record<string, any>;
@@ -84,17 +82,36 @@ test("the message opens with one header and one row of controls", () => {
   ]);
 });
 
-test("the model select lists the cli s models in order with default first", () => {
+test("the model select lists the agent s models in order with the default entry first", () => {
   const select = controls(setupBlocks("id", drawn(MODELS), DEFAULT_CHOICE))[SETUP_MODEL] as Json;
   assert.deepEqual(
     select.options.map((o: Json) => o.value),
-    MODELS.map((m) => m.value),
+    MODELS.map((m) => (m.isDefault ? DEFAULT : m.value)),
   );
   assert.equal(select.options[0].text.text, MODELS[0]?.displayName);
   assert.equal(select.initial_option.value, DEFAULT);
 });
 
-test("a model option carries the cli s description cut to 75", () => {
+test("the agent's default entry is drawn as the default choice, wherever it stands in the list", () => {
+  const entry = (value: string, isDefault: boolean): ModelInfo => ({
+    value,
+    isDefault,
+    resolvedModel: null,
+    displayName: value,
+    description: null,
+    supportsEffort: false,
+    supportedEffortLevels: [],
+  });
+  const list = [entry("big", false), entry("standard", true)];
+  const select = controls(setupBlocks("id", drawn(list), DEFAULT_CHOICE))[SETUP_MODEL] as Json;
+  assert.deepEqual(
+    select.options.map((o: Json) => o.value),
+    ["big", DEFAULT],
+  );
+  assert.equal(select.initial_option.value, DEFAULT);
+});
+
+test("a model option carries the agent s description cut to 75", () => {
   const select = controls(setupBlocks("id", drawn(MODELS), DEFAULT_CHOICE))[SETUP_MODEL] as Json;
   const first = select.options[0];
   assert.deepEqual(first.description, {
@@ -103,6 +120,7 @@ test("a model option carries the cli s description cut to 75", () => {
   });
   const model = (description: string | null): ModelInfo => ({
     value: "m",
+    isDefault: false,
     resolvedModel: null,
     displayName: "M",
     description,
@@ -122,19 +140,22 @@ test("the effort select is default then the model s levels", () => {
   const options: Json[] = select.options;
   assert.deepEqual(
     options.map((o) => o.value),
-    [DEFAULT, ...effortLevels(MODELS, "opus")],
+    [DEFAULT, ...effortLevels(MODELS, "big")],
   );
-  assert.deepEqual(options.map((o) => o.text.text).slice(0, 2), ["Effort: default", "Effort: low"]);
+  assert.deepEqual(options.map((o) => o.text.text).slice(0, 2), [
+    "Effort: default",
+    "Effort: brief",
+  ]);
   assert.equal(select.initial_option.value, DEFAULT);
 });
 
 test("a model without effort offers only default", () => {
-  const found = controls(setupBlocks("id", drawn(MODELS), choice({ model: "haiku" })));
+  const found = controls(setupBlocks("id", drawn(MODELS), choice({ model: "small" })));
   assert.deepEqual(
     (found[SETUP_EFFORT] as Json).options.map((o: Json) => o.value),
     [DEFAULT],
   );
-  assert.equal((found[SETUP_MODEL] as Json).initial_option.value, "haiku");
+  assert.equal((found[SETUP_MODEL] as Json).initial_option.value, "small");
 });
 
 test("the bypass checkbox starts unchecked and keeps a tick", () => {
@@ -194,9 +215,9 @@ test("with no model the Effort control lists the request's efforts", () => {
 });
 
 test("the efforts of a request are not drawn when it lists models", () => {
-  const found = controls(setupBlocks("id", drawn(MODELS, { efforts: ["brief"] }), DEFAULT_CHOICE));
+  const found = controls(setupBlocks("id", drawn(MODELS, { efforts: ["extra"] }), DEFAULT_CHOICE));
   const values = (found[SETUP_EFFORT] as Json).options.map((o: Json) => o.value);
-  assert.ok(!values.includes("brief"));
+  assert.ok(!values.includes("extra"));
 });
 
 test("with no model, no efforts and no bypass the row holds Start alone", () => {
@@ -216,15 +237,15 @@ test("an untouched form reads as all defaults", () => {
 });
 
 test("each control is read back", () => {
-  assert.deepEqual(readChoice(state("opus", "high", true), MODELS), {
-    model: "opus",
-    effort: "high",
+  assert.deepEqual(readChoice(state("big", "full", true), MODELS), {
+    model: "big",
+    effort: "full",
     bypass: true,
   });
 });
 
 test("an effort the model does not support reads as default", () => {
-  assert.deepEqual(readChoice(state("haiku", "high"), MODELS), choice({ model: "haiku" }));
+  assert.deepEqual(readChoice(state("small", "full"), MODELS), choice({ model: "small" }));
 });
 
 test("a model the cli did not list reads as default", () => {
@@ -233,8 +254,8 @@ test("a model the cli did not list reads as default", () => {
 
 test("the summary names the model by its display name", () => {
   assert.equal(
-    summary(MODELS, { model: "opus", effort: "high", bypass: true }),
-    texts.fill(texts.SETUP_SUMMARY, { model: "Opus 5.5", effort: "high", bypass: "on" }),
+    summary(MODELS, { model: "big", effort: "full", bypass: true }),
+    texts.fill(texts.SETUP_SUMMARY, { model: "Big 2", effort: "full", bypass: "on" }),
   );
   assert.ok(summary(MODELS, DEFAULT_CHOICE).endsWith("Effort: Default · Bypass: off"));
 });

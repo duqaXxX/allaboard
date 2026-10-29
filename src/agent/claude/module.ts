@@ -4,6 +4,7 @@ import { isAbsolute } from "node:path";
 import type { Check, ModuleSetup } from "../../module-setup.ts";
 import { AgentConfigError, type AgentEntry } from "../seam.ts";
 import { ClaudeBackend, type ClaudeBackendOptions } from "./backend.ts";
+import { TOOL_NAMES, TOOLS } from "./tools.ts";
 
 // Claude Code's own variables the owner may set in the daemon's file; each reaches a thread's
 // session as written, and Claude Code judges its value. `BASH_DEFAULT_TIMEOUT_MS`, in
@@ -108,6 +109,9 @@ export function claudeSetup(home: string): ModuleSetup {
   };
 }
 
+/** The heading of this module's section of `docs/limits.md`. */
+export const LIMITS_HEADING = "Limits of the Claude Agent SDK";
+
 /**
  * The entry that builds the Claude back end. `options` are what a test replaces: the SDK's
  * query, the owner's home, the usage probe's start.
@@ -116,6 +120,9 @@ export function claudeAgent(options: ClaudeBackendOptions = {}): AgentEntry {
   return {
     required: [],
     optional: VARIABLES,
+    tools: TOOLS,
+    toolNames: TOOL_NAMES,
+    limitsHeading: LIMITS_HEADING,
     executable: "claude",
     setup: () => claudeSetup(options.home ?? homedir()),
     build: (context) => {

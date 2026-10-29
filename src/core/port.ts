@@ -33,7 +33,7 @@ export type ApprovalsPort = RequestsApprovals;
 export type HoldsPort = RequestsHolds;
 
 /** What a provider reads of the agent. */
-export type AgentPort = HomeAgent & Pick<AgentBackend, "name" | "words">;
+export type AgentPort = HomeAgent & Pick<AgentBackend, "name" | "words" | "tools">;
 
 /** What a provider reads of the cleanup: a way to ask for a pass now. */
 export type { CleanupPage } from "./port/cleanup.ts";
@@ -113,7 +113,7 @@ export type { FooterField, FooterKey } from "./footer.ts";
 export { footerFields, formatWorkDuration, valueWithDetail } from "./footer.ts";
 export type { Instance } from "./instance.ts";
 export { Fold, shownPreview } from "./reply/fold.ts";
-export { proposedPlan } from "./reply/previews.ts";
+export { Previews } from "./reply/previews.ts";
 export { formatDuration } from "./reply/renderer.ts";
 export type { Tail, TailEntry } from "./reply/tail.ts";
 export { isLast, isOvertaken, tails } from "./reply/tail.ts";

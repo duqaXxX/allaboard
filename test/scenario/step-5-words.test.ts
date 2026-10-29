@@ -170,7 +170,7 @@ test("an agent command typed with ! reaches the agent as the command it names", 
 
   await world.owner.says(world.channel, "!echo hello there", { thread });
   await world.ended(thread, 2);
-  assert.equal(world.prompts().at(-1), "/echo hello there");
+  assert.equal(world.prompts().at(-1), ":echo hello there");
   assert.equal(world.shown(thread).at(-1), `hello there\nworked · full · ${world.folder}`);
   await world.finish();
 });

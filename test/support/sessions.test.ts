@@ -27,7 +27,6 @@ import {
 const OPTIONS: StartOptions = {
   folder: "/project",
   resume: null,
-  settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
 };
