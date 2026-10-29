@@ -77,7 +77,7 @@ export function channelStatus(deps: FlowDeps, talk: Talk): ChannelStatus {
       }
       activity = texts.STATUS_CHANNEL_IDLE + since;
     }
-    const mark = chat.capabilities.reactions ? chat.statusMark?.(status) : undefined;
+    const mark = chat.capabilities.rootStatus ? chat.statusMark?.(status) : undefined;
     let line =
       mark === undefined
         ? fill(texts.STATUS_CHANNEL_ROW, { link: linked, activity })

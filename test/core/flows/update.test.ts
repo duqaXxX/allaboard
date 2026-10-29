@@ -859,7 +859,7 @@ test("a message in a thread is told in that thread", async (t) => {
 
 test("a message of the channel is told in the channel: its thread has no reply yet", async (t) => {
   // A chat may show a line for the owner alone in a thread only once that thread is active
-  // (Slack's `chat.postEphemeral` reference), and a message of the channel has none yet.
+  // (as a line shown to the owner alone does), and a message of the channel has none yet.
   const { world, updates } = await updating(t);
   await updates.check();
   const first = await world.opened("hello");

@@ -17,7 +17,7 @@ export const NAMES: Names = {
   newSession: ["clear", "reset", "new"],
 };
 
-/** The plain agent's names (`PLAIN_WORDS`), for the tests of the core and the chat. */
+/** The plain agent's names (`PLAIN_WORDS`) with Slack's, for the tests of the Slack provider. */
 export const PLAIN_NAMES: Names = {
   agent: "Plain",
   author: "Plain",
@@ -28,3 +28,6 @@ export const PLAIN_NAMES: Names = {
   logout: "signout",
   newSession: ["restart"],
 };
+
+/** The plain agent's names with the memory chat's, for the tests of the core. */
+export const MEMORY_NAMES: Names = { ...PLAIN_NAMES, chat: "Memory chat" };

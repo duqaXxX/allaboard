@@ -75,15 +75,15 @@ export interface ThreadState {
   /** The level the owner set by command; null when unset or set back to the default. */
   readonly effort: string | null;
   // Crash repair, each an id only, never message content:
-  // the ts of every open reply's last message (more than one can be open at once: a background
+  // the id of every open reply's last message (more than one can be open at once: a background
   // task's own reply can outlive the turn that started it). Each `ReplySink` owns one entry:
   // added on its first message, replaced on a continuation, removed once its final write is
   // known to have landed. A sink that gave up on that write leaves its entry: the next start's
   // crash repair (`repairCrash`) finishes the message and removes it.
   readonly openReplies: readonly string[];
-  /** ts of every approval, question, setup form or same-folder hold request still carrying buttons. */
+  /** Id of every approval, question, setup form or same-folder hold request still carrying buttons. */
   readonly requests: readonly string[];
-  // The kind of each request, by its ts. An entry written before the kinds existed has none; the
+  // The kind of each request, by its message id. An entry written before the kinds existed has none; the
   // repair treats it as a request to delete.
   readonly requestKinds: Readonly<Record<string, RequestKind>>;
   // The root's status while it is working or waiting; cleared once done or error is requested.
@@ -217,8 +217,9 @@ function parseRestartNotice(value: unknown): RestartNotice | null {
   return { channel, message, version };
 }
 
-// Files written before the words were stored hold the name of the reaction that showed each
-// status. They are read as the word they stand for; no file is rewritten for it.
+// Files written before the words were stored hold the name of the emoji that showed each status.
+// They are read as the word they stand for; no file is rewritten for it. This reads the values an
+// older file holds: a file-format migration, not a rule of any chat.
 const LEGACY_STATUS: ReadonlyMap<string, SessionStatus> = new Map<string, SessionStatus>([
   ["hourglass_flowing_sand", "working"],
   ["raised_hand", "waiting"],
@@ -233,7 +234,7 @@ const STATUS_WORDS: ReadonlySet<unknown> = new Set<SessionStatus>([
   "error",
 ]);
 
-/** A stored status as a word: a word as it is, a reaction name of an older file as its word. */
+/** A stored status as a word: a word as it is, an emoji name of an older file as its word. */
 function statusOrNull(value: unknown): SessionStatus | null {
   if (typeof value !== "string") return null;
   if (STATUS_WORDS.has(value)) return value as SessionStatus;
@@ -327,8 +328,8 @@ function shown(threads: ReadonlyMap<string, ThreadState>): Map<string, string> {
   return new Map(
     // Whether the thread asks the owner (`asksOwner`) too, which the channel's line shows: the
     // root's status is written before the request it waits on.
-    [...threads].map(([ts, t]) => [
-      ts,
+    [...threads].map(([id, t]) => [
+      id,
       JSON.stringify([
         t.sessionId,
         t.status,
@@ -398,7 +399,7 @@ export class StateStore {
   private channelsById: Map<string, ChannelRecord>;
   private modules: StateModules | null;
   // Called after a write that changed which channels are bound, which threads exist, the
-  // session one holds, or a root's reaction: what the session index is built from. It is
+  // session one holds, or a root's status: what the session index is built from. It is
   // given the (channelId, threadId) of each thread the write touched. Never while loading.
   onSessionsChange: SessionsChange | null = null;
   // The version of the update the owner was last told of: a top-level key beside
@@ -591,22 +592,22 @@ export class StateStore {
   }
 
   /**
-   * One `ReplySink`'s own entry in the open-replies list (crash repair): drop `oldTs` (if it
-   * was there), add `newTs` (if not already there), in one write. A no-op for a thread that
+   * One `ReplySink`'s own entry in the open-replies list (crash repair): drop `oldId` (if it
+   * was there), add `newId` (if not already there), in one write. A no-op for a thread that
    * does not exist, and for a call that changes nothing (both ends of a fresh sink's first
-   * message, `oldTs=null, newTs=null`, would otherwise still write).
+   * message, `oldId=null, newId=null`, would otherwise still write).
    */
   replaceOpenReply(
     channelId: string,
     threadId: string,
-    oldTs: string | null,
-    newTs: string | null,
+    oldId: string | null,
+    newId: string | null,
   ): void {
     const current = this.thread(channelId, threadId);
     if (current === null) return;
     let replies = current.openReplies;
-    if (oldTs !== null && replies.includes(oldTs)) replies = replies.filter((t) => t !== oldTs);
-    if (newTs !== null && !replies.includes(newTs)) replies = [...replies, newTs];
+    if (oldId !== null && replies.includes(oldId)) replies = replies.filter((t) => t !== oldId);
+    if (newId !== null && !replies.includes(newId)) replies = [...replies, newId];
     if (
       replies.length !== current.openReplies.length ||
       replies.some((t, i) => t !== current.openReplies[i])
@@ -619,13 +620,13 @@ export class StateStore {
    * Record a request message still carrying buttons, with its kind (crash repair); a no-op for a
    * thread that does not exist or already has it.
    */
-  addRequest(channelId: string, threadId: string, messageTs: string, kind: RequestKind): void {
+  addRequest(channelId: string, threadId: string, messageId: string, kind: RequestKind): void {
     const current = this.thread(channelId, threadId);
-    if (current !== null && !current.requests.includes(messageTs)) {
+    if (current !== null && !current.requests.includes(messageId)) {
       this.setThread(channelId, threadId, {
         ...current,
-        requests: [...current.requests, messageTs],
-        requestKinds: { ...current.requestKinds, [messageTs]: kind },
+        requests: [...current.requests, messageId],
+        requestKinds: { ...current.requestKinds, [messageId]: kind },
       });
     }
   }
@@ -634,11 +635,11 @@ export class StateStore {
    * Drop a decided or removed request from the list (crash repair); a no-op if it is not there,
    * including for a thread that does not exist.
    */
-  removeRequest(channelId: string, threadId: string, messageTs: string): void {
+  removeRequest(channelId: string, threadId: string, messageId: string): void {
     const current = this.thread(channelId, threadId);
-    if (current?.requests.includes(messageTs)) {
-      const remaining = current.requests.filter((t) => t !== messageTs);
-      const { [messageTs]: _gone, ...kinds } = current.requestKinds;
+    if (current?.requests.includes(messageId)) {
+      const remaining = current.requests.filter((t) => t !== messageId);
+      const { [messageId]: _gone, ...kinds } = current.requestKinds;
       this.setThread(channelId, threadId, {
         ...current,
         requests: remaining,
@@ -679,7 +680,7 @@ export class StateStore {
   /**
    * Clear a thread's crash-repair fields together, once it has been repaired (or repair failed
    * for good and was logged); a no-op if already clear or the thread is gone. With `keepOpen`
-   * the open replies and the root's status stay: an answer never reached Slack, and the next
+   * the open replies and the root's status stay: an answer never reached the chat, and the next
    * start's repair still has to close it and say so.
    */
   clearRepair(

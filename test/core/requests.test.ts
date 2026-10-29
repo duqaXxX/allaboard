@@ -3,8 +3,8 @@ import { test } from "node:test";
 import type { Question, QuestionAnswer } from "../../src/agent/seam.ts";
 import { APPROVE, Approvals, answerOf, DENY, toAnswer } from "../../src/core/requests.ts";
 import { DENY_MESSAGE, named, SKIP_MESSAGE } from "../../src/core/texts.ts";
-import { CHANNEL, OTHER_CHANNEL, OTHER_THREAD, THREAD } from "../support/fake-slack.ts";
-import { PLAIN_NAMES } from "../support/names.ts";
+import { CHANNEL, OTHER_CHANNEL, OTHER_THREAD, THREAD } from "../support/ids.ts";
+import { MEMORY_NAMES } from "../support/names.ts";
 
 const TWO: readonly Question[] = [
   {
@@ -28,7 +28,7 @@ const TWO: readonly Question[] = [
 ];
 
 test("questions are read by id, only from the thread the request was posted in", () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [approvalId] = approvals.open(CHANNEL, THREAD, "q", TWO);
   assert.deepEqual(approvals.questions(approvalId, CHANNEL, THREAD), TWO);
   assert.equal(approvals.questions(approvalId, OTHER_CHANNEL, THREAD), null);
@@ -37,7 +37,7 @@ test("questions are read by id, only from the thread the request was posted in",
 });
 
 test("a request with no questions, or an empty list of them, has none to read", () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [permission] = approvals.open(CHANNEL, THREAD, "Bash: ls");
   const [empty] = approvals.open(CHANNEL, THREAD, "q", []);
   assert.equal(approvals.questions(permission, CHANNEL, THREAD), null);
@@ -45,14 +45,14 @@ test("a request with no questions, or an empty list of them, has none to read", 
 });
 
 test("a request that is gone has no questions to read", () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [approvalId] = approvals.open(CHANNEL, THREAD, "q", TWO);
   approvals.discard(approvalId);
   assert.equal(approvals.questions(approvalId, CHANNEL, THREAD), null);
 });
 
 test("resolve only in the same channel and thread and only once", async () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [approvalId, pending] = approvals.open(CHANNEL, THREAD, "Bash: ls");
   assert.equal(approvals.resolve(approvalId, OTHER_CHANNEL, THREAD, APPROVE), null);
   assert.equal(approvals.resolve(approvalId, CHANNEL, OTHER_THREAD, APPROVE), null);
@@ -62,7 +62,7 @@ test("resolve only in the same channel and thread and only once", async () => {
 });
 
 test("deny all releases every pending request of the same thread", async () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [, a] = approvals.open(CHANNEL, THREAD, "a");
   const [, b] = approvals.open(CHANNEL, THREAD, "b");
   const [, otherThread] = approvals.open(CHANNEL, OTHER_THREAD, "c");
@@ -70,8 +70,8 @@ test("deny all releases every pending request of the same thread", async () => {
   const [, question] = approvals.open(CHANNEL, THREAD, "q", TWO);
   const denied = approvals.denyAll(CHANNEL, THREAD);
   assert.deepEqual(new Set(denied.map((p) => p.title)), new Set(["a", "b", "q"]));
-  assert.deepEqual(await a.decision, { allow: false, message: named(DENY_MESSAGE, PLAIN_NAMES) });
-  assert.deepEqual(await b.decision, { allow: false, message: named(DENY_MESSAGE, PLAIN_NAMES) });
+  assert.deepEqual(await a.decision, { allow: false, message: named(DENY_MESSAGE, MEMORY_NAMES) });
+  assert.deepEqual(await b.decision, { allow: false, message: named(DENY_MESSAGE, MEMORY_NAMES) });
   // A question is told it was dismissed, as the Skip button tells it.
   assert.deepEqual(await question.decision, { answered: false, message: SKIP_MESSAGE });
   assert.equal(otherThread.decided, false);
@@ -79,12 +79,12 @@ test("deny all releases every pending request of the same thread", async () => {
 });
 
 test("pending in reads a thread s requests without resolving them", () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [aId, a] = approvals.open(CHANNEL, THREAD, "a");
   const [, otherThread] = approvals.open(CHANNEL, OTHER_THREAD, "c");
   approvals.posted(aId, "ts-a");
   const seen = approvals.pendingIn(CHANNEL, THREAD);
-  assert.deepEqual(new Set(seen.map((p) => [p.title, p.messageTs].join("|"))), new Set(["a|ts-a"]));
+  assert.deepEqual(new Set(seen.map((p) => [p.title, p.messageId].join("|"))), new Set(["a|ts-a"]));
   assert.equal(a.decided, false);
   assert.equal(otherThread.decided, false);
   // A no-op read: the same request is still there, and still answerable, afterward.
@@ -96,7 +96,7 @@ test("pending in reads a thread s requests without resolving them", () => {
 });
 
 test("ids are unguessable and unique", () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const ids = new Set(Array.from({ length: 100 }, () => approvals.open(CHANNEL, THREAD, "t")[0]));
   assert.equal(ids.size, 100);
   assert.ok([...ids].every((id) => id.length >= 16));
@@ -125,35 +125,35 @@ test("a pick that names no option is refused", () => {
 });
 
 test("the owner's decision becomes the seam's answer", () => {
-  assert.deepEqual(toAnswer(APPROVE, null, PLAIN_NAMES), { allow: true });
-  assert.deepEqual(toAnswer(DENY, null, PLAIN_NAMES), {
+  assert.deepEqual(toAnswer(APPROVE, null, MEMORY_NAMES), { allow: true });
+  assert.deepEqual(toAnswer(DENY, null, MEMORY_NAMES), {
     allow: false,
-    message: named(DENY_MESSAGE, PLAIN_NAMES),
+    message: named(DENY_MESSAGE, MEMORY_NAMES),
   });
   const answered = toAnswer(
     { kind: "answer", answers: { Q: "A" }, notes: {} },
     TWO,
-    PLAIN_NAMES,
+    MEMORY_NAMES,
   ) as QuestionAnswer;
   assert.deepEqual(answered, { answered: true, answers: { Q: "A" }, notes: {} });
   // Skip on a question names the dismissal, not the denial.
-  assert.deepEqual(toAnswer(DENY, TWO, PLAIN_NAMES), { answered: false, message: SKIP_MESSAGE });
+  assert.deepEqual(toAnswer(DENY, TWO, MEMORY_NAMES), { answered: false, message: SKIP_MESSAGE });
 });
 
 test("a request decided before its message is known says so", () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [approvalId] = approvals.open(CHANNEL, THREAD, "Bash: ls");
   approvals.denyAll(CHANNEL, THREAD); // !stop while the request was being posted
-  assert.equal(approvals.posted(approvalId, "1790000000.000001"), false);
+  assert.equal(approvals.posted(approvalId, "msg-1"), false);
   const [liveId, pending] = approvals.open(CHANNEL, THREAD, "Bash: ls");
-  assert.equal(approvals.posted(liveId, "1790000000.000002"), true);
-  assert.equal(pending.messageTs, "1790000000.000002");
+  assert.equal(approvals.posted(liveId, "msg-2"), true);
+  assert.equal(pending.messageId, "msg-2");
 });
 
 // The bookkeeping of the pending requests.
 
 test("a discarded request is gone", () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [approvalId, pending] = approvals.open(CHANNEL, THREAD, "a");
   assert.equal(approvals.get(approvalId), pending);
   approvals.discard(approvalId);
@@ -162,7 +162,7 @@ test("a discarded request is gone", () => {
 });
 
 test("a resolved request is removed and its answer is the seam s", async () => {
-  const approvals = new Approvals(PLAIN_NAMES);
+  const approvals = new Approvals(MEMORY_NAMES);
   const [approvalId, pending] = approvals.open(CHANNEL, THREAD, "q", TWO);
   approvals.resolve(approvalId, CHANNEL, THREAD, {
     kind: "answer",

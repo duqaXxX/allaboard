@@ -445,7 +445,7 @@ test("an agent that declares no optional capability runs a whole turn", async (t
 const STATUS_MEMBERS = ["showStatus", "clearStatus", "settleStatus"];
 
 test("reactions off: no status is shown, cleared or settled, and the stored one is kept", async (t) => {
-  const h = harnessFor(t, { chatCapabilities: { reactions: false } })({
+  const h = harnessFor(t, { chatCapabilities: { rootStatus: false } })({
     turns: [sdkMessages("tools")],
   });
   const session = h.session();
@@ -460,7 +460,7 @@ test("reactions off: no status is shown, cleared or settled, and the stored one 
 });
 
 test("reactions off: a hold that is cancelled clears no status", async (t) => {
-  const h = harnessFor(t, { chatCapabilities: { reactions: false } })({});
+  const h = harnessFor(t, { chatCapabilities: { rootStatus: false } })({});
   const session = h.session();
   session.holdStart();
   await session.holdEnd({ continued: false });
@@ -469,7 +469,7 @@ test("reactions off: a hold that is cancelled clears no status", async (t) => {
 });
 
 test("reactions on: the status is shown through the chat", async (t) => {
-  const h = harnessFor(t, { chatCapabilities: { reactions: true } })({
+  const h = harnessFor(t, { chatCapabilities: { rootStatus: true } })({
     turns: [sdkMessages("tools")],
   });
   const session = h.session();

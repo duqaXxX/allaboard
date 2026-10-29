@@ -341,7 +341,8 @@ export const TASKS_LAUNCHED = "**{n} background tasks launched**";
 // mechanical`, which `ctrl+o` opens on the report (captured 2026-10-24 on Claude Code 2.1.310).
 // The card opens and closes as the chat draws it; the report is its body.
 export const MESSAGE_FROM = "Message from {name}";
-// How much of a subagent's words the message keeps.
+// How much of a subagent's words the message keeps: the core's own choice (set with the card,
+// #53, 2026-10-24), not a limit of any chat; a chat cuts what its own message cannot hold.
 export const MESSAGE_LIMIT = 1500;
 // The terminal's words for a subagent that ended its turn while work it started in the background
 // still runs: `Agent "<description>" is waiting on its own background work · 13s` (captured
@@ -447,14 +448,8 @@ export const PLAN_OFF_THREAD = "Plan mode is off in this session.";
 export const STOPPED = "Stopped the current turn.";
 // An answered question, as the terminal keeps it in the transcript.
 export const ANSWERED = naming("User answered {author}'s questions:");
-// Slack drops plain spaces at the start of a line; no-break spaces stay and make the indent.
-export const NESTED = `${"\u00a0".repeat(4)}⎿ `;
 export const STOPPED_CHANNEL = "Stopped what was running in this channel.";
-// The thread's status line while a restart waits for background tasks only, and the same after
-// the app's name. Never a message: it would notify and stay in the thread after the restart.
-export const RESTART_WAITS = "Restart waits for {counts} · !stop ends {them} now";
-export const RESTART_WAITS_STATUS = "is waiting to restart: {counts} still running";
-// The same as a message, only where Slack refuses the app a thread status.
+// The same as a message, only where the chat refuses the app an activity line.
 export const RESTART_WAITS_MESSAGE =
   "allaboard is restarting once these background tasks end: {counts}. `!stop` ends them now.";
 export const NOTHING_TO_STOP = "Nothing is running in this channel.";
@@ -610,21 +605,9 @@ export const STATUS_LOOP = "Loop `{cadence}`: {prompt}";
 export const STATUS_WORKING = "Working in: `{directory}`";
 // The count `!status` adds to a session's row.
 export const RUNNING = "⏳ {counts}";
-// Slack's status line under a thread's last message. A client shows the
-// loading message: `THREAD_WORKING` while a prompt of the owner's is owed its answer and while
-// the agent says it works.
-// `STILL_RUNNING` is the terminal's words for a task that outlives its turn (`· 1 shell still
-// running`, Claude Code 2.1.287, read 2026-10-02), and the title of the list of what still runs,
-// with no hourglass: an emoji draws large and grey in a status line (seen on desktop,
-// 2026-10-02). `THREAD_WORKING_STATUS` says the same
-// after the app's name, which is what a client that draws `<app name> <status>` shows
-// (measured 2026-10-02, desktop and iOS).
-export const THREAD_WORKING = "Working…";
-// The terminal's words while it compacts (`Compacting conversation`, read in the CLI 2.1.292).
-export const THREAD_COMPACTING = "Compacting conversation…";
-export const THREAD_COMPACTING_STATUS = "is compacting the conversation…";
+// The terminal's words for a task that outlives its turn (`· 1 shell still running`, Claude Code
+// 2.1.287, read 2026-10-02), and the title of the list of what still runs, with no hourglass.
 export const STILL_RUNNING = "{counts} still running";
-export const THREAD_WORKING_STATUS = "is working…";
 export const ACTIVITY_BUSY = "running a turn, {queued} queued";
 // `!status` sent to the channel (top-level, or a thread that holds no session): the channel's
 // folder, then one line per live session, each with a link to its thread.

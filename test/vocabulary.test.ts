@@ -36,7 +36,17 @@ export function moduleDirectories(src: string): string[] {
 }
 
 // What only one module has, besides its name: its libraries and what its chat or agent calls things.
-const MODULE_WORDS = ["anthropic", "bolt", "threadTs", "mrkdwn", "modal", "ephemeral", "emoji"];
+const MODULE_WORDS = [
+  "anthropic",
+  "bolt",
+  "threadTs",
+  "messageTs",
+  "workspace",
+  "mrkdwn",
+  "modal",
+  "ephemeral",
+  "emoji",
+];
 
 /** The words of the modules under `src`: the name of each, and `MODULE_WORDS`. */
 export function wordsOf(src: string): string[] {
@@ -119,27 +129,40 @@ test("no source file outside the modules and the registry names an agent or a ch
 const TESTS = import.meta.dirname;
 
 /** The relative specifiers a file imports, resolved against its own folder. */
-function importedBy(path: string): string[] {
-  const specifiers = [
-    ...readFileSync(path, "utf8").matchAll(/(?:from|import\(?)\s*["']([^"']+)["']/g),
-  ].map((match) => match[1] as string);
-  return specifiers.filter((s) => s.startsWith(".")).map((s) => join(path, "..", s));
+function importedBy(path: string): { target: string; typeOnly: boolean }[] {
+  const text = readFileSync(path, "utf8");
+  // An `import type` statement is erased: it reaches no value of the file it names.
+  const types = new Set(
+    [...text.matchAll(/import\s+type\b[^;]*?from\s*["']([^"']+)["']/g)].map(
+      (match) => match[1] as string,
+    ),
+  );
+  const specifiers = [...text.matchAll(/(?:from|import\(?)\s*["']([^"']+)["']/g)].map(
+    (match) => match[1] as string,
+  );
+  return specifiers
+    .filter((s) => s.startsWith("."))
+    .map((s) => ({ target: join(path, "..", s), typeOnly: types.has(s) }));
 }
 
 /**
- * The files under `test/<layer>/` that reach a file of an agent module, as the `src/` path of
- * the first module file on the way. A file reaches a module by importing it, or by importing a
- * file under `test/` or `src/` that does, at any depth: the indirect path through `test/support/`
- * hid the Claude harness from the first version of this guard, and the one through
- * `src/registry.ts` or `src/main.ts`, which import the modules, hid their callers from the second.
- * A bare `import "./x.ts"` counts as an import.
+ * The files under `test/<layer>/` that reach a file of a module of `kind` (`agent` or `chat`),
+ * as the `src/` path of the first module file on the way. A file reaches a module by importing
+ * it, or by importing a file under `test/` or `src/` that does, at any depth: the indirect path
+ * through `test/support/` hid the Claude harness from the first version of this guard, and the
+ * one through `src/registry.ts` or `src/main.ts`, which import the modules, hid their callers
+ * from the second. A bare `import "./x.ts"` counts as an import. A `wiring` file (a `src/`
+ * path) is not followed when it is reached through one of the importers listed for it, or by an
+ * `import type`; any other import of it is followed.
  */
-export function importingAgentModules(
+export function importingModules(
+  kind: "agent" | "chat",
   tests: string,
   src: string,
   layers: readonly string[],
+  wiring: Readonly<Record<string, readonly string[]>> = {},
 ): string[] {
-  const homes = moduleDirectories(src).filter((home) => home.startsWith("agent/"));
+  const homes = moduleDirectories(src).filter((home) => home.startsWith(`${kind}/`));
   const reached = new Map<string, boolean>();
   function reaches(path: string, seen: Set<string>): boolean {
     const known = reached.get(path);
@@ -147,10 +170,13 @@ export function importingAgentModules(
     if (seen.has(path)) return false;
     seen.add(path);
     let found = false;
-    for (const target of importedBy(path)) {
+    const importer = relative(src, path).split(sep).join("/");
+    for (const { target, typeOnly } of importedBy(path)) {
       const inSrc = relative(src, target).split(sep).join("/");
       if (!inSrc.startsWith("..") && homes.some((home) => inSrc.startsWith(home))) {
         found = true;
+      } else if (inSrc in wiring && (typeOnly || wiring[inSrc]?.includes(importer))) {
+        continue;
       } else if ((target.startsWith(tests) || target.startsWith(src)) && existsSync(target)) {
         found = reaches(target, seen);
       }
@@ -198,7 +224,7 @@ test("the scan finds the files that reach an agent module, whatever its name and
   writeFileSync(join(root, "tests/core/d.test.ts"), 'import { o } from "../support/outer.ts";');
   writeFileSync(join(root, "tests/core/e.test.ts"), 'import { c } from "../support/clean.ts";');
   assert.deepEqual(
-    importingAgentModules(join(root, "tests"), join(root, "src"), ["core", "chat"]),
+    importingModules("agent", join(root, "tests"), join(root, "src"), ["core", "chat"]),
     ["chat/x/c.test.ts", "core/a.test.ts", "core/d.test.ts"],
   );
 });
@@ -228,7 +254,7 @@ test("the scan follows an import through a source file and finds a bare import",
     join(root, "tests/core/clean.test.ts"),
     'import { y } from "../../src/core/plain.ts";',
   );
-  assert.deepEqual(importingAgentModules(join(root, "tests"), join(root, "src"), ["core"]), [
+  assert.deepEqual(importingModules("agent", join(root, "tests"), join(root, "src"), ["core"]), [
     "core/bare.test.ts",
     "core/via-core.test.ts",
     "core/via-registry.test.ts",
@@ -242,7 +268,101 @@ test("the scan follows an import through a source file and finds a bare import",
 // the top-level tests of the daemon, none of which is under a guarded layer. A test of the core
 // that needs a stream or a vocabulary of one agent therefore lives under `test/agent/<module>/`.
 test("no test of the core or the chat reaches an agent module, directly or through a support file", () => {
-  assert.deepEqual(importingAgentModules(TESTS, SRC, ["core", "chat"]), []);
+  assert.deepEqual(importingModules("agent", TESTS, SRC, ["core", "chat"]), []);
+});
+
+test("the scan keeps the two kinds of module apart, whatever their names", () => {
+  const root = mkdtempSync(join(tmpdir(), "allaboard-imports-"));
+  for (const directory of [
+    "src/agent/codex",
+    "src/chat/discord",
+    "tests/core",
+    "tests/scenario",
+    "tests/support",
+  ]) {
+    mkdirSync(join(root, directory), { recursive: true });
+  }
+  const client = 'import { c } from "../../src/chat/discord/client.ts";';
+  writeFileSync(join(root, "tests/support/fake-discord.ts"), client);
+  writeFileSync(join(root, "tests/core/direct.test.ts"), client);
+  writeFileSync(
+    join(root, "tests/core/indirect.test.ts"),
+    'import { f } from "../support/fake-discord.ts";',
+  );
+  writeFileSync(join(root, "tests/scenario/bare.test.ts"), 'import "../../src/chat/discord/x.ts";');
+  writeFileSync(
+    join(root, "tests/core/agent.test.ts"),
+    'import { a } from "../../src/agent/codex/a.ts";',
+  );
+  const tests = join(root, "tests");
+  const src = join(root, "src");
+  assert.deepEqual(importingModules("chat", tests, src, ["core", "scenario"]), [
+    "core/direct.test.ts",
+    "core/indirect.test.ts",
+    "scenario/bare.test.ts",
+  ]);
+  assert.deepEqual(importingModules("agent", tests, src, ["core", "scenario"]), [
+    "core/agent.test.ts",
+  ]);
+});
+
+test("a file listed as wiring is skipped only through its importers, and a direct import counts", () => {
+  const root = mkdtempSync(join(tmpdir(), "allaboard-imports-"));
+  for (const directory of ["src/agent", "src/chat/discord", "tests/scenario", "tests/core"]) {
+    mkdirSync(join(root, directory), { recursive: true });
+  }
+  writeFileSync(join(root, "src/registry.ts"), 'import { d } from "./chat/discord/module.ts";');
+  // The daemon is the importer the scenarios run, so the registry behind it is the wiring.
+  writeFileSync(join(root, "src/daemon.ts"), 'import { r } from "./registry.ts";');
+  writeFileSync(
+    join(root, "tests/scenario/world.ts"),
+    'import { run } from "../../src/daemon.ts";',
+  );
+  // A test that takes the registry itself can name a module through it.
+  writeFileSync(
+    join(root, "tests/scenario/direct-registry.ts"),
+    'import { REGISTRY } from "../../src/registry.ts";',
+  );
+  writeFileSync(
+    join(root, "tests/core/direct-registry.test.ts"),
+    'import { REGISTRY } from "../../src/registry.ts";',
+  );
+  // A type is erased: naming the registry's type reaches no module.
+  writeFileSync(
+    join(root, "tests/scenario/type-only.ts"),
+    'import type { Registry } from "../../src/registry.ts";',
+  );
+  writeFileSync(
+    join(root, "tests/scenario/direct.ts"),
+    'import { d } from "../../src/chat/discord/module.ts";',
+  );
+  const tests = join(root, "tests");
+  const src = join(root, "src");
+  assert.deepEqual(importingModules("chat", tests, src, ["scenario", "core"]), [
+    "core/direct-registry.test.ts",
+    "scenario/direct-registry.ts",
+    "scenario/direct.ts",
+    "scenario/type-only.ts",
+    "scenario/world.ts",
+  ]);
+  assert.deepEqual(
+    importingModules("chat", tests, src, ["scenario", "core"], { "registry.ts": ["daemon.ts"] }),
+    ["core/direct-registry.test.ts", "scenario/direct-registry.ts", "scenario/direct.ts"],
+  );
+});
+
+// The rule for the chat side (#129, invariant 9): a test under `test/core/` or `test/scenario/`
+// never reaches `src/chat/<module>/`, directly or through a support file such as
+// `test/support/fake-slack.ts`. A test of the core through a provider lives under
+// `test/chat/<module>/`; the core's tests use the memory chat and neutral ids.
+// The registry is the one source file meant to import every module, and a scenario runs the
+// daemon, which imports it: the scenarios pass their own registry, so the path through the daemon
+// is the wiring and not a reach. A test that imports the registry itself is not exempt: it could
+// name a module through `REGISTRY`. Only the registry's type is free.
+const WIRING = { "registry.ts": ["daemon.ts"] };
+
+test("no test of the core or the scenarios reaches a chat module", () => {
+  assert.deepEqual(importingModules("chat", TESTS, SRC, ["core", "scenario"], WIRING), []);
 });
 
 /** The tool names a vocabulary declares: its keys and list entries, never the input keys. */

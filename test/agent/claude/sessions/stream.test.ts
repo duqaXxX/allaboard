@@ -13,9 +13,9 @@ import {
 import { bannerText } from "../../../../src/chat/slack/reply/markdown.ts";
 import { STREAM_SECONDS } from "../../../../src/chat/slack/reply/sinks.ts";
 import { Status } from "../../../../src/chat/slack/reply/status.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { APPROVE } from "../../../../src/core/requests.ts";
 import { INJECTED_TURN_WAIT } from "../../../../src/core/sessions/constants.ts";
-import * as texts from "../../../../src/core/texts.ts";
 import {
   AsyncEvent,
   CHANNEL,
@@ -750,8 +750,8 @@ test("a prompt shows the thread status before claude writes anything", async (t)
   assert.deepEqual(call, {
     channel_id: CHANNEL,
     thread_ts: THREAD,
-    status: texts.THREAD_WORKING_STATUS,
-    loading_messages: [texts.THREAD_WORKING],
+    status: slackTexts.THREAD_WORKING_STATUS,
+    loading_messages: [slackTexts.THREAD_WORKING],
   });
   assert.deepEqual(writes(h), []); // the status is not a message
 });
@@ -761,7 +761,7 @@ test("the thread status is cleared when the turn ends", async (t) => {
   const turn = await h.session().submit("list the files");
   await turn.done.wait();
   await h.until(() => statuses(h).at(-1) === "");
-  assert.equal(statuses(h)[0], texts.THREAD_WORKING_STATUS);
+  assert.equal(statuses(h)[0], slackTexts.THREAD_WORKING_STATUS);
 });
 
 test("the thread status goes while an approval waits and comes back after it", async (t) => {
@@ -777,7 +777,7 @@ test("the thread status goes while an approval waits and comes back after it", a
   await turn.done.wait();
   await h.until(() => statuses(h).at(-1) === "");
   // shown again after the answer
-  assert.ok(statuses(h).slice(waiting).includes(texts.THREAD_WORKING_STATUS));
+  assert.ok(statuses(h).slice(waiting).includes(slackTexts.THREAD_WORKING_STATUS));
 });
 
 test("a task that outlives its turn is not counted by the thread status", async (t) => {
@@ -786,7 +786,7 @@ test("a task that outlives its turn is not counted by the thread status", async 
   const session = h.session();
   await (await session.submit("start it")).done.wait();
   await h.until(() => lines(h).at(-1) === ""); // the turn ended: nobody is owed an answer
-  assert.ok(lines(h)[0] === texts.THREAD_WORKING && session.runningKinds !== "");
+  assert.ok(lines(h)[0] === slackTexts.THREAD_WORKING && session.runningKinds !== "");
   assert.ok(!statuses(h).join().includes("still running"));
   // The count is a state of the thread, never a line of the reply's stream.
   const told = h.slack.apiCalls.flatMap((call) => (call.args.chunks ?? []) as JsonObject[]);
@@ -812,7 +812,7 @@ test("stop clears the thread status", async (t) => {
   const session = h.session();
   await session.submit("hello");
   await h.until(() => h.clients.length > 0 && h.clients.at(-1)?.queries.join() === "hello");
-  await h.until(() => statuses(h).join() === texts.THREAD_WORKING_STATUS);
+  await h.until(() => statuses(h).join() === slackTexts.THREAD_WORKING_STATUS);
   assert.equal(await session.stop(), true);
   await h.until(() => statuses(h).at(-1) === ""); // while the interrupt still winds down
 });

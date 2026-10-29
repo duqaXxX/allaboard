@@ -1,7 +1,7 @@
 /**
  * A `!word` that is no command, in a chat that suggests commands: the owner gets a field
  * holding what they typed and the commands it could mean, and nothing reaches the agent. Over the
- * memory chat; the Slack side is `test/agent/claude/slack-app/slack-app-suggest.test.ts`.
+ * memory chat; a provider's own side is tested under `test/chat/`.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

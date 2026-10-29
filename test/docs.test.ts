@@ -521,10 +521,13 @@ test("the readme stays a landing page", () => {
   );
 });
 
-// One `## Limits of ...` section per agent module, its heading declared by the module's entry
-// (`AgentEntry.limitsHeading`): a test reads the headings from the registry, so a module added
-// there has a section to write before the checks below pass.
-const AGENT_LIMITS = Object.values(REGISTRY.agents).map((entry) => entry.limitsHeading);
+// One `## Limits of ...` section per agent module and per chat module, its heading declared by
+// the module's entry (`AgentEntry.limitsHeading`, `ChatEntry.limitsHeading`): a test reads the
+// headings from the registry, so a module added there has a section to write before the checks
+// below pass.
+const MODULE_LIMITS = [...Object.values(REGISTRY.agents), ...Object.values(REGISTRY.chats)].map(
+  (entry) => entry.limitsHeading,
+);
 // Claude's section is the one the probe checks, with the recorded server info and its words.
 const CLAUDE_LIMITS = REGISTRY.agents.claude?.limitsHeading ?? "";
 
@@ -553,6 +556,25 @@ function limitsRows(heading: string): string[][] {
     );
 }
 
+// The page of a chat module is `docs/<registry name>-provider.md`, and architecture.md links to it:
+// the core's account stays neutral, so the provider's own calls and measurements need that page.
+test("each chat module has its provider page, and architecture.md links to it", () => {
+  const linked = new Set(
+    targetsOf(read(join(ROOT, "docs", "architecture.md"))).map((target) =>
+      resolve(ROOT, "docs", target.split("#")[0] ?? ""),
+    ),
+  );
+  assert.ok(Object.keys(REGISTRY.chats).length > 0);
+  for (const name of Object.keys(REGISTRY.chats)) {
+    const page = join(ROOT, "docs", `${name}-provider.md`);
+    assert.ok(existsSync(page), `${name}: docs/${name}-provider.md is missing`);
+    assert.ok(
+      linked.has(page),
+      `${name}: architecture.md does not link to docs/${name}-provider.md`,
+    );
+  }
+});
+
 test("the commands the daemon answers as not offered are the ones the page lists so", () => {
   // `!name` for one of them is answered by the daemon, so the two lists are one.
   const listed = [CLAUDE_LIMITS, "Choices of allaboard"].flatMap((heading) =>
@@ -579,11 +601,11 @@ test("a command listed as not offered is not in the recorded commands", () => {
   );
 });
 
-test("the page holds one Limits of section for each agent module, with at least one row", () => {
+test("the page holds one Limits of section for each agent and chat module, with at least one row", () => {
   const headings = [...read(LIMITS).matchAll(/^## (.+)$/gm)].map((m) => m[1] ?? "");
-  assert.ok(AGENT_LIMITS.length > 0);
-  assert.equal(new Set(AGENT_LIMITS).size, AGENT_LIMITS.length, "two modules share a heading");
-  for (const heading of AGENT_LIMITS) {
+  assert.ok(MODULE_LIMITS.length > 0);
+  assert.equal(new Set(MODULE_LIMITS).size, MODULE_LIMITS.length, "two modules share a heading");
+  for (const heading of MODULE_LIMITS) {
     assert.ok(heading.startsWith("Limits of "), `${heading}: not a Limits of heading`);
     assert.equal(headings.filter((found) => found === heading).length, 1, `${heading}: sections`);
     assert.ok(limitsRows(heading).length > 0, `${heading}: no row`);
@@ -593,7 +615,7 @@ test("the page holds one Limits of section for each agent module, with at least 
 test("every limit says whether an issue looks into it", () => {
   const headings = [...read(LIMITS).matchAll(/^## (.+)$/gm)].map((m) => m[1] ?? "");
   const tables = headings.filter((heading) => heading !== "Not checked");
-  for (const heading of AGENT_LIMITS) assert.ok(tables.includes(heading), heading);
+  for (const heading of MODULE_LIMITS) assert.ok(tables.includes(heading), heading);
   assert.ok(tables.length >= 4, `${headings}`);
   const issue = /^\[#(\d+)\]\(https:\/\/github\.com\/duqaXxX\/allaboard\/issues\/\1\)$/;
   for (const heading of tables) {

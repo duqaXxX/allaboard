@@ -63,6 +63,7 @@ import {
   type Tool,
 } from "../../../../src/chat/slack/reply/sinks.ts";
 import type { Task } from "../../../../src/chat/slack/reply/tasks.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import type { Clock } from "../../../../src/clock.ts";
 import { Cancelled } from "../../../../src/core/port.ts";
 import { TurnRenderer } from "../../../../src/core/reply/renderer.ts";
@@ -2234,7 +2235,7 @@ test("a stopped message shows the answers as one block", async () => {
   const zero = ZERO_WIDTH_SPACE;
   assert.equal(
     get(blocks[0], "elements", 0, "text"),
-    `✓ User answered Claude's questions:\n${texts.NESTED}· Colour? → &lt;b&gt; \`${zero}x\`${zero}`,
+    `✓ User answered Claude's questions:\n${slackTexts.NESTED}· Colour? → &lt;b&gt; \`${zero}x\`${zero}`,
   );
 });
 

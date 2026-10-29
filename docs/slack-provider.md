@@ -5,7 +5,9 @@ serves `!open`, publishes the session index on the app's Home tab, and handles w
 The core, the two seams, the sessions and the state file are in
 [architecture.md](architecture.md), which also defines the terms used here. A note of the form
 `measured: "..."` names a row of
-[Measured platform behaviour](architecture.md#measured-platform-behaviour).
+[Measured platform behaviour](#measured-platform-behaviour) below, or of the table of the same name in
+[architecture.md](architecture.md#measured-platform-behaviour) when the observation is about the SDK or
+Claude Code.
 
 ## Writing to Slack
 
@@ -67,11 +69,15 @@ leaves the pass running. `ReplySink.settle` then waits for what is in flight.
 
 ### Order, runs of calls and cards
 
+An answered question lists each answer under a line that starts with `NESTED` (`src/chat/slack/texts.ts`):
+four no-break spaces then `⎿`, since Slack drops the plain spaces at the start of a line.
+
 Within a reply, writes happen in the order things happen. Claude's text goes as `markdown_text`
 chunks. Tools go as `task_update` chunks, each a card Slack updates in place by its id.
 
-A run of calls, the calls between two pieces of text, shares one card (`fold.Fold`, fed by
-`ReplySink.task`), as the terminal draws one line for a run (captured on Claude Code 2.1.296).
+A run of calls, the calls between two pieces of text, shares one card (`Fold` in
+`src/chat/slack/reply/fold.ts`, fed by `ReplySink.task`: the folding is the Slack provider's own, since
+it rests on a card Slack updates in place), as the terminal draws one line for a run (captured on Claude Code 2.1.296).
 While a call of the run runs, the card is titled with it: the last call started that still runs,
 by the tool's name and its first argument, or by its description for a command
 (`Previews.described`). Calls that run at the same time show one at a time, and nothing shows of
@@ -565,7 +571,7 @@ the doc comments of the symbols named here.
 needs no event from the owner. It always publishes to the configured owner's user id. The page is
 the Slack provider's: `ChatProvider.index` is present, `main` asks
 it to refresh when `state.json`'s sessions change, and `Home` reads the core through the port
-(`CorePort.state`, `CorePort.agent`) alone.
+(`CorePort.state`, `CorePort.agent`) alone. It does not check the agent's `sessionListing` capability: it calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists. At start the daemon asks it for the first page (`Home.request`) and `ChannelLine.refresh` takes over each channel's line an earlier run left. Its Refresh control asks the core's cleanup of `state.json` (`CorePort.cleanup`).
 
 `Home.publish` reads the bound channels (`StateStore.channels`) and asks Slack for each one's name
 once per run (`conversations.info`); a channel Slack no longer has is left out with its threads. It
@@ -891,6 +897,11 @@ the same title again; any other refusal is retried at the next turn. `titleThrea
 `tagThread`, it asks the Home tab to read the root again whether it ended or was
 refused.
 
+The owner's words that `!status` shows (`ChatProvider.escape` as `words`) are left as written: its
+markdown block draws the owner's mentions as mentions and their code as code (an entity or a
+backslash escape would show literally inside a code span, measured 2026-10-20), and `!status`
+is a message only the owner sees, which never pushes, so a mention in it reaches no one.
+
 ### A deleted first message
 
 Two shapes of the `message` event say a message was deleted, both seen on 2026-10-20 when the
@@ -952,6 +963,8 @@ each bounded by the client's 30 seconds (`clients.REQUEST_TIMEOUT_MS`), so about
 message ahead with no network, plus the pause of the one connection retry and up to 60 seconds of `Retry-After`
 Slack sends; a message with none ahead waits for nothing. Other threads are not affected.
 The buttons and forms keep no such order: each names the message it answers.
+
+A clip whose transcript is in the file's `vtt` is the exception: `Clips.takeClip` hands it over after the download of that file, and a typed reply sent after it can be handed over first.
 
 | The owner | The listener reads | The core decides |
 |---|---|---|
@@ -1187,6 +1200,301 @@ so a command a new Claude Code release adds needs no change here. Bolt's per-req
 returns the identity `auth.test` gave at startup and no token, so no request costs an extra API call
 and Bolt builds no client of its own; its `ignoreSelf` filter and its conversation store are
 switched off, and what Bolt logs goes to the daemon's log.
+
+## Building the provider
+
+`module.slackChat` builds the Slack provider (its `build` reads the core only once it is used): the two Slack clients (`module.makeClients`: `clients.sharedClient` for every call but a
+reply's, `clients.repliesClient` for replies), `auth.test` for the workspace id and the bot
+user id, the `SlackChat` with the shared `UpdateLimiter` and the channels' `ChannelLine` (see "Pushes and threads" above), the `ThreadDeleter` when the owner's
+user token is configured (`module.deleter`, which calls `auth.test` with that token), the
+`Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
+"Attached files").
+
+The entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` and `SLACK_OWNER_USER_ID` and reads
+`SLACK_USER_TOKEN`. It refuses a token of the wrong kind in `module.slackChat`, before it calls Slack
+(`tokens.wrongKind`).
+
+`ChatProvider.identities` has two keys for Slack, because it has two tokens and Slack documents no call that maps the app-level token to its app: the bot (`<team id>:<bot user id>`, from `auth.test` on the bot token) and the app-level
+token Socket Mode connects with (`app-token:` and the SHA-256 of the token, computed in
+`module.appTokenKey` so that the token itself never leaves the Slack module).
+A copied `.env` that keeps either token collides on that key. The core takes the lock on each key (`lock.chatIdentityLocks`; see "State and the single-instance lock" in [architecture.md](architecture.md#state-and-the-single-instance-lock)).
+
+## The Socket Mode connection
+
+`SlackChat.start` opens the connection and builds the Bolt app with `app.buildApp`, which registers the listeners. Slack delivers an event over the connection, which Bolt's `SocketModeReceiver` holds (`app.socketReceiver`).
+
+`@slack/socket-mode` 3.1.0 reconnects from its `close` listener without awaiting the call
+(`SocketModeClient.delayReconnectAttempt`), and when Slack refuses the app token for good
+(`invalid_auth` and the four other codes the client calls unrecoverable) the request for a new
+WebSocket URL is rejected there with no event for it. The log then holds
+`unhandled rejection: invalid_auth`, and the daemon needs a working token and a restart.
+
+When the network is gone the Socket Mode client asks Slack for a new WebSocket URL again and
+again until it gets one. `app.socketReceiver` sets how: the waits start at one second, grow by
+1.3 each time, stop growing at `app.RECONNECT_WAIT_SECONDS` (60), and the client never gives up,
+so a try follows the one that failed by a minute at most. Left to itself `@slack/socket-mode`
+3.1.0 lets the wait grow with no limit: with the network gone for two hours it tried 30 times,
+the last wait 26 minutes (run on mocked timers, 2026-10-10). The log holds
+`socket mode: reconnecting`, then one warning per failed try.
+
+The Slack libraries are given loggers that never write their own text (`quiet-logger`), since it can quote a message and, at the debug level, the Socket Mode ticket in the WebSocket URL: the web clients write nothing, Bolt and the Socket Mode client one line per warning or error that names the library, and the daemon logs the states of the connection itself.
+
+## Stopping
+
+`ChatProvider.stop` (`SlackChat.stop`) closes the connection, tells the listeners it is stopping and gives up the clips still waiting for a transcript. `ChatProvider.close` publishes the session index a last time.
+
+From `ChatProvider.stop` the listeners' checks (`Answers.admitted`, or `Answers.fromOwner` and `Answers.channelAllowed` for a message) refuse, and nothing posts, reacts, opens a modal, submits a prompt or deletes a request.
+
+Node stays alive after a stop while anything holds its event loop, and the Socket Mode connection does: `@slack/socket-mode` 3.1.0 closed its WebSocket 5.9 seconds after the stop in each of three runs on 2026-10-10, with the lock already free.
+
+A thread left with only background tasks while a restart waits says `RESTART_WAITS` (`src/chat/slack/texts.ts`) in its status line. Where Slack refuses the app a thread status (`ThreadChat.activityRefused`), the core says it in one message (`texts.RESTART_WAITS_MESSAGE`).
+
+## Who may talk to it
+
+The Slack listeners run two checks, through `Answers.admitted` (the `message` listener, and Answer opening a question's
+form, run the two halves themselves, in the order [Slack handlers](slack-provider.md#slack-handlers)
+gives), before anything reaches Claude Code:
+
+1. `guards.isOwner`: the Slack user is the configured owner AND the workspace is the one `auth.test`
+   reported at startup. A click from a user whose home workspace differs is refused
+   (`guards.interactionActor`).
+2. `ChannelGuard.refusal`: the channel is private, not shared with another workspace, and its
+   members are exactly the owner and the bot. It is read from Slack every time, so inviting a third
+   person stops the bot in that channel at once. A channel that cannot be read is refused.
+
+A payload is read field by field, and a field of the wrong type never passes a check. Messages with
+a subtype (edits, deletions, joins) and messages from bots are ignored (`guards.isPromptMessage`),
+except `file_share`, a message carrying files, and `thread_broadcast`, a thread reply sent with
+**Also send to #channel**, which is handled as any reply in its thread. Neither event has a `team`
+field (measured: "File share event has no team", "Thread broadcast event has no team"), so
+`guards.messageActor` reads the workspace elsewhere. For a `file_share` it comes from the files'
+`user_team`, which must be the same for every file, or the message is refused. For a
+`thread_broadcast` it is the `team_id` of the envelope the event came in, and only when the
+envelope's `is_ext_shared_channel` is `false`: that id names the workspace the event happened in,
+not the writer's own, so in a channel shared outside the workspace the message is ignored. The
+channel check refuses such a channel in any case. A `team` that is present and is no string names no
+workspace: the message is refused, and neither the files nor the envelope are read in its place. A
+`thread_broadcast` that carries files follows the files' rule; no such event has been recorded. The
+hidden `message_changed` that Slack sends after a `thread_broadcast` is ignored like any edit. A
+refusal reaches the owner as an ephemeral message; everyone else gets nothing.
+
+A control of the session index (the Home tab) runs the first check alone. Its payload names no
+channel, and all it does is choose what the owner's own page shows, or delete what the owner
+confirmed there: nothing reaches Claude Code.
+
+A word typed inside a session's thread is answered by an ephemeral `Talk.say` under the owner's message (`chat.postEphemeral` with `thread_ts`), which Slack drops on reload. `!bypass` adds `Talk.acknowledge`, a ✅ reaction on the word, which stays. Slack shows a message only the user sees in a thread only once that thread is active (`chat.postEphemeral` and the messaging page, docs.slack.dev, read 2026-10-17), so a notice for a message of the channel goes to the channel; whether Slack notifies for one is not known.
+
+## Attached files
+
+`attachments` handles the files of a `file_share` message, in the Slack provider. The message
+reaches the core at once as an `InboundMessage` whose `content` downloads, checks and saves the
+files and makes the prompt; the message flow reads it when the message's turn among its thread's
+comes, so nothing of the files reaches Claude Code before that. Every file is checked first (`attachments.refusal`): its download URL must be
+`https://files.slack.com/...`, the only host that receives the bot token, and its type and size
+must be within the limits listed in [Files in a message](setup.md#files-in-a-message). The image
+limits are those of Claude's vision API; a non-image file must be a `text/*` type or one of
+`attachments.FILE_TYPES`. One message takes at most the images `attachments.imagesRefusal` allows,
+since images stay in the conversation and are sent again at every turn, and a request is capped at
+32 MB. Then the
+files are downloaded together, with the bot token and no redirect followed, each within
+`attachments.DOWNLOAD_TIMEOUT_MS`; `attachments.download` checks the host again before it sends the
+token. Slack answers 302 when the app lacks `files:read` (measured: "Download without files:read").
+An image becomes an image part, and the turn's prompt one user message of content parts
+(`attachments.promptFor`), which the back end sends through the SDK's streaming input
+(`prompt.userMessage`); any other file is saved to the instance's scratch folder (`ChatContext.scratchDir`, `$TMPDIR/allaboard/` for the default instance) and its path is appended to
+the prompt, but only once every file arrived, so a failed message leaves no copy. The folder must be
+a real directory of this user with no group or other permission bit set (it is created with mode 700),
+or nothing is written there; at each start the files older
+than 3 days are removed (`attachments.prepareUploads`), so a conversation resumed after a restart
+still finds its files. A refused file or a failed download sends nothing: `content` answers null after the provider told
+the owner which file and why.
+
+## Questions and the form
+
+The session puts a permission or a question to the owner through `ThreadChat.ask` (see "Approvals" in [architecture.md](architecture.md#approvals)); this is how the Slack provider draws it.
+
+Everything the model wrote (the title, the description, the input, a
+question's header) goes to Slack with `&`, `<` and `>` escaped and a zero-width space after each
+backtick (`escape.shownAsWritten`), so no `<url|label>` can hide what it links and no text can close
+its code block. 
+
+Answer opens a modal (`requests.questionView`) that shows one question at a time: radio buttons, or checkboxes when several may be picked, each option with its description, and
+**Other** as the last option of the list, as the terminal's list ends with its own row for a typed
+answer. The choice is required (no `optional`, so Slack shows no `(optional)` beside the question).
+While Other is chosen an input block under the choice, **Your answer** (required, placeholder
+`Type your own answer`), takes the text; **Notes** (optional) shows while a real option is
+chosen, not for Other alone (with a multi-select, while at least one real box is ticked, Other
+ticked or not), and a note kept in the draft is sent only then. Slack caps an option object's text and description at 75
+characters each and gives it no place for the option's `preview`. When an option says more than
+that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
+in bold, its full description, and its preview in a preformatted element, which keeps its line
+breaks. Rich text shows its text as written, so nothing Claude wrote is read as markup. The choice
+under them keeps the labels alone, titled with the question's header. With
+several questions the terminal's tab row is drawn as one `context` line: each question's header
+with `☒` once answered and `☐` before, cut at 40 characters, a header left empty reading
+`Question 2`, the page on screen in bold, then `✔ Submit` (bold on the review page). The modal's
+own button reads `Next (1/3)` and moves to the next page (`response_action: update`) only once the
+question has an answer, otherwise the question gets an error (`response_action: errors`), and, before
+the review was reached, it moves on whether or not the other questions already have one. On the last question it reads
+`Review`: it opens one more page of the same form (its page number is the question count) when
+every question has an answer, else the first question without one, with no error text. That page
+holds the tab row, `Review your answers`, and per question a section `● question` and `→ answer`
+(a multi-select's joined with `, `) and, when a real option was chosen and the question has notes,
+a line `Notes: …` under it, with an `Edit` button as the section's accessory (`question_edit_{n}`,
+one action id per question, since Slack wants them unique in a view); each text goes through
+`escape.shownAsWritten`, which escapes `&`, `<`, `>` and backticks (so `*` and `_` still format),
+and a section is cut to 3,000 characters before the escape, never inside one. `Edit` opens that
+question's page with its answers as stored, through `views.update` on the click's view id and
+`hash` (`Requests.onQuestionEdit`); the review page has no field, so nothing is absorbed or
+validated. The draft records that the review was reached (`Draft.reviewed`): from then on, and on
+a page opened by `Edit`, the footer reads `Review` and Next goes back to the review page when
+every question has an answer, else to the first one without. `Submit answers` alone sends. The
+modal's close button reads `Close` on every page. No question page has a button in its body (the review page has `Edit`). One question
+has none of this and its `Submit` sends.
+What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
+request id, with the page on screen; the
+view's `private_metadata` holds only the request's id, channel and thread, the form's generation
+and the page it shows (`requests.FormIds`), so Other and Notes take 300 characters each
+(`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
+valid: every Answer opens a new generation (Close then Answer, a second click, a second device),
+and the older forms are stale (a form whose `views.open` fails does not count: the older one
+stays valid). A stale form's changes and its Edit are ignored, and its Next or Submit answers
+`response_action: errors` with `texts.QUESTION_STALE` on the question's block (on the review page,
+which has no field, the form is replaced by that sentence) and sends nothing; a change from a page Next has already left, or an Edit from a page that is not the review, is ignored too. Every field of the valid form
+reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
+`dispatch_action`), and the draft is updated from it. Only a change of the choice redraws the
+form with `views.update` (Other's field and Notes come and go with it); typing never does. A
+block keeps its `block_id` (`q0`, `o0`, `n0`) while it stays on screen, so Slack keeps what is
+typed in it. An entry goes when its request is answered, skipped or found gone, at
+the next Answer for a request that ended another way, and when the app closes. Answer after Close
+reopens the form on the page left, with the pages already submitted and what each field of the
+open page held at its last change.
+
+A text kept in the draft is sent only while
+Other is chosen, and the Review page shows it as the answer. With nothing chosen Next and Submit
+show `Choose an option or type your own answer.` under the question; Other chosen with only
+spaces is a field error on the Other block. Next and Submit also compare the input blocks the
+payload's `view.blocks` lists (what is on screen) with the ones the draft draws, and answer
+`response_action: update` with the form drawn again, sending nothing, in two cases only: Other is
+chosen on the page and its field `o{page}` is not on screen (Slack's required check could not run
+on it), or the draft holds a note for the page, the form draws its field `n{page}` and it is not on
+screen. Any other difference sends what the draft holds, so a Next clicked before the redraw that
+adds Notes lands passes at once, and a field left on screen that the choice no longer needs (Other
+unticked, the redraw refused) is read but its text is not used while its choice is not. The
+reference for `view.state.values` does not say whether an empty input is listed (read 2026-10-16),
+so the state is not used for this. A note kept in the
+draft is not sent without an answer, and the Review page does not show it either. 
+
+The modal carries no channel or thread: each click in it is checked against the
+owner, the workspace, and the channel and thread its request was posted in (`requests.FormIds` in its
+`private_metadata`; the draft is never in it). 
+
+## The setup message
+
+A session's setup (see "Messages, the same-folder hold and the setup" in [architecture.md](architecture.md#messages-the-same-folder-hold-and-the-setup)) is drawn as one message in the thread (`setup.setupBlocks`): a
+header (`texts.SETUP_HEADER`) and one `actions` block (block_id `setup`, one row that Slack wraps
+on a narrow screen) holding the controls the request offers. A Model select lists the
+CLI's own models (the models of `AgentSession.info`, kept as `ThreadSession.models` and stored
+with the pending setup, so a click reads its choice against the list the message was built from),
+each option showing the model's `displayName` and, under it, the CLI's own `description` (cut to
+Slack's 75 characters, left out when the entry has none); the select is left out when the agent
+lists no model. An Effort select offers `Effort: default` (which passes nothing) and
+`Effort: <level>` for the chosen model's `supportedEffortLevels`, or for the agent's own
+`effortLevels` when it lists no model (left out when the agent has none either). A Bypass
+checkbox is shown only when the request offers a bypass mode, and is ticked when the folder's own Claude Code settings start the process in
+bypassPermissions, so unticking is an explicit off, with `!bypass off`'s semantics. Start carries the setup id. `state.values` is keyed
+by that block_id, then by each control's action_id (`setup.readSelection`). Changing the model
+rewrites the message (`chat.update`, which never notifies, and is skipped once the setup is
+decided) with the new model's levels, drawn from what the request said (`SlackChat.drawnSetup`,
+kept for the last 64 setups posted). 
+
+## The root's reaction
+
+The Slack provider keeps one `StatusReaction` (in `status`) on the thread's own root message, which `thread_ts` always is: a top-level owner message, or the owner's own `!resume` message. The reaction is the thread's status as the core asks it (`ThreadChat.showStatus`).
+
+A change of the reaction is
+two calls, `reactions.add` then `reactions.remove`, and a session reads idle before the second has
+returned: a close of an idle session (the idle close, a restart's drain) aborts the reader's wait
+there, and the call in flight still runs to its end. A `StatusReaction` whose change was aborted
+reads as a fresh instance, so its next change strips every other name, and `ThreadSession.close`
+calls `ThreadChat.settleStatus` (`StatusReaction.settle`), which makes the change asked for last
+and makes no call when the root already shows it. A session rebuilt on the same root (a restart, a
+resumed thread) starts a fresh `StatusReaction`, whose first successful `show` strips every other
+reaction name already on the root, so an earlier session's leftover `✅` or `❌` never sits next to
+the new one. A `missing_scope` failure (the workspace has not reinstalled the app for
+`reactions:write`) is logged once for the whole process; every `StatusReaction` instance stops
+calling Slack for reactions for the rest of the run. 
+
+## The status line
+
+The provider keeps the activity line as one `ThreadStatus` (in `status`): Slack's status line under the thread's last message (`assistant.threads.setStatus`), in Slack's words (`activityWords`). `ThreadStatus.show` never waits on Slack: one task per
+instance makes the calls in order, so two quick changes end on the last one and a turn that ends
+at once sets nothing. The line is sent as the one loading message, which is what a client shows,
+with a `status` that says the same after the app's name (`is working…`,
+`is compacting the conversation…`) for a client that draws that instead (with `status` alone, iOS showed
+nothing: measured: "Thread status on iOS"). Slack removes a status two minutes after it was set
+and clears it when the app replies (documented: "Status removal after two minutes"), so it is set
+again every `status.THREAD_STATUS_REFRESH_SECONDS` and within
+`status.THREAD_STATUS_AFTER_WRITE_SECONDS` of a write (`ThreadStatus.wrote`, which `SlackThread`
+calls after every pass of a reply that made a Slack call and after every notice it posts), at most
+one call per that interval. An answer to a word typed in the thread reaches the status through `ThreadChat.written`, which `SlackThread` calls after every notice it posts; `ThreadChat.close` clears the status. A clearing call that fails is tried once more, and again at the close. A
+refusal is logged once per error code in a row and swallowed; one that says the token cannot call
+the method (`status.THREAD_STATUS_REFUSED`) stops every `ThreadStatus` from calling Slack for the
+rest of the run. Nothing about it is stored, and a crash leaves at most a status Slack removes by
+itself.
+
+## Repairing a reply
+
+The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's stream, reads the
+message back by its own ts and edits it: every card left running closed as an error, the list of
+what still runs taken off, and the stopped line appended (within Slack's 50 blocks). The stream's
+own stop is the one notification the reply owes; the edit notifies nobody and nothing is posted.
+A message that cannot be read back, or is gone, is left as it is. Its `withdraw` deletes the
+message, and `showStatus` goes through the same `StatusReaction` a live session uses. Each of the
+three answers false when Slack did not do it and the message is still there; `channel_not_found`,
+`message_not_found` or `thread_not_found` (`errors.GONE`) says the message is gone, which counts
+as done. The Slack calls, the cap and the cases that leave a message untouched are in the doc
+comment of `endReply`.
+
+## Answering the cleanup
+
+The core's cleanup of `state.json` ("Cleaning `state.json`" in [architecture.md](architecture.md#cleaning-statejson)) asks the provider whether a channel and a thread are still there (`ChatProvider.channelState`, `ChatProvider.threadState`).
+
+- The lookup for channels is `channels.channelLookup`: `gone` is `channel_not_found` from
+`conversations.info`, and any other failure is no answer and removes nothing. A private channel the bot was removed from gives the
+same answer as a deleted one, so it is forgotten too. 
+
+- The lookup for threads is `channels.threadLookup`: `gone` is `thread_not_found`
+from `conversations.replies` on the root with `limit=1`, or a root returned as a tombstone
+(`subtype` `tombstone`, which is what a root deleted while replies remain becomes), and any other
+failure is no answer.
+
+## Measured platform behaviour
+
+What this page states about Slack that no reference documents or that a reference leaves open, with how and when each was observed. The prose points to a row as `measured: "Name"`; the rows about the SDK and Claude Code are in [architecture.md](architecture.md#measured-platform-behaviour). "Not recorded" marks a date, version or method that was not written down when the observation was made. A documentation read has no version. A row names the package it was observed through (`slack-sdk` of the Python library the daemon no longer uses, `slack-bolt`); the behaviour is Slack's own. The last row is a documentation read, not an observation.
+
+| Name | Observed | Method | Date | Version |
+|---|---|---|---|---|
+| File share event has no team | A `file_share` message event carries no `team` field | not recorded | 2026-09-25 | slack-bolt 1.30.0 |
+| Thread broadcast event has no team | A reply sent with **Also send to #channel** arrives as a `message` event of subtype `thread_broadcast` with `thread_ts`, a `root` copy of the thread's first message and no `team` or `parent_user_id`; its envelope has `team_id` and `is_ext_shared_channel`; a hidden `message_changed` wrapping the same reply follows | A reply recorded in Socket Mode, daemon stopped | 2026-10-09 | slack-bolt 1.30.0 |
+| Download without files:read | Slack answers 302 to a file download when the app lacks `files:read` | not recorded | 2026-09-25 | not recorded |
+| Card text is appended | Slack appends the `details` and the `output` of a `task_update` to what the card already holds | not recorded | 2026-10-01 | slack-sdk 3.44.1 |
+| Stream lifetime | `chat.appendStream` is refused 300.3 seconds after `chat.startStream` | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
+| Update after stop is silent | A stream stopped at 4 minutes 51 seconds, then ten `chat.update` calls on its message: no notification | not recorded | 2026-09-29 | not recorded |
+| Stream text under a later message on iOS | On Slack for iOS, the text of a reply that is a stream still open disappears once the app posts a message below it, and shows again when the stream stops. Same with the thread status line set before, during or cleared before the post; the text stays only with no status line, or when `chat.stopStream` runs on the reply before the post. `conversations.replies` held the full text throughout (`streaming_state` `in_progress`) | A probe on a dev app, the owner watching the thread live on iOS; one run per condition | 2026-10-25 | Slack for iOS, version not recorded |
+| Message limits | A message holds 12,000 characters and 50 blocks or task cards | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
+| Block cap after a stream stops | A post and an update are held to 50 items; a stream is not, but the update after its stop is | not recorded | 2026-10-08 | slack-sdk 3.45.0 |
+| Container text on update | A stream and a post count the text of a collapsed container toward the 12,000 characters; `chat.update` does not (50 containers of 10,000 characters accepted, nothing refused) | not recorded | 2026-10-06 | slack-sdk 3.44.1 |
+| Card text cap | The text of a message's cards counts toward the cap of a streamed message by a formula Slack does not document | private test channel | 2026-10-01 | slack-sdk 3.44.1 |
+| Open card stored as error | A card left `in_progress` in a stopped message is stored as an error until it is updated | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
+| Push on stream stop | A stream in a thread the owner started notifies once, when it stops, with its first text as the banner, and never when it starts | iPhone locked, Slack open in a browser, channel on Just mentions | 2026-09-29 | not recorded |
+| Open stream cannot be deleted | A stream cannot be deleted while it is open | not recorded | 2026-09-28 | slack-sdk 3.44.1 |
+| Stream needs a thread | `chat.startStream` answers `invalid_thread_ts` without `thread_ts` | not recorded | 2026-09-23 | not recorded |
+| Thread status on iOS | A thread status sent as `status` alone showed nothing on iOS; the loading message shows | Slack iOS and desktop, free plan, an app holding `assistant:write` | 2026-10-02 | slack-sdk 3.44.1 |
+| Permalink opens on the reply | Slack opens a thread on the reply that a permalink names | Mac app and iOS | 2026-10-05 | not recorded |
+| Clip transcript | A clip is a message with no text and one file of subtype `slack_audio` (`audio/mp4`, `media_display_type` `audio`); the same recording uploaded as a file has no subtype and gets a transcript too. No event follows its posting. After **Generate transcript**, `file_change` arrived four times in 15 seconds and `files.info` then gave `transcription` with `status` `complete`, a `locale` and `preview` (`content`, `has_more` false up to 67 characters); `vtt` on `files.slack.com` returned the transcript as WebVTT to the bot token. Slack chose the locale: `it-IT` once and `en-GB` twice for clips spoken in Italian, the two with wrong words. Not seen: a status other than `complete`, `has_more` true, the body of the `file_change` event (the log names it only) | Three clips from the iOS app, Slack free plan, a workspace set to English | 2026-10-09 | slack-sdk 3.45.0 |
+| Thread status with desktop open | The iOS app can show no thread status for a thread that Slack on desktop already has open; with desktop closed, or with the thread opened on iOS first, it shows on both | Five runs read by eye, one per condition; the reference of `assistant.threads.setStatus` does not describe it | 2026-10-04 | slack-sdk 3.44.1 |
+| Status removal after two minutes | Slack removes a thread status two minutes after it was set and clears it when the app replies | `assistant.threads.setStatus` reference, read | 2026-10-02 | none, a documentation read |
 
 ## Setting up an instance
 

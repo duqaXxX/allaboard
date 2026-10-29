@@ -26,7 +26,15 @@ export type { UsageLimit } from "../agent/seam.ts";
 
 /**
  * A thread, by the two names its chat gives it. Only the provider that made them can read
- * them: the core stores them, compares them and hands them back.
+ * them: the core stores them, compares them (`===`) and hands them back.
+ *
+ * The thread model of the seam: a thread is what a top-level message of a channel opens, and the
+ * provider creates its name when it delivers that message (`InboundMessage.topLevel`), the same
+ * name in every later message of the thread. The name may be the id of the message that opened
+ * it (a chat whose threads are its messages) or a name of its own (a chat that makes a thread a
+ * separate place); the core never assumes either, and the chat conformance suite runs a provider
+ * of each kind. The core never creates a thread name, except through `ChannelChat.open`, which
+ * returns the new thread's `ThreadRef`.
  */
 export interface ThreadRef {
   readonly channel: string;
@@ -77,7 +85,7 @@ export interface TaskUpdate {
   readonly preview: Preview | null;
   /**
    * Null on every line the core hands to a sink. A provider that shows a run of calls as
-   * counts passes its lines through the core's `Fold`, which sets this on the lines it makes:
+   * counts folds the lines itself and sets this on the lines it makes:
    * what replaces the line once the reply's body has ended; empty removes it. A run's line that
    * lists commands (`details`) keeps null: it stays, to be opened on them.
    */
@@ -161,11 +169,16 @@ export interface ChatCapabilities {
   /** A reply's text is shown as it is written; without it the core hands over each text whole. */
   readonly nativeStreaming: boolean;
   /**
-   * `ThreadChat.showStatus`, `clearStatus`, `settleStatus` and `acknowledge`, and
-   * `ChatProvider.statusMark`.
+   * The thread's root shows the session's status: `ThreadChat.showStatus`, `clearStatus` and
+   * `settleStatus`, and `ChatProvider.statusMark`. How the chat draws it is its own.
    */
-  readonly reactions: boolean;
-  /** `ThreadChat.showActivity`. */
+  readonly rootStatus: boolean;
+  /**
+   * A word of the owner's that took effect is marked on his own message:
+   * `ThreadChat.acknowledge`. Independent of `rootStatus`: a chat may do either alone.
+   */
+  readonly acknowledgement: boolean;
+  /** `ThreadChat.showActivity` and `activityRefused`. */
   readonly activityLine: boolean;
   /** `ChatProvider.openFile`. */
   readonly fileUpload: boolean;
@@ -179,7 +192,7 @@ export interface ChatCapabilities {
   readonly threadOpen: boolean;
   /** `ChatProvider.suggestCommands`. */
   readonly commandSuggestions: boolean;
-  /** `ThreadChat.showLoop` and `endLoop`: without it a scheduled run is an ordinary reply. */
+  /** `ThreadChat.showLoop`, `loopCardLast` and `endLoop`: without it a scheduled run is an ordinary reply. */
   readonly loopCard: boolean;
 }
 
@@ -209,6 +222,19 @@ export type SessionStatus = "working" | "waiting" | "done" | "error";
  * waits for the thread. Shown only, never stored: a close replaces it with how the session ended.
  */
 export type RootStatus = SessionStatus | "restarting";
+
+/**
+ * What a thread is doing, for the activity line under its last message. A closed set: the core
+ * says what is going on and the provider says it in its own words.
+ */
+export type Activity =
+  | { readonly kind: "working" }
+  | { readonly kind: "compacting" }
+  /**
+   * A restart waits on background tasks only: `counts` names them (`1 shell · 2 agents`), and
+   * `single` is true when it is one task.
+   */
+  | { readonly kind: "restart-wait"; readonly counts: string; readonly single: boolean };
 
 /** How `ThreadChat.showStatus` changes the root's status. */
 export interface StatusOptions {
@@ -273,6 +299,13 @@ export interface Reply extends ReplySink {
    * The session has ended everything it was doing: `footer` is drawn under this reply's last
    * message, by an edit, which notifies nobody, and stays there. Written at once; true when it
    * landed, false when it did not or when the reply's end never landed (no footer for it then).
+   *
+   * A chat that cannot rewrite a message, or whose rewrites notify, draws it as it can: as a
+   * message of its own below the reply (true once posted, and the push is that chat's), or not
+   * at all (false). The core asks nothing more of it: on false the footer stays owed to this
+   * reply and is read and offered again the next time the session has ended everything, and it
+   * is never offered to another reply. The core never reads `overtaken`, and `rest` and
+   * `showRunning` may leave the list undrawn; only `last` decides where a report goes.
    */
   showFooter(footer: FooterFields, signal?: AbortSignal): Promise<boolean>;
 }
@@ -302,21 +335,25 @@ export interface ThreadChat {
   /**
    * Shows the session's status on the thread's root. Changes are made in the order asked; with
    * a `signal`, rejects with its reason when it aborts, and the change may be left half made.
-   * False when the chat did not make the change and the root does not show `status`.
+   * False when the chat did not make the change and the root does not show `status`. Present
+   * with `rootStatus`, as are `clearStatus` and `settleStatus`.
    */
-  showStatus(status: RootStatus, options?: StatusOptions): Promise<boolean>;
+  showStatus?(status: RootStatus, options?: StatusOptions): Promise<boolean>;
   /** Leaves the root with no status of this session. */
-  clearStatus(): Promise<void>;
+  clearStatus?(): Promise<void>;
   /** Brings the root to the status asked for last: for whoever aborted a change on its way. */
-  settleStatus(): Promise<void>;
+  settleStatus?(): Promise<void>;
   /**
-   * What the thread says is going on under its last message, from now on; empty for nothing.
-   * `afterName` says the same after the app's name, for a client that draws it that way.
-   * Never waits on the chat.
+   * What the thread says is going on under its last message, from now on; null for nothing. The
+   * words are the provider's: it draws each `Activity` in its own, in whatever forms its client
+   * needs. Never waits on the chat. Present with `activityLine`.
    */
-  showActivity(text: string, afterName: string): void;
-  /** Whether the chat refuses this app an activity line for good: the session then posts. */
-  readonly activityRefused: boolean;
+  showActivity?(activity: Activity | null): void;
+  /**
+   * Whether the chat refuses this app an activity line for good: the session then posts.
+   * Present with `activityLine`.
+   */
+  readonly activityRefused?: boolean;
   /** Something of the app's was posted in the thread outside this object. */
   written(): void;
   /**
@@ -366,8 +403,11 @@ export interface ThreadChat {
    * `ChatError` when it could not be written.
    */
   say(markdown: string, options?: { readonly ownerOnly?: boolean }): Promise<void>;
-  /** Marks a message of the owner's as a word that took effect. Never rejects. */
-  acknowledge(message: MessageId): Promise<void>;
+  /**
+   * Marks a message of the owner's as a word that took effect. Never rejects. Present with
+   * `acknowledgement`.
+   */
+  acknowledge?(message: MessageId): Promise<void>;
   /**
    * A link to the thread labelled `label`, written for `markup`; null when the chat gives
    * none. Never rejects.
@@ -381,20 +421,22 @@ export interface ThreadChat {
   endReply(reply: MessageId, note: string): Promise<boolean>;
   /**
    * Shows `card` as the thread's loop card: the first call posts a message, every later one
-   * rewrites that same message, which notifies nobody. Needs `ChatCapabilities.loopCard`. Calls
-   * take effect in the order made. Never rejects.
+   * rewrites that same message, which notifies nobody (a chat that cannot rewrite or whose
+   * rewrites notify does not declare `loopCard`, and a scheduled run is an ordinary reply).
+   * Present with `loopCard`, as are
+   * `loopCardLast` and `endLoop`. Calls take effect in the order made. Never rejects.
    */
-  showLoop(card: LoopCard): Promise<void>;
+  showLoop?(card: LoopCard): Promise<void>;
   /**
    * Whether the loop card is the newest message of the thread the chat knows of: nothing of the
    * owner's and nothing else of the app's below it. False while no card is shown.
    */
-  readonly loopCardLast: boolean;
+  readonly loopCardLast?: boolean;
   /**
    * The loop is over: `line` is posted as a new message of the thread, the one push of the loop,
    * and the card is let go, so a later `showLoop` posts a card anew. Never rejects.
    */
-  endLoop(line: string): Promise<void>;
+  endLoop?(line: string): Promise<void>;
   /** The session closed: the activity line is cleared, and nothing is left running. */
   close(): Promise<void>;
 }
@@ -634,7 +676,10 @@ export interface InboundMessage {
   /** The thread it was written in; for a message of the channel itself, the thread it opens. */
   readonly ref: ThreadRef;
   readonly id: MessageId;
-  /** Written in the channel, not inside a thread. */
+  /**
+   * Written in the channel, not inside a thread: the message opens the thread `ref` names. For
+   * any other message `ref` is the thread it was written in.
+   */
   readonly topLevel: boolean;
   /** The text as the owner typed it. */
   readonly text: string;
@@ -737,7 +782,7 @@ export interface ChatProvider {
   threadState(ref: ThreadRef): Promise<Presence>;
   /**
    * The mark a root carries for `status`, written for a reference, so that a line about a session
-   * shows what its thread shows. Present with `reactions`.
+   * shows what its thread shows. Present with `rootStatus`.
    */
   statusMark?(status: SessionStatus): string;
   /** The chat's index of the sessions. A chat with none leaves it out, and nothing asks for one. */

@@ -545,7 +545,8 @@ test("the end of a loop is said after the turn that deleted it, not in the middl
   await h.until(() => loopMessages(h).length === 1);
   const busyWhenEnded: boolean[] = [];
   const thread = session.threadChat;
-  const endLoop = thread.endLoop.bind(thread);
+  const endLoop = thread.endLoop?.bind(thread);
+  assert.ok(endLoop, "the loop card is declared and its end present");
   thread.endLoop = (line: string) => {
     busyWhenEnded.push(session.busy);
     return endLoop(line);

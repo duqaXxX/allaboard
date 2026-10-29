@@ -29,7 +29,7 @@ import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import type { ThreadSession } from "../../../src/core/sessions/session.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import { type Names, namesOf } from "../../../src/core/texts.ts";
-import { FakeClock } from "../../support/fake-slack.ts";
+import { FakeClock } from "../../support/fake-clock.ts";
 import {
   type MemoryChat,
   memoryChat,

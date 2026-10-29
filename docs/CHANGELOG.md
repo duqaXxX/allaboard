@@ -53,8 +53,62 @@ All notable changes to this project are documented here. The format follows
   over Claude's recorded streams moved under `test/agent/claude/`, the rest use the plain agent,
   and `test/vocabulary.test.ts` follows relative imports through `test/support/` and `src/`, bare ones included; `test/config.test.ts` moved out of `test/core/` since it loads the registry the daemon ships (#119).
 
+- Each chat module gives its entry a `limitsHeading` too, and `test/docs.test.ts` requires one
+  `## Limits of ...` section per chat in `docs/limits.md`; `test/vocabulary.test.ts` gains the
+  chat counterpart of the import guard (#129).
+- `test/docs.test.ts` requires a provider page, `docs/<name>-provider.md`, for each chat in the
+  registry, linked from `docs/architecture.md` (#129).
+
 ### Changed
 
+- The tests of the core and the scenarios no longer reach a chat module: they take `FakeClock` and
+  `AsyncEvent` from `test/support/fake-clock.ts`, the ids of `test/support/ids.ts` (`chan-1`,
+  `thread-1`, `msg-1`) and the owner `alice` in place of Slack's, and the guard's list of
+  exceptions is gone (#129).
+- The Slack provider's API calls and measurements leave `docs/architecture.md` for
+  `docs/slack-provider.md`: the connection and its shutdown, who may talk to it, attached files,
+  the question form, the setup message, the root's reaction and the status line, the repair of a
+  reply, the answers to the cleanup and the Slack rows of the measured platform behaviour. The
+  architecture states the core and the seams in words that fit any chat and links to the page;
+  `docs/setup.md` says that Part 1 and the `SLACK_*` variables are the Slack module's, `docs/limits.md`
+  that each chat has a section of its own, and `CONTRIBUTING.md` lists what a new chat adds (#129).
+- The session's log line for a root that is not set to done names the status and not Slack's
+  reaction (`no done status set in ...`) (#129).
+- The Slack workarounds that sat in the core move to the Slack module: `Fold` (a run of calls as
+  one card) to `src/chat/slack/reply/fold.ts` and `NESTED` (the no-break indent) to
+  `src/chat/slack/texts.ts`; the core's strings and comments no longer state Slack behaviour as
+  the product's, and `messageTs` and `ts` of the core's code are `messageId` and `id`
+  (`state.json` keeps its keys). `MESSAGE_LIMIT`, `TITLE_LIMIT` and `DESCRIPTION_LIMIT` are
+  documented as the core's own choices: none came from a chat's limit (#129).
+- The rule that places the list of what still runs (`tails`, `isLast`, `isOvertaken`), a Slack
+  drawing workaround, moves from `src/core/reply/tail.ts` to `src/chat/slack/reply/tail.ts` and
+  leaves `src/core/port.ts`; the memory chat places the list and answers `last` and `overtaken` by
+  a rule of its own model (#129).
+- `test/vocabulary.test.ts` no longer lets a test reach a chat module through `src/registry.ts`
+  itself: the registry is skipped only behind `src/daemon.ts` (the scenarios run it over a registry
+  they build) or as a type, so a test that imports `REGISTRY` is caught (#129).
+- The chat conformance suite sends the deletion of a kept thread's first message from the owner's
+  user id in another workspace too, and the memory chat ignores it as the Slack provider does
+  (#129).
+- A prompt the daemon sends to a session itself (`!fork` with a prompt) is no longer given an
+  inbound message with an invented id, so the core assumes nothing of how a chat names threads
+  (#129).
+- The chat seam states what a chat does that cannot rewrite a message or whose rewrites notify:
+  `Reply.showFooter` may post the footer as a message of its own or return false (the footer then
+  stays owed and is offered again), and the core never reads `Reply.overtaken`. The memory chat
+  takes `edits: false` to play such a chat (#129).
+- Members of the chat seam that a capability serves are optional and present exactly when it is
+  declared (`showStatus`, `clearStatus`, `settleStatus`, `acknowledge`, `showActivity`,
+  `activityRefused`, `showLoop`, `loopCardLast`, `endLoop`), and the chat conformance suite asserts
+  it. The capability `reactions` is `rootStatus`, and marking a word that took effect is its own
+  capability, `acknowledgement`. `ThreadChat.showActivity` takes an `Activity` (working,
+  compacting, a restart waiting on tasks) and the Slack provider writes its words, the status line
+  texts having moved from `src/core/texts.ts` to `src/chat/slack/texts.ts` (#129).
+- The chat seam states its thread model (a thread is what a top-level message opens; its name is
+  the opening message's id or one of its own), the memory chat can name its threads either way
+  and the chat conformance suite runs with both, and it sends a message, a click and a form from
+  the owner's user id in another workspace through every provider: the memory chat and the Slack
+  provider both stop them (#129).
 - The names of the agent's tools the terminal shows in words or a preview of its own (`Bash`, `Edit`, `ExitPlanMode`...) leave `src/core/` for the agent module: the agent seam gains `ToolVocabulary` (`AgentBackend.tools`, `AgentEntry.tools`), the chat seam an `ApprovalRequest` that carries the plan, and `test/vocabulary.test.ts` fails on a tool name of the agent (`AgentEntry.toolNames`, the vocabulary included) held as a string in the core or the chat, apart from the labelled constants it lists (#119).
 - A copy `!fork` makes starts at once, told it was forked from a session that still runs, as the
   terminal's `/fork` starts its copy (`CLAUDE_CODE_RESUME_SOURCE_ALIVE`): it no longer reads that a

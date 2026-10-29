@@ -51,7 +51,7 @@ export class LoopReply implements Reply {
 
   /** Whether nothing sits below the card in the thread: a report written into it is seen. */
   get newest(): boolean {
-    return this.#thread.loopCardLast;
+    return this.#thread.loopCardLast ?? false;
   }
 
   async text(
@@ -146,6 +146,6 @@ export class LoopReply implements Reply {
       text: this.#body(),
       footer: this.#footer,
     };
-    await this.#thread.showLoop(card);
+    await this.#thread.showLoop?.(card);
   }
 }

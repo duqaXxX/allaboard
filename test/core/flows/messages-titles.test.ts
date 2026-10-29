@@ -298,7 +298,7 @@ test("rootGone forgets the thread and what is kept of it, and frees the hold", a
   assert.ok(world.shown(ref).length > 0);
   // The provider calls only for a thread the core keeps; a call for another one is harmless.
   await world.inbound.rootGone(ref);
-  await world.inbound.rootGone({ channel: ref.channel, thread: "1790999999.000001" });
+  await world.inbound.rootGone({ channel: ref.channel, thread: "thread-gone" });
 });
 
 test("a first message deleted during a turn is left to the cleanup, and the turn end edits and stores nothing", async (t) => {
@@ -394,18 +394,18 @@ test("!status draws the stored words with the chat's control characters escaped 
   world.state.setRootPrompt(
     ref.channel,
     ref.thread,
-    "<!channel> and <@U000BOB>\nVec<String> & a>b with *bold* and `code`",
+    "<b>bold</b> and <i>x</i>\nVec<String> & a>b with *bold* and `code`",
   );
   await world.says("!status", ref.thread);
   const status = world.shown(ref).at(-1) ?? "";
   assert.ok(
     status.endsWith(
-      "Prompt:\n> &lt;!channel&gt; and &lt;@U000BOB&gt;\n" +
+      "Prompt:\n> &lt;b&gt;bold&lt;/b&gt; and &lt;i&gt;x&lt;/i&gt;\n" +
         "> Vec&lt;String&gt; &amp; a&gt;b with *bold* and `code`",
     ),
     status,
   );
-  assert.ok(!status.includes("<!channel>"), "nothing that would ping is left");
+  assert.ok(!status.includes("<b>"), "no control character is left raw");
 });
 
 test("a concurrent delete's hold survives a rootGone that took none", async (t) => {

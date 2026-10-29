@@ -22,9 +22,8 @@ import { PLAIN_NAMES } from "./flows/messages-world.ts";
 const CLEARS = PLAIN_NAMES.newSession;
 
 /**
- * The chat provider's markdown escape, which the core takes as a parameter: the same characters
- * as `MARKDOWN_INLINE` in `src/chat/slack/reply/escape.ts` (Slack's markdown block reference,
- * read 2026-09-25).
+ * The chat provider's markdown escape, which the core takes as a parameter: a provider that draws
+ * markdown escapes these characters.
  */
 function markdownEscape(text: string): string {
   return text.replace(/([\\`*_{}[\]()&~])/g, "\\$1");

@@ -87,8 +87,8 @@ test("stops one past the rows shown", async () => {
   assert.ok(checked.length < FOLDER_ROWS + 1 + TRUST_BATCH); // the batch that crossed the line, at most
 });
 
-// The Slack rows built from these folders (a bind button each, more folders than rows, no trusted
-// folder, the root as written) are the chat provider's, tested in `test/chat/slack/bind.test.ts`.
+// The rows a provider builds from these folders (a bind button each, more folders than rows, no trusted
+// folder, the root as written) are the chat provider's, tested under `test/chat/`.
 
 test("the root is listed and a repository root alone", async () => {
   const root = scratch();

@@ -81,6 +81,11 @@ export interface ChatEntry {
   readonly required: readonly string[];
   readonly optional: readonly string[];
   /**
+   * The heading of the module's section of `docs/limits.md` (`Limits of ...`): the page holds
+   * one such section per chat module, and a test reads each from here.
+   */
+  readonly limitsHeading: string;
+  /**
    * Builds the provider and learns who it is in the chat. Rejects with `ConfigError` when a
    * variable holds what the chat refuses.
    */
@@ -112,11 +117,8 @@ export { FOLDER_ROWS } from "./folders.ts";
 export type { FooterField, FooterKey } from "./footer.ts";
 export { footerFields, formatWorkDuration, valueWithDetail } from "./footer.ts";
 export type { Instance } from "./instance.ts";
-export { Fold, shownPreview } from "./reply/fold.ts";
 export { Previews } from "./reply/previews.ts";
 export { formatDuration } from "./reply/renderer.ts";
-export type { Tail, TailEntry } from "./reply/tail.ts";
-export { isLast, isOvertaken, tails } from "./reply/tail.ts";
 export { oneLine, STOPPED, TITLE_LIMIT } from "./reply/words.ts";
 export { answerOf } from "./requests.ts";
 export { DirectoryUnavailable, SessionClosed, SessionGone } from "./sessions/errors.ts";
@@ -127,6 +129,6 @@ export type { RequestKind } from "./state.ts";
 export { asksOwner } from "./state.ts";
 export type { Names } from "./texts.ts";
 export * as texts from "./texts.ts";
-export { fill, Named, NESTED, named } from "./texts.ts";
+export { fill, Named, named } from "./texts.ts";
 export type { UpdateLine } from "./updates.ts";
 export { sharedCopyLine } from "./updates.ts";

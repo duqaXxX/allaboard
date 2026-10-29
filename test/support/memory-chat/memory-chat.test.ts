@@ -115,20 +115,51 @@ test("a reply is one message: text and task lines in order, what runs, then the 
   assert.ok(!chat.texts(channel, ref.thread).join().includes("1 shell"));
 });
 
-test("a call for a capability it lacks is recorded and changes nothing", async () => {
+test("a chat that cannot rewrite a message draws no list and posts the footer as a message", async () => {
+  const { chat, provider, channel } = await built(memoryChat({ edits: false }));
+  const ref = chat.openThread(channel);
+  const thread = provider.thread(ref);
+  const reply = thread.openReply(() => {});
+  await reply.text("An answer");
+  await reply.finish([]);
+  assert.equal(await reply.closeOut(), true);
+  thread.showRunning({ title: "1 shell still running", lines: [{ text: "Sleep", agent: null }] });
+  const footer = {
+    bypass: false,
+    planning: false,
+    model: "model-a",
+    effort: null,
+    advisor: null,
+    effortObserved: null,
+    folder: "/work",
+    branch: null,
+    changes: null,
+    sessionTokens: null,
+    contextPercent: null,
+    sessionLimit: null,
+    weekLimit: null,
+    account: null,
+    accountPlan: null,
+    work: null,
+  };
+  assert.equal(await reply.showFooter(footer), true, "the footer landed");
+  assert.deepEqual(chat.texts(channel, ref.thread).slice(1), ["An answer", "model-a · /work"]);
+});
+
+test("a member a capability it lacks would serve is absent", async () => {
   const { chat, provider, channel } = await built();
   const thread = provider.thread(chat.openThread(channel));
-  await thread.showStatus("working");
-  await thread.clearStatus();
-  thread.showActivity("Reading", "is reading");
-  await thread.acknowledge("msg-1");
-  assert.deepEqual(chat.strayCalls(), [
-    "showStatus working",
+  for (const member of [
+    "showStatus",
     "clearStatus",
-    "showActivity Reading",
-    "acknowledge msg-1",
-  ]);
-  assert.equal(chat.messages(channel).length, 1, "only the old thread's root");
+    "settleStatus",
+    "acknowledge",
+    "showActivity",
+    "activityRefused",
+  ] as const) {
+    assert.equal(thread[member], undefined, member);
+  }
+  assert.equal(provider.statusMark, undefined);
 });
 
 test("the chat outlives a provider: a new one over the same entry sees the threads", async () => {

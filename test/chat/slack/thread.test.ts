@@ -168,7 +168,7 @@ test("a reply is written in the thread to the owner and names its open message",
 
 test("a write of a reply sets the thread status again", async () => {
   const { slack, clock, thread } = made();
-  thread.showActivity("Working…", "is working…");
+  thread.showActivity({ kind: "working" });
   await settle(clock);
   assert.equal(slack.callsTo("assistant.threads.setStatus").length, 1);
   const reply = thread.openReply(() => {});
@@ -461,7 +461,7 @@ for (const [kind, request] of [
 
 test("a message posted outside the session sets the thread status again", async () => {
   const { slack, clock, thread } = made();
-  thread.showActivity("Working…", "is working…");
+  thread.showActivity({ kind: "working" });
   await settle(clock);
   thread.written();
   await clock.advance(THREAD_STATUS_AFTER_WRITE_SECONDS);
@@ -470,7 +470,7 @@ test("a message posted outside the session sets the thread status again", async 
 
 test("a notice is one grey line in the thread shown as written", async () => {
   const { slack, clock, thread } = made();
-  thread.showActivity("Working…", "is working…");
+  thread.showActivity({ kind: "working" });
   await settle(clock);
   await thread.notice('1 message was not sent: send it again.\n- "a <b> & c"');
   const [post, ...more] = slack.callsTo("chat.postMessage");
@@ -578,7 +578,7 @@ test("the activity line is refused once slack says the token cannot set one", as
   slack.responses["assistant.threads.setStatus"] = rejected("missing_scope");
   const warnings = mock.method(statusLogger, "warning", () => {});
   try {
-    thread.showActivity("Working…", "is working…");
+    thread.showActivity({ kind: "working" });
     await settle(clock);
   } finally {
     warnings.mock.restore();
@@ -602,7 +602,7 @@ test("the status line counts its refresh on the steady clock, not on the wall cl
   });
   const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
   const shown = () => slack.callsTo("assistant.threads.setStatus").length;
-  thread.showActivity("Working…", "is working…");
+  thread.showActivity({ kind: "working" });
   await steady.advance(0);
   assert.equal(shown(), 1);
   await wall.advance(10 * THREAD_STATUS_REFRESH_SECONDS);

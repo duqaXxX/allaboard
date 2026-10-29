@@ -1,5 +1,6 @@
 /**
- * One daemon at a time: Socket Mode spreads events across every open connection.
+ * One daemon at a time. A chat identity takes one daemon: a chat that sends each event to one of
+ * the connections open for the same identity would split them between two.
  *
  * What holds, by platform (`singleInstance` picks the mechanism):
  *
@@ -68,9 +69,9 @@ export class AlreadyRunning extends Error {
 }
 
 /**
- * Another daemon holds the lock of this daemon's chat identity (the chat app's bot): two
- * instances would share one app, and the chat then sends each event to one of the two
- * connections at random. Its own class so that the message can tell it from the instance lock's.
+ * Another daemon holds the lock of this daemon's chat identity: a chat identity takes one daemon,
+ * since two instances sharing it would each get a share of its events. Its own class so that the
+ * message can tell it from the instance lock's.
  */
 export class ChatIdentityTaken extends AlreadyRunning {
   constructor(directory: string) {

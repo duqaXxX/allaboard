@@ -40,7 +40,7 @@ import {
   STRANGER,
   THREAD,
 } from "../support/fake-slack.ts";
-import { memoryChat, OWNER, SOMEONE } from "../support/memory-chat.ts";
+import { ELSEWHERE, memoryChat, OWNER, SOMEONE } from "../support/memory-chat.ts";
 import {
   type Body,
   clickIn,
@@ -92,8 +92,8 @@ function memoryPerson(
   };
 }
 
-async function memoryRig(): Promise<ChatRig> {
-  const chat = memoryChat({ suggestions: true });
+async function memoryRig(threadIds: "own" | "opening" = "own"): Promise<ChatRig> {
+  const chat = memoryChat({ suggestions: true, threadIds });
   const provider = await chat.build({
     variables: {},
     allowedRoot: "/work",
@@ -111,6 +111,7 @@ async function memoryRig(): Promise<ChatRig> {
     thread: chat.openThread(channel),
     owner: memoryPerson(chat.as(OWNER), OWNER),
     other: memoryPerson(chat.as(SOMEONE), SOMEONE),
+    ownerElsewhere: memoryPerson(chat.as(OWNER, ELSEWHERE), OWNER),
     keep: (thread) => chat.keepThread(thread),
     ownerOnlyNotices: false,
     read: (scope) =>
@@ -201,9 +202,24 @@ function slackPerson(
   app: () => App | null,
   asked: Map<string, Pending>,
   user: string,
+  team: string = world.identity.teamId,
 ): Person {
   let sequence = 0;
-  const dispatch = async (body: Body): Promise<void> => {
+  // What Slack sends from another workspace: the event names its team, a click or a form names
+  // the team and the user's home team (the owner's user id is the same there, the workspace is not).
+  const inTeam = (body: Body): Body => {
+    if (team === world.identity.teamId) return body;
+    if (body.event !== undefined) {
+      body.event.team = team;
+      body.team_id = team;
+    } else {
+      body.team = { ...body.team, id: team };
+      body.user = { ...body.user, team_id: team };
+    }
+    return body;
+  };
+  const dispatch = async (original: Body): Promise<void> => {
+    const body = inTeam(original);
     // The chat delivers nothing before the connection opens.
     const built = app();
     if (built === null) return;
@@ -331,7 +347,7 @@ function pendingOf(ref: ThreadRef, questions: readonly Question[]): Pending {
     questions,
     decision: new Promise(() => {}),
     decided: false,
-    messageTs: null,
+    messageId: null,
   };
 }
 
@@ -386,6 +402,7 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     thread: { channel: CHANNEL, thread: THREAD },
     owner: slackPerson(world, app, asked, world.identity.ownerUserId),
     other: slackPerson(world, app, asked, STRANGER),
+    ownerElsewhere: slackPerson(world, app, asked, world.identity.ownerUserId, "T000ELSEWHERE"),
     // The core's state holds the threads the owner started: the provider tells of those alone.
     keep: (thread) => {
       world.state.openThread(thread.channel, thread.thread);
@@ -408,6 +425,10 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
   };
 }
 
-chatConformance("the memory chat", memoryRig);
+chatConformance("the memory chat", () => memoryRig());
+// A thread named by its opening message's id, as Slack's is: the other thread model of the seam.
+chatConformance("the memory chat, threads named by their opening message", () =>
+  memoryRig("opening"),
+);
 
 chatConformance("the Slack provider", slackRig);

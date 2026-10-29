@@ -27,18 +27,17 @@ import {
   type OwnerRequest,
   type Presence,
   type Reply,
-  type RootStatus,
   type RunningList,
   type TaskUpdate,
   type ThreadChat,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
-import { isLast, isOvertaken } from "../../../src/core/port.ts";
 import { DAEMON, type MessageKind, type Placed, type Room, type StoredMessage } from "./room.ts";
 
 const CAPABILITIES: ChatCapabilities = {
   nativeStreaming: false,
-  reactions: false,
+  rootStatus: false,
+  acknowledgement: false,
   activityLine: false,
   fileUpload: false,
   threadTags: false,
@@ -128,6 +127,18 @@ class MemoryReply implements Reply, Placed {
   async showFooter(footer: FooterFields): Promise<boolean> {
     // An end that did not land has no message the footer is known to sit under.
     if (!this.#landed) return false;
+    if (!this.#room.edits) {
+      // Nothing to rewrite: the footer is a message below the reply, once.
+      this.#footer ??= footerLine(footer);
+      try {
+        this.#room.write(this.#ref.channel, this.#ref.thread, DAEMON, this.#footer, "notice");
+        return true;
+      } catch (error) {
+        if (!(error instanceof ChatError)) throw error;
+        this.#footer = null;
+        return false;
+      }
+    }
     this.#footer ??= footerLine(footer);
     this.#write();
     return !this.#lost;
@@ -137,12 +148,14 @@ class MemoryReply implements Reply, Placed {
   get last(): boolean {
     if (this.#message === null) return false;
     const { others, marks } = this.#room.around(this.#message);
-    return isLast(this.#message.position, others, marks);
+    const at = this.#message.position;
+    return others.every((other) => other < at) && marks.every((mark) => mark < at);
   }
 
   get overtaken(): boolean {
     if (this.#message === null) return false;
-    return isOvertaken(this.#message.position, this.#room.around(this.#message).others);
+    const at = this.#message.position;
+    return this.#room.around(this.#message).others.some((other) => other > at);
   }
 
   async text(markdown: string): Promise<void> {
@@ -178,7 +191,7 @@ class MemoryReply implements Reply, Placed {
 
   /** The list shows once the reply waits (`rest`) or ended; a reply that only finished ends at once. */
   get #drawsFooter(): boolean {
-    return this.#finished && (this.#rested || this.#closed);
+    return this.#room.edits && this.#finished && (this.#rested || this.#closed);
   }
 
   async closeOut(): Promise<boolean> {
@@ -286,31 +299,12 @@ class MemoryThread implements ThreadChat {
     this.#ref = ref;
   }
 
-  readonly activityRefused = false;
-
   openReply(onOpenMessage: OpenMessageChange): Reply {
     return new MemoryReply(this.#room, this.#ref, onOpenMessage);
   }
 
   showRunning(list: RunningList | null): void {
     this.#room.showRunning(this.#ref, list);
-  }
-
-  async showStatus(status: RootStatus): Promise<boolean> {
-    this.#room.stray(`showStatus ${status}`);
-    return true;
-  }
-
-  async clearStatus(): Promise<void> {
-    this.#room.stray("clearStatus");
-  }
-
-  async settleStatus(): Promise<void> {
-    this.#room.stray("settleStatus");
-  }
-
-  showActivity(text: string): void {
-    this.#room.stray(`showActivity ${text}`);
   }
 
   written(): void {}
@@ -348,10 +342,6 @@ class MemoryThread implements ThreadChat {
 
   async say(markdown: string): Promise<void> {
     await this.#post(markdown, "reference");
-  }
-
-  async acknowledge(message: MessageId): Promise<void> {
-    this.#room.stray(`acknowledge ${message}`);
   }
 
   async link(): Promise<string | null> {

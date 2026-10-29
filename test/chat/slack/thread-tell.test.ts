@@ -62,7 +62,7 @@ test("tell does nothing once the provider stopped", async () => {
 
 test("a tell clears the thread's status, which is set again", async () => {
   const { slack, clock, thread } = madeChat();
-  thread.showActivity("Working…", "is working…");
+  thread.showActivity({ kind: "working" });
   await clock.advance(0);
   await thread.tell(TEXT);
   await clock.advance(THREAD_STATUS_AFTER_WRITE_SECONDS);

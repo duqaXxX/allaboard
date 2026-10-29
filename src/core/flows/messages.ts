@@ -37,6 +37,14 @@ import { forkFlow } from "./fork.ts";
 import type { FlowDeps, Report, Talk } from "./talk.ts";
 import { unservedWords, wordFlow } from "./words.ts";
 
+/**
+ * What a prompt sent to a session needs of a message: an `InboundMessage` has all of it, and a
+ * prompt the daemon sends itself (`sendPrompt`) has no message of the chat, so no `id`.
+ */
+type Submission = Pick<InboundMessage, "ref" | "text" | "content"> & {
+  readonly id?: InboundMessage["id"];
+};
+
 /** The first word of a passthrough, as typed: the text up to its first space. */
 function firstWord(command: Passthrough): string {
   return command.text.split(" ", 1)[0] ?? "";
@@ -121,7 +129,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
    * or alias the session lists: the caller then sends it as it always did.
    */
   async function suggest(
-    message: InboundMessage,
+    message: Submission,
     session: ThreadSession,
     command: Passthrough,
     typed: string,
@@ -129,6 +137,8 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     const { ref } = message;
     if (!chat.capabilities.commandSuggestions || chat.suggestCommands === undefined) return false;
     if (!agent.capabilities.commands) return false;
+    // A prompt the daemon sends itself has no message of the chat to hang a suggestion on.
+    if (message.id === undefined) return false;
     const word = firstWord(command);
     const listed = session.commands.some(
       (offered) => offered.name === word || offered.aliases.includes(word),
@@ -165,15 +175,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
   async function sendPrompt(ref: ThreadRef, prompt: string): Promise<void> {
     const session = sessions.get(ref.channel, ref.thread);
     if (session === null) throw new SessionGone(names);
-    const message: InboundMessage = {
-      ref,
-      id: ref.thread,
-      topLevel: false,
-      text: prompt,
-      plain: prompt,
-      literal: true,
-      content: async () => prompt,
-    };
+    const message: Submission = { ref, text: prompt, content: async () => prompt };
     await talk.replyOnFailure(ref, () =>
       submitToSession(message, session, null, { inThread: true, typed: prompt }),
     );
@@ -185,7 +187,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
    * is due.
    */
   async function submitToSession(
-    message: InboundMessage,
+    message: Submission,
     opened: ThreadSession,
     command: Passthrough | null,
     options: { readonly inThread: boolean; readonly typed: string },

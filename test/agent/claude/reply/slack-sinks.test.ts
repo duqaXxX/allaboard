@@ -8,9 +8,9 @@ import type { TaskUpdate } from "../../../../src/chat/seam.ts";
 import { type Block, blockText, contextBlock } from "../../../../src/chat/slack/reply/blocks.ts";
 import { UpdateLimiter } from "../../../../src/chat/slack/reply/limiter.ts";
 import { ReplySink } from "../../../../src/chat/slack/reply/sinks.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import type { Clock } from "../../../../src/clock.ts";
 import { TurnRenderer } from "../../../../src/core/reply/renderer.ts";
-import * as texts from "../../../../src/core/texts.ts";
 import { CLAUDE_PREVIEWS } from "../../../support/claude-tools.ts";
 import {
   BOT,
@@ -199,8 +199,8 @@ test("an answered question shows in the reply where it was answered", async () =
   assert.deepEqual(answers.blocks, [
     contextBlock(
       `✓ User answered Claude's questions:\n` +
-        `${texts.NESTED}· Which color do you prefer? → Blue\n` +
-        `${texts.NESTED}· Do you also like green? → Yes, Only in spring`,
+        `${slackTexts.NESTED}· Which color do you prefer? → Blue\n` +
+        `${slackTexts.NESTED}· Do you also like green? → Yes, Only in spring`,
     ),
   ]);
   // Claude's next words come after the answers, in the same message.

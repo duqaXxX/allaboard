@@ -32,7 +32,7 @@ export interface Pending {
   readonly answer: Promise<HoldAnswer | null>;
   /** Whether `answer` is settled. */
   decided: boolean;
-  messageTs: string | null;
+  messageId: string | null;
   readonly kind: HoldKind;
   /**
    * What the asker needs back with a click that carries only the id: the setup's model list,
@@ -74,7 +74,7 @@ export class Holds {
       threadId,
       answer,
       decided: false,
-      messageTs: null,
+      messageId: null,
       kind,
       context,
       cancelled: false,
@@ -117,10 +117,10 @@ export class Holds {
    * Record the message that shows a hold, so it can be removed once decided; false when the hold
    * was decided before its message was known (a click or `!stop` while posting).
    */
-  posted(holdId: string, messageTs: string): boolean {
+  posted(holdId: string, messageId: string): boolean {
     const entry = this.entries.get(holdId);
     if (entry === undefined) return false;
-    entry.pending.messageTs = messageTs;
+    entry.pending.messageId = messageId;
     return !entry.pending.decided;
   }
 
@@ -153,12 +153,12 @@ export class Holds {
    * The id of the open hold shown by this message, for a control that carries no id of its own
    * (a select): null when it is decided, gone, or shown elsewhere.
    */
-  atMessage(channelId: string, threadId: string, messageTs: string): string | null {
+  atMessage(channelId: string, threadId: string, messageId: string): string | null {
     for (const [holdId, { pending }] of this.entries) {
       if (
         pending.channelId === channelId &&
         pending.threadId === threadId &&
-        pending.messageTs === messageTs &&
+        pending.messageId === messageId &&
         !pending.decided
       ) {
         return holdId;
@@ -171,12 +171,12 @@ export class Holds {
    * Whether this message shows a hold that was decided and whose answer is still being applied:
    * false once its asker discarded it, as for a hold never held (a restart).
    */
-  decidedAt(channelId: string, threadId: string, messageTs: string): boolean {
+  decidedAt(channelId: string, threadId: string, messageId: string): boolean {
     for (const { pending } of this.entries.values()) {
       if (
         pending.channelId === channelId &&
         pending.threadId === threadId &&
-        pending.messageTs === messageTs
+        pending.messageId === messageId
       ) {
         return pending.decided;
       }

@@ -27,8 +27,30 @@ import {
   type OwnerList,
   type OwnerRequest,
   type TaskUpdate,
+  type ThreadChat,
   type ThreadRef,
 } from "../../src/chat/seam.ts";
+
+/**
+ * Everybody the owner check must stop: somebody else, and the owner's own user id from another
+ * workspace of the chat (invariant 1: the user and the workspace are both checked).
+ */
+function strangers(rig: ChatRig): readonly Person[] {
+  return [rig.other, rig.ownerElsewhere];
+}
+
+/** A thread whose loop card members are present, as a provider that declares `loopCard` has them. */
+type LoopThread = ThreadChat & Required<Pick<ThreadChat, "showLoop" | "loopCardLast" | "endLoop">>;
+
+function loopOf(thread: ThreadChat): LoopThread {
+  assert.ok(
+    thread.showLoop !== undefined &&
+      thread.endLoop !== undefined &&
+      thread.loopCardLast !== undefined,
+    "loopCard declared, a member of it absent",
+  );
+  return thread as LoopThread;
+}
 
 // ---- the adapter
 
@@ -104,6 +126,11 @@ export interface ChatRig {
   readonly thread: ThreadRef;
   readonly owner: Person;
   readonly other: Person;
+  /**
+   * The owner's own user id as it would act from another workspace or tenant of the chat: the
+   * owner check compares the tenant as well as the user.
+   */
+  readonly ownerElsewhere: Person;
   /** The core keeps `thread`: the daemon holds it, as it does for a thread the owner started. */
   keep(thread: ThreadRef): void;
   /**
@@ -488,12 +515,13 @@ export function chatConformance(
         assert.notEqual(provider.name, "");
         const flags = Object.entries(provider.capabilities);
         assert.deepEqual(flags.map(([flag]) => flag).sort(), [
+          "acknowledgement",
           "activityLine",
           "commandSuggestions",
           "fileUpload",
           "loopCard",
           "nativeStreaming",
-          "reactions",
+          "rootStatus",
           "threadDelete",
           "threadOpen",
           "threadTags",
@@ -512,8 +540,29 @@ export function chatConformance(
         assert.deepEqual(again.provider.identities, s.provider.identities);
       });
 
-      check("has statusMark exactly when it declares reactions", async ({ provider }) => {
-        assert.equal(typeof provider.statusMark === "function", provider.capabilities.reactions);
+      check("has each member a capability serves exactly when it declares it", async (s) => {
+        const thread = s.provider.thread(s.rig.thread);
+        const present = (...members: (keyof ThreadChat)[]) =>
+          members.map((member) => thread[member] !== undefined);
+        const { capabilities } = s.provider;
+        const all = (values: boolean[], expected: boolean, what: string) =>
+          assert.deepEqual(
+            values,
+            values.map(() => expected),
+            what,
+          );
+        all(
+          present("showStatus", "clearStatus", "settleStatus"),
+          capabilities.rootStatus,
+          "rootStatus",
+        );
+        all(present("acknowledge"), capabilities.acknowledgement, "acknowledgement");
+        all(present("showActivity", "activityRefused"), capabilities.activityLine, "activityLine");
+        all(present("showLoop", "loopCardLast", "endLoop"), capabilities.loopCard, "loopCard");
+      });
+
+      check("has statusMark exactly when it declares rootStatus", async ({ provider }) => {
+        assert.equal(typeof provider.statusMark === "function", provider.capabilities.rootStatus);
         if (provider.statusMark === undefined) return;
         const marks = (["working", "waiting", "done", "error"] as const).map((status) =>
           provider.statusMark?.(status),
@@ -645,7 +694,7 @@ export function chatConformance(
           await thread.tell("Nobody is told");
           await thread.tell("Nobody is told", { stays: true });
           await thread.notice("Nobody is told");
-          await thread.acknowledge("no-such-message");
+          await thread.acknowledge?.("no-such-message");
           await thread.link("the thread", "notice");
           await thread.endReply("no-such-message", "stopped");
         },
@@ -1078,25 +1127,37 @@ export function chatConformance(
     });
 
     describe("what a capability adds", () => {
-      gated("shows a status and takes it away", "reactions", async ({ provider, ref }) => {
+      gated("shows a status and takes it away", "rootStatus", async ({ provider, ref }) => {
         const thread = provider.thread(ref);
+        assert.ok(thread.showStatus && thread.settleStatus && thread.clearStatus);
         assert.equal(await thread.showStatus("working"), true);
         assert.equal(await thread.showStatus("done"), true);
         await thread.settleStatus();
         await thread.clearStatus();
       });
 
+      gated("marks a word of the owner's that took effect", "acknowledgement", async (s) => {
+        const said = await s.rig.owner.says(s.rig.channel, "words", { thread: s.ref.thread });
+        const thread = s.provider.thread(s.ref);
+        assert.ok(thread.acknowledge);
+        await thread.acknowledge(said.id);
+      });
+
       gated("takes an activity line without waiting", "activityLine", async ({ provider, ref }) => {
         const thread = provider.thread(ref);
+        assert.ok(thread.showActivity);
         assert.equal(typeof thread.activityRefused, "boolean");
-        thread.showActivity("Reading the module", "is reading the module");
-        thread.showActivity("", "");
+        thread.showActivity({ kind: "working" });
+        thread.showActivity({ kind: "compacting" });
+        thread.showActivity({ kind: "restart-wait", counts: "1 shell", single: true });
+        thread.showActivity({ kind: "restart-wait", counts: "1 shell · 2 agents", single: false });
+        thread.showActivity(null);
       });
     });
 
     describe("the loop card", () => {
       gated("is one message that each run rewrites", "loopCard", async ({ rig, provider, ref }) => {
-        const thread = provider.thread(ref);
+        const thread = loopOf(provider.thread(ref));
         const before = rig.read(ref).length;
         await thread.showLoop({
           label: "Scheduled run · every minute · run 1",
@@ -1126,7 +1187,7 @@ export function chatConformance(
         "carries the footer of the latest run, rewritten with each run",
         "loopCard",
         async ({ rig, provider, ref }) => {
-          const thread = provider.thread(ref);
+          const thread = loopOf(provider.thread(ref));
           const before = rig.read(ref).length;
           await thread.showLoop({
             label: "Scheduled run · run 1",
@@ -1157,9 +1218,12 @@ export function chatConformance(
         "shows the time of the run beside the label",
         "loopCard",
         async ({ rig, provider, ref }) => {
-          await provider
-            .thread(ref)
-            .showLoop({ label: "Scheduled run · run 1", at: AT, text: "", footer: null });
+          await loopOf(provider.thread(ref)).showLoop({
+            label: "Scheduled run · run 1",
+            at: AT,
+            text: "",
+            footer: null,
+          });
           await rig.settle();
           assert.ok(rig.read(ref).some((m) => /Scheduled run · run 1 · \S/.test(m.text)));
         },
@@ -1169,7 +1233,7 @@ export function chatConformance(
         "is the last message until something is written below it",
         "loopCard",
         async ({ rig, provider, ref }) => {
-          const thread = provider.thread(ref);
+          const thread = loopOf(provider.thread(ref));
           assert.equal(thread.loopCardLast, false, "no card shown yet");
           await thread.showLoop({ label: "Scheduled run · run 1", at: AT, text: "", footer: null });
           await rig.settle();
@@ -1184,9 +1248,12 @@ export function chatConformance(
       );
 
       gated("an empty run still shows its label", "loopCard", async ({ rig, provider, ref }) => {
-        await provider
-          .thread(ref)
-          .showLoop({ label: "Scheduled run · run 1", at: AT, text: "", footer: null });
+        await loopOf(provider.thread(ref)).showLoop({
+          label: "Scheduled run · run 1",
+          at: AT,
+          text: "",
+          footer: null,
+        });
         await rig.settle();
         assert.ok(rig.read(ref).some((m) => m.text.includes("Scheduled run · run 1")));
       });
@@ -1195,7 +1262,7 @@ export function chatConformance(
         "the end is a new message and lets the card go",
         "loopCard",
         async ({ rig, provider, ref }) => {
-          const thread = provider.thread(ref);
+          const thread = loopOf(provider.thread(ref));
           const before = rig.read(ref).length;
           await thread.showLoop({
             label: "Scheduled run · run 1",
@@ -1221,7 +1288,7 @@ export function chatConformance(
       );
 
       gated("never rejects when the chat refuses", "loopCard", async ({ rig, provider, ref }) => {
-        const thread = provider.thread(ref);
+        const thread = loopOf(provider.thread(ref));
         rig.refuseWrites();
         await thread.showLoop({ label: "Scheduled run · run 1", at: AT, text: "x", footer: null });
         await thread.endLoop("Scheduled loop ended · 1 run");
@@ -1536,25 +1603,31 @@ export function chatConformance(
       });
     });
 
-    describe("the owner check: nobody else reaches the daemon", () => {
+    describe("the owner check: nobody else reaches the daemon, in or out of the owner's workspace", () => {
       inbound(
         "the deletion of a kept thread's first message that somebody else wrote never arrives",
         async (s) => {
-          const theirs = await s.rig.other.says(s.rig.channel, "somebody else's words");
-          s.rig.keep(theirs.ref);
-          // The event names the author of what went, not who deleted it: whoever deletes it.
-          await s.rig.owner.deletes(theirs);
-          await s.rig.other.deletes(theirs);
-          assert.ok(s.inbound.empty);
+          for (const person of strangers(s.rig)) {
+            const theirs = await person.says(s.rig.channel, "somebody else's words");
+            s.rig.keep(theirs.ref);
+            // The event names the author of what went, not who deleted it: whoever deletes it.
+            // The owner's own deletion of it is a deletion in the owner's workspace; what the
+            // owner's user id wrote elsewhere is sent by `person` alone, from that workspace.
+            if (person === s.rig.other) await s.rig.owner.deletes(theirs);
+            await person.deletes(theirs);
+            assert.ok(s.inbound.empty);
+          }
         },
       );
 
       inbound("a message from somebody else never arrives", async (s) => {
-        await s.rig.other.says(s.rig.channel, "run something else");
-        await s.rig.other.says(s.rig.channel, "inside the owner's thread", {
-          thread: s.ref.thread,
-        });
-        assert.ok(s.inbound.empty);
+        for (const person of strangers(s.rig)) {
+          await person.says(s.rig.channel, "run something else");
+          await person.says(s.rig.channel, "inside the owner's thread", {
+            thread: s.ref.thread,
+          });
+          assert.ok(s.inbound.empty);
+        }
         await s.rig.owner.says(s.rig.channel, OWN_WORDS);
         assert.equal(s.inbound.messages.length, 1, "the owner's does, on the same path");
       });
@@ -1565,8 +1638,10 @@ export function chatConformance(
           const asking = request(requestId, s.ref.channel);
           const message = await s.provider.thread(s.ref).ask(requestId, asking, "A request");
           const asked: Asked = { ref: s.ref, requestId, request: asking, message };
-          await s.rig.other.answers(asked, answer);
-          assert.ok(s.inbound.empty);
+          for (const person of strangers(s.rig)) {
+            await person.answers(asked, answer);
+            assert.ok(s.inbound.empty);
+          }
           await s.rig.owner.answers(asked, answer);
           assert.equal(s.inbound.answers.length, 1, "the owner's does, on the same control");
         });
@@ -1582,8 +1657,10 @@ export function chatConformance(
           const shown = s.rig.read({ channel: s.rig.channel }).find((m) => m.text.includes(title));
           assert.ok(shown?.id);
           const listed: Listed = { channel: s.rig.channel, list, message: shown.id };
-          await s.rig.other.picks(listed, row);
-          assert.ok(s.inbound.empty, title);
+          for (const person of strangers(s.rig)) {
+            await person.picks(listed, row);
+            assert.ok(s.inbound.empty, title);
+          }
           await s.rig.owner.picks(listed, row);
           assert.equal(s.inbound.picks.length, 1, title);
           s.inbound.picks.length = 0;
@@ -1615,8 +1692,10 @@ export function chatConformance(
           const where = { channel: s.rig.channel, thread: s.ref.thread };
           const shown = s.rig.read(where).find((m) => m.pressable && m.text.includes("!mo opus"));
           assert.ok(shown, "the suggestion is shown, with a control");
-          await s.rig.other.types(shown, s.ref, "!model opus");
-          assert.ok(s.inbound.empty);
+          for (const person of strangers(s.rig)) {
+            await person.types(shown, s.ref, "!model opus");
+            assert.ok(s.inbound.empty);
+          }
           await s.rig.owner.types(shown, s.ref, "!model opus");
           assert.equal(s.inbound.messages.length, 1, "the owner's does, on the same control");
           const [message] = s.inbound.messages;
@@ -1638,8 +1717,10 @@ export function chatConformance(
           .find((m) => m.text.includes("Update allaboard 0.3.0 to 0.3.1"));
         assert.ok(shown?.id);
         const listed: Listed = { channel: s.rig.channel, list: UPDATE, message: shown.id };
-        await s.rig.other.picks(listed, "0.3.1");
-        assert.ok(s.inbound.empty);
+        for (const person of strangers(s.rig)) {
+          await person.picks(listed, "0.3.1");
+          assert.ok(s.inbound.empty);
+        }
         await s.rig.owner.picks(listed, "0.3.1");
         assert.equal(s.inbound.picks.length, 1, "the owner's does, on the same control");
       });

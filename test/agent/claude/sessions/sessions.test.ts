@@ -27,6 +27,7 @@ import { questionResult } from "../../../../src/agent/claude/requests.ts";
 import { ResumeRefused, type SessionEvent } from "../../../../src/agent/seam.ts";
 import type { Reply } from "../../../../src/chat/seam.ts";
 import { Status, ThreadStatus } from "../../../../src/chat/slack/reply/status.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { resolvePath } from "../../../../src/core/paths.ts";
 import type { TurnRenderer } from "../../../../src/core/reply/renderer.ts";
 import { APPROVE, type Outcome } from "../../../../src/core/requests.ts";
@@ -112,7 +113,7 @@ const POSIX_ONLY = {
     "a mode, a symbolic link and a git layout are read by POSIX rules",
 };
 
-const NESTED = texts.NESTED;
+const NESTED = slackTexts.NESTED;
 
 function at<T>(list: readonly T[], index: number): T {
   const found = list.at(index);
@@ -646,7 +647,7 @@ test("close leaves every repair field cleared", async (t) => {
   await session.submit("clean");
   await h.until(() => pending(h.approvals).length > 0);
   const approvalId = at(pending(h.approvals), 0);
-  const requestTs = h.approvals.get(approvalId)?.messageTs;
+  const requestTs = h.approvals.get(approvalId)?.messageId;
   await session.close();
   const stored = thread(h);
   assert.deepEqual(stored.openReplies, []);
@@ -3558,7 +3559,7 @@ test("a stop still waits for a task the running turn started before it", async (
   await polled(h);
   assert.ok(!drain.done()); // the task began before the signal: it is waited for
   // Said by the thread's status line, never by a message: no push, and nothing left behind.
-  const waits = texts.fill(texts.RESTART_WAITS, { counts: "1 shell", them: "it" });
+  const waits = texts.fill(slackTexts.RESTART_WAITS, { counts: "1 shell", them: "it" });
   await h.until(() => statusLines(h).at(-1) === waits);
   assert.equal(waits, "Restart waits for 1 shell · !stop ends it now");
   assert.deepEqual(h.slack.callsTo("chat.postMessage"), []);
@@ -3576,7 +3577,7 @@ test("a stop held by a background task says so and bang stop ends it", async (t)
   await polled(h);
   assert.ok(!drain.done());
   // Said by the thread's status line, never by a message: no push, and nothing left behind.
-  const waits = texts.fill(texts.RESTART_WAITS, { counts: "1 shell", them: "it" });
+  const waits = texts.fill(slackTexts.RESTART_WAITS, { counts: "1 shell", them: "it" });
   await h.until(() => statusLines(h).at(-1) === waits);
   assert.equal(waits, "Restart waits for 1 shell · !stop ends it now");
   assert.deepEqual(h.slack.callsTo("chat.postMessage"), []);
@@ -5232,7 +5233,7 @@ test("a reply s end that brings no checkmark logs what held it", async (t) => {
   }
   const held = log.entries
     .map((entry) => entry.message)
-    .filter((line) => line.includes("no done reaction"));
+    .filter((line) => line.includes("no done status set"));
   assert.ok(held.length > 0 && held.every((line) => line.includes("running=1 shell"))); // the command still runs
   assert.equal(h.reactions().at(-1), Status.WORKING);
 });

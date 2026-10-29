@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Holds } from "../../src/core/hold.ts";
 import { DEFAULT_CHOICE } from "../../src/core/setup.ts";
-import { CHANNEL, OTHER_CHANNEL, OTHER_THREAD, THREAD } from "../support/fake-slack.ts";
+import { CHANNEL, OTHER_CHANNEL, OTHER_THREAD, THREAD } from "../support/ids.ts";
 
 test("ids are unguessable and unique", () => {
   const holds = new Holds();
@@ -83,23 +83,23 @@ test("a hold decided before its message is known says so", () => {
   const holds = new Holds();
   const [clickedId, clicked] = holds.open(CHANNEL, THREAD);
   holds.resolve(clickedId, CHANNEL, THREAD, true);
-  assert.equal(holds.posted(clickedId, "1790000000.000001"), false);
-  assert.equal(clicked.messageTs, "1790000000.000001");
+  assert.equal(holds.posted(clickedId, "msg-1"), false);
+  assert.equal(clicked.messageId, "msg-1");
 
   const [stoppedId] = holds.open(CHANNEL, OTHER_THREAD);
   holds.cancel(CHANNEL, OTHER_THREAD);
-  assert.equal(holds.posted(stoppedId, "1790000000.000002"), false);
+  assert.equal(holds.posted(stoppedId, "msg-2"), false);
 
   const [liveId, live] = holds.open(OTHER_CHANNEL, THREAD);
-  assert.equal(holds.posted(liveId, "1790000000.000003"), true);
-  assert.equal(live.messageTs, "1790000000.000003");
+  assert.equal(holds.posted(liveId, "msg-3"), true);
+  assert.equal(live.messageId, "msg-3");
 });
 
 test("an answer that arrives before the post returned is kept for the asker", async () => {
   const holds = new Holds();
   const [holdId, pending] = holds.open(CHANNEL, THREAD);
   holds.resolve(holdId, CHANNEL, THREAD, DEFAULT_CHOICE);
-  assert.equal(holds.posted(holdId, "1790000000.000001"), false);
+  assert.equal(holds.posted(holdId, "msg-1"), false);
   assert.equal(await pending.answer, DEFAULT_CHOICE);
   assert.equal(holds.get(holdId), pending);
 });
@@ -107,24 +107,24 @@ test("an answer that arrives before the post returned is kept for the asker", as
 test("a control with no id of its own finds the open hold its message shows", () => {
   const holds = new Holds();
   const [holdId] = holds.open(CHANNEL, THREAD);
-  holds.posted(holdId, "1790000000.000001");
-  assert.equal(holds.atMessage(CHANNEL, THREAD, "1790000000.000001"), holdId);
-  assert.equal(holds.atMessage(CHANNEL, THREAD, "1790000000.000009"), null);
-  assert.equal(holds.atMessage(OTHER_CHANNEL, THREAD, "1790000000.000001"), null);
-  assert.equal(holds.atMessage(CHANNEL, OTHER_THREAD, "1790000000.000001"), null);
+  holds.posted(holdId, "msg-1");
+  assert.equal(holds.atMessage(CHANNEL, THREAD, "msg-1"), holdId);
+  assert.equal(holds.atMessage(CHANNEL, THREAD, "msg-4"), null);
+  assert.equal(holds.atMessage(OTHER_CHANNEL, THREAD, "msg-1"), null);
+  assert.equal(holds.atMessage(CHANNEL, OTHER_THREAD, "msg-1"), null);
   holds.resolve(holdId, CHANNEL, THREAD, DEFAULT_CHOICE);
-  assert.equal(holds.atMessage(CHANNEL, THREAD, "1790000000.000001"), null);
+  assert.equal(holds.atMessage(CHANNEL, THREAD, "msg-1"), null);
 });
 
 test("a message whose hold was decided is told apart from one whose hold is gone", () => {
   const holds = new Holds();
   const [holdId] = holds.open(CHANNEL, THREAD);
-  holds.posted(holdId, "1790000000.000001");
-  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000001"), false);
+  holds.posted(holdId, "msg-1");
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "msg-1"), false);
   holds.resolve(holdId, CHANNEL, THREAD, DEFAULT_CHOICE);
-  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000001"), true);
-  assert.equal(holds.decidedAt(CHANNEL, OTHER_THREAD, "1790000000.000001"), false);
-  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000009"), false);
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "msg-1"), true);
+  assert.equal(holds.decidedAt(CHANNEL, OTHER_THREAD, "msg-1"), false);
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "msg-4"), false);
   holds.discard(holdId);
-  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000001"), false);
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "msg-1"), false);
 });

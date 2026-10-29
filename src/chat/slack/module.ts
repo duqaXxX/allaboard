@@ -217,11 +217,15 @@ function checkTokens(context: ChatContext): void {
   if (wrongUser !== null) throw new ConfigError(wrongUser);
 }
 
+/** The heading of this module's section of `docs/limits.md`. */
+export const LIMITS_HEADING = "Limits of Slack";
+
 /** The registry's entry for Slack. */
 export function slackChat(options: SlackOptions = {}): ChatEntry {
   return {
     required: ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_OWNER_USER_ID"],
     optional: ["SLACK_USER_TOKEN", MENTION_VARIABLE],
+    limitsHeading: LIMITS_HEADING,
     setup: (instance) => slackSetup(instance, options.probe),
     async build(context: ChatContext): Promise<ChatProvider> {
       checkTokens(context);
