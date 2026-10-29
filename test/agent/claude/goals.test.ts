@@ -1,13 +1,12 @@
 /**
- * A goal's `goal_status` entries into changes, on the entries a session store received in a
- * recorded session (`test/fixtures/sdk/goal-lifecycle-store.json`, SDK 0.3.304, 2026-10-20): a
+ * A goal's `goal_status` entries into changes, on the transcript entries a session store received
+ * (it mirrors the transcript line for line) in a recorded session (`test/fixtures/sdk/goal-lifecycle-store.json`, SDK 0.3.304, 2026-10-20): a
  * goal set and stopped, resumed by the next prompt (a check that failed, then achieved), a second
  * goal set and stopped, then cleared.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { goalChange, goalStore, stopHookSummary } from "../../../src/agent/claude/goals.ts";
-import type { SessionEvent } from "../../../src/agent/seam.ts";
+import { goalChange, stopHookSummary, transcriptEvents } from "../../../src/agent/claude/goals.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 
 const APPENDS = sdkJson("goal-lifecycle-store") as Array<{ entries: JsonObject[] }>;
@@ -48,22 +47,17 @@ test("an achieved goal with no counts keeps the change and loses the counts", ()
   });
 });
 
-test("the store delivers the main transcript's changes, keeps nothing and loads nothing", async () => {
-  const delivered: SessionEvent[] = [];
-  const sessionStore = goalStore((event) => delivered.push(event));
-  const key = {
-    projectKey: "-home-dev-project",
-    sessionId: "68da9311-0000-4000-8000-000000000001",
-  };
-  await sessionStore.append({ ...key, subpath: "subagents/agent-a1b2c3" }, ENTRIES as never);
-  assert.equal(delivered.length, 0);
-  await sessionStore.append(key, ENTRIES as never);
-  assert.equal(delivered.length, 5);
-  assert.equal(await sessionStore.load(key), null);
+test("the transcript's entries are the goal's changes, in order, then the last saved message", () => {
+  const events = transcriptEvents(ENTRIES);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["goal_changed", "goal_changed", "goal_changed", "goal_changed", "goal_changed"],
+  );
+  assert.deepEqual(transcriptEvents([]), []);
 });
 
-// A project Stop hook that refused once, then let the turn end, on the entries a session store
-// received (`stop-hook-block-store.json`, SDK 0.3.310, 2026-10-27): the summary of the refusal
+// A project Stop hook that refused once, then let the turn end, on the transcript entries a
+// session store received (`stop-hook-block-store.json`, SDK 0.3.310, 2026-10-27): the summary of the refusal
 // and the summary of the Stop that followed. Both list the daemon's own Stop callback.
 const BLOCK_ENTRIES = (
   sdkJson("stop-hook-block-store") as Array<{ entries: JsonObject[] }>
@@ -140,16 +134,9 @@ test("a goal's failed check writes no event of the stop hooks", () => {
   assert.equal(stopHookSummary({ ...summary, hookErrors: ["no"], hookCount: "1" }), null);
 });
 
-test("the store delivers what the stop hooks said", async () => {
-  const delivered: SessionEvent[] = [];
-  const sessionStore = goalStore((event) => delivered.push(event));
-  const key = {
-    projectKey: "-home-dev-project",
-    sessionId: "68da9311-0000-4000-8000-000000000002",
-  };
-  await sessionStore.append(key, BLOCK_ENTRIES as never);
+test("the transcript's entries say what the stop hooks said", () => {
   assert.deepEqual(
-    delivered.filter((event) => event.type === "stop_hooks_ran"),
+    transcriptEvents(BLOCK_ENTRIES).filter((event) => event.type === "stop_hooks_ran"),
     [REFUSED],
   );
 });

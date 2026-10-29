@@ -156,6 +156,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- No Claude Code session could start once sessions were started with file checkpoints for
+  `!rewind`: every turn answered `Claude Code reported an error: Error`. The SDK refuses an
+  `Options.sessionStore` beside `enableFileCheckpointing`, and a store was how the daemon received
+  a goal's changes, the stop hooks' account and the messages a session saved. These are now read
+  from the session's transcript as Claude Code appends to it (`src/agent/claude/transcript.ts`),
+  before each record of the stream is passed on; only the lines a process of the SDK wrote count,
+  so what a terminal writes to the same session is left to `turnsAfter`.
 - An Edit or Write preview you had opened closed again each time its reply was edited, on Slack's
   desktop and iOS apps (#27). Each preview's container now keeps one block id for the life of its
   message, and stays open.

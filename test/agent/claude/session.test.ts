@@ -8,6 +8,9 @@
  * which writes the same flag on the command line.
  */
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
@@ -16,6 +19,7 @@ import {
   SessionClosedError,
   type SessionConfig,
 } from "../../../src/agent/claude/session.ts";
+import { Transcript } from "../../../src/agent/claude/transcript.ts";
 import { Translator } from "../../../src/agent/claude/translate.ts";
 import type {
   PermissionAnswer,
@@ -36,7 +40,7 @@ import {
   FakeSdk,
   fail,
   hook,
-  store,
+  written,
 } from "../../support/fake-query.ts";
 import { type JsonObject, sdkJson, sdkRecords } from "../../support/fixtures.ts";
 
@@ -57,7 +61,8 @@ const POST_TOOL_USE = sdkJson("post-tool-use-hook") as JsonObject;
 const MODEL_SWITCH = sdkJson("post-model-switch-hook") as JsonObject;
 const ASK = sdkJson("ask-can-use-tool") as JsonObject;
 const BASH = { command: "echo ok", description: "Print ok" };
-// The store's appends of a recorded session (`goal-lifecycle-store.json`, 2026-10-20, SDK 0.3.304).
+// The transcript entries of a recorded session, as a session store received them
+// (`goal-lifecycle-store.json`, 2026-10-20, SDK 0.3.304).
 const GOAL_APPENDS = sdkJson("goal-lifecycle-store") as Array<{ entries: JsonObject[] }>;
 const GOAL_ENTRIES = GOAL_APPENDS.flatMap((append) => append.entries);
 const EXITED = "the Claude Code process exited";
@@ -112,6 +117,17 @@ async function started(
   return { session, query: sdk.only, events: session.events[Symbol.asyncIterator]() };
 }
 
+/**
+ * A transcript in a folder of its own, removed when the test ends: the file a script's `written`
+ * appends to, and the session's reader of it, which waits for the stream to name the session.
+ */
+async function transcriptOf(t: TestContext): Promise<{ path: string; transcript: Transcript }> {
+  const folder = await mkdtemp(join(tmpdir(), "transcript-"));
+  t.after(() => rm(folder, { recursive: true, force: true }));
+  const path = join(folder, "68da9311-0000-4000-8000-000000000001.jsonl");
+  return { path, transcript: new Transcript(async () => path) };
+}
+
 /** The events up to and including the first of `type`, or all of them when the stream ends. */
 async function until(
   events: AsyncIterator<SessionEvent>,
@@ -161,8 +177,8 @@ test(
       "extraArgs",
       "hooks",
       "includePartialMessages",
-      "sessionStore",
-      "sessionStoreFlush",
+      // No `sessionStore`: the SDK refuses one beside `enableFileCheckpointing` at `query()`
+      // (SDK 0.3.312), which failed every start; the transcript is read instead.
       "settingSources",
       "stderr",
       "systemPrompt",
@@ -201,7 +217,9 @@ test("a session starts with the defaults of an interactive one", LIMIT, async (t
   // `env` replaces the inherited environment: without the daemon's own, no path and no home.
   // Read name by name as the copy holds them: on Windows the path is `Path`, which only
   // `process.env` itself answers under another case.
-  const own = Object.entries(process.env);
+  // The names the daemon sets over it are checked by tests of their own.
+  const over = new Set(["CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS", "CLAUDE_CODE_ENTRYPOINT"]);
+  const own = Object.entries(process.env).filter(([name]) => !over.has(name));
   assert.ok(own.length > 0);
   for (const [name, value] of own) assert.equal(env[name], value, name);
 });
@@ -224,6 +242,20 @@ test("a session is asked to say its state, over the owner's variables", LIMIT, a
   const asked = "CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS";
   const { query } = await started(t, {}, { variables: { [asked]: "0" } });
   assert.equal(query.options.env?.[asked], "1");
+});
+
+// A daemon started from an editor's terminal inherits its name, which would mark every line of
+// the session's transcript as not its own (`transcript.ts`).
+test("a session runs under the SDK's own entrypoint, whatever it inherits", LIMIT, async (t) => {
+  const name = "CLAUDE_CODE_ENTRYPOINT";
+  const before = process.env[name];
+  process.env[name] = "claude-vscode";
+  t.after(() => {
+    if (before === undefined) delete process.env[name];
+    else process.env[name] = before;
+  });
+  const { query } = await started(t, {}, { variables: { [name]: "cli" } });
+  assert.equal(query.options.env?.[name], "sdk-ts");
 });
 
 test("a variable the daemon's environment sets wins over a default", LIMIT, async (t) => {
@@ -257,7 +289,6 @@ test("a session of the daemon's own keeps the SDK's defaults", LIMIT, async (t) 
   assert.equal("systemPrompt" in query.options, false);
   assert.equal("env" in query.options, false);
   assert.equal("toolConfig" in query.options, false);
-  assert.equal("sessionStore" in query.options, false);
 });
 
 test("a resumed session passes the stored id, effort and model", LIMIT, async (t) => {
@@ -644,29 +675,27 @@ test(
   },
 );
 
-// The goal's changes reach only the transcript (measured 2026-10-20, SDK 0.3.304).
-
-test("a session hands its transcript to a store that keeps nothing, at once", LIMIT, async (t) => {
-  const { query } = await started(t);
-  assert.equal(query.options.sessionStoreFlush, "eager");
-  const key = {
-    projectKey: "-home-dev-project",
-    sessionId: "68da9311-0000-4000-8000-000000000001",
-  };
-  assert.equal(await query.options.sessionStore?.load(key), null);
-});
+// The goal's changes reach only the transcript (measured 2026-10-20, SDK 0.3.304, and
+// 2026-10-29, SDK 0.3.312).
 
 test(
-  "a goal's changes in the main transcript are events, before the turn's end",
+  "a goal's changes the session's process wrote are events, before the turn's end",
   LIMIT,
   async (t) => {
+    const { path, transcript } = await transcriptOf(t);
+    // What a terminal wrote to the same session, `entrypoint` `cli`, is not this process's.
+    const terminal = GOAL_ENTRIES.map((entry) => ({ ...entry, entrypoint: "cli" }));
     const batch: Batch = [
       ...TOOLS.slice(0, -1),
-      store(GOAL_ENTRIES, "subagents/agent-a1b2c3"),
-      store(GOAL_ENTRIES),
+      written(terminal),
+      written(GOAL_ENTRIES),
       TOOLS.at(-1) as JsonObject,
     ];
-    const { session, events } = await started(t, { turns: [batch] });
+    const { session, events } = await started(
+      t,
+      { turns: [batch], transcript: path },
+      { transcript },
+    );
     await session.send(PROMPT);
     const seen = await until(events, "turn_ended");
     const goals = seen.flatMap((event) => (event.type === "goal_changed" ? [event.goal] : []));
@@ -680,6 +709,22 @@ test(
     );
   },
 );
+
+test("a transcript that cannot be read loses its lines, not the session", LIMIT, async (t) => {
+  const { path } = await transcriptOf(t);
+  // A folder where the file should be: every read of it fails.
+  await mkdir(path);
+  const transcript = new Transcript(async () => path);
+  const errors: string[] = [];
+  t.mock.method(logger, "error", (message: string) => errors.push(message));
+  const batch: Batch = [...TOOLS.slice(0, -1), TOOLS.at(-1) as JsonObject];
+  const { session, events } = await started(t, { turns: [batch] }, { transcript });
+  await session.send(PROMPT);
+  const seen = await until(events, "turn_ended");
+  assert.equal(seen.at(-1)?.type, "turn_ended");
+  // Once for a failure that lasts the whole turn, by its name alone.
+  assert.deepEqual(errors, ["could not read the transcript: NotAFileError"]);
+});
 
 test("the PostToolUse hook gives the folder alone", LIMIT, async (t) => {
   const batch: Batch = [...TOOLS.slice(0, 3), hook("PostToolUse", POST_TOOL_USE)];
@@ -1007,7 +1052,8 @@ const CLEAR_TURN = GOAL_RECORDS.slice(CLEAR_START);
 const CLEAR_STARTED = CLEAR_TURN.find((record) => record.state === "started") as JsonObject;
 
 test("clearGoal sends `/goal clear` and nothing of its turn reaches the core", LIMIT, async (t) => {
-  const { session, query, events } = await started(t);
+  const { path, transcript } = await transcriptOf(t);
+  const { session, query, events } = await started(t, { transcript: path }, { transcript });
   const clearing = session.clearGoal();
   await pause();
   assert.equal(textOf(query.sent.at(-1)), "/goal clear");
@@ -1016,7 +1062,7 @@ test("clearGoal sends `/goal clear` and nothing of its turn reaches the core", L
   ).slice(-1);
   query.answer([
     ...CLEAR_TURN.slice(0, -1),
-    store(cleared),
+    written(cleared),
     CLEAR_TURN.at(-1) as JsonObject,
     { ...CLEAR_STARTED, state: "completed" },
   ]);

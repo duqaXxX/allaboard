@@ -38,12 +38,13 @@ import {
 } from "../seam.ts";
 import { advisorModel, type ResolveSettings, type SettingsSource } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
-import { GOAL_CLEAR, goalStore } from "./goals.ts";
+import { GOAL_CLEAR, transcriptEvents } from "./goals.ts";
 import { postModelSwitchHookEvents, postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
 import { agentInfo, contextUsage as contextUsageOf, loadedContext } from "./info.ts";
 import { userMessage } from "./prompt.ts";
 import { permissionResult, questionResult, toRequest } from "./requests.ts";
 import { filesRestore } from "./rewind.ts";
+import { OWN_ENTRYPOINT, type Transcript } from "./transcript.ts";
 import { Translator } from "./translate.ts";
 
 export const logger = getLogger("allaboard.agent.claude.session");
@@ -154,6 +155,11 @@ export interface SessionConfig extends StartOptions {
    * process of a thread's session over everything else in its environment.
    */
   readonly variables?: Readonly<Record<string, string>>;
+  /**
+   * The session's transcript, read for what only it holds (a goal's changes, the stop hooks'
+   * account, the messages saved); absent for a session the daemon starts for itself.
+   */
+  readonly transcript?: Transcript;
 }
 
 /**
@@ -242,6 +248,12 @@ const SESSION_SIGNALS: Readonly<Record<string, string>> = {
   CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: "1",
 };
 
+// The name Claude Code writes on each line of the transcript, which tells the session's own lines
+// from a terminal's (`transcript.ts`). The SDK's default, which it applies only when the
+// environment it is given has none (`sdk.mjs` 0.3.312): the daemon's own may carry an editor's.
+// The session's alone: a `claude` the owner runs with `!!` is his own, as in a terminal.
+const ENTRYPOINT: Readonly<Record<string, string>> = { CLAUDE_CODE_ENTRYPOINT: OWN_ENTRYPOINT };
+
 /**
  * The environment a thread's session runs in: the terminal's defaults, under the daemon's own
  * environment and the owner's variables, and the signals the daemon reads from the stream on top.
@@ -307,6 +319,11 @@ export class ClaudeSession implements AgentSession {
   #command: CommandTurn | null = null;
   // An error result arrived before the process answered the start: a resume it refused.
   #startRefused = false;
+  // The transcript read of the record in hand: a hook's events wait for it, so they come after
+  // that record as they did before the pump awaited anything.
+  #reading: Promise<void> = Promise.resolve();
+  // The last read of the transcript failed: the next failure is not logged again.
+  #transcriptFailed = false;
 
   /** The token of the cut this session was started with, else absent. */
   get rewindToken(): string | undefined {
@@ -365,13 +382,9 @@ export class ClaudeSession implements AgentSession {
         // the daemon reads from the stream is not the owner's to turn off.
         env: {
           ...sessionEnvironment(variables),
+          ...ENTRYPOINT,
           ...(resume !== null && forkOf !== undefined && forkSource(resume, forkOf)),
         },
-        // A goal's changes reach only the transcript, which this store is handed as it is
-        // written. `eager` delivers each entry at once; the SDK flushes the store before it
-        // yields a `result` (`sdk.mjs` 0.3.304), so a turn's changes come before its end.
-        sessionStore: goalStore((event) => this.#deliver(event)),
-        sessionStoreFlush: "eager",
       }),
       extraArgs,
       canUseTool: async (toolName, input, context) => {
@@ -408,14 +421,16 @@ export class ClaudeSession implements AgentSession {
 
   #hook(events: (input: unknown) => SessionEvent[]): HookCallback {
     return async (input) => {
+      await this.#reading;
       for (const event of events(input)) this.#deliver(event);
       return {};
     };
   }
 
   /**
-   * An event that comes beside the stream (a hook, the store). One of the hidden command's turn
-   * (Stop, PostToolUse) is as much the command's as its records: nothing of it reaches the core.
+   * An event that comes beside the stream (a hook, the transcript). One of the hidden command's
+   * turn (Stop, PostToolUse) is as much the command's as its records: nothing of it reaches the
+   * core.
    */
   #deliver(event: SessionEvent): void {
     if (this.#command === null) this.#queue.push(event);
@@ -440,11 +455,36 @@ export class ClaudeSession implements AgentSession {
     }
   }
 
+  /**
+   * Hands on what the process wrote to its transcript before `record`, so that it comes first
+   * (`transcript.ts`). A partial stream event passes by: what is written comes with whole records.
+   */
+  async #readTranscript(record: unknown): Promise<void> {
+    const transcript = this.#config.transcript;
+    if (transcript === undefined || !isRecord(record) || record.type === "stream_event") return;
+    if (typeof record.session_id === "string") transcript.locate(record.session_id);
+    let events: SessionEvent[];
+    try {
+      events = transcriptEvents(await transcript.read());
+    } catch (error) {
+      // An unread transcript loses a goal's lines, not the session; it is read again at the next
+      // record, and a failure that lasts is logged once.
+      if (!this.#transcriptFailed)
+        logger.error(`could not read the transcript: ${errorName(error)}`);
+      this.#transcriptFailed = true;
+      return;
+    }
+    this.#transcriptFailed = false;
+    for (const event of events) this.#deliver(event);
+  }
+
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
   async #pump(): Promise<void> {
     let reason = PROCESS_EXITED;
     try {
       for await (const record of this.#query) {
+        this.#reading = this.#readTranscript(record);
+        await this.#reading;
         if (!this.#started && isRecord(record) && record.type === "result") {
           this.#startRefused = record.is_error === true;
         }

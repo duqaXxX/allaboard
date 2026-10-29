@@ -9,11 +9,12 @@
  *   2026-10-06, CLI 2.1.286, and 2026-10-09, 2.1.292);
  * - `answer` and `inject`: a batch delivered when the test chooses, as a turn nobody asked for;
  * - inside a batch, `ask` (a call of the permission callback), `hook` (a run of a registered
- *   hook), `store` (entries appended to the session store), `END` (the process exits) and
- *   `fail` (the stream throws);
+ *   hook), `written` (entries Claude Code appends to the session's transcript, the file
+ *   `FakeScript.transcript`), `END` (the process exits) and `fail` (the stream throws);
  * - `holdClose`: a close that ends the stream only when the test lets it, as a CLI takes real
  *   time to flush and exit after EOF.
  */
+import { appendFileSync } from "node:fs";
 import type {
   CanUseTool,
   EffortLevel,
@@ -52,11 +53,9 @@ export interface HookRun {
   readonly input: Record<string, unknown>;
 }
 
-/** Transcript entries handed to the session store, at this point of a batch. */
-export interface StoreAppend {
-  readonly store: readonly JsonObject[];
-  /** A subagent's transcript; absent for the main one. */
-  readonly subpath?: string;
+/** Entries Claude Code appends to the session's transcript, at this point of a batch. */
+export interface TranscriptWrite {
+  readonly written: readonly JsonObject[];
 }
 
 export interface EndOfStream {
@@ -68,7 +67,13 @@ export interface StreamFailure {
 }
 
 /** A wire record, or something the process does at that point. */
-export type Scripted = JsonObject | AskCall | HookRun | StoreAppend | EndOfStream | StreamFailure;
+export type Scripted =
+  | JsonObject
+  | AskCall
+  | HookRun
+  | TranscriptWrite
+  | EndOfStream
+  | StreamFailure;
 export type Batch = readonly Scripted[];
 
 export const END: EndOfStream = { end: true };
@@ -81,8 +86,8 @@ export function hook(event: HookRun["hook"], input: Record<string, unknown>): Ho
   return { hook: event, input };
 }
 
-export function store(entries: readonly JsonObject[], subpath?: string): StoreAppend {
-  return subpath === undefined ? { store: entries } : { store: entries, subpath };
+export function written(entries: readonly JsonObject[]): TranscriptWrite {
+  return { written: entries };
 }
 
 export function fail(error: Error): StreamFailure {
@@ -123,6 +128,8 @@ export interface FakeScript {
   readonly holdClose?: boolean;
   /** `close()` throws this, after it has done its work, as a transport that fails to kill. */
   readonly closeThrows?: Error;
+  /** The file `written` appends to: the session's transcript. */
+  readonly transcript?: string;
 }
 
 function isAsk(item: Scripted): item is AskCall {
@@ -133,8 +140,8 @@ function isHook(item: Scripted): item is HookRun {
   return "hook" in item && !("type" in item);
 }
 
-function isStore(item: Scripted): item is StoreAppend {
-  return "store" in item && !("type" in item);
+function isWrite(item: Scripted): item is TranscriptWrite {
+  return "written" in item && !("type" in item);
 }
 
 function isEnd(item: Scripted): item is EndOfStream {
@@ -240,8 +247,8 @@ export class FakeQuery implements QueryHandle {
           await this.#ask(item);
         } else if (isHook(item)) {
           await this.#hook(item);
-        } else if (isStore(item)) {
-          await this.#store(item);
+        } else if (isWrite(item)) {
+          this.#write(item);
         } else {
           yield item;
         }
@@ -279,15 +286,11 @@ export class FakeQuery implements QueryHandle {
     }
   }
 
-  async #store({ store: entries, subpath }: StoreAppend): Promise<void> {
-    const sessionStore = this.options.sessionStore;
-    if (sessionStore === undefined) throw new Error("the session gave no session store");
-    const key = {
-      projectKey: "-home-dev-project",
-      sessionId: "68da9311-0000-4000-8000-000000000001",
-    };
-    // The entries are recorded ones, which `SessionStoreEntry` declares opaque.
-    await sessionStore.append(subpath === undefined ? key : { ...key, subpath }, entries as never);
+  /** Appends whole lines, as Claude Code does before it yields the record that follows. */
+  #write({ written: entries }: TranscriptWrite): void {
+    const path = this.#script.transcript;
+    if (path === undefined) throw new Error("the script names no transcript");
+    appendFileSync(path, entries.map((entry) => `${JSON.stringify(entry)}\n`).join(""));
   }
 
   #record(call: ControlCall): void {

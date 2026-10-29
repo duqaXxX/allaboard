@@ -677,7 +677,7 @@ export const UNREAD_KINDS: readonly string[] = [
   // The list of background tasks: the task records say the same, one task at a time.
   "system:background_tasks_changed",
   // The terminal's toast that points to its own detail (`Stop hook error occurred · ctrl+o to
-  // see`, recorded 2026-10-27): the reply says that detail, from the session store.
+  // see`, recorded 2026-10-27): the reply says that detail, from the transcript.
   "system:notification",
   // A hook starting (`SessionStart:resume`, recorded 2026-10-29): its output reaches the model, and
   // nothing of it is for the owner.
