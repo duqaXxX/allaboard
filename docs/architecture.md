@@ -71,7 +71,7 @@ What crosses the chat seam, in both directions:
 | Crossing | Direction | What |
 |---|---|---|
 | a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `rest`, `last`, `overtaken` and `showFooter`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
-| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, which takes an `Activity` and leaves its words to the provider, `activityRefused`, `written`), the list of what still runs (`showRunning`), the loop card of scheduled runs (`showLoop`, `endLoop`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
+| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, which takes an `Activity` and leaves its words to the provider, `activityRefused`, `written`), the list of what still runs (`showRunning`), the loop card of scheduled runs (`showLoop`, `endLoop`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a list with a control per row (`offer`, with `threadLists`) and a shared file (`share`, with `fileUpload`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice` (which resolves with the id of the message posted, null when the chat cannot say), `say`, `open` (with `threadOpen`: a message that starts a thread, which `!fork` posts), `tell`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
 | the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `threadState`, `index`, `openFile`, `tagThread`, `titleThread` and `statusMark` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders, of sessions or the update of allaboard |
@@ -266,7 +266,8 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `rootStatus` | the session asks for no status on the root, the crash repair sets no error status, `ChatProvider.statusMark` is absent and a channel's `!status` writes each session's status as a word |
 | `acknowledgement` | `ThreadChat.acknowledge` is absent and a word that took effect is not marked on the owner's message |
 | `activityLine` | `ThreadChat.showActivity` and `activityRefused` are absent, the session shows no activity line, and no message says that a restart waits |
-| `fileUpload` | `ChatProvider.openFile` is absent and `!open` answers that the chat cannot show a file (`texts.OPEN_UNAVAILABLE`) |
+| `fileUpload` | `ChatProvider.openFile` and `ThreadChat.share` are absent, `!open` answers that the chat cannot show a file (`texts.OPEN_UNAVAILABLE`), and `!diff` is not offered |
+| `threadLists` | `ThreadChat.offer` is absent and `!diff` is not offered: `!help`, `!guide` and the suggestions leave it out, and typing it answers `texts.DIFF_UNAVAILABLE`. The picks of such a list reach the core as `diff-file` and `diff-view` (`ListPick`) |
 | `threadTags` | `ChatProvider.tagThread` is absent, `!tag` and `!untag` answer that the chat cannot tag a thread (`texts.TAG_UNAVAILABLE`), and `!help` and `!guide` leave them out |
 | `threadTitles` | `ChatProvider.titleThread` is absent and the core reads no title for the root, whatever the agent declares |
 | `threadDelete` | `ChatProvider.deleteThread` is absent, `!delete-thread` answers that the chat cannot delete a thread (`texts.DELETE_THREAD_UNAVAILABLE`), and `!help` and `!guide` leave it out |
@@ -1721,6 +1722,35 @@ The search reads the folder from disk, and the changed files come from git:
 
 The commands, their measurements (git 2.54.0, 2026-10-05 and 2026-10-06) and each rule above are
 in the doc comments of `src/core/files/listing.ts` and `src/core/files/changed.ts`.
+
+## Changed files of `!diff`
+
+`!diff` is the core's (`src/core/flows/diff.ts`); the chat draws a list and shares a file
+(`ThreadChat.offer`, `ThreadChat.share`). The word runs git only in the repository the agent's
+record of trust names for the session's folder (`SessionManager.repository`); an agent that keeps
+no record (`folderTrust` false) does not offer it. A repository still to trust is refused with the
+agent's own line (`AgentWords.trust`).
+
+- **The list.** `files/diff.diffStats` compares the work tree with `HEAD` (the empty tree while the
+  repository has no commit) with `diff-index --numstat -z --no-renames --no-ext-diff
+  --no-textconv`, and adds the untracked files that `ls-files --others --exclude-standard` names,
+  counted from their content (`readOpenable`, at most 1 MiB; a larger one or one with a NUL byte
+  in its first 8,000 bytes is `binary`). Paths are from the repository's root, so the totals agree
+  with the footer's. Every command runs through `runGit`, under `GIT_TIMEOUT`, with
+  `--no-optional-locks` and `--literal-pathspecs`, and none writes the index.
+- **The patch.** `files/diff.diffPatch` runs `diff-index -p` for one literal path; an untracked
+  file's is a new-file patch written in TypeScript, since `git diff --no-index` exits 1 and
+  `runGit` reads that as a failure. A pick carries the session and the path and nothing else; the
+  patch is read when the control is used, for a path the tree lists at that moment only. The
+  bytes collected are bounded by `ChatProvider.fileLimit`, which the chat declares with
+  `fileUpload` (Slack: its 1 MB snippet limit); a larger diff is told, not shared. Both
+  `diff-index` calls take `--ignore-submodules=dirty`, so no submodule's config or filters run.
+- **The turns.** `ThreadSession` records the `fileChange` of every `call_ended` under the prompt of
+  the running turn (`sessions/changes.TurnChanges`), a subagent's calls included, and a turn the
+  agent starts itself under the prompt before it. `files/diff.groupEdits`, `statOfEdits` and
+  `patchOfEdits` turn those hunks into rows and a patch for files inside the repository. They are
+  not stored: a restart, an idle close of the process and a turn typed in a terminal leave none,
+  and a change made by a shell command is under `Current` only.
 
 ## Updating allaboard
 

@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!diff` inside a thread lists the files that differ from HEAD in the session's git repository,
+  untracked ones included, with the lines added and removed, as the terminal's `/diff` does. A
+  **Diff** button on a row shares that file's unified diff into the thread as `<name>.diff`. Once
+  the session has edited files, a selector adds a view per turn (`T1`, `T2`, ...) built from the
+  hunks of Claude's Write and Edit calls. It is refused outside git and in a repository not
+  trusted in Claude Code. The chat seam gains `ThreadChat.offer` (`threadLists`) and
+  `ThreadChat.share` (`fileUpload`), and the picks `diff-file` and `diff-view` (#14).
 - `!fork [prompt]` inside a thread copies its session into a new thread of the channel, as the
   terminal's `/fork` does: the copy keeps the model, effort and bypass, starts on the prompt (or
   waits for your first message there), and the original thread goes on. The new thread's first

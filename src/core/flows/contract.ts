@@ -75,6 +75,20 @@ export interface ForkFlow {
   word(ref: ThreadRef, message: MessageId, session: ThreadSession, prompt: string): Promise<void>;
 }
 
+/** `!diff`. */
+export interface DiffFlow {
+  /**
+   * `!diff` typed in the thread of `session`: lists the files of its repository that differ from
+   * HEAD, with a control per file and a selector of views, or tells the owner why it cannot.
+   */
+  word(ref: ThreadRef, session: ThreadSession): Promise<void>;
+  /**
+   * The owner used a control of that list: a file shares its diff into the thread, a view draws
+   * the list again. A list made for another session, or a file no longer changed, is told.
+   */
+  picked(pick: Extract<ListPick, { type: "diff-file" | "diff-view" }>): Promise<void>;
+}
+
 /** `!bind`. */
 export interface BindFlow {
   /** `!bind <folder>` typed in a channel. */
@@ -101,10 +115,10 @@ export interface AllaboardFlow {
   notice(message: InboundMessage): Promise<void>;
 }
 
-/** A pick from a list of folders or of sessions; the update's is `AllaboardFlow.picked`. */
+/** A pick from a list of folders or of sessions; the update's and the diff's are their flows'. */
 export interface PicksFlow {
   /** As `ChatInbound.picked`. */
-  picked(pick: Exclude<ListPick, { type: "update" }>): Promise<void>;
+  picked(pick: Extract<ListPick, { type: "folder" | "session" }>): Promise<void>;
 }
 
 /** A message the owner wrote. */
@@ -120,6 +134,7 @@ export interface OtherFlows {
   readonly terminal: TerminalFlow;
   readonly resume: ResumeFlow;
   readonly bind: BindFlow;
+  readonly diff: DiffFlow;
   /** Absent in a daemon built without a way to update itself: `!allaboard` is then not offered. */
   readonly allaboard?: AllaboardFlow;
 }

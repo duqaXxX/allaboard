@@ -75,6 +75,14 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
   }
   if (!agent.capabilities.sessionForks || !chat.capabilities.threadOpen) unserved.add(WORD.fork);
   if (!chat.capabilities.fileUpload) unserved.add(WORD.open);
+  // The daemon's git runs only in a repository the agent's record of trust names.
+  if (
+    !chat.capabilities.fileUpload ||
+    !chat.capabilities.threadLists ||
+    !agent.capabilities.folderTrust
+  ) {
+    unserved.add(WORD.diff);
+  }
   if (!chat.capabilities.threadTags) {
     unserved.add(WORD.tag);
     unserved.add(WORD.untag);
@@ -156,6 +164,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           loadedContext: have.loadedContext,
           forks: !unserved.has(WORD.fork),
           fileUpload: chat.capabilities.fileUpload,
+          diff: !unserved.has(WORD.diff),
           threadTags: chat.capabilities.threadTags,
           threadDelete: chat.capabilities.threadDelete,
           shell: have.shellCommands && deps.shellCommands,
@@ -285,6 +294,13 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           await talk.inChannel(channel, texts.FORK_TOP_LEVEL);
         } else {
           await fork.word(ref, message, session, command.prompt);
+        }
+        return;
+      case "diff":
+        if (session === null) {
+          await talk.inChannel(channel, texts.DIFF_TOP_LEVEL);
+        } else {
+          await others.diff.word(ref, session);
         }
         return;
       case "terminal":

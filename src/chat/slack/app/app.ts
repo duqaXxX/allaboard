@@ -63,6 +63,7 @@ import {
   REFRESH_ACTION,
   SHOW_ALL_ACTION,
 } from "../home.ts";
+import { DIFF_FILE_ACTION, DIFF_VIEW_ACTION } from "../lists.ts";
 import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.ts";
 import { levelLogger } from "../quiet-logger.ts";
 import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
@@ -100,6 +101,7 @@ import {
   messageActor,
 } from "./guards.ts";
 import { HomeControls } from "./home-controls.ts";
+import { ThreadLists } from "./lists.ts";
 import { filesOf, inboundMessage } from "./messages.ts";
 import { Open } from "./open.ts";
 import { ThreadOrder, threadKey } from "./order.ts";
@@ -271,6 +273,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   const requests = new Requests(parts, answers);
   const open = new Open(parts, answers);
   const resumeBind = new ResumeBind(parts, answers);
+  const threadLists = new ThreadLists(parts, answers);
   const clips = new Clips(parts, answers);
   const home = new HomeControls(parts);
   const deleteThread = new DeleteThread(parts, answers);
@@ -438,6 +441,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(BIND_ACTION, resumeBind.onBind);
   action(RESUME_ACTION, resumeBind.onResume);
   action(UPDATE_ACTION, resumeBind.onUpdate);
+  action(DIFF_FILE_ACTION, threadLists.onDiffFile);
+  action(DIFF_VIEW_ACTION, threadLists.onDiffView);
 
   action(NEW_THREAD_ACTION, home.onHomeLink, { acknowledgeOnly: true });
   for (const actionId of FILTER_ACTIONS) action(actionId, home.onHomeFilter);

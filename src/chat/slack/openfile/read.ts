@@ -28,11 +28,27 @@ export async function uploadFile(
   relative: string,
 ): Promise<void> {
   const title = titleOf(relative);
+  await shareFile(client, channel, threadTs, content, posix.basename(title), title);
+}
+
+/**
+ * Shares `content` into the thread as the file `filename`, shown under `title`: the form of
+ * `uploadFile` for a file that is no path of the folder (`!diff` shares a patch). Rejects with
+ * Slack's error.
+ */
+export async function shareFile(
+  client: WebClient,
+  channel: string,
+  threadTs: string,
+  content: Buffer,
+  filename: string,
+  title: string,
+): Promise<void> {
   await client.files.uploadV2({
     channel_id: channel,
     thread_ts: threadTs,
     file: content,
-    filename: posix.basename(title),
+    filename,
     title,
   });
 }

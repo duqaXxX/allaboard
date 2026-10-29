@@ -28,6 +28,8 @@ export interface GuideOffer {
   readonly loadedContext: boolean;
   /** The chat shows a file (`fileUpload`). */
   readonly fileUpload: boolean;
+  /** The chat shows lists and files in a thread, and the agent keeps a record of trust (`!diff`). */
+  readonly diff: boolean;
   /** The chat tags a thread (`threadTags`). */
   readonly threadTags: boolean;
   /** The chat deletes a thread (`threadDelete`). */
@@ -89,6 +91,7 @@ export function guideText(names: Names, offered: GuideOffer): string {
     `${offered.questions ? texts.GUIDE_APPROVALS_AND_QUESTIONS : texts.GUIDE_APPROVALS}\n${approvals.join(" ")}`,
     sessions,
     ...(offered.fileUpload ? [say(texts.GUIDE_FILES)] : []),
+    ...(offered.diff ? [say(texts.GUIDE_DIFF)] : []),
     ...(offered.bypass ? [say(texts.GUIDE_BYPASS)] : []),
     ...(offered.plan ? [say(texts.GUIDE_PLAN)] : []),
     ...(offered.threadTags ? [say(texts.GUIDE_TAGS)] : []),

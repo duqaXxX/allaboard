@@ -30,9 +30,11 @@ export type {
   OpenList,
   OpenRequest,
   OpenSuggestion,
+  OpenThreadList,
   Person,
   SaysOptions,
   Sent,
+  SharedFile,
   ShownMessage,
 } from "./memory-chat/room.ts";
 export { DAEMON, ELSEWHERE, HOME, OWNER, SOMEONE } from "./memory-chat/room.ts";
@@ -44,6 +46,12 @@ export interface MemoryChatOptions {
   readonly identities?: readonly string[];
   /** The provider declares `commandSuggestions` and shows a suggestion as a message. */
   readonly suggestions?: boolean;
+  /** The provider declares `threadLists` and posts a list in a thread as a message with rows. */
+  readonly lists?: boolean;
+  /** The provider declares `fileUpload` and keeps the files shared into a thread (`Room.shared`). */
+  readonly files?: boolean;
+  /** With `files`: the most bytes the provider takes as one shared file (1 MiB when absent). */
+  readonly fileLimit?: number;
   /**
    * How a thread is named: by a name of its own (the default, never the id of the message that
    * opened it), or by the id of its opening message (`opening`).
@@ -67,6 +75,9 @@ export class MemoryChat extends Room implements ChatEntry {
   readonly words = { names: [], literals: [], patterns: [] };
   readonly #identities: readonly string[];
   readonly #suggests: boolean;
+  readonly #lists: boolean;
+  readonly #files: boolean;
+  readonly #fileLimit: number | undefined;
   #built: MemoryProvider | null = null;
 
   constructor(
@@ -75,10 +86,16 @@ export class MemoryChat extends Room implements ChatEntry {
     suggests = false,
     threadIds: "own" | "opening" = "own",
     edits = true,
+    lists = false,
+    files = false,
+    fileLimit?: number,
   ) {
     super(owner, threadIds, edits);
     this.#identities = identities;
     this.#suggests = suggests;
+    this.#lists = lists;
+    this.#files = files;
+    this.#fileLimit = fileLimit;
   }
 
   /** The provider `build` made last; throws before the first build. */
@@ -89,7 +106,14 @@ export class MemoryChat extends Room implements ChatEntry {
 
   async build(context: ChatContext): Promise<ChatProvider> {
     this.bind(context.clock);
-    this.#built = new MemoryProvider(this, this.#identities, this.#suggests);
+    this.#built = new MemoryProvider(
+      this,
+      this.#identities,
+      this.#suggests,
+      this.#lists,
+      this.#files,
+      this.#fileLimit,
+    );
     return this.#built;
   }
 }
@@ -102,5 +126,8 @@ export function memoryChat(options: MemoryChatOptions = {}): MemoryChat {
     options.suggestions ?? false,
     options.threadIds ?? "own",
     options.edits ?? true,
+    options.lists ?? false,
+    options.files ?? false,
+    options.fileLimit,
   );
 }

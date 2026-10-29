@@ -34,6 +34,7 @@ import {
   PlainStore,
   plainAgent,
 } from "../support/plain-agent.ts";
+import { repositoryAt } from "../support/repositories.ts";
 import { heldByARunningDaemon, realWorkDone, SettledClock } from "../support/settle.ts";
 import { FakeMachine } from "../support/updates.ts";
 
@@ -69,19 +70,24 @@ const NOT_DECLARED = new Set([
 ]);
 
 /** `target` with a call to any of `NOT_DECLARED` written to `calls`. */
-function watched<T extends object>(target: T, calls: string[], label: string): T {
+function watched<T extends object>(
+  target: T,
+  calls: string[],
+  label: string,
+  absent: ReadonlySet<string> = NOT_DECLARED,
+): T {
   return new Proxy(target, {
     get(inner, property) {
       const member = Reflect.get(inner, property, inner);
       if (typeof member !== "function") return member;
       return (...args: unknown[]) => {
-        if (typeof property === "string" && NOT_DECLARED.has(property)) {
+        if (typeof property === "string" && absent.has(property)) {
           calls.push(`${label}.${property}`);
         }
         const result = member.apply(inner, args);
         // A session the agent starts is watched too.
         if (property === "start" && result instanceof Promise) {
-          return result.then((session: AgentSession) => watched(session, calls, "session"));
+          return result.then((session: AgentSession) => watched(session, calls, "session", absent));
         }
         return result;
       };
@@ -127,6 +133,11 @@ export interface WorldOptions {
   readonly identities?: readonly string[];
   /** The plain agent reads the owner's shell commands (`shellCommands`). */
   readonly shell?: boolean;
+  /**
+   * The channel's folder is a git repository the agent trusts (`trusted` says whether it still
+   * does), and the chat posts lists in a thread and shares files into it.
+   */
+  readonly diff?: { trusted: boolean };
   /** More lines of the `.env`, after the selection and the allowed root. */
   readonly env?: readonly string[];
 }
@@ -205,10 +216,17 @@ export class World {
       store: this.store,
       turns: this.turns,
       ...(options.shell === true && { shell: {} }),
+      ...(options.diff !== undefined && {
+        trust: {
+          repository: repositoryAt,
+          trusted: () => options.diff?.trusted === true,
+        },
+      }),
     });
-    this.chat = memoryChat(
-      options.identities === undefined ? {} : { identities: options.identities },
-    );
+    this.chat = memoryChat({
+      ...(options.identities === undefined ? {} : { identities: options.identities }),
+      ...(options.diff !== undefined && { lists: true, files: true }),
+    });
     this.identityKeys = (options.identities ?? [MEMORY_IDENTITY]).length;
     this.channel = this.chat.openChannel("work");
     // The channel is bound before the first start, as the owner's `!bind` of an earlier day left it.
@@ -217,6 +235,15 @@ export class World {
     });
     state.bind(this.channel, this.folder);
 
+    // An agent with a record of trust declares the two members that read it.
+    const absent =
+      options.diff === undefined
+        ? NOT_DECLARED
+        : new Set(
+            [...NOT_DECLARED].filter(
+              (name) => !name.startsWith("trusted") && name !== "folderTrusted",
+            ),
+          );
     const agent: AgentEntry = {
       required: [],
       optional: [],
@@ -224,7 +251,7 @@ export class World {
       toolNames: [],
       limitsHeading: "Limits of a test agent",
       words: { names: [], literals: [], patterns: [] },
-      build: (context) => watched(this.entry.build(context), this.undeclared, "agent"),
+      build: (context) => watched(this.entry.build(context), this.undeclared, "agent", absent),
     };
     const chat: ChatEntry = {
       required: [],

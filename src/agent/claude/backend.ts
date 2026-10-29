@@ -82,7 +82,6 @@ const NOT_OFFERED: Readonly<Record<string, string | null>> = Object.freeze({
   bg: null,
   cd: BOUND_FOLDER,
   "add-dir": BOUND_FOLDER,
-  diff: "Ask Claude for the diff.",
   export: "Copy the reply from its thread.",
   copy: "Copy the reply from its thread.",
   permissions: SETTINGS_APPLY,

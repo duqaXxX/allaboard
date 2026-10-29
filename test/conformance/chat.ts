@@ -28,6 +28,7 @@ import {
   type OwnerRequest,
   type TaskUpdate,
   type ThreadChat,
+  type ThreadList,
   type ThreadRef,
 } from "../../src/chat/seam.ts";
 
@@ -95,6 +96,13 @@ export interface Listed {
   readonly message: MessageId;
 }
 
+/** A list the daemon offered in a thread, as `ThreadChat.offer` showed it. */
+export interface ThreadListed {
+  readonly ref: ThreadRef;
+  readonly list: ThreadList;
+  readonly message: MessageId;
+}
+
 /**
  * Somebody in the chat. What a person does reaches the provider the way it would in the chat:
  * the provider alone decides whether it reaches the daemon.
@@ -105,6 +113,10 @@ export interface Person {
   answers(asked: Asked, answer: OwnerAnswer): Promise<void>;
   /** Uses the control of the row `row` (a folder's path, a session's id) of a list. */
   picks(listed: Listed, row: string): Promise<void>;
+  /** Uses the control of the file `path` of a list offered in a thread. */
+  picksFile(listed: ThreadListed, path: string): Promise<void>;
+  /** Uses the selector of a list offered in a thread to show the view `view`. */
+  picksView(listed: ThreadListed, view: string): Promise<void>;
   /**
    * Deletes the message `said` (the first message of a thread when its id is the thread's own),
    * the way the chat lets a person delete one.
@@ -334,6 +346,30 @@ const UPDATE: OwnerList = {
   sharing: [null, "work2"],
 };
 
+const DIFF_LIST: ThreadList = {
+  type: "diff",
+  view: "current",
+  views: [
+    { id: "current", label: "Current" },
+    { id: "turn-1", label: "T1" },
+  ],
+  files: [
+    { path: "src/a.ts", added: 3, removed: 1, binary: false },
+    { path: "logo.png", added: 0, removed: 0, binary: true },
+  ],
+  session: "session-1",
+};
+
+/** Offers `DIFF_LIST` in the check's thread and finds the message that shows it. */
+async function offerDiff(s: Started): Promise<ThreadListed> {
+  const message = await s.provider.thread(s.ref).offer?.(DIFF_LIST, "Changed files");
+  assert.ok(message, "the list is a message");
+  const where = { channel: s.rig.channel, thread: s.ref.thread };
+  const shown = s.rig.read(where).find((m) => m.id === message);
+  assert.ok(shown?.pressable, "the list has controls");
+  return { ref: s.ref, list: DIFF_LIST, message };
+}
+
 const FOLDERS: OwnerList = {
   type: "folders",
   root: "/work",
@@ -523,6 +559,7 @@ export function chatConformance(
           "nativeStreaming",
           "rootStatus",
           "threadDelete",
+          "threadLists",
           "threadOpen",
           "threadTags",
           "threadTitles",
@@ -574,6 +611,18 @@ export function chatConformance(
       check("has openFile exactly when it declares fileUpload", async ({ provider }) => {
         assert.equal(typeof provider.openFile === "function", provider.capabilities.fileUpload);
       });
+
+      check(
+        "has offer and share exactly when it declares threadLists and fileUpload",
+        async (s) => {
+          const thread = s.provider.thread(s.rig.thread);
+          assert.equal(typeof thread.offer === "function", s.provider.capabilities.threadLists);
+          assert.equal(typeof thread.share === "function", s.provider.capabilities.fileUpload);
+          const limit = s.provider.fileLimit;
+          assert.equal(limit !== undefined, s.provider.capabilities.fileUpload, "fileLimit");
+          if (limit !== undefined) assert.ok(Number.isInteger(limit) && limit > 0, String(limit));
+        },
+      );
 
       check("has open on a channel exactly when it declares threadOpen", async (s) => {
         const channel = s.provider.channel(s.rig.channel);
@@ -1706,6 +1755,62 @@ export function chatConformance(
           assert.equal(message?.topLevel, false);
           assert.equal(message?.literal, false, "read as typed text");
           assert.equal(promptText((await message?.content()) ?? null), "!model opus");
+        },
+      );
+
+      gated(
+        "a control of a list in a thread arrives with the thread, the session and the list's message",
+        "threadLists",
+        async (s) => {
+          const listed = await offerDiff(s);
+          await s.rig.owner.picksFile(listed, "src/a.ts");
+          await s.rig.owner.picksView(listed, "turn-1");
+          assert.deepEqual(s.inbound.picks, [
+            {
+              type: "diff-file",
+              ref: s.ref,
+              session: "session-1",
+              view: "current",
+              path: "src/a.ts",
+              list: listed.message,
+            },
+            {
+              type: "diff-view",
+              ref: s.ref,
+              session: "session-1",
+              view: "turn-1",
+              list: listed.message,
+            },
+          ]);
+        },
+      );
+
+      gated(
+        "a control of a list in a thread from somebody else never arrives",
+        "threadLists",
+        async (s) => {
+          const listed = await offerDiff(s);
+          for (const person of strangers(s.rig)) {
+            await person.picksFile(listed, "src/a.ts");
+            await person.picksView(listed, "turn-1");
+            assert.ok(s.inbound.empty);
+          }
+          await s.rig.owner.picksFile(listed, "src/a.ts");
+          assert.equal(s.inbound.picks.length, 1, "the owner's does, on the same control");
+        },
+      );
+
+      gated(
+        "redraws a list in place, and shares a file without posting a line",
+        "threadLists",
+        async (s) => {
+          const listed = await offerDiff(s);
+          const thread = s.provider.thread(s.ref);
+          const again = await thread.offer?.(DIFF_LIST, "Changed files", listed.message);
+          assert.equal(again, listed.message, "the same message");
+          const where = { channel: s.rig.channel, thread: s.ref.thread };
+          const shown = s.rig.read(where).filter((m) => m.text.includes("Changed files"));
+          assert.equal(shown.length, 1, "no second list");
         },
       );
 

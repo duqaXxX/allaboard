@@ -248,7 +248,7 @@ export class ListsWorld {
         message: async () => {},
         picked: async (pick) => {
           world.picked.push(pick);
-          if (pick.type !== "update") await flows.picks.picked(pick);
+          if (pick.type === "folder" || pick.type === "session") await flows.picks.picked(pick);
         },
       }),
     );

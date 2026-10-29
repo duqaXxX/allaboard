@@ -879,6 +879,33 @@ export function clickIn(
   return body;
 }
 
+/**
+ * `clickIn` for a choice made in a `static_select` of a message: the action carries the option
+ * picked as `selected_option` (the shape the Home tab's filters already read). Slack's
+ * block_actions page (docs.slack.dev/reference/interaction-payloads/block_actions-payload, read
+ * 2026-10-29) shows a button only and says a select's `value` names the chosen option.
+ */
+export function selectIn(
+  actionId: string,
+  value: string,
+  channel: string,
+  threadTs: string,
+  options: { readonly messageTs?: string; readonly user?: Body } = {},
+): Body {
+  const body = clickIn(actionId, value, channel, threadTs, options);
+  const { action_ts: actionTs } = body.actions[0];
+  body.actions = [
+    {
+      type: "static_select",
+      block_id: "diff-views",
+      action_id: actionId,
+      selected_option: { text: { type: "plain_text", text: "View", emoji: true }, value },
+      action_ts: actionTs,
+    },
+  ];
+  return body;
+}
+
 /** The value a posted message's own button carries, read back as a click would send it. */
 export function buttonValue(blocks: Body[], actionId: string): string {
   for (const block of blocks) {

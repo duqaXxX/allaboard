@@ -72,19 +72,15 @@ export class WithFolderTrust extends PlainAgent {
   override readonly words = { ...PLAIN_WORDS, trust: "cd {directory} && plain" };
   readonly trusted = new Set<string>();
 
-  async folderTrusted(): Promise<boolean> {
-    return true;
-  }
+  override folderTrusted = async (): Promise<boolean> => true;
 
-  async trustedRepository(folder: string): Promise<Repository | null> {
-    return this.trusted.has(folder) ? WithFolderTrust.#at(folder) : null;
-  }
+  override trustedRepository = async (folder: string): Promise<Repository | null> =>
+    this.trusted.has(folder) ? WithFolderTrust.#at(folder) : null;
 
-  async untrustedRepository(folder: string): Promise<Repository | null> {
-    return !this.trusted.has(folder) && existsSync(join(folder, ".git"))
+  override untrustedRepository = async (folder: string): Promise<Repository | null> =>
+    !this.trusted.has(folder) && existsSync(join(folder, ".git"))
       ? WithFolderTrust.#at(folder)
       : null;
-  }
 
   static #at(folder: string): Repository {
     return { root: folder, key: folder, gitDir: join(folder, ".git"), insideGitDir: false };
@@ -223,7 +219,7 @@ function variant(
 ): ChatProvider {
   const capabilities: ChatCapabilities = {
     ...inner.capabilities,
-    fileUpload: how.files,
+    fileUpload: how.files || inner.capabilities.fileUpload,
     rootStatus: how.reactions,
     acknowledgement: how.reactions,
     threadTags: how.tags,
@@ -327,6 +323,10 @@ export interface WorldOptions {
   readonly deletes?: boolean;
   /** The chat suggests commands for a `!word` that is none (`suggestCommands`). */
   readonly suggests?: boolean;
+  /** The chat posts lists in a thread and shares files into it (`threadLists`, `ThreadChat.share`). */
+  readonly diff?: boolean;
+  /** With `diff`: the most bytes the chat takes as one shared file. */
+  readonly fileLimit?: number;
   /** The chat has reactions: a word that took effect is marked on the owner's message. */
   readonly reactions?: boolean;
   /** The daemon can update itself, through this host (`World.updates`); absent, it cannot. */
@@ -443,7 +443,14 @@ export class MessagesWorld {
     const earlier = options.restartOf;
     const folder =
       earlier?.folder ?? realpathSync(mkdtempSync(join(tmpdir(), "allaboard-messages-")));
-    const chat = earlier?.chat ?? memoryChat({ suggestions: options.suggests ?? false });
+    const chat =
+      earlier?.chat ??
+      memoryChat({
+        suggestions: options.suggests ?? false,
+        lists: options.diff ?? false,
+        files: options.diff ?? false,
+        ...(options.fileLimit !== undefined && { fileLimit: options.fileLimit }),
+      });
     const provider = await chat.build({
       variables: {},
       allowedRoot: folder,

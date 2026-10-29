@@ -105,6 +105,7 @@ import { type Choice, DEFAULT } from "../setup.ts";
 import { runShell, shellHead } from "../shell.ts";
 import { endsWork } from "../status.ts";
 import * as texts from "../texts.ts";
+import { TurnChanges, type TurnEdits } from "./changes.ts";
 import {
   FAILURE_LIMIT,
   HOLD_MARKER,
@@ -266,6 +267,8 @@ export class ThreadSession {
   private readonly queue = new Queue<Turn>();
   /** Out of the queue, not sent yet. */
   private taken: Turn | null = null;
+  /** The files each turn of this process edited, for `!diff`. */
+  private readonly turnChanges = new TurnChanges();
   private sent: Turn[] = [];
   private active: ActiveTurn | null = null;
   private readonly connectLock = new Mutex();
@@ -636,6 +639,11 @@ export class ThreadSession {
    */
   get resolvedDirectory(): string {
     return this.resolved;
+  }
+
+  /** The turns of this process that edited a file, oldest first, with what each edited. */
+  editsByTurn(): TurnEdits[] {
+    return this.turnChanges.list();
   }
 
   get busy(): boolean {
@@ -2721,6 +2729,9 @@ export class ThreadSession {
         `${this.deps.agent.name} reported an error in ${this.where}: ${event.category}`,
       );
     }
+    if (event.type === "call_ended" && event.fileChange !== null) {
+      this.turnChanges.note(event.fileChange);
+    }
     await active.renderer.feed(event);
     this.adoptPromoted(active.renderer);
     // A call's end can leave its task running in the background, which the list then counts.
@@ -3665,6 +3676,7 @@ export class ThreadSession {
       startedAt: this.now(),
     };
     this.active = active;
+    if (turn !== null) this.turnChanges.begin(turn.uuid);
     // A run is no work of the owner's, nor is the report of a task it started: the card times
     // and foots them (`dateRun`).
     if (!(this.reply(renderer) instanceof LoopReply)) {
