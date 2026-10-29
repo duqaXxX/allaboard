@@ -85,6 +85,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `SDKSessionInfo` | type | info.ts: listedSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `SDKUserMessage` | type | prompt.ts: Content, userMessage; session.ts: QueryFunction, ClaudeSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `SessionStore` | type | goals.ts: goalStore | package | P33 |
+| `@anthropic-ai/claude-agent-sdk` | `RewindFilesResult` | type | rewind.ts: filesRestore; session.ts: QueryHandle | reference | P44 |
 | `@anthropic-ai/claude-agent-sdk` | `SessionMessage` | type | turns.ts: turnsOf | package | none |
 | `@anthropic-ai/claude-agent-sdk` | `forkSession` | function | backend.ts: ClaudeBackend.forkSession | reference | P43 |
 | `@anthropic-ai/claude-agent-sdk` | `getSessionInfo` | function | backend.ts: ClaudeBackend.sessionTitle | reference | none |
@@ -98,6 +99,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Query` | `getContextUsage` | method | session.ts: ClaudeSession.contextUsage | reference | P2 |
 | `Query` | `initializationResult` | method | session.ts: ClaudeSession.ready, ClaudeSession.info | reference | P2 |
 | `Query` | `interrupt` | method | session.ts: ClaudeSession.interrupt | reference | P8 |
+| `Query` | `rewindFiles` | method | session.ts: ClaudeSession.restoreFiles | reference | P44 |
 | `Query` | `setPermissionMode` | method | session.ts: ClaudeSession.setPermissionMode | reference | P9 |
 | `Query` | `stopTask` | method | session.ts: ClaudeSession.stopTask | reference | P12 |
 | `HookCallbackMatcher` | `hooks` | option | session.ts: ClaudeSession.#options | reference | none |
@@ -105,6 +107,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `canUseTool` | option | session.ts: ClaudeSession.#options | reference | P11 |
 | `Options` | `cwd` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `effort` | option | session.ts: ClaudeSession.#options | reference | P16 |
+| `Options` | `enableFileCheckpointing` | option | session.ts: ClaudeSession.#options | reference | P44 |
 | `Options` | `env` | option | session.ts: ClaudeSession.#options, sessionEnvironment | reference | none |
 | `env` | `CLAUDE_CODE_RESUME_SOURCE_ALIVE` | key | session.ts: forkSource | measured | P43 |
 | `Options` | `extraArgs` | option | session.ts: ClaudeSession.#options | reference | none |
@@ -112,6 +115,8 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `includePartialMessages` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `model` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `resume` | option | session.ts: ClaudeSession.#options | reference | P7 |
+| `Options` | `resumeSessionAt` | option | session.ts: ClaudeSession.#options | reference | P45 |
+| `Options` | `resumeDropsTurn` | option | session.ts: ClaudeSession.#options | package | P45 |
 | `Options` | `settingSources` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `stderr` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `systemPrompt` | option | session.ts: ClaudeSession.#options | reference | none |
@@ -147,8 +152,16 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `forkSession` | `title` | option | backend.ts: ClaudeBackend.forkSession | reference | none |
 | `forkSession` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
 | `ForkSessionResult` | `sessionId` | field | backend.ts: ClaudeBackend.forkSession | package | P43 |
+| `Query.rewindFiles` | `dryRun` | key | session.ts: ClaudeSession.restoreFiles | measured | P44 |
+| `RewindFilesResult` | `canRewind` | field | rewind.ts: filesRestore | reference | P44 |
+| `RewindFilesResult` | `error` | field | rewind.ts: filesRestore | reference | P44 |
+| `RewindFilesResult` | `filesChanged` | field | rewind.ts: filesRestore | reference | P44 |
+| `RewindFilesResult` | `insertions` | field | rewind.ts: filesRestore | reference | P44 |
+| `RewindFilesResult` | `deletions` | field | rewind.ts: filesRestore | reference | P44 |
+| `RewindFilesResult` | `skippedLinks` | field | rewind.ts: filesRestore | reference | P44 |
 | `getSessionInfo` | `dir` | option | backend.ts: ClaudeBackend.sessionTitle | reference | none |
 | `getSessionInfo` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
+| `getSessionMessages` | `includeSystemMessages` | option | backend.ts: ClaudeBackend.#rewindStart | package | none |
 | `getSessionMessages` | `dir` | option | turns.ts: turnsAfter | reference | none |
 | `listSessions` | `dir` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `includeWorktrees` | option | listing.ts: directorySessions | reference | none |
@@ -451,6 +464,7 @@ union, none of which any recording carries.
 - `stream_event:message_delta`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`
 - `system:api_retry`: `SDKAPIRetryMessage`
 - `system:background_tasks_changed`: `SDKBackgroundTasksChangedMessage`
+- `system:hook_started`: `SDKHookStartedMessage`
 - `system:notification`: `SDKNotificationMessage`
 - `system:thinking_tokens`: `SDKThinkingTokensMessage`
 - `tool_progress`: `SDKToolProgressMessage`
@@ -464,7 +478,6 @@ union, none of which any recording carries.
 - `SDKFilesPersistedEvent`
 - `SDKHookProgressMessage`
 - `SDKHookResponseMessage`
-- `SDKHookStartedMessage`
 - `SDKInformationalMessage`
 - `SDKLocalCommandOutputMessage`
 - `SDKMemoryRecallMessage`

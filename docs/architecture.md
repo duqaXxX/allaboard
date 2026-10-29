@@ -61,7 +61,7 @@ What crosses the agent seam:
 
 | Crossing | Direction | What |
 |---|---|---|
-| commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions` and `aliveSessions` (with `sessionListing`), `folderTrusted`, `trustedRepository` and `untrustedRepository` (with `folderTrust`), `usageLimits`, `tagSession`, `forkSession` (with `sessionForks`), `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask` (with `subagents` or `backgroundTasks`), `setPermissionMode`, `setModel`, `setEffort` (with `liveEffort`), `contextUsage`, `loaded` (with `loadedContext`), `info`, `close` |
+| commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions` and `aliveSessions` (with `sessionListing`), `folderTrusted`, `trustedRepository` and `untrustedRepository` (with `folderTrust`), `usageLimits`, `tagSession`, `forkSession` (with `sessionForks`), `prompts` (with `fileRestore` or `conversationRewind`), `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask` (with `subagents` or `backgroundTasks`), `setPermissionMode`, `setModel`, `setEffort` (with `liveEffort`), `contextUsage`, `restoreFiles` (with `fileRestore`), `loaded` (with `loadedContext`), `info`, `close` |
 | events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), word that the running turn took a task's notification (`notification_folded`), a message from another of the owner's sessions (`peer_message`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
 | declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, and `AgentBackend.tools`, the `ToolVocabulary` of the tools the terminal shows in words or a preview of its own (also on the `AgentEntry`, readable without a back end; `NO_TOOL_WORDS` for an agent with none), which `Previews` of `src/core/reply/previews.ts` draws and every other tool shows generically, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
@@ -252,6 +252,8 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `usageLimits` | `AgentBackend.usageLimits` is absent and the footer shows no limit |
 | `sessionTags` | `AgentBackend.tagSession` is absent and `!tag` and `!untag` change the chat's tag alone; a thread whose session has no id yet is tagged in the chat alone as well. A rejection of `tagSession` leaves the chat's tag and is told to the owner (`texts.TAG_AGENT_FAILED`) |
 | `sessionTitles` | `AgentBackend.sessionTitle` is absent: the core shows no title on the root and `!status` has no `Title:` |
+| `fileRestore` | `AgentSession.restoreFiles` is absent and `!rewind` offers no Restore code; with neither this nor `conversationRewind` `!rewind` is not offered |
+| `conversationRewind` | `StartOptions.rewindTo` is never passed and `!rewind` offers no Restore conversation |
 | `goals` | a `goal_changed` event is ignored, with a warning in the log: a reply shows no goal line, `!stop` never says a goal is still set, and a channel's `!stop` drops no goal (`AgentSession.clearGoal` is never called) |
 | `models` | `AgentInfo.models` is ignored: the setup has no Model select and `AgentSession.setModel` is never called |
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
@@ -267,7 +269,8 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `acknowledgement` | `ThreadChat.acknowledge` is absent and a word that took effect is not marked on the owner's message |
 | `activityLine` | `ThreadChat.showActivity` and `activityRefused` are absent, the session shows no activity line, and no message says that a restart waits |
 | `fileUpload` | `ChatProvider.openFile` and `ThreadChat.share` are absent, `!open` answers that the chat cannot show a file (`texts.OPEN_UNAVAILABLE`), and `!diff` is not offered |
-| `threadLists` | `ThreadChat.offer` is absent and `!diff` is not offered: `!help`, `!guide` and the suggestions leave it out, and typing it answers `texts.DIFF_UNAVAILABLE`. The picks of such a list reach the core as `diff-file` and `diff-view` (`ListPick`) |
+| `threadLists` | `ThreadChat.offer` is absent and `!diff` and `!rewind` are not offered: `!help`, `!guide` and the suggestions leave them out, and typing one answers `texts.DIFF_UNAVAILABLE` or `texts.REWIND_UNAVAILABLE`. The picks of such a list reach the core as `diff-file`, `diff-view`, `rewind-point` and `rewind-action` (`ListPick`) |
+| `messageFold` | `ThreadChat.fold` and `Reply.posted` are absent: `!rewind` still goes back, and a line says the replies after the prompt were not marked as removed (`texts.REWIND_NO_FOLD`) |
 | `threadTags` | `ChatProvider.tagThread` is absent, `!tag` and `!untag` answer that the chat cannot tag a thread (`texts.TAG_UNAVAILABLE`), and `!help` and `!guide` leave them out |
 | `threadTitles` | `ChatProvider.titleThread` is absent and the core reads no title for the root, whatever the agent declares |
 | `threadDelete` | `ChatProvider.deleteThread` is absent, `!delete-thread` answers that the chat cannot delete a thread (`texts.DELETE_THREAD_UNAVAILABLE`), and `!help` and `!guide` leave it out |
@@ -1751,6 +1754,56 @@ agent's own line (`AgentWords.trust`).
   `patchOfEdits` turn those hunks into rows and a patch for files inside the repository. They are
   not stored: a restart, an idle close of the process and a turn typed in a terminal leave none,
   and a change made by a shell command is under `Current` only.
+
+## Going back with `!rewind`
+
+`!rewind` is the core's (`src/core/flows/rewind.ts`); the agent lists the prompts and restores
+the files or cuts the conversation, the chat draws two lists and folds messages
+(`ThreadChat.offer`, `ThreadChat.fold`). The agent declares `fileRestore` and
+`conversationRewind` (either is enough for the word to be offered), the chat `threadLists`.
+
+- **The list.** `AgentBackend.prompts` returns the session's prompts oldest first, each as
+  `RewindPoint { id, text, conversation }`; the core hands the chat the newest first. `id` is the
+  id the prompt was sent under (`Prompt.id`, the turn's `uuid`). A pick carries the session and
+  the prompt id and nothing else; the prompts are read again when a control is used, and an id
+  the agent no longer lists is told (`texts.REWIND_POINT_GONE`).
+- **The actions.** A pick of a prompt asks `restoreFiles(id, true)` (a preview that changes
+  nothing); the code actions are offered when it says `possible` and lists files, and the
+  conversation action when `conversationRewind` is declared and `RewindPoint.conversation` is true
+  (Claude: not for the session's first prompt, which has no earlier entry to resume at). Restore
+  code and conversation restores the files first, on the live session, whose checkpoints they are,
+  then cuts. The terminal's Summarize options are not offered: no seam member compacts part of a
+  conversation.
+- **The cut.** `ThreadSession.rewindConversation` refuses while the session is in use (a turn, a
+  request or a background task), and reads in use while it runs; it drops the client and starts the
+  agent again with `StartOptions.rewindTo` under one hold of the connect lock, so no queued prompt
+  connects between the two. The session id is kept. The agent keeps a cut only once a prompt is
+  written after it (Claude: measured 2026-10-29, SDK 0.3.312), so `RewindMemory.cutAt` stays set
+  and every start asks for it again until a prompt is sent, with the agent's token for the
+  conversation as the cut found it (`AgentSession.rewindToken`, `StartOptions.rewindToken`, opaque
+  to the core): the agent refuses the cut once someone else wrote to the session, the thread goes
+  on without it and the owner is told (`texts.REWIND_DROPPED`). A move to a terminal drops the cut too (and tells the owner,
+  `texts.REWIND_DROPPED_TERMINAL`); the turns a terminal wrote are kept by the token alone, since
+  the foreign-turn check has no saved message to compare with until the next prompt. `!rewind` lists only the prompts before a cut that waits. `RewindRefused` (the agent could not
+  cut there) starts the session without the cut; a refusal when the cut is asked again after an
+  idle close is logged and the thread goes on with the whole conversation. The saved message of
+  the foreign-turn check and the turns' edits of `!diff` of the dropped prompts are forgotten. What is
+  folded and forgotten is the dropped prompts' (the agent's list from the picked one on), found by
+  id.
+- **The replies.** `sessions/rewind-memory.RewindMemory` remembers, per prompt, the replies its
+  turn wrote into (`Reply.posted`, the messages each has posted) and, for a turn the agent
+  started, the prompt before it. After a cut the core folds every message from the picked prompt
+  on (`ThreadChat.fold(message, texts.REWOUND_TITLE)`), posts the prompt again with `say`, and
+  tells the owner. It keeps the last 50 prompts and is handed to the session that replaces a
+  closed one, as the goal is, with its replies let go of into ids. Nothing is stored in
+  `state.json` (invariant 3): after a restart of allaboard the replies of earlier turns are not
+  known and are not folded (`texts.REWIND_UNKNOWN_REPLIES`).
+- **Claude.** `claude/rewind.ts` reads `getSessionMessages`: the prompts are the user entries
+  `promptOf` reads, minus the slash-command records (`<command-name>`); the cut resumes at the
+  entry before the prompt (`resumeSessionAt`) and declares the turn it drops (`resumeDropsTurn`)
+  only when no prompt follows, since the SDK's guard accepts one turn and refused two (measured
+  2026-10-29). Every non-bare session starts with `enableFileCheckpointing`. A start the CLI
+  refuses arrives through `initializationResult()` and is `RewindRefused` when a cut was asked.
 
 ## Updating allaboard
 

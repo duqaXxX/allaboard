@@ -14,6 +14,7 @@ import {
   type EffortLevel,
   type HookCallback,
   type Options,
+  type RewindFilesResult,
   type SDKUserMessage,
   type PermissionMode as SdkPermissionMode,
   query as sdkQuery,
@@ -24,12 +25,14 @@ import {
   type AgentInfo,
   type AgentSession,
   type ContextUsage,
+  type FilesRestore,
   type ForkSource,
   type LoadedContext,
   type PermissionMode,
   type Prompt,
   type RequestHandler,
   ResumeRefused,
+  RewindRefused,
   type SessionEvent,
   type StartOptions,
 } from "../seam.ts";
@@ -40,6 +43,7 @@ import { postModelSwitchHookEvents, postToolUseHookEvents, stopHookEvents } from
 import { agentInfo, contextUsage as contextUsageOf, loadedContext } from "./info.ts";
 import { userMessage } from "./prompt.ts";
 import { permissionResult, questionResult, toRequest } from "./requests.ts";
+import { filesRestore } from "./rewind.ts";
 import { Translator } from "./translate.ts";
 
 export const logger = getLogger("allaboard.agent.claude.session");
@@ -94,6 +98,7 @@ export interface QueryHandle extends AsyncIterable<unknown> {
   applyFlagSettings(settings: { effortLevel: EffortLevel | null }): Promise<void>;
   initializationResult(): Promise<unknown>;
   getContextUsage(): Promise<unknown>;
+  rewindFiles(userMessageId: string, options?: { dryRun?: boolean }): Promise<RewindFilesResult>;
   close(): void;
 }
 
@@ -135,6 +140,15 @@ export interface SessionConfig extends StartOptions {
    * defaults.
    */
   readonly bare?: boolean;
+  /**
+   * With `resume`: the entry the conversation is kept up to (`resumeSessionAt`), everything after
+   * it dropped; the backend resolves it from `rewindTo`.
+   */
+  readonly resumeSessionAt?: string;
+  /** With `resumeSessionAt`: the turn it drops, which the CLI checks (`resumeDropsTurn`). */
+  readonly resumeDropsTurn?: string;
+  /** With `resumeSessionAt`: the conversation's last entry when the cut was made (`rewindToken`). */
+  readonly resumeTail?: string;
   /**
    * The owner's own variables for Claude Code, as the daemon's file gives them: they reach the
    * process of a thread's session over everything else in its environment.
@@ -294,6 +308,11 @@ export class ClaudeSession implements AgentSession {
   // An error result arrived before the process answered the start: a resume it refused.
   #startRefused = false;
 
+  /** The token of the cut this session was started with, else absent. */
+  get rewindToken(): string | undefined {
+    return this.#config.resumeTail;
+  }
+
   /** Spawns the Claude Code process: `ready` says when it answered. */
   constructor(
     config: SessionConfig,
@@ -313,6 +332,7 @@ export class ClaudeSession implements AgentSession {
 
   #options(requests: RequestHandler): Options {
     const { folder, resume, model, effort, chrome, bare, variables, forkOf } = this.#config;
+    const { resumeSessionAt, resumeDropsTurn } = this.#config;
     // Makes bypass possible, not active: `setPermissionMode` switches it on the live session.
     // `replay-user-messages` (CLI reference): Claude Code re-emits each prompt with the uuid the
     // daemon sent it under, which tells a prompt it took into a running turn from one that waits
@@ -323,6 +343,10 @@ export class ClaudeSession implements AgentSession {
     return {
       cwd: folder,
       ...(resume !== null && { resume }),
+      // The cut of a rewind: the session id is kept (no `forkSession`), and the cut holds only
+      // once a prompt is written after it (measured 2026-10-29), which the core takes care of.
+      ...(resume !== null && resumeSessionAt !== undefined && { resumeSessionAt }),
+      ...(resume !== null && resumeDropsTurn !== undefined && { resumeDropsTurn }),
       // The effort `/effort` set does not survive a resume (measured 2026-09-28), so the daemon
       // keeps it per thread and passes it back here.
       ...(effort !== null && { effort: effortOf(effort) }),
@@ -330,6 +354,9 @@ export class ClaudeSession implements AgentSession {
       settingSources: [...this.#config.settingsSources],
       includePartialMessages: true,
       ...(!bare && {
+        // A checkpoint of the files at each prompt, which `!rewind` puts back (a session started
+        // without it has none to restore). Every session of a thread is started with it.
+        enableFileCheckpointing: true,
         allowDangerouslySkipPermissions: true,
         systemPrompt: SYSTEM_PROMPT,
         toolConfig: TOOL_CONFIG,
@@ -462,8 +489,14 @@ export class ClaudeSession implements AgentSession {
       // The stream is read to its end first: the error result it carries tells a refused resume
       // from a process that failed to start.
       await this.close();
-      if (this.#config.resume !== null && this.#startRefused)
+      if (this.#config.resume !== null && this.#startRefused) {
+        // A rewind's start that the CLI refused (its guard, `Resume rejected by
+        // --resume-drops-turn:`, or a point it does not know) leaves the session as it was: the
+        // thread goes on, not the `ResumeRefused` of a transcript that is gone. Both arrive
+        // through `initializationResult`, as an error result (recorded 2026-10-29).
+        if (this.#config.resumeSessionAt !== undefined) throw new RewindRefused({ cause: error });
         throw new ResumeRefused({ cause: error });
+      }
       throw underItsName(error);
     }
   }
@@ -564,6 +597,13 @@ export class ClaudeSession implements AgentSession {
   async setEffort(level: string | null): Promise<void> {
     const effortLevel = level === null ? null : effortOf(level);
     await this.#ask(() => this.#query.applyFlagSettings({ effortLevel }));
+  }
+
+  /** The files as they were at the prompt, back or forward (the SDK's `rewindFiles`). */
+  async restoreFiles(promptId: string, preview: boolean): Promise<FilesRestore> {
+    return filesRestore(
+      await this.#ask(() => this.#query.rewindFiles(promptId, { dryRun: preview })),
+    );
   }
 
   async contextUsage(): Promise<ContextUsage> {

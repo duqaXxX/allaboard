@@ -387,6 +387,15 @@ test("the first content starts the stream and nothing comes before it", async ()
   assert.deepEqual(start.chunks, [{ type: "markdown_text", text: "Looking at the files." }]);
 });
 
+test("posted lists the reply's messages as they are written, in order", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  assert.deepEqual(sink.posted(), []);
+  await sink.text("Looking at the files.");
+  await settled();
+  assert.deepEqual(sink.posted(), [slack.streamTs[0]]);
+});
+
 test("a turn that opens with a tool starts with its card", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);

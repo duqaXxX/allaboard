@@ -567,8 +567,10 @@ the doc comments of the symbols named here.
 
 ## Lists in a thread
 
-`!diff` posts a list in the session's thread and shares a file when one of its controls is used.
-The core decides what is listed and what a control does ([Changed files of `!diff`](architecture.md#changed-files-of-diff));
+`!diff` and `!rewind` post a list in the session's thread, and `!diff` shares a file when one of
+its controls is used. The core decides what is listed and what a control does
+([Changed files of `!diff`](architecture.md#changed-files-of-diff),
+[Going back with `!rewind`](architecture.md#going-back-with-rewind));
 the provider declares `threadLists` and draws.
 
 - **Drawing.** `SlackThread.offer` posts `lists.diffBlocks` with `chat.postMessage`, or, given the
@@ -583,6 +585,23 @@ the provider declares `threadLists` and draws.
   workspace and the thread (`Answers.admitted`), read the value, which is untrusted, and call
   `ChatInbound.picked` with a `diff-file` or `diff-view` pick. A value of another shape reaches
   nothing. The core checks the session of the pick against the thread's own.
+- **The rewind lists.** `lists.listBlocks` draws the prompts of `!rewind` as one context line and
+  a `static_select` of the newest `lists.REWIND_POINTS` (100, the select's limit), each option
+  its first words (75 characters) and the value `[session, prompt]`; a prompt whose value is over
+  150 characters is left out. The actions at a prompt are buttons whose value is `[session,
+  prompt, action]`, the code one with its counts (`2 files, +3 −1`). `ThreadLists.onRewindPoint`
+  and `onRewindAction` acknowledge, check the owner, the workspace and the thread, read the value,
+  and refuse an action that is none of the four words, before `ChatInbound.picked` is called.
+- **Folding.** `SlackThread.fold` (`fold.foldMessage`, with `messageFold`) reads the message back
+  with `conversations.replies` (`oldest` and `latest` its own ts, `inclusive`, `limit` 1), turns
+  its blocks into text (`markdown`, `section`, `header`, `context`, `rich_text` and `task_card`
+  title, details and output) and rewrites it with `chat.update` as one `task_card` with status
+  `complete`, the title the core gave and the text as its `details`, under the fixed block id
+  `task-folded-<ts>` that keeps an opened card open across an edit. Text past `CARD_TEXT_LIMIT`
+  (2,900 characters) is cut with a marker. A message that cannot be read or rewritten answers
+  false, and the core says how many were not marked. `Reply.posted` (`ReplySink.posted`) gives
+  the messages of a reply, its closing message included. Not measured: whether `chat.update`
+  replaces a message that was a native stream, and Slack's real limit for a card's `details`.
 - **Sharing.** `SlackThread.share` uploads the bytes with `files.uploadV2` through
   `read.shareFile`, the name and title the core gave; `uploadFile` of `!open` is the same call with
   the basename and path of a file of the folder. Slack's error code becomes the `ChatError` the

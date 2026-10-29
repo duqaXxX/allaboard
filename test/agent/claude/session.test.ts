@@ -149,11 +149,14 @@ test(
     assert.equal(options.includePartialMessages, true);
     // Makes bypass possible, not active.
     assert.equal(options.allowDangerouslySkipPermissions, true);
+    // The checkpoints `!rewind` restores the files from.
+    assert.equal(options.enableFileCheckpointing, true);
     assert.deepEqual(options.extraArgs, { "replay-user-messages": null });
     assert.deepEqual(Object.keys(options).sort(), [
       "allowDangerouslySkipPermissions",
       "canUseTool",
       "cwd",
+      "enableFileCheckpointing",
       "env",
       "extraArgs",
       "hooks",

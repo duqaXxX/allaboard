@@ -36,6 +36,7 @@ import type {
   CommandInfo,
   ContextUsage,
   FileChange,
+  FilesRestore,
   ForeignTurns,
   GoalChange,
   ListedSession,
@@ -50,6 +51,7 @@ import type {
   QuestionRequest,
   Repository,
   RequestHandler,
+  RewindPoint,
   SavedMessage,
   ScheduledJob,
   SessionEvent,
@@ -59,7 +61,7 @@ import type {
   StartOptions,
   ToolVocabulary,
 } from "../../src/agent/seam.ts";
-import { NO_TOOL_WORDS, ResumeRefused } from "../../src/agent/seam.ts";
+import { NO_TOOL_WORDS, ResumeRefused, RewindRefused } from "../../src/agent/seam.ts";
 
 export const PLAIN_NAME = "Plain";
 
@@ -132,6 +134,8 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   sessionTags: false,
   sessionTitles: false,
   sessionForks: true,
+  fileRestore: false,
+  conversationRewind: false,
   goals: false,
   scheduledJobs: false,
   shellCommands: false,
@@ -278,6 +282,8 @@ interface Stored {
   readonly folder: string;
   title: string;
   lastModified: number;
+  /** The prompts the owner sent, with the files of the folder as they were when each was sent. */
+  prompts: { readonly point: RewindPoint; readonly files: ReadonlyMap<string, string> }[];
 }
 
 /**
@@ -287,11 +293,91 @@ interface Stored {
 export class PlainStore {
   readonly #sessions = new Map<string, Stored>();
   readonly #now: () => number;
+  /** The files each folder holds, by path: a test writes them, a restore puts them back. */
+  readonly #files = new Map<string, Map<string, string>>();
   #counter = 0;
   #last = 0;
 
   constructor(options: { readonly now?: () => number } = {}) {
     this.#now = options.now ?? Date.now;
+  }
+
+  /** Writes a file of `folder` the way the agent's own edit would: a test stands in for the agent. */
+  writeFile(folder: string, path: string, content: string): void {
+    const files = this.#files.get(folder) ?? new Map<string, string>();
+    this.#files.set(folder, files);
+    files.set(path, content);
+  }
+
+  /** The content of a file of `folder`, null when there is none. */
+  file(folder: string, path: string): string | null {
+    return this.#files.get(folder)?.get(path) ?? null;
+  }
+
+  /** Records a prompt of the session, with the files as they are now. */
+  addPrompt(folder: string, id: string, point: RewindPoint): void {
+    const stored = this.#sessions.get(id);
+    if (stored === undefined || stored.folder !== folder) return;
+    stored.prompts.push({ point, files: new Map(this.#files.get(folder) ?? []) });
+  }
+
+  /** The id of the session's last prompt, "" for a session with none: the token of its conversation. */
+  tail(folder: string, id: string): string {
+    return this.prompts(folder, id).at(-1)?.id ?? "";
+  }
+
+  /** The prompts of the session, oldest first; none for a session it does not have. */
+  prompts(folder: string, id: string): RewindPoint[] {
+    const stored = this.#sessions.get(id);
+    return stored?.folder === folder ? stored.prompts.map((entry) => entry.point) : [];
+  }
+
+  /** Drops the prompt `promptId` and every later one from the session; false for none such. */
+  cut(folder: string, id: string, promptId: string): boolean {
+    const stored = this.#sessions.get(id);
+    const at = stored?.prompts.findIndex((entry) => entry.point.id === promptId) ?? -1;
+    if (stored === undefined || stored.folder !== folder || at === -1) return false;
+    stored.prompts.splice(at);
+    return true;
+  }
+
+  /**
+   * The files of `folder` as they were at the prompt, back or forward: with `preview` only what
+   * it would change. A line counts as changed by its text; the counts are those of the restore.
+   */
+  restore(folder: string, id: string, promptId: string, preview: boolean): FilesRestore {
+    const stored = this.#sessions.get(id);
+    const entry =
+      stored?.folder === folder ? stored.prompts.find((e) => e.point.id === promptId) : undefined;
+    if (entry === undefined) {
+      return {
+        possible: false,
+        reason: "no checkpoint for that prompt",
+        files: [],
+        insertions: 0,
+        deletions: 0,
+        skipped: 0,
+      };
+    }
+    const now = this.#files.get(folder) ?? new Map<string, string>();
+    const paths = [...new Set([...now.keys(), ...entry.files.keys()])].sort();
+    const files: string[] = [];
+    let insertions = 0;
+    let deletions = 0;
+    for (const path of paths) {
+      const was = entry.files.get(path) ?? null;
+      const is = now.get(path) ?? null;
+      if (was === is) continue;
+      files.push(path);
+      const lines = (text: string | null) => (text === null || text === "" ? [] : text.split("\n"));
+      insertions += lines(was).filter((line) => !lines(is).includes(line)).length;
+      deletions += lines(is).filter((line) => !lines(was).includes(line)).length;
+      if (!preview) {
+        if (was === null) now.delete(path);
+        else now.set(path, was);
+      }
+    }
+    return { possible: true, reason: null, files, insertions, deletions, skipped: 0 };
   }
 
   newId(): string {
@@ -308,7 +394,7 @@ export class PlainStore {
     this.#last = Math.max(this.#now(), this.#last + 1);
     const stored = this.#sessions.get(id);
     if (stored === undefined) {
-      this.#sessions.set(id, { id, folder, title, lastModified: at ?? this.#last });
+      this.#sessions.set(id, { id, folder, title, lastModified: at ?? this.#last, prompts: [] });
     } else {
       stored.lastModified = at ?? this.#last;
       if (stored.title === "") stored.title = title;
@@ -324,6 +410,7 @@ export class PlainStore {
     if (stored === undefined || stored.folder !== folder) throw new Error(`no session ${id}`);
     const copy = this.newId();
     this.remember(folder, copy, title ?? `${stored.title} (fork)`);
+    // The copy's checkpoints are not the original's, as the Claude agent's (measured 2026-10-28).
     return copy;
   }
 
@@ -449,12 +536,18 @@ export interface PlainSessionContext {
   readonly models: readonly ModelInfo[];
   /** The session is named (`session_started`) when it starts, not with its first prompt. */
   readonly namedAtStart: boolean;
+  /** The agent keeps the prompts and checkpoints of its sessions (`fileRestore`, `conversationRewind`). */
+  readonly rewinds: boolean;
+  /** The conversation cannot be cut before a session's first prompt. */
+  readonly firstUncuttable: boolean;
 }
 
 export class PlainSession implements AgentSession {
   readonly events: AsyncIterable<SessionEvent>;
   readonly id: string;
   readonly options: StartOptions;
+  /** With `rewindTo`: the conversation's token when the cut was made. */
+  readonly rewindToken?: string;
   /** Every prompt sent, in order. */
   readonly prompts: Prompt[] = [];
   /** Every request put to the owner with the answer it got. */
@@ -467,11 +560,15 @@ export class PlainSession implements AgentSession {
   #turn: AbortController | null = null;
   #released: (() => void) | null = null;
   #sequence = 0;
+  #cut = false;
 
   constructor(context: PlainSessionContext) {
     this.#context = context;
     this.id = context.id;
     this.options = context.options;
+    if (context.options.rewindTo !== undefined) {
+      this.rewindToken = context.store.tail(context.options.folder, context.id);
+    }
     this.events = this.#queue;
     if (context.namedAtStart) this.#name();
   }
@@ -492,6 +589,21 @@ export class PlainSession implements AgentSession {
     this.prompts.push(prompt);
     const text = textOf(prompt);
     this.#context.store.remember(this.options.folder, this.id, text);
+    if (this.#context.rewinds && this.#command(text) === null) {
+      const { store } = this.#context;
+      const { folder, rewindTo } = this.options;
+      // A cut holds only once a prompt is written after it, as the Claude agent's does.
+      if (rewindTo !== undefined && !this.#cut) {
+        this.#cut = true;
+        store.cut(folder, this.id, rewindTo);
+      }
+      const first = store.prompts(folder, this.id).length === 0;
+      store.addPrompt(folder, this.id, {
+        id: prompt.id,
+        text,
+        conversation: !(first && this.#context.firstUncuttable),
+      });
+    }
     this.#chain = this.#chain.then(() => this.#play(text));
   }
 
@@ -528,6 +640,9 @@ export class PlainSession implements AgentSession {
   }
 
   loaded?: () => Promise<LoadedContext>;
+
+  /** Present with `fileRestore`. */
+  restoreFiles?: (promptId: string, preview: boolean) => Promise<FilesRestore>;
 
   async info(): Promise<AgentInfo> {
     return {
@@ -805,6 +920,19 @@ export interface PlainAgentOptions {
    * repository of a folder is what `repository` answers while `trusted` says the folder is
    * trusted. Its line to ask for trust is `trust {directory}`.
    */
+  /**
+   * The agent keeps a prompt list and checkpoints (`prompts`): `files` adds `fileRestore`
+   * (`restoreFiles` over the files a test writes to the store), `conversation` adds
+   * `conversationRewind` (`rewindTo` cuts the store's record of the session once a prompt is
+   * sent after it), and `refuse` makes every start with `rewindTo` reject with `RewindRefused`.
+   */
+  readonly rewind?: {
+    readonly files?: true;
+    readonly conversation?: true;
+    readonly refuse?: true;
+    /** `RewindPoint.conversation` is false for a session's first prompt, as the Claude agent's is. */
+    readonly firstUncuttable?: true;
+  };
   readonly trust?: {
     readonly repository: (folder: string) => Promise<Repository | null>;
     readonly trusted: (folder: string) => boolean;
@@ -842,10 +970,12 @@ export class PlainAgent implements AgentBackend {
   untrustedRepository?: (folder: string) => Promise<Repository | null>;
   sessionHolders?: (session: string) => Promise<readonly SessionHolder[] | null>;
   turnsAfter?: (folder: string, session: string, after: SavedMessage) => Promise<ForeignTurns>;
+  prompts?: (folder: string, session: string) => Promise<readonly RewindPoint[]>;
   /** What each live session answers to `loaded`, with `loadedContext`. */
   readonly loaded: LoadedContext | null;
   readonly models: readonly ModelInfo[];
   readonly #namedAtStart: boolean;
+  readonly #rewind: PlainAgentOptions["rewind"];
 
   constructor(options: PlainAgentOptions = {}) {
     const words =
@@ -860,6 +990,15 @@ export class PlainAgent implements AgentBackend {
     this.loaded = options.loaded ?? null;
     this.models = options.models ?? [];
     this.#namedAtStart = options.namedAtStart === true;
+    this.#rewind = options.rewind;
+    if (options.rewind !== undefined) {
+      this.capabilities = Object.freeze({
+        ...this.capabilities,
+        fileRestore: options.rewind.files === true,
+        conversationRewind: options.rewind.conversation === true,
+      });
+      this.prompts = async (folder, session) => this.store.prompts(folder, session);
+    }
     if (options.models !== undefined) {
       this.capabilities = Object.freeze({ ...this.capabilities, models: true });
     }
@@ -921,6 +1060,15 @@ export class PlainAgent implements AgentBackend {
     if (options.resume !== null && !this.store.has(options.folder, options.resume)) {
       throw new ResumeRefused();
     }
+    if (options.rewindTo !== undefined && this.#rewind?.refuse === true) throw new RewindRefused();
+    // A cut asked for again over a conversation that has grown since is refused, as Claude's is.
+    if (
+      options.rewindToken !== undefined &&
+      options.resume !== null &&
+      this.store.tail(options.folder, options.resume) !== options.rewindToken
+    ) {
+      throw new RewindRefused();
+    }
     const session = new PlainSession({
       id: options.resume ?? this.store.newId(),
       options,
@@ -929,7 +1077,13 @@ export class PlainAgent implements AgentBackend {
       takeTurn: () => this.turns.shift() ?? [say("ok")],
       models: this.models,
       namedAtStart: this.#namedAtStart,
+      rewinds: this.#rewind !== undefined,
+      firstUncuttable: this.#rewind?.firstUncuttable === true,
     });
+    if (this.#rewind?.files === true) {
+      session.restoreFiles = async (promptId, preview) =>
+        this.store.restore(options.folder, session.id, promptId, preview);
+    }
     const loaded = this.loaded;
     if (loaded !== null) session.loaded = async () => loaded;
     this.sessions.push(session);

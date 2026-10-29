@@ -20,6 +20,7 @@ import type {
   Options,
   PermissionMode,
   PermissionResult,
+  RewindFilesResult,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
@@ -95,6 +96,7 @@ export type ControlCall =
   | { readonly method: "setPermissionMode"; readonly mode: PermissionMode }
   | { readonly method: "applyFlagSettings"; readonly effortLevel: EffortLevel | null }
   | { readonly method: "getContextUsage" }
+  | { readonly method: "rewindFiles"; readonly id: string; readonly dryRun: boolean }
   | { readonly method: "close" };
 
 export interface FakeScript {
@@ -109,6 +111,12 @@ export interface FakeScript {
   /** The initialize request fails with this, as when Claude Code refuses to resume. */
   readonly initError?: Error;
   readonly contextUsage?: unknown;
+  /**
+   * The answer to `rewindFiles`, by the prompt id and `dry` or `real` (the SDK's `dryRun`);
+   * `test/fixtures/sdk/rewind-files.json` holds recorded ones. A prompt it does not name gets the
+   * recorded answer for a prompt with no checkpoint.
+   */
+  readonly rewinds?: Readonly<Record<string, RewindFilesResult>>;
   /** A control call that rejects with this error. */
   readonly rejects?: Partial<Record<ControlCall["method"], Error>>;
   /** `close()` ends the stream only when `finishClose()` is called. */
@@ -311,6 +319,20 @@ export class FakeQuery implements QueryHandle {
     }
     if (this.#script.initError !== undefined) throw this.#script.initError;
     return this.#script.init ?? sdkJson("server-info");
+  }
+
+  async rewindFiles(
+    userMessageId: string,
+    options?: { dryRun?: boolean },
+  ): Promise<RewindFilesResult> {
+    const dryRun = options?.dryRun === true;
+    this.#record({ method: "rewindFiles", id: userMessageId, dryRun });
+    return (
+      this.#script.rewinds?.[`${dryRun ? "dry" : "real"} ${userMessageId}`] ?? {
+        canRewind: false,
+        error: "No file checkpoint found for this message.",
+      }
+    );
   }
 
   async getContextUsage(): Promise<unknown> {

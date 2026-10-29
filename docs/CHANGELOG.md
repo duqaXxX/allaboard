@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!rewind` inside a thread goes back to an earlier prompt of the session, as the terminal's
+  `/rewind` does: a selector lists the prompts, newest first, and a pick offers **Restore code and
+  conversation**, **Restore conversation**, **Restore code** (the code ones only where a dry run
+  shows changes, with the files and lines) and **Never mind**. Restoring the conversation starts
+  the session again without the prompt and what follows, on the same session id; the replies after
+  it stay in the thread, each message folded into one card titled `Removed by rewind`, and the
+  prompt is posted again to send. The first prompt offers the code alone, and the terminal's
+  Summarize options are not offered. Claude Code sessions are now started with file checkpoints.
+  The agent seam gains `fileRestore` and `conversationRewind` (`prompts`, `restoreFiles`,
+  `StartOptions.rewindTo`, `RewindRefused`) and the chat seam `messageFold` (`ThreadChat.fold`,
+  `Reply.posted`), the rewind lists and their picks `rewind-point` and `rewind-action` (#13).
+  Replies of turns that ran before allaboard last started are not folded.
 - `!diff` inside a thread lists the files that differ from HEAD in the session's git repository,
   untracked ones included, with the lines added and removed, as the terminal's `/diff` does. A
   **Diff** button on a row shares that file's unified diff into the thread as `<name>.diff`. Once

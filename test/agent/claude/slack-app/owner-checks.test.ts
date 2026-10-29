@@ -34,9 +34,13 @@ import {
   TODAY,
 } from "../../../../src/chat/slack/home.ts";
 import {
+  actionValue,
   DIFF_FILE_ACTION,
   DIFF_VIEW_ACTION,
   fileValue,
+  pointValue,
+  REWIND_ACTION_ACTION,
+  REWIND_POINT_ACTION,
   viewValue,
 } from "../../../../src/chat/slack/lists.ts";
 import {
@@ -490,6 +494,40 @@ const CASES: readonly Case[] = [
           sender,
         ),
         acted: () => world.ephemerals().includes(coreTexts.DIFF_STALE),
+      };
+    },
+  },
+  {
+    listener: `action ${REWIND_POINT_ACTION}`,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          selectIn(REWIND_POINT_ACTION, pointValue("other-session", "p-1"), CHANNEL, THREAD, {
+            messageTs: THREAD,
+          }),
+          sender,
+        ),
+        acted: () => world.ephemerals().includes(coreTexts.REWIND_STALE),
+      };
+    },
+  },
+  {
+    listener: `action ${REWIND_ACTION_ACTION}`,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          clickIn(
+            REWIND_ACTION_ACTION,
+            actionValue("other-session", "p-1", "conversation"),
+            CHANNEL,
+            THREAD,
+            { messageTs: THREAD },
+          ),
+          sender,
+        ),
+        acted: () => world.ephemerals().includes(coreTexts.REWIND_STALE),
       };
     },
   },

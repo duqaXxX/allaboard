@@ -98,6 +98,7 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!plan` / `!plan off` | Switches a session to plan mode and back |
 | `!open` | Shares a file of the session's folder into the thread |
 | `!diff` | Lists the files the session's git repository changed since HEAD, with a Diff button each |
+| `!rewind` | Goes back to an earlier prompt of the session: restores its code, its conversation or both |
 | `!tag <name>` | Tags and pins the thread's first message |
 | `!untag` | Takes the tag and the pin away |
 | `!delete-thread` | Deletes the thread, once you confirm |

@@ -13,7 +13,12 @@ import {
   DIFF_VIEW_ACTION,
   diffBlocks,
   fileValue,
+  listBlocks,
   parseValue,
+  REWIND_ACTION_ACTION,
+  REWIND_ACTIONS,
+  REWIND_POINT_ACTION,
+  REWIND_POINTS,
   viewValue,
 } from "../../../src/chat/slack/lists.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
@@ -27,7 +32,7 @@ beforeEach(() => resetStatusFlags());
 // biome-ignore lint/suspicious/noExplicitAny: Block Kit read in a test
 type Json = Record<string, any>;
 
-const LIST: ThreadList = {
+const LIST: Extract<ThreadList, { type: "diff" }> = {
   type: "diff",
   view: "current",
   views: [{ id: "current", label: "Current" }],
@@ -54,7 +59,7 @@ test("one view draws no selector, several draw one with the current view selecte
     (diffBlocks(LIST, "t") as Json[]).some((block) => block.type === "actions"),
     false,
   );
-  const several: ThreadList = {
+  const several: Extract<ThreadList, { type: "diff" }> = {
     ...LIST,
     view: "turn-1",
     views: [
@@ -183,4 +188,109 @@ test("share rejects with Slack's code, and no path in it", async () => {
     thread.share({ name: "a.diff", title: "a.diff", content: Buffer.from("x") }),
     (error: unknown) => error instanceof ChatError && error.name === "snippet_too_large",
   );
+});
+
+// The rewind lists: a selector of prompts, then a button for each action at one prompt.
+
+const POINTS: ThreadList = {
+  type: "rewind-points",
+  session: "session-1",
+  points: [
+    { id: "p-2", text: "fix the\nsecond & last bug" },
+    { id: "p-1", text: "add the first feature" },
+  ],
+};
+
+test("the prompts are the options of one selector, newest first, each by its first words", () => {
+  const blocks = listBlocks(POINTS, "Go back to a prompt") as Json[];
+  assert.equal(blocks[0]?.type, "context");
+  const select = blocks[1]?.elements[0];
+  assert.equal(select.type, "static_select");
+  assert.equal(select.action_id, REWIND_POINT_ACTION);
+  assert.deepEqual(
+    select.options.map((option: Json) => option.text.text),
+    ["fix the second & last bug", "add the first feature"],
+  );
+  assert.deepEqual(parseValue(select.options[0].value, 2), ["session-1", "p-2"]);
+});
+
+test("a selector holds 100 prompts and the list says how many more there are", () => {
+  const many: ThreadList = {
+    type: "rewind-points",
+    session: "session-1",
+    points: Array.from({ length: REWIND_POINTS + 5 }, (_, n) => ({ id: `p-${n}`, text: `t${n}` })),
+  };
+  const blocks = listBlocks(many, "t") as Json[];
+  assert.equal(blocks[1]?.elements[0].options.length, REWIND_POINTS);
+  assert.equal(
+    blocks[2]?.elements[0].text,
+    fill(slackTexts.REWIND_MORE, { rows: REWIND_POINTS, count: REWIND_POINTS + 5 }),
+  );
+});
+
+test("a prompt whose id would overflow an option's value is left out, not the list", () => {
+  const long: ThreadList = {
+    type: "rewind-points",
+    session: "session-1",
+    points: [
+      { id: "x".repeat(200), text: "too long an id" },
+      { id: "p-1", text: "fine" },
+    ],
+  };
+  const select = (listBlocks(long, "t") as Json[])[1]?.elements[0];
+  assert.deepEqual(
+    select.options.map((option: Json) => option.text.text),
+    ["fine"],
+  );
+});
+
+const ACTIONS: ThreadList = {
+  type: "rewind-actions",
+  session: "session-1",
+  point: { id: "p-2", text: "fix the second bug" },
+  files: { count: 2, insertions: 3, deletions: 1 },
+  conversation: true,
+};
+
+function buttons(list: ThreadList): Json[] {
+  return (listBlocks(list, "Rewind") as Json[])[1]?.elements;
+}
+
+test("every action is a button carrying the session, the prompt and the action", () => {
+  const all = buttons(ACTIONS);
+  assert.deepEqual(
+    all.map((button) => button.text.text),
+    [
+      slackTexts.REWIND_BOTH,
+      slackTexts.REWIND_CONVERSATION,
+      `${slackTexts.REWIND_CODE} (2 files, +3 −1)`,
+      slackTexts.REWIND_CANCEL,
+    ],
+  );
+  assert.ok(all.every((button) => button.action_id === REWIND_ACTION_ACTION));
+  assert.deepEqual(
+    all.map((button) => parseValue(button.value, 3)),
+    REWIND_ACTIONS.map((action) => ["session-1", "p-2", action]),
+  );
+});
+
+test("an action the agent cannot do is not a button", () => {
+  const noFiles = buttons({ ...ACTIONS, files: null } as ThreadList);
+  assert.deepEqual(
+    noFiles.map((button) => parseValue(button.value, 3)?.[2]),
+    ["conversation", "cancel"],
+  );
+  const noConversation = buttons({ ...ACTIONS, conversation: false } as ThreadList);
+  assert.deepEqual(
+    noConversation.map((button) => parseValue(button.value, 3)?.[2]),
+    ["code", "cancel"],
+  );
+});
+
+test("a single file reads as a file", () => {
+  const one = buttons({
+    ...ACTIONS,
+    files: { count: 1, insertions: 0, deletions: 4 },
+  } as ThreadList);
+  assert.equal(one[2]?.text.text, `${slackTexts.REWIND_CODE} (1 file, +0 −4)`);
 });

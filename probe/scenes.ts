@@ -29,8 +29,8 @@ import { ClaudeBackend, type ClaudeStartOptions } from "../src/agent/claude/back
 import { CAPABILITIES } from "../src/agent/claude/capabilities.ts";
 import { directorySessions, projectKey, projectsDir } from "../src/agent/claude/listing.ts";
 import { recordPath } from "../src/agent/claude/record.ts";
-import type { ClaudeSession } from "../src/agent/claude/session.ts";
-import { AsyncQueue } from "../src/agent/claude/session.ts";
+import { rewindStart } from "../src/agent/claude/rewind.ts";
+import { AsyncQueue, ClaudeSession } from "../src/agent/claude/session.ts";
 import { TOOLS } from "../src/agent/claude/tools.ts";
 import { Translator } from "../src/agent/claude/translate.ts";
 import { locate } from "../src/agent/claude/trust.ts";
@@ -45,7 +45,7 @@ import type {
   RequestHandler,
   SessionEvent,
 } from "../src/agent/seam.ts";
-import { ResumeRefused } from "../src/agent/seam.ts";
+import { ResumeRefused, RewindRefused } from "../src/agent/seam.ts";
 import { promptFor } from "../src/chat/slack/attachments.ts";
 import { resumeBlocks } from "../src/chat/slack/resume.ts";
 import * as slackTexts from "../src/chat/slack/texts.ts";
@@ -126,6 +126,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "session tag": ["P31"],
   "generated title": ["P32"],
   "fork source": ["P43"],
+  rewind: ["P44", "P45"],
   "folder trust": ["P34"],
   "stop hooks": ["P42"],
   "settings mode": ["P37"],
@@ -2521,6 +2522,109 @@ async function forkSourceAlive(s: Stage): Promise<Seen> {
 }
 
 /**
+ * P44: a session started as the daemon starts it (`enableFileCheckpointing`) can put its files
+ * back: after two Write turns, a dry run to the second prompt lists the file that turn created,
+ * and the real run removes it and keeps the first turn's file (recorded on 2026-10-29, Claude Code
+ * 2.1.312). The control is the two files existing before the restore.
+ */
+async function fileCheckpoints(s: Stage): Promise<Seen> {
+  const folder = join(s.root, "rewind-files");
+  await mkdir(folder);
+  const live = await s.open(folder);
+  await live.turn("Using the Write tool, create a.txt containing exactly: one");
+  const second = await live.turn("Using the Write tool, create b.txt containing exactly: two");
+  const a = join(folder, "a.txt");
+  const b = join(folder, "b.txt");
+  if (!existsSync(a) || !existsSync(b)) {
+    return { P44: observation(false, false, "Claude wrote no file in two turns") };
+  }
+  const dry = await live.session.restoreFiles(second.id, true);
+  const lists = dry.possible && dry.files.some((file) => basename(file) === "b.txt");
+  const real = await live.session.restoreFiles(second.id, false);
+  const held = lists && real.possible && !existsSync(b) && existsSync(a);
+  return {
+    P44: observation(true, held, held ? "" : "the restore did not take b.txt away", {
+      preview: lists,
+      restored: real.possible,
+    }),
+  };
+}
+
+/**
+ * P45: the cut the back end makes for `rewindTo`. Two turns each give a codeword; the session is
+ * closed and started again with `rewindTo` the second prompt (which the back end guards with
+ * `resumeDropsTurn`); asked for the codewords it names the first alone, under the same session
+ * id. A range of two turns under the same guard is refused with `RewindRefused`. The control is
+ * the answer of the cut session.
+ */
+async function conversationCut(s: Stage): Promise<Seen> {
+  const folder = join(s.root, "rewind-cut");
+  await mkdir(folder);
+  const first = await s.open(folder);
+  await first.turn("Remember the codeword alphaword. Reply with the single word: ok");
+  const second = await first.turn(
+    "Remember the codeword bravoword. Reply with the single word: ok",
+  );
+  const id = sessionIdOf(first.events);
+  if (id === null) return { P45: observation(false, false, "the session reported no id") };
+  await first.session.close();
+  const cut = await s.open(folder, { resume: id, rewindTo: second.id });
+  const asked = await cut.turn(
+    "List every codeword I asked you to remember, comma separated, nothing else.",
+  );
+  const answer = ofType(asked.events, "text")
+    .map((event) => event.text)
+    .join(" ")
+    .toLowerCase();
+  if (answer.trim() === "")
+    return { P45: observation(false, false, "the cut session said nothing") };
+  const sameId = sessionIdOf(cut.events) === id;
+  const dropped = answer.includes("alphaword") && !answer.includes("bravoword");
+  await cut.session.close();
+
+  // A range of two turns under the guard of one is refused (recorded on 2026-10-29).
+  const wide = await s.open(folder, { resume: id });
+  await wide.turn("Remember the codeword charlieword. Reply with the single word: ok");
+  await wide.turn("Remember the codeword deltaword. Reply with the single word: ok");
+  await wide.session.close();
+  const points = await s.backend.prompts(folder, id);
+  const kept = points.at(0);
+  const dropsFirstTwo = points.at(1);
+  if (kept === undefined || dropsFirstTwo === undefined) {
+    return { P45: observation(false, false, "the conversation lost its prompts") };
+  }
+  const messages = await getSessionMessages(id, { dir: folder });
+  const start = rewindStart(messages, dropsFirstTwo.id);
+  let refused = false;
+  if (start !== null) {
+    try {
+      const guarded = new ClaudeSession(
+        {
+          ...s.options(folder, { resume: id }),
+          settingsSources: [],
+          chrome: false,
+          resumeSessionAt: start.at,
+          resumeDropsTurn: dropsFirstTwo.id,
+        },
+        s.owner,
+      );
+      await guarded.ready();
+      await guarded.close();
+    } catch (error) {
+      refused = error instanceof RewindRefused;
+    }
+  }
+  const held = sameId && dropped && refused;
+  return {
+    P45: observation(true, held, held ? "" : "the cut or the refusal was not as measured", {
+      sameId,
+      dropped,
+      refused,
+    }),
+  };
+}
+
+/**
  * Removes the transcripts the probe's sessions left under Claude Code's projects folder: only
  * the folders whose name holds this run's random temporary folder. Anything else is left alone.
  */
@@ -2591,6 +2695,13 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
       Object.assign(seen, await attempt("session tag", s, () => sessionTag(s.root)));
       Object.assign(seen, await attempt("generated title", s, () => generatedTitle(s)));
       Object.assign(seen, await attempt("fork source", s, () => forkSourceAlive(s)));
+      Object.assign(
+        seen,
+        await attempt("rewind", s, async () => ({
+          ...(await fileCheckpoints(s)),
+          ...(await conversationCut(s)),
+        })),
+      );
       Object.assign(seen, await attempt("folder trust", s, () => folderTrust(s)));
       Object.assign(seen, await attempt("stop hooks", s, () => stopHooks(s)));
       Object.assign(seen, await attempt("settings mode", s, () => settingsMode(s)));

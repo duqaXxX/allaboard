@@ -65,7 +65,7 @@ import type {
   ShellRun,
   TaskKind,
 } from "../../agent/seam.ts";
-import { ResumeRefused } from "../../agent/seam.ts";
+import { type FilesRestore, ResumeRefused, RewindRefused } from "../../agent/seam.ts";
 import type {
   Activity,
   FooterFields,
@@ -139,6 +139,7 @@ import {
 } from "./errors.ts";
 import { cadenceOf, promptOf } from "./loops.ts";
 import { quoted } from "./quote.ts";
+import { RewindMemory } from "./rewind-memory.ts";
 import { Cancelled, cancellable, Event, Mutex, Queue, Task } from "./tasks.ts";
 import { ThreadTitle } from "./title.ts";
 import { type ActiveTurn, notSent, Turn, takenNote } from "./turn.ts";
@@ -269,6 +270,13 @@ export class ThreadSession {
   private taken: Turn | null = null;
   /** The files each turn of this process edited, for `!diff`. */
   private readonly turnChanges = new TurnChanges();
+  /**
+   * The messages of each prompt's replies and the cut a rewind made, for `!rewind`. Memory only,
+   * handed on after a close as `goal` is (`SessionManager.session`).
+   */
+  rewinds = new RewindMemory();
+  /** A rewind's start of the agent is running: its refusal is the rewind's to tell. */
+  private rewinding = false;
   private sent: Turn[] = [];
   private active: ActiveTurn | null = null;
   private readonly connectLock = new Mutex();
@@ -657,7 +665,16 @@ export class ThreadSession {
 
   /** Working or waiting for the owner: a thread that is never deleted (`SessionManager.release`). */
   get inUse(): boolean {
-    return this.waitingForOwner || !this.idle;
+    return this.rewinding || this.waitingForOwner || !this.idle;
+  }
+
+  /**
+   * The prompt a rewind cut the conversation at, while the agent has not yet kept the cut (no
+   * prompt was sent after it): the prompts from it on are gone for the agent, and `!rewind` lists
+   * none of them.
+   */
+  get pendingCut(): string | null {
+    return this.rewinds.cutAt;
   }
 
   /**
@@ -1014,134 +1031,206 @@ export class ThreadSession {
   async ensureConnected(signal?: AbortSignal): Promise<AgentSession> {
     const release = await this.connectLock.acquire(signal);
     try {
-      if (this.closedFlag) throw new SessionClosed();
-      if (this.client !== null) return this.client;
-      // The reader of the process before this one may still be ending (it withdraws the
-      // requests that process left, then releases its turns): a process started now would have
-      // its turn released by that reader, which ends whatever turn is active when it gets there.
-      // Nothing that reader awaits takes this lock, and a reader that has finished settles at once.
-      if (this.reader !== null) await cancellable(this.reader.settled(), signal);
-      if (this.predecessor !== null) {
-        // The agent process this thread had before may still be exiting: it needs time to
-        // flush the session file after EOF, and starting with the same id to resume before that
-        // is done would race it. The Python SDK needed up to about 20 seconds; with the
-        // TypeScript SDK 0.3.296 `close()` resolved in 282 ms and a resume of the same id right
-        // after it worked (measured 2026-10-10). The wait stays, since it costs nothing then.
-        await this.predecessor.wait(signal);
-        this.predecessor = null;
-      }
-      await cancellable(
-        checkDirectory(this.directory, trustedBy(this.deps.agent), this.names),
-        signal,
-      );
-      // Another process updating allaboard (another instance on the copy, or the terminal's
-      // `allaboard update`) replaces the copy this process would start from.
-      if (await cancellable(this.updatingElsewhere(), signal)) throw new StartsBlocked();
-      // After the last await before `connect`: a level the owner set meanwhile is the one the
-      // process starts with.
-      const stored = this.deps.state.thread(this.channelId, this.threadId);
-      const sessionId = stored?.sessionId ?? null;
-      const effort = stored?.effort ?? null;
-      let client: AgentSession;
-      // (sync) With the call of `connect` that starts the process: a block raised meanwhile
-      // (an install began) must not be passed by a start that checked before it.
-      if (this.startsBlocked) throw new StartsBlocked();
-      try {
-        client = await this.connect(sessionId, effort, signal);
-      } catch (error) {
-        if (!(error instanceof ResumeRefused) || sessionId === null) throw error;
-        // The stored session is gone (its transcript was deleted): the thread cannot continue.
-        // Its entry is dropped and the session ends itself here, so no later turn (already
-        // queued, or the next one taken by the worker) starts a second, unrecorded session in
-        // its place: it fails the same way instead.
-        logger.warning(`could not resume the stored session in ${this.where}`);
-        this.deps.state.removeThread(this.channelId, this.threadId);
-        this.closedFlag = true;
-        // No client was ever connected in this branch (`connect` rejected): nothing to wait
-        // on, so the "fully closed" signal fires at once, same as `close()`'s tail.
-        this.doneClosing.set();
-        this.onClosed?.();
-        this.idleTimerCheck(); // cancels any armed timer; closed now, so none rearms
-        const worker = this.worker;
-        if (worker !== null && worker.signal !== signal) {
-          // Called directly (`!status`, `!bypass`), not from this session's own worker: an
-          // idle worker left blocked on the queue (most likely on this very connect lock,
-          // still held here) would never learn to stop otherwise. It is cancelled and awaited
-          // first, and its taken turn (if any) rescued only once it is confirmed stopped:
-          // cancelling it while it still held a turn, with nothing rescuing that turn, left
-          // that reply saying "writing" forever. When the worker IS the caller (the common
-          // case: this branch runs inside the worker's own call), its own catch up the stack
-          // already fails the taken turn itself; failing it again here too would double the
-          // reply's text.
-          worker.cancel();
-          await worker.settled();
-          const taken = this.taken;
-          this.taken = null;
-          if (taken !== null) {
-            try {
-              await this.fail(taken, texts.named(texts.SESSION_GONE, this.names), { error: true });
-            } catch {
-              // the queued ones below are still told
-            }
-          }
-        }
-        await this.failQueued(texts.named(texts.SESSION_GONE, this.names));
-        throw new SessionGone(this.names, { cause: error });
-      }
-      let choice: boolean | null;
-      let mode: string;
-      try {
-        const info = await cancellable(client.info(), signal);
-        const offered = this.deps.agent.capabilities;
-        this.commands = offered.commands ? [...info.commands] : [];
-        this.models = offered.models ? [...info.models] : [];
-        this.account = info.account;
-        const modes = this.deps.agent.capabilities.permissionModes;
-        this.nativeMode = info.permissionMode || modes.default;
-        // Read once: a Start writing the switch meanwhile must not make the client's mode and
-        // what is recorded for it disagree.
-        choice = this.bypassChoice;
-        mode = this.nativeMode;
-        if (choice === true) {
-          mode = this.modeFor(true);
-          await cancellable(client.setPermissionMode(mode), signal);
-        } else if (choice === false && (this.nativeMode === modes.bypass || !info.permissionMode)) {
-          // An explicit off outlives a rebuild: the folder's own bypass would return. An agent
-          // that reports no mode (a release can drop the field) may have started in it.
-          if (!info.permissionMode) {
-            logger.warning(
-              `the agent reported no permission mode for ${this.where}, setting ${modes.default}`,
-            );
-          }
-          mode = modes.default;
-          await cancellable(client.setPermissionMode(mode), signal);
-        }
-      } catch (error) {
-        // A client nobody holds would leave its agent process running.
-        await this.disconnect(client);
-        throw error;
-      }
-      this.client = client;
-      this.resumedAtStart = sessionId !== null;
-      this.clientEffort = effort;
-      this.clientBypass = this.bypassRuns(choice);
-      this.mode = mode;
-      // A resumed session runs at the settings' level (measured), unknown until reported,
-      // unless the daemon itself just asked for a stored level: that request is shown at once,
-      // until the agent's own report (every turn ends with one) corrects it.
-      const requested = this.validEffort(effort);
-      this.effortSetting = requested;
-      this.effort = null;
-      this.effortReported = requested !== null;
-      this.effortUnsupported = false;
-      this.workingDirectory = null; // the new process starts in the bound folder
-      this.modelSwitched = null; // the new client starts from its own state
-      this.sessionTokens = null; // counted by the client process, which starts at zero
-      this.reader = new Task((reading) => this.read(client, reading));
-      this.idleTimerCheck(); // a daemon word (`!status`, say) connects with no turn
-      return client;
+      return await this.connectHeld(signal);
     } finally {
       release();
+    }
+  }
+
+  /** `ensureConnected` for a caller that holds the connect lock. */
+  private async connectHeld(signal?: AbortSignal): Promise<AgentSession> {
+    if (this.closedFlag) throw new SessionClosed();
+    if (this.client !== null) return this.client;
+    // The reader of the process before this one may still be ending (it withdraws the
+    // requests that process left, then releases its turns): a process started now would have
+    // its turn released by that reader, which ends whatever turn is active when it gets there.
+    // Nothing that reader awaits takes this lock, and a reader that has finished settles at once.
+    if (this.reader !== null) await cancellable(this.reader.settled(), signal);
+    if (this.predecessor !== null) {
+      // The agent process this thread had before may still be exiting: it needs time to
+      // flush the session file after EOF, and starting with the same id to resume before that
+      // is done would race it. The Python SDK needed up to about 20 seconds; with the
+      // TypeScript SDK 0.3.296 `close()` resolved in 282 ms and a resume of the same id right
+      // after it worked (measured 2026-10-10). The wait stays, since it costs nothing then.
+      await this.predecessor.wait(signal);
+      this.predecessor = null;
+    }
+    await cancellable(
+      checkDirectory(this.directory, trustedBy(this.deps.agent), this.names),
+      signal,
+    );
+    // Another process updating allaboard (another instance on the copy, or the terminal's
+    // `allaboard update`) replaces the copy this process would start from.
+    if (await cancellable(this.updatingElsewhere(), signal)) throw new StartsBlocked();
+    // After the last await before `connect`: a level the owner set meanwhile is the one the
+    // process starts with.
+    const stored = this.deps.state.thread(this.channelId, this.threadId);
+    const sessionId = stored?.sessionId ?? null;
+    const effort = stored?.effort ?? null;
+    let client: AgentSession;
+    // (sync) With the call of `connect` that starts the process: a block raised meanwhile
+    // (an install began) must not be passed by a start that checked before it.
+    if (this.startsBlocked) throw new StartsBlocked();
+    try {
+      client = await this.connect(sessionId, effort, signal);
+    } catch (error) {
+      if (!(error instanceof ResumeRefused) || sessionId === null) throw error;
+      // The stored session is gone (its transcript was deleted): the thread cannot continue.
+      // Its entry is dropped and the session ends itself here, so no later turn (already
+      // queued, or the next one taken by the worker) starts a second, unrecorded session in
+      // its place: it fails the same way instead.
+      logger.warning(`could not resume the stored session in ${this.where}`);
+      this.deps.state.removeThread(this.channelId, this.threadId);
+      this.closedFlag = true;
+      // No client was ever connected in this branch (`connect` rejected): nothing to wait
+      // on, so the "fully closed" signal fires at once, same as `close()`'s tail.
+      this.doneClosing.set();
+      this.onClosed?.();
+      this.idleTimerCheck(); // cancels any armed timer; closed now, so none rearms
+      const worker = this.worker;
+      if (worker !== null && worker.signal !== signal) {
+        // Called directly (`!status`, `!bypass`), not from this session's own worker: an
+        // idle worker left blocked on the queue (most likely on this very connect lock,
+        // still held here) would never learn to stop otherwise. It is cancelled and awaited
+        // first, and its taken turn (if any) rescued only once it is confirmed stopped:
+        // cancelling it while it still held a turn, with nothing rescuing that turn, left
+        // that reply saying "writing" forever. When the worker IS the caller (the common
+        // case: this branch runs inside the worker's own call), its own catch up the stack
+        // already fails the taken turn itself; failing it again here too would double the
+        // reply's text.
+        worker.cancel();
+        await worker.settled();
+        const taken = this.taken;
+        this.taken = null;
+        if (taken !== null) {
+          try {
+            await this.fail(taken, texts.named(texts.SESSION_GONE, this.names), { error: true });
+          } catch {
+            // the queued ones below are still told
+          }
+        }
+      }
+      await this.failQueued(texts.named(texts.SESSION_GONE, this.names));
+      throw new SessionGone(this.names, { cause: error });
+    }
+    let choice: boolean | null;
+    let mode: string;
+    try {
+      const info = await cancellable(client.info(), signal);
+      const offered = this.deps.agent.capabilities;
+      this.commands = offered.commands ? [...info.commands] : [];
+      this.models = offered.models ? [...info.models] : [];
+      this.account = info.account;
+      const modes = this.deps.agent.capabilities.permissionModes;
+      this.nativeMode = info.permissionMode || modes.default;
+      // Read once: a Start writing the switch meanwhile must not make the client's mode and
+      // what is recorded for it disagree.
+      choice = this.bypassChoice;
+      mode = this.nativeMode;
+      if (choice === true) {
+        mode = this.modeFor(true);
+        await cancellable(client.setPermissionMode(mode), signal);
+      } else if (choice === false && (this.nativeMode === modes.bypass || !info.permissionMode)) {
+        // An explicit off outlives a rebuild: the folder's own bypass would return. An agent
+        // that reports no mode (a release can drop the field) may have started in it.
+        if (!info.permissionMode) {
+          logger.warning(
+            `the agent reported no permission mode for ${this.where}, setting ${modes.default}`,
+          );
+        }
+        mode = modes.default;
+        await cancellable(client.setPermissionMode(mode), signal);
+      }
+    } catch (error) {
+      // A client nobody holds would leave its agent process running.
+      await this.disconnect(client);
+      throw error;
+    }
+    this.client = client;
+    this.resumedAtStart = sessionId !== null;
+    this.clientEffort = effort;
+    this.clientBypass = this.bypassRuns(choice);
+    this.mode = mode;
+    // A resumed session runs at the settings' level (measured), unknown until reported,
+    // unless the daemon itself just asked for a stored level: that request is shown at once,
+    // until the agent's own report (every turn ends with one) corrects it.
+    const requested = this.validEffort(effort);
+    this.effortSetting = requested;
+    this.effort = null;
+    this.effortReported = requested !== null;
+    this.effortUnsupported = false;
+    this.workingDirectory = null; // the new process starts in the bound folder
+    this.modelSwitched = null; // the new client starts from its own state
+    this.sessionTokens = null; // counted by the client process, which starts at zero
+    this.reader = new Task((reading) => this.read(client, reading));
+    this.idleTimerCheck(); // a daemon word (`!status`, say) connects with no turn
+    return client;
+  }
+
+  /**
+   * `!rewind`: the files as they were when the prompt `promptId` was sent, or with `preview` what
+   * restoring them would change. Starts the agent when it is not running.
+   */
+  async restoreFiles(promptId: string, preview: boolean): Promise<FilesRestore> {
+    const client = await this.ensureConnected();
+    if (client.restoreFiles === undefined) throw new Error("the agent session restores no files");
+    return client.restoreFiles(promptId, preview);
+  }
+
+  /**
+   * `!rewind`: cuts the conversation at the prompt `promptId`, everything from it on gone for the
+   * agent, the session id kept. `dropped` are the ids of the prompts the cut drops, the picked one
+   * and every later one the agent lists: what is folded and forgotten is theirs, whether or not
+   * the picked prompt was remembered. The agent process is closed and started again with the cut, so
+   * nothing may run: `busy` when a turn, a request or background work does, with nothing done.
+   * `refused` when the agent could not cut there: the session is started again as it was. On
+   * `done`, `replies` are the messages of the replies from that prompt on that this process
+   * knows, and `known` whether it knew that prompt's replies at all (a restart forgets them).
+   */
+  async rewindConversation(
+    promptId: string,
+    dropped: readonly string[],
+  ): Promise<{
+    readonly outcome: "done" | "refused" | "busy";
+    readonly replies: readonly MessageId[];
+    readonly known: boolean;
+  }> {
+    const none = { replies: [], known: false } as const;
+    if (this.inUse || this.draining || this.closedFlag) return { outcome: "busy", ...none };
+    // (sync) With the check: from here the session reads in use, so no word starts anything
+    // beside the rewind, and the lock below keeps a queued prompt from connecting in between.
+    this.rewinding = true;
+    try {
+      const known = this.rewinds.knows(dropped);
+      const replies = this.rewinds.messagesOf(dropped);
+      const release = await this.connectLock.acquire();
+      try {
+        this.rewinds.cutAt = promptId;
+        this.rewinds.token = null;
+        await this.dropClientLocked();
+        try {
+          await this.connectHeld();
+          // A move to a terminal during the hold clears the cut: the rewind did not stand.
+          if (this.rewinds.cutAt !== promptId) return { outcome: "refused", ...none };
+        } catch (error) {
+          this.rewinds.drop();
+          if (!(error instanceof RewindRefused)) throw error;
+          await this.connectHeld();
+          return { outcome: "refused", ...none };
+        }
+      } catch (error) {
+        this.rewinds.drop();
+        throw error;
+      } finally {
+        release();
+      }
+      // The saved message may lie in the range just dropped, and so may a turn's edits.
+      this.saved = null;
+      this.rewinds.forgetIds(dropped);
+      this.turnChanges.forgetIds(dropped);
+      return { outcome: "done", replies, known };
+    } finally {
+      this.rewinding = false;
     }
   }
 
@@ -1630,6 +1719,16 @@ export class ThreadSession {
    * the next message resumes it. `cut` when a turn was cut, `idle` otherwise.
    */
   async moveToTerminal(): Promise<"cut" | "idle"> {
+    // The terminal resumes the whole record (it ignores a cut), and what it writes lands after it.
+    const waited = this.rewinds.cutAt !== null;
+    this.rewinds.drop();
+    if (waited) {
+      try {
+        await this.post(texts.REWIND_DROPPED_TERMINAL);
+      } catch {
+        // The move goes on; the owner is told when the chat takes the line.
+      }
+    }
     const hold = this.deps.holds.cancel(this.channelId, this.threadId);
     if (hold !== null) await this.deleteRequest(hold.messageId);
     // Work on its way to the agent is work to cut too: a turn taken or queued, a start in
@@ -2150,23 +2249,29 @@ export class ThreadSession {
     if (effort !== null && valid === null) {
       logger.warning(`dropped an unrecognized stored effort level in ${this.where}`);
     }
-    const starting = this.deps.agent.start(
-      {
-        folder: this.directory,
-        resume: sessionId,
-        // A copy `!fork` made is started as the terminal starts its copy, every time.
-        ...(forkOf != null && { forkOf }),
-        model: null,
-        // A model set by command survives a resume by itself (measured); the effort a command
-        // set does not, so the daemon stores it per thread and passes it back here.
-        effort: valid,
-      },
-      {
-        permission: (request, signal) =>
-          this.answering(request, signal) as Promise<PermissionAnswer>,
-        question: (request, signal) => this.answering(request, signal) as Promise<QuestionAnswer>,
-      },
-    );
+    const start = (rewindTo: string | null, rewindToken: string | null) =>
+      this.deps.agent.start(
+        {
+          folder: this.directory,
+          resume: sessionId,
+          // A copy `!fork` made is started as the terminal starts its copy, every time.
+          ...(forkOf != null && { forkOf }),
+          model: null,
+          // A model set by command survives a resume by itself (measured); the effort a command
+          // set does not, so the daemon stores it per thread and passes it back here.
+          effort: valid,
+          // The cut of a rewind, until a prompt is sent after it: the agent keeps it only then.
+          ...(rewindTo !== null && { rewindTo }),
+          ...(rewindTo !== null && rewindToken !== null && { rewindToken }),
+        },
+        {
+          permission: (request, signal) =>
+            this.answering(request, signal) as Promise<PermissionAnswer>,
+          question: (request, signal) => this.answering(request, signal) as Promise<QuestionAnswer>,
+        },
+      );
+    const cut = sessionId === null ? null : this.rewinds.cutAt;
+    const starting = cut === null ? start(null, null) : this.startCut(cut, start);
     try {
       return await cancellable(starting, signal);
     } catch (error) {
@@ -2181,6 +2286,35 @@ export class ThreadSession {
         closing.finally(() => this.abandoned.delete(closing));
       }
       throw error;
+    }
+  }
+
+  /**
+   * A start with the cut of a rewind. A refusal is the rewind's to tell when it asked for the
+   * start; otherwise (the cut is asked again after an idle close) the thread goes on with the
+   * whole conversation, as the agent leaves it.
+   */
+  private async startCut(
+    cut: string,
+    start: (rewindTo: string | null, rewindToken: string | null) => Promise<AgentSession>,
+  ): Promise<AgentSession> {
+    try {
+      const client = await start(cut, this.rewinds.token);
+      // The token stands for the conversation as the cut found it: asked again, the agent
+      // refuses the cut once someone else wrote to the session.
+      this.rewinds.token ??= client.rewindToken ?? null;
+      return client;
+    } catch (error) {
+      if (!(error instanceof RewindRefused)) throw error;
+      this.rewinds.drop();
+      if (this.rewinding) throw error;
+      logger.warning(`the agent refused to cut the conversation again in ${this.where}`);
+      try {
+        await this.post(texts.REWIND_DROPPED);
+      } catch {
+        // The owner is told when the chat takes it; the thread goes on either way.
+      }
+      return start(null, null);
     }
   }
 
@@ -2248,6 +2382,8 @@ export class ThreadSession {
         this.sent.push(turn);
         this.taken = null;
         await cancellable(client.send({ id: turn.uuid, content: turn.prompt }), signal);
+        // A prompt written after a cut is what makes the agent keep it.
+        this.rewinds.drop();
         await turn.done.wait(signal);
       } catch (error) {
         if (error instanceof Cancelled) throw error;
@@ -3677,6 +3813,11 @@ export class ThreadSession {
     };
     this.active = active;
     if (turn !== null) this.turnChanges.begin(turn.uuid);
+    const reply = this.reply(renderer);
+    if (!(reply instanceof LoopReply)) {
+      if (turn !== null) this.rewinds.begin(turn.uuid, reply);
+      else this.rewinds.add(reply);
+    }
     // A run is no work of the owner's, nor is the report of a task it started: the card times
     // and foots them (`dateRun`).
     if (!(this.reply(renderer) instanceof LoopReply)) {

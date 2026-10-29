@@ -83,6 +83,13 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
   ) {
     unserved.add(WORD.diff);
   }
+  // The prompts are listed in the thread; the agent restores files or cuts the conversation.
+  if (
+    !chat.capabilities.threadLists ||
+    (!agent.capabilities.fileRestore && !agent.capabilities.conversationRewind)
+  ) {
+    unserved.add(WORD.rewind);
+  }
   if (!chat.capabilities.threadTags) {
     unserved.add(WORD.tag);
     unserved.add(WORD.untag);
@@ -165,6 +172,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           forks: !unserved.has(WORD.fork),
           fileUpload: chat.capabilities.fileUpload,
           diff: !unserved.has(WORD.diff),
+          rewind: !unserved.has(WORD.rewind),
           threadTags: chat.capabilities.threadTags,
           threadDelete: chat.capabilities.threadDelete,
           shell: have.shellCommands && deps.shellCommands,
@@ -301,6 +309,13 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           await talk.inChannel(channel, texts.DIFF_TOP_LEVEL);
         } else {
           await others.diff.word(ref, session);
+        }
+        return;
+      case "rewind":
+        if (session === null) {
+          await talk.inChannel(channel, texts.REWIND_TOP_LEVEL);
+        } else {
+          await others.rewind.word(ref, session);
         }
         return;
       case "terminal":

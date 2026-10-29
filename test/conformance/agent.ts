@@ -431,6 +431,26 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       assert.equal(typeof world.backend.forkSession === "function", caps.sessionForks);
     });
 
+    check("prompts is a member exactly when a way back is declared", LIMIT, async (world) => {
+      assert.equal(
+        typeof world.backend.prompts === "function",
+        caps.fileRestore || caps.conversationRewind,
+      );
+    });
+
+    check(
+      "a session's restoreFiles is a member exactly when fileRestore is declared",
+      LIMIT,
+      async (world) => {
+        const session = await world.backend.start(startOptions(world), new Requests());
+        try {
+          assert.equal(typeof session.restoreFiles === "function", caps.fileRestore);
+        } finally {
+          await session.close();
+        }
+      },
+    );
+
     check("sessionHolders is a member exactly when it is declared", LIMIT, async (world) => {
       assert.equal(typeof world.backend.sessionHolders === "function", caps.sessionHolders);
     });

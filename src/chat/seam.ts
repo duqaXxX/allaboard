@@ -184,6 +184,11 @@ export interface ChatCapabilities {
   readonly fileUpload: boolean;
   /** `ThreadChat.offer`: a list with a control per row, posted in a session's thread. */
   readonly threadLists: boolean;
+  /**
+   * `ThreadChat.fold` and `Reply.posted`: the chat rewrites a message of the daemon's into one
+   * collapsed element that keeps what the message showed.
+   */
+  readonly messageFold: boolean;
   /** `ChatProvider.tagThread`. */
   readonly threadTags: boolean;
   /** `ChatProvider.titleThread`. */
@@ -298,6 +303,11 @@ export interface Reply extends ReplySink {
   /** Whether another reply has a message below this one: it then ends where it is, by edit. */
   readonly overtaken: boolean;
   /**
+   * The messages of the thread this reply has posted so far, oldest first, a closing or footer
+   * message included; none while it has written nothing. Present with `messageFold`.
+   */
+  posted?(): readonly MessageId[];
+  /**
    * The session has ended everything it was doing: `footer` is drawn under this reply's last
    * message, by an edit, which notifies nobody, and stays there. Written at once; true when it
    * landed, false when it did not or when the reply's end never landed (no footer for it then).
@@ -384,6 +394,14 @@ export interface ThreadChat {
    * Present with `threadLists`.
    */
   offer?(list: ThreadList, title: string, replacing?: MessageId): Promise<MessageId>;
+  /**
+   * Rewrites a message of the daemon's in this thread into one collapsed element titled `title`
+   * that holds what the message showed, as text: the controls of the message, if any, are gone.
+   * Nothing is deleted. Resolves with false, and changes nothing, when the message cannot be read
+   * or rewritten (it is gone, or the chat refused); never rejects for that. Present with
+   * `messageFold`.
+   */
+  fold?(message: MessageId, title: string): Promise<boolean>;
   /**
    * Shares a file into the thread: `name` is its file name, `title` what the chat shows for it.
    * Nothing is posted by the daemon on success. Rejects with a `ChatError` whose name is the
@@ -618,6 +636,12 @@ export interface DiffRow {
   readonly binary: boolean;
 }
 
+/** A prompt of a session the owner can go back to (`!rewind`): the id it was sent under and its text. */
+export interface RewindRow {
+  readonly id: string;
+  readonly text: string;
+}
+
 /** A list a word posts in a session's thread (`ThreadChat.offer`), each row with a control of its own. */
 export type ThreadList =
   /**
@@ -627,13 +651,43 @@ export type ThreadList =
    * made for, which a pick hands back. The provider decides how many rows it draws and how it
    * says that more exist.
    */
-  {
-    readonly type: "diff";
-    readonly view: string;
-    readonly views: readonly { readonly id: string; readonly label: string }[];
-    readonly files: readonly DiffRow[];
-    readonly session: string;
-  };
+  | {
+      readonly type: "diff";
+      readonly view: string;
+      readonly views: readonly { readonly id: string; readonly label: string }[];
+      readonly files: readonly DiffRow[];
+      readonly session: string;
+    }
+  /**
+   * The prompts of a session (`!rewind`), newest first, one to pick. The provider decides how many
+   * it draws and how it says that more exist. `session` is the session the list was made for,
+   * which a pick hands back.
+   */
+  | {
+      readonly type: "rewind-points";
+      readonly session: string;
+      readonly points: readonly RewindRow[];
+    }
+  /**
+   * What can be done at `point` (`!rewind`): a control for each action offered, and one for
+   * Never mind. `files` is set when the code can be restored there, with what that changes;
+   * `conversation` when the conversation can be cut there. Restore code and conversation is
+   * offered when both are.
+   */
+  | {
+      readonly type: "rewind-actions";
+      readonly session: string;
+      readonly point: RewindRow;
+      readonly files: {
+        readonly count: number;
+        readonly insertions: number;
+        readonly deletions: number;
+      } | null;
+      readonly conversation: boolean;
+    };
+
+/** What the owner chose to do at a prompt of a rewind list. */
+export type RewindAction = "both" | "conversation" | "code" | "cancel";
 
 /** What the owner picked from an `OwnerList`. `list` is the message that showed it. */
 export type ListPick =
@@ -669,6 +723,23 @@ export type ListPick =
       readonly session: string;
       readonly view: string;
       readonly path: string;
+      readonly list: MessageId;
+    }
+  /** The selection of a prompt in a rewind list: `promptId` as the option carried it, which is untrusted. */
+  | {
+      readonly type: "rewind-point";
+      readonly ref: ThreadRef;
+      readonly session: string;
+      readonly promptId: string;
+      readonly list: MessageId;
+    }
+  /** The control of an action in a rewind list: `promptId` and `action` as the control carried them. */
+  | {
+      readonly type: "rewind-action";
+      readonly ref: ThreadRef;
+      readonly session: string;
+      readonly promptId: string;
+      readonly action: RewindAction;
       readonly list: MessageId;
     }
   /** The selector of a diff list: `view` as the option carried it, which is untrusted. */

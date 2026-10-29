@@ -56,3 +56,23 @@ test("the place of a turn is forgotten with its edits, and a turn with none keep
   }
   assert.ok(turns.tracked <= TURN_CHANGES_KEPT + 1, String(turns.tracked));
 });
+
+test("forgetting turns by their prompts drops them, and the edits that follow are nobody's", () => {
+  const changes = new TurnChanges();
+  changes.begin("t1");
+  changes.note(change("a"));
+  changes.begin("t2");
+  changes.note(change("b"));
+  changes.begin("t3");
+  changes.note(change("c"));
+  changes.forgetIds(["t2", "t3"]);
+  assert.deepEqual(
+    changes.list().map((turn) => turn.id),
+    ["t1"],
+  );
+  changes.note(change("d"));
+  assert.deepEqual(
+    changes.list().map((turn) => turn.changes.length),
+    [1],
+  );
+});

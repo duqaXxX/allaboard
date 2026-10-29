@@ -26,6 +26,7 @@ import {
   type OwnerAnswer,
   type OwnerList,
   type OwnerRequest,
+  type RewindAction,
   type TaskUpdate,
   type ThreadChat,
   type ThreadList,
@@ -117,6 +118,10 @@ export interface Person {
   picksFile(listed: ThreadListed, path: string): Promise<void>;
   /** Uses the selector of a list offered in a thread to show the view `view`. */
   picksView(listed: ThreadListed, view: string): Promise<void>;
+  /** Uses the selector of a rewind list offered in a thread to pick the prompt `promptId`. */
+  picksPoint(listed: ThreadListed, promptId: string): Promise<void>;
+  /** Uses the control of `action` in the actions of a rewind list offered in a thread. */
+  picksAction(listed: ThreadListed, action: RewindAction): Promise<void>;
   /**
    * Deletes the message `said` (the first message of a thread when its id is the thread's own),
    * the way the chat lets a person delete one.
@@ -360,6 +365,33 @@ const DIFF_LIST: ThreadList = {
   session: "session-1",
 };
 
+const REWIND_POINTS: ThreadList = {
+  type: "rewind-points",
+  session: "session-1",
+  points: [
+    { id: "prompt-2", text: "fix the second bug" },
+    { id: "prompt-1", text: "add the first feature" },
+  ],
+};
+
+const REWIND_ACTIONS: ThreadList = {
+  type: "rewind-actions",
+  session: "session-1",
+  point: { id: "prompt-2", text: "fix the second bug" },
+  files: { count: 2, insertions: 3, deletions: 1 },
+  conversation: true,
+};
+
+/** Offers `list` in the check's thread and finds the message that shows it. */
+async function offerList(s: Started, list: ThreadList, title: string): Promise<ThreadListed> {
+  const message = await s.provider.thread(s.ref).offer?.(list, title);
+  assert.ok(message, "the list is a message");
+  const where = { channel: s.rig.channel, thread: s.ref.thread };
+  const shown = s.rig.read(where).find((m) => m.id === message);
+  assert.ok(shown?.pressable, "the list has controls");
+  return { ref: s.ref, list, message };
+}
+
 /** Offers `DIFF_LIST` in the check's thread and finds the message that shows it. */
 async function offerDiff(s: Started): Promise<ThreadListed> {
   const message = await s.provider.thread(s.ref).offer?.(DIFF_LIST, "Changed files");
@@ -556,6 +588,7 @@ export function chatConformance(
           "commandSuggestions",
           "fileUpload",
           "loopCard",
+          "messageFold",
           "nativeStreaming",
           "rootStatus",
           "threadDelete",
@@ -596,6 +629,8 @@ export function chatConformance(
         all(present("acknowledge"), capabilities.acknowledgement, "acknowledgement");
         all(present("showActivity", "activityRefused"), capabilities.activityLine, "activityLine");
         all(present("showLoop", "loopCardLast", "endLoop"), capabilities.loopCard, "loopCard");
+        all(present("fold"), capabilities.messageFold, "messageFold");
+        all(present("offer"), capabilities.threadLists, "threadLists");
       });
 
       check("has statusMark exactly when it declares rootStatus", async ({ provider }) => {
@@ -1797,6 +1832,69 @@ export function chatConformance(
           }
           await s.rig.owner.picksFile(listed, "src/a.ts");
           assert.equal(s.inbound.picks.length, 1, "the owner's does, on the same control");
+        },
+      );
+
+      gated(
+        "a prompt picked and an action chosen in a rewind list arrive with the session and the prompt",
+        "threadLists",
+        async (s) => {
+          const points = await offerList(s, REWIND_POINTS, "Go back to a prompt");
+          await s.rig.owner.picksPoint(points, "prompt-2");
+          const actions = await offerList(s, REWIND_ACTIONS, "Rewind");
+          for (const action of ["both", "conversation", "code", "cancel"] as const) {
+            await s.rig.owner.picksAction(actions, action);
+          }
+          assert.deepEqual(s.inbound.picks, [
+            {
+              type: "rewind-point",
+              ref: s.ref,
+              session: "session-1",
+              promptId: "prompt-2",
+              list: points.message,
+            },
+            ...(["both", "conversation", "code", "cancel"] as const).map((action) => ({
+              type: "rewind-action" as const,
+              ref: s.ref,
+              session: "session-1",
+              promptId: "prompt-2",
+              action,
+              list: actions.message,
+            })),
+          ]);
+        },
+      );
+
+      gated(
+        "a control of a rewind list from somebody else never arrives",
+        "threadLists",
+        async (s) => {
+          const points = await offerList(s, REWIND_POINTS, "Go back to a prompt");
+          const actions = await offerList(s, REWIND_ACTIONS, "Rewind");
+          for (const person of strangers(s.rig)) {
+            await person.picksPoint(points, "prompt-2");
+            await person.picksAction(actions, "both");
+            assert.ok(s.inbound.empty);
+          }
+          await s.rig.owner.picksAction(actions, "code");
+          assert.equal(s.inbound.picks.length, 1, "the owner's does, on the same control");
+        },
+      );
+
+      gated(
+        "folds a message into its title with what it showed inside, and a message that is gone is not folded",
+        "messageFold",
+        async (s) => {
+          const thread = s.provider.thread(s.ref);
+          await thread.notice("an answer to fold");
+          const where = { channel: s.rig.channel, thread: s.ref.thread };
+          const old = s.rig.read(where).find((m) => m.text.includes("an answer to fold"));
+          assert.ok(old?.id, "the notice is a message");
+          assert.equal(await thread.fold?.(old.id, "Removed by rewind"), true);
+          const folded = s.rig.read(where).find((m) => m.id === old.id);
+          assert.ok(folded?.text.includes("Removed by rewind"));
+          assert.ok(folded?.text.includes("an answer to fold"), "what it showed is kept inside");
+          assert.equal(await thread.fold?.("not-a-message", "Removed by rewind"), false);
         },
       );
 

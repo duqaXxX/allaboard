@@ -89,6 +89,21 @@ export interface DiffFlow {
   picked(pick: Extract<ListPick, { type: "diff-file" | "diff-view" }>): Promise<void>;
 }
 
+/** `!rewind`. */
+export interface RewindFlow {
+  /**
+   * `!rewind` typed in the thread of `session`: lists its prompts, newest first, or tells the
+   * owner why it cannot (a session that has not started, one that works, no prompt yet).
+   */
+  word(ref: ThreadRef, session: ThreadSession): Promise<void>;
+  /**
+   * The owner picked a prompt, which draws what can be done there (the code, the conversation,
+   * both), or an action, which does it. A list made for another session, or a prompt the session
+   * no longer holds, is told.
+   */
+  picked(pick: Extract<ListPick, { type: "rewind-point" | "rewind-action" }>): Promise<void>;
+}
+
 /** `!bind`. */
 export interface BindFlow {
   /** `!bind <folder>` typed in a channel. */
@@ -135,6 +150,7 @@ export interface OtherFlows {
   readonly resume: ResumeFlow;
   readonly bind: BindFlow;
   readonly diff: DiffFlow;
+  readonly rewind: RewindFlow;
   /** Absent in a daemon built without a way to update itself: `!allaboard` is then not offered. */
   readonly allaboard?: AllaboardFlow;
 }

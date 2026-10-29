@@ -12,11 +12,18 @@ import { DRAIN_POLL_SECONDS } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
 import { checkDirectory, repositoryBy, trustedBy } from "./directory.ts";
 import { DirectoryUnavailable, SessionClosed } from "./errors.ts";
+import type { RewindMemory } from "./rewind-memory.ts";
 import { logger, ThreadSession } from "./session.ts";
 import type { Event } from "./tasks.ts";
 
 function keyOf(channelId: string, threadId: string): string {
   return `${channelId}\n${threadId}`;
+}
+
+/** What `!rewind` remembers of a thread whose session object is gone, and the thread it is for. */
+interface Kept {
+  readonly ref: ThreadRef;
+  readonly memory: RewindMemory;
 }
 
 export class SessionManager {
@@ -27,6 +34,8 @@ export class SessionManager {
   // close and the resume that follows, and says nothing of it until its next check, so the
   // object built next is handed it.
   private readonly goals = new Map<string, string>();
+  /** What `!rewind` remembers of a thread whose session object was dropped, until it is rebuilt. */
+  private readonly rewinds = new Map<string, Kept>();
   /** The threads being deleted (`release`): no session is handed out or built in one. */
   private readonly heldThreads = new Set<string>();
   /**
@@ -119,6 +128,7 @@ export class SessionManager {
     let predecessor: Event | null = null;
     let goal = this.goals.get(key) ?? null;
     let saved: SavedMessage | null = null;
+    let rewinds = this.rewinds.get(key)?.memory ?? null;
     let allowed: string[] = [];
     let moved = false;
     if (session?.closed) {
@@ -130,6 +140,8 @@ export class SessionManager {
       predecessor = session.doneClosing;
       goal = session.goal;
       saved = session.saved;
+      session.rewinds.settle();
+      rewinds = session.rewinds;
       allowed = [...session.terminalsAllowed];
       moved = session.movedMidTurn;
       session = null;
@@ -142,6 +154,8 @@ export class SessionManager {
       built.draining = this.draining;
       built.goal = goal;
       built.saved = saved;
+      if (rewinds !== null) built.rewinds = rewinds;
+      this.rewinds.delete(key);
       for (const id of allowed) built.terminalsAllowed.add(id);
       built.movedMidTurn = moved;
       this.goals.delete(key);
@@ -165,6 +179,15 @@ export class SessionManager {
     if (this.sessions.get(key) !== session) return;
     this.sessions.delete(key);
     if (session.goal !== null) this.goals.set(key, session.goal);
+    // Replies are let go of, their messages kept: a closed session holds no reply's text.
+    session.rewinds.settle();
+    // Nothing to keep, nothing kept: a thread that never rewound leaves no entry behind.
+    if (session.rewinds.empty) this.rewinds.delete(key);
+    else
+      this.rewinds.set(key, {
+        ref: { channel: session.channelId, thread: session.threadId },
+        memory: session.rewinds,
+      });
   }
 
   /**
@@ -172,6 +195,12 @@ export class SessionManager {
    * must not remove under a running session.
    */
   liveThreads(): ThreadRef[] {
+    // Asked by each pass of the cleanup: what is remembered for a thread `state.json` forgot goes.
+    for (const [key, kept] of this.rewinds) {
+      if (this.deps.state.thread(kept.ref.channel, kept.ref.thread) === null) {
+        this.rewinds.delete(key);
+      }
+    }
     return [...this.sessions.values()]
       .filter((session) => !session.closed)
       .map((session) => ({ channel: session.channelId, thread: session.threadId }));
@@ -269,9 +298,17 @@ export class SessionManager {
   /** The second half of `release`: closes the thread's session, if any, once `hold` took it. */
   async closeHeld(channelId: string, threadId: string): Promise<void> {
     const session = this.sessions.get(keyOf(channelId, threadId));
-    if (session === undefined) return;
-    if (!session.closed) await session.close(texts.ENDED_IDLE);
-    await session.doneClosing.wait();
+    if (session !== undefined) {
+      if (!session.closed) await session.close(texts.ENDED_IDLE);
+      await session.doneClosing.wait();
+    }
+    // The thread is being deleted: nothing of it is remembered after the session let go of it.
+    this.rewinds.delete(keyOf(channelId, threadId));
+  }
+
+  /** How many threads' rewind memory is kept for a session object to come, for a test. */
+  get remembered(): number {
+    return this.rewinds.size;
   }
 
   /** Whether the thread is being deleted: it still has its entry, and takes no session. */

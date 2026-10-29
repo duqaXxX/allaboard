@@ -67,6 +67,8 @@ const NOT_DECLARED = new Set([
   "setModel",
   "setEffort",
   "stopTask",
+  "prompts",
+  "restoreFiles",
 ]);
 
 /** `target` with a call to any of `NOT_DECLARED` written to `calls`. */
@@ -138,6 +140,11 @@ export interface WorldOptions {
    * does), and the chat posts lists in a thread and shares files into it.
    */
   readonly diff?: { trusted: boolean };
+  /**
+   * The agent keeps the prompts and file checkpoints of its sessions and cuts a conversation, and
+   * the chat posts lists in a thread and folds a message into its title.
+   */
+  readonly rewind?: boolean;
   /** More lines of the `.env`, after the selection and the allowed root. */
   readonly env?: readonly string[];
 }
@@ -216,6 +223,9 @@ export class World {
       store: this.store,
       turns: this.turns,
       ...(options.shell === true && { shell: {} }),
+      ...(options.rewind === true && {
+        rewind: { files: true as const, conversation: true as const },
+      }),
       ...(options.diff !== undefined && {
         trust: {
           repository: repositoryAt,
@@ -226,6 +236,7 @@ export class World {
     this.chat = memoryChat({
       ...(options.identities === undefined ? {} : { identities: options.identities }),
       ...(options.diff !== undefined && { lists: true, files: true }),
+      ...(options.rewind === true && { lists: true, folds: true }),
     });
     this.identityKeys = (options.identities ?? [MEMORY_IDENTITY]).length;
     this.channel = this.chat.openChannel("work");
@@ -236,14 +247,15 @@ export class World {
     state.bind(this.channel, this.folder);
 
     // An agent with a record of trust declares the two members that read it.
-    const absent =
-      options.diff === undefined
-        ? NOT_DECLARED
-        : new Set(
-            [...NOT_DECLARED].filter(
-              (name) => !name.startsWith("trusted") && name !== "folderTrusted",
-            ),
-          );
+    const absent = new Set(
+      [...NOT_DECLARED].filter(
+        (name) =>
+          !(
+            options.diff !== undefined &&
+            (name.startsWith("trusted") || name === "folderTrusted")
+          ) && !(options.rewind === true && (name === "prompts" || name === "restoreFiles")),
+      ),
+    );
     const agent: AgentEntry = {
       required: [],
       optional: [],

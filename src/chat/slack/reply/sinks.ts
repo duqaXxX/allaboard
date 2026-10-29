@@ -864,6 +864,13 @@ export class ReplySink implements Sink {
     return ts === null ? null : positionOf(ts);
   }
 
+  /** The messages this reply has posted, oldest first, its closing message last when it has one. */
+  posted(): readonly string[] {
+    const ids = this.messages.flatMap((message) => (message.ts === null ? [] : [message.ts]));
+    if (this.closing !== null && !this.closingGone) ids.push(this.closing);
+    return ids;
+  }
+
   /** Whether nothing of the owner's and no other reply sits below this reply's last message. */
   get last(): boolean {
     return this.places.last(this);

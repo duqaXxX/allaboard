@@ -173,6 +173,15 @@ export const DIFF_BUTTON = "Diff";
 export const DIFF_VIEW_PLACEHOLDER = "View";
 export const DIFF_BINARY = "binary";
 export const DIFF_MORE = "Only the first {rows} of {count} files are shown.";
+// A rewind list (`!rewind`): a selector of prompts, then a button per action.
+export const REWIND_PLACEHOLDER = "Pick a prompt";
+export const REWIND_MORE = "Only the newest {rows} of {count} prompts are shown.";
+export const REWIND_BOTH = "Restore code and conversation";
+export const REWIND_CONVERSATION = "Restore conversation";
+export const REWIND_CODE = "Restore code";
+export const REWIND_CANCEL = "Never mind";
+// Ends a folded message whose text did not fit the card.
+export const FOLD_CUT = "[cut: the rest did not fit]";
 export const RESUME_BUTTON = "Resume";
 export const RESUME_MORE =
   "Only the newest {rows} are shown: `!resume <id>`, or `!resume <title>` for a session that " +

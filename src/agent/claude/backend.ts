@@ -7,6 +7,7 @@ import { homedir } from "node:os";
 import {
   forkSession as sdkForkSession,
   getSessionInfo as sdkGetSessionInfo,
+  getSessionMessages as sdkGetSessionMessages,
   tagSession as sdkTagSession,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { Clock } from "../../clock.ts";
@@ -19,18 +20,21 @@ import type {
   ListedSession,
   Repository,
   RequestHandler,
+  RewindPoint,
   SavedMessage,
   SessionHolder,
   ShellMode,
   StartOptions,
   UsageLimits,
 } from "../seam.ts";
+import { RewindRefused } from "../seam.ts";
 import type { ResolveSettings, SettingsSource } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
 import { chromeEnabled } from "./chrome.ts";
 import { GOAL_CLEAR } from "./goals.ts";
 import { type RunOutput, sessionHolders } from "./holders.ts";
 import { aliveSessions, byLastActivity, directorySessions, projectsDir } from "./listing.ts";
+import { type RewindStart, rewindPoints, rewindStart } from "./rewind.ts";
 import { ClaudeSession, type QueryFunction, THREAD_SETTINGS_SOURCES } from "./session.ts";
 import { shellMode } from "./shell.ts";
 import { TOOLS } from "./tools.ts";
@@ -74,7 +78,6 @@ function trustWith(environment: string): string {
 const SETTINGS_APPLY = "The settings you made in the terminal apply: change them there.";
 const BOUND_FOLDER = "A thread works in the folder its channel was bound to.";
 const NOT_OFFERED: Readonly<Record<string, string | null>> = Object.freeze({
-  rewind: null,
   branch: null,
   subtask: null,
   btw: null,
@@ -203,9 +206,15 @@ export class ClaudeBackend implements AgentBackend {
   async start(options: ClaudeStartOptions, requests: RequestHandler): Promise<ClaudeSession> {
     // Read at every start, so a change in `/chrome` holds from a session's next start.
     const chrome = await chromeEnabled(this.#home, this.#configDir);
+    const rewind = await this.#rewindStart(options);
     const session = new ClaudeSession(
       {
         ...options,
+        ...(rewind !== null && {
+          resumeSessionAt: rewind.at,
+          resumeTail: rewind.tail,
+          ...(rewind.drops !== undefined && { resumeDropsTurn: rewind.drops }),
+        }),
         settingsSources: options.settingsSources ?? THREAD_SETTINGS_SOURCES,
         chrome,
         variables: this.#variables,
@@ -216,6 +225,43 @@ export class ClaudeBackend implements AgentBackend {
     );
     await session.ready();
     return session;
+  }
+
+  /**
+   * Where a start with `rewindTo` resumes: null for a start without it. Rejects with
+   * `RewindRefused` for a prompt the conversation does not hold or that is its first, which has
+   * no earlier entry to resume at.
+   */
+  async #rewindStart(
+    options: StartOptions,
+  ): Promise<(RewindStart & { readonly tail: string }) | null> {
+    if (options.rewindTo === undefined || options.resume === null) return null;
+    const read = this.#getSessionMessages ?? sdkGetSessionMessages;
+    // The system entries (compact boundaries, notices) are chain entries too: the kept turn's
+    // last entry may be one. Entries `getSessionMessages` does not list at all (attachments, the
+    // markers of an interrupted turn) stay out of sight; see `rewindStart`.
+    const messages = await read(options.resume, {
+      dir: options.folder,
+      includeSystemMessages: true,
+    });
+    // The conversation's last entry stands for it: a cut that waits for a prompt is asked for
+    // again with it, and refused once something was written after it.
+    const tail = messages.at(-1)?.uuid ?? "";
+    if (options.rewindToken !== undefined && options.rewindToken !== tail) {
+      throw new RewindRefused();
+    }
+    const start = rewindStart(messages, options.rewindTo);
+    if (start === null) throw new RewindRefused();
+    return { ...start, tail };
+  }
+
+  /**
+   * The prompts of a session of `folder`, oldest first, from its conversation as the SDK reads it
+   * (`rewindPoints`).
+   */
+  async prompts(folder: string, session: string): Promise<readonly RewindPoint[]> {
+    const read = this.#getSessionMessages ?? sdkGetSessionMessages;
+    return rewindPoints(await read(session, { dir: folder }));
   }
 
   /**

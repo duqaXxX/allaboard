@@ -4,8 +4,8 @@
  * module that imports the SDK.
  *
  * The values declared here are errors the core has to tell from every other, and it may import
- * nothing of a back end: `ResumeRefused`, the failure of a start, and `AgentConfigError`, a
- * setting of the owner's the agent cannot use.
+ * nothing of a back end: `ResumeRefused`, the failure of a start, `RewindRefused`, a start that
+ * cut the conversation, and `AgentConfigError`, a setting of the owner's the agent cannot use.
  */
 import type { Clock } from "../clock.ts";
 import type { ModuleSetup, ModuleWords } from "../module-setup.ts";
@@ -19,6 +19,18 @@ export class ResumeRefused extends Error {
   constructor(options?: ErrorOptions) {
     super("the agent could not resume the session", options);
     this.name = "ResumeRefused";
+  }
+}
+
+/**
+ * The agent refused to start a session with `StartOptions.rewindTo`: it cannot drop the
+ * conversation from that prompt. The session is untouched; started again without `rewindTo` it
+ * holds the whole conversation. Not a `ResumeRefused`: the session exists, and the thread goes on.
+ */
+export class RewindRefused extends Error {
+  constructor(options?: ErrorOptions) {
+    super("the agent could not rewind the session", options);
+    this.name = "RewindRefused";
   }
 }
 
@@ -116,6 +128,16 @@ export interface Capabilities {
   readonly sessionTitles: boolean;
   /** `AgentBackend.forkSession`. */
   readonly sessionForks: boolean;
+  /**
+   * `AgentSession.restoreFiles`: the agent keeps a checkpoint of the files it changes at each
+   * prompt and puts them back as they were at one. Only for sessions it started with that on.
+   */
+  readonly fileRestore: boolean;
+  /**
+   * `StartOptions.rewindTo`: the agent starts a session with the conversation cut at a prompt,
+   * the session id kept.
+   */
+  readonly conversationRewind: boolean;
   /**
    * `goal_changed`: the agent says what becomes of a goal the owner set with its command. The
    * command's own text says when a goal is set or cleared; the event adds what it does not.
@@ -340,10 +362,60 @@ export interface StartOptions {
   readonly folder: string;
   /** The session to resume, or null for a new one. */
   readonly resume: string | null;
+  /**
+   * With `resume`: the id of a prompt (`RewindPoint.id`) the session resumes without, and
+   * everything after it, as far as the agent sees; the session id is kept. The agent may keep
+   * the cut only once something is written after it, so the caller starts again with the same
+   * option until a prompt is sent. Rejects with `RewindRefused` when the agent cannot cut there.
+   * Present only with `conversationRewind`.
+   */
+  readonly rewindTo?: string;
+  /**
+   * With `rewindTo`, on a start that asks for the same cut again: the token the session of the
+   * first start gave (`AgentSession.rewindToken`). The agent rejects the start with
+   * `RewindRefused` when the conversation changed since the token was taken (someone else wrote
+   * to the session), so a cut that waits for a prompt is never applied over what was written
+   * after it. Opaque to the caller.
+   */
+  readonly rewindToken?: string;
   /** With `resume` naming a copy: the session it was made from, which still runs. */
   readonly forkOf?: ForkSource;
   readonly model: string | null;
   readonly effort: string | null;
+}
+
+/** A prompt of a session's conversation the owner can go back to (`AgentBackend.prompts`). */
+export interface RewindPoint {
+  /** The id the prompt was sent under (`Prompt.id`). */
+  readonly id: string;
+  /** What the owner typed, as the agent shows it. */
+  readonly text: string;
+  /**
+   * `StartOptions.rewindTo` can drop the conversation from this prompt: false where the agent has
+   * nothing earlier to resume at (the session's first prompt). Meaningful with
+   * `conversationRewind`; the files can still be restored at a prompt that says false.
+   */
+  readonly conversation: boolean;
+}
+
+/**
+ * What putting the files back as they were at a prompt does, or would do (`AgentSession.restoreFiles`).
+ * The counts describe the restore, not the turn: the lines the files have now against the lines
+ * they get back.
+ */
+export interface FilesRestore {
+  /** The agent can restore the files at that prompt. */
+  readonly possible: boolean;
+  /** The agent's words for why it cannot; null when it can. */
+  readonly reason: string | null;
+  /** The files the restore changes, as the agent names them. */
+  readonly files: readonly string[];
+  /** Lines the restore adds back. */
+  readonly insertions: number;
+  /** Lines the restore removes. */
+  readonly deletions: number;
+  /** Files it left alone because they are no regular files (a link); 0 on a preview. */
+  readonly skipped: number;
 }
 
 export interface TextPart {
@@ -888,6 +960,12 @@ export interface RequestHandler {
 
 /** One live session of an agent. */
 export interface AgentSession {
+  /**
+   * On a session started with `rewindTo`: an opaque token that stands for the conversation as it
+   * was when the cut was made, which the caller hands back as `StartOptions.rewindToken` when it
+   * asks for the same cut again. Absent otherwise.
+   */
+  readonly rewindToken?: string;
   /** Every event of the session, in order, until the session closes or its process is lost. */
   readonly events: AsyncIterable<SessionEvent>;
   /**
@@ -925,6 +1003,13 @@ export interface AgentSession {
    */
   setEffort?(level: string | null): Promise<void>;
   contextUsage(): Promise<ContextUsage>;
+  /**
+   * Puts the files the session changed back as they were when the prompt `promptId` was sent,
+   * forward as well as back; with `preview` it only says what that would do. The files of the
+   * session's own checkpoints: a session started before the agent kept any has none, and says
+   * `possible: false`. Rejects when the agent cannot be asked. Present with `fileRestore`.
+   */
+  restoreFiles?(promptId: string, preview: boolean): Promise<FilesRestore>;
   /**
    * The model the agent's settings name as the session's advisor now, as they name it (an alias
    * `AgentInfo.models` lists by value, or a model's id); null when none is set or the advisor is
@@ -1031,6 +1116,12 @@ export interface AgentBackend {
    * agent's own name for it. Starts no process. Present with `sessionForks`.
    */
   forkSession?(folder: string, session: string, title: string | null): Promise<string>;
+  /**
+   * The prompts of the session `session` of `folder`, oldest first, that the owner can go back
+   * to: what the owner typed, not the agent's own commands. Rejects when the agent cannot read
+   * them. Present with `fileRestore` or `conversationRewind`.
+   */
+  prompts?(folder: string, session: string): Promise<readonly RewindPoint[]>;
   /**
    * The title the agent shows for the session `session` of `folder`, generated by the agent or
    * set by the owner; null while it has none. Read at the end of every turn and at a status, so it

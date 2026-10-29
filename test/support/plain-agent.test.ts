@@ -15,7 +15,7 @@ import type {
   SessionEvent,
   StartOptions,
 } from "../../src/agent/seam.ts";
-import { ResumeRefused } from "../../src/agent/seam.ts";
+import { ResumeRefused, RewindRefused } from "../../src/agent/seam.ts";
 import {
   call,
   die,
@@ -302,4 +302,102 @@ test("what a live session cannot do, it refuses", LIMIT, async () => {
   const info = await session.info();
   assert.deepEqual([info.models, info.commands.length, info.permissionMode], [[], 2, PLAIN_MODE]);
   await session.close();
+});
+
+// Going back: the plain agent keeps the prompts of a session and the files at each of them.
+
+test("without the option the plain agent offers no way back", LIMIT, async () => {
+  const agent = new PlainAgent();
+  assert.deepEqual(
+    [agent.capabilities.fileRestore, agent.capabilities.conversationRewind],
+    [false, false],
+  );
+  assert.equal(agent.prompts, undefined);
+  const { session } = await started(agent);
+  assert.equal(session.restoreFiles, undefined);
+  await session.close();
+});
+
+test("the prompts come oldest first and leave out the agent's own commands", LIMIT, async () => {
+  const agent = new PlainAgent({ rewind: { files: true, conversation: true } });
+  const { session } = await started(agent);
+  const [one, two, three] = [prompt("first"), prompt(":echo hi"), prompt("second")];
+  for (const sent of [one, two, three]) await session.send(sent);
+  await session.close();
+  assert.deepEqual(await agent.prompts?.(FOLDER, session.id), [
+    { id: one.id, text: "first", conversation: true },
+    { id: three.id, text: "second", conversation: true },
+  ]);
+});
+
+test("a preview changes nothing and a restore goes back and forward", LIMIT, async () => {
+  const store = new PlainStore();
+  const agent = new PlainAgent({ store, rewind: { files: true } });
+  const { session } = await started(agent);
+  const [one, two] = [prompt("one"), prompt("two")];
+  store.writeFile(FOLDER, "a.txt", "alpha");
+  await session.send(one);
+  store.writeFile(FOLDER, "a.txt", "beta");
+  store.writeFile(FOLDER, "b.txt", "new");
+  await session.send(two);
+  store.writeFile(FOLDER, "a.txt", "gamma");
+
+  const restore = session.restoreFiles;
+  assert.ok(restore !== undefined);
+  const dry = await restore(one.id, true);
+  assert.deepEqual(
+    [dry.possible, dry.files, store.file(FOLDER, "a.txt"), store.file(FOLDER, "b.txt")],
+    [true, ["a.txt", "b.txt"], "gamma", "new"],
+  );
+  assert.deepEqual([dry.insertions, dry.deletions], [1, 2]);
+
+  await restore(one.id, false);
+  assert.deepEqual([store.file(FOLDER, "a.txt"), store.file(FOLDER, "b.txt")], ["alpha", null]);
+  // Forward: the checkpoint of the later prompt is still there, taken as that prompt was sent.
+  await restore(two.id, false);
+  assert.deepEqual([store.file(FOLDER, "a.txt"), store.file(FOLDER, "b.txt")], ["beta", "new"]);
+  assert.equal((await restore("nothing", true)).possible, false);
+  await session.close();
+});
+
+test("a rewind keeps the session id and holds only once a prompt is sent", LIMIT, async () => {
+  const store = new PlainStore();
+  const agent = new PlainAgent({ store, rewind: { conversation: true } });
+  const { session } = await started(agent);
+  const [one, two] = [prompt("one"), prompt("two")];
+  await session.send(one);
+  await session.send(two);
+  await session.close();
+
+  const cut = (await agent.start(
+    { ...START, resume: session.id, rewindTo: two.id },
+    handler(),
+  )) as PlainSession;
+  assert.equal(cut.id, session.id);
+  // Nothing written yet: a plain resume sees the whole conversation.
+  assert.equal((await agent.prompts?.(FOLDER, session.id))?.length, 2);
+  const again = prompt("three");
+  await cut.send(again);
+  assert.deepEqual(await agent.prompts?.(FOLDER, session.id), [
+    { id: one.id, text: "one", conversation: true },
+    { id: again.id, text: "three", conversation: true },
+  ]);
+  await cut.close();
+});
+
+test("a refused rewind leaves a session that starts plainly", LIMIT, async () => {
+  const store = new PlainStore();
+  const agent = new PlainAgent({ store, rewind: { conversation: true, refuse: true } });
+  const { session } = await started(agent);
+  const sent = prompt("one");
+  await session.send(sent);
+  await session.close();
+  await assert.rejects(
+    agent.start({ ...START, resume: session.id, rewindTo: sent.id }, handler()),
+    RewindRefused,
+  );
+  const plain = await agent.start({ ...START, resume: session.id }, handler());
+  assert.ok(plain);
+  assert.equal((await agent.prompts?.(FOLDER, session.id))?.length, 1);
+  await plain.close();
 });

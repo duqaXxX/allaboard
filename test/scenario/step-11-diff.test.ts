@@ -33,7 +33,10 @@ test("!diff lists the changed files and a control shares one file's diff", async
   await world.owner.says(world.channel, "!diff", { thread });
   const [list] = world.chat.threadLists();
   assert.ok(list, "a list is open in the thread");
-  assert.deepEqual(list.list.files, [{ path: "a.txt", added: 1, removed: 0, binary: false }]);
+  assert.equal(list.list.type, "diff");
+  assert.deepEqual(list.list.type === "diff" && list.list.files, [
+    { path: "a.txt", added: 1, removed: 0, binary: false },
+  ]);
 
   assert.equal(await world.owner.picksFile(list.message, "a.txt"), true);
   const [shared] = world.chat.shared();

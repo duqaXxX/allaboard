@@ -575,13 +575,22 @@ export class FakeSlack extends WebClient {
 
   /**
    * What `conversations.replies` reads back of the messages this fake holds: the daemon's own,
-   * as its bot wrote them (a stream carries `streaming_state`), newer than `oldest`.
+   * as its bot wrote them (a stream carries `streaming_state`), newer than `oldest` and older than
+   * `latest`.
    */
   #thread(args: Args): JsonObject {
     const oldest = Number(args.oldest || 0);
+    // `latest` and `inclusive` as the reference words them (conversations.replies, read
+    // 2026-10-29): `inclusive` keeps the messages at `oldest` and `latest`, and is ignored unless
+    // one of the two is given.
+    const latest = args.latest ? Number(args.latest) : null;
+    const inclusive = args.inclusive === true && (args.oldest || args.latest);
     const found: JsonObject[] = [];
     for (const message of this.messages.values()) {
-      if (!(Number(message.ts) > oldest) || message.deleted) continue;
+      const at = Number(message.ts);
+      const after = inclusive ? at >= oldest : at > oldest;
+      const before = latest === null || (inclusive ? at <= latest : at < latest);
+      if (!after || !before || message.deleted) continue;
       found.push({
         ts: message.ts,
         user: BOT,

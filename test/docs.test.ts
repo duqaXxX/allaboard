@@ -594,7 +594,7 @@ test("a command listed as not offered is not in the recorded commands", () => {
   const named = limitsRows(CLAUDE_LIMITS).flatMap((row) =>
     [...(row[1] ?? "").matchAll(/`\/([a-z-]+)`/g)].map((m) => m[1] ?? ""),
   );
-  assert.ok(named.length >= 18, `${named}`);
+  assert.ok(named.length >= 17, `${named}`);
   assert.deepEqual(
     named.filter((name) => offered.has(name)),
     [],

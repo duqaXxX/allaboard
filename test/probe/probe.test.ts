@@ -273,7 +273,7 @@ test("the probe runs when started through a symlink, as `--latest` starts it und
 
 test("the commands not offered are read from the limits page", () => {
   const names = notOffered();
-  for (const expected of ["rewind", "plan", "cd", "voice"])
+  for (const expected of ["branch", "plan", "cd", "voice"])
     assert.ok(names.includes(expected), expected);
   assert.equal(new Set(names).size, names.length);
 });

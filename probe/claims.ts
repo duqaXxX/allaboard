@@ -279,7 +279,7 @@ export const CLAIMS: readonly Claim[] = [
     "each command `docs/limits.md` lists as not offered to a session is answered `isn't " +
       "available in this environment`",
     "src/core/commands.ts#parseBang",
-    "send `!rewind` in a thread; the reply is `/rewind isn't available in this " +
+    "send `!branch` in a thread; the reply is `/branch isn't available in this " +
       "environment.` A command that answers anything else is no longer a limit: take its " +
       "row out of `docs/limits.md` and say so in the issue it names",
   ),
@@ -493,6 +493,29 @@ export const CLAIMS: readonly Claim[] = [
       "copy says it has one still running and names the session it was forked from, never that " +
       "the command stopped. If it fails, look for `CLAUDE_CODE_RESUME_SOURCE_ALIVE` and " +
       "`fork-source` in the bundled CLI's strings, and read `docs/limits.md` for the row on `!fork`",
+  ),
+  claim(
+    "P44",
+    "model",
+    "a session started as the daemon starts it keeps file checkpoints: a dry run of `rewindFiles` " +
+      "to the prompt that created a file lists that file, and a real run takes the file away",
+    "src/agent/claude/session.ts#ClaudeSession.restoreFiles",
+    "in a thread ask Claude to create a file with the Write tool, then in a second message another, " +
+      "and send `!rewind`: the second prompt offers Restore code with the counts of one file. If " +
+      "it offers nothing, `enableFileCheckpointing` is not in force: look for it in " +
+      "`ClaudeSession.#options`",
+  ),
+  claim(
+    "P45",
+    "model",
+    "a resume with `resumeSessionAt` at the entry before the last prompt and `resumeDropsTurn` of " +
+      "that prompt keeps the session id and the model no longer sees that prompt, and the same " +
+      "guard over a range of two turns is refused with `Resume rejected by --resume-drops-turn:`",
+    "src/agent/claude/backend.ts#ClaudeBackend.start",
+    "in a thread give Claude a codeword, then another, send `!rewind` and pick Restore conversation " +
+      "on the second prompt, then ask for every codeword: only the first is named. If the thread " +
+      "reports that the agent could not rewind, the guard refused a range it should accept: read " +
+      "`docs/limits.md` for the row on restoring the conversation",
   ),
   claim(
     "L1",

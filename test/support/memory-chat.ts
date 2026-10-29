@@ -50,6 +50,11 @@ export interface MemoryChatOptions {
   readonly lists?: boolean;
   /** The provider declares `fileUpload` and keeps the files shared into a thread (`Room.shared`). */
   readonly files?: boolean;
+  /**
+   * The provider declares `messageFold`: a rewind folds a message into its title, and the message
+   * keeps its text behind it (`ShownMessage.inside`).
+   */
+  readonly folds?: boolean;
   /** With `files`: the most bytes the provider takes as one shared file (1 MiB when absent). */
   readonly fileLimit?: number;
   /**
@@ -78,6 +83,7 @@ export class MemoryChat extends Room implements ChatEntry {
   readonly #lists: boolean;
   readonly #files: boolean;
   readonly #fileLimit: number | undefined;
+  readonly #folds: boolean;
   #built: MemoryProvider | null = null;
 
   constructor(
@@ -89,8 +95,10 @@ export class MemoryChat extends Room implements ChatEntry {
     lists = false,
     files = false,
     fileLimit?: number,
+    folds = false,
   ) {
     super(owner, threadIds, edits);
+    this.#folds = folds;
     this.#identities = identities;
     this.#suggests = suggests;
     this.#lists = lists;
@@ -113,6 +121,7 @@ export class MemoryChat extends Room implements ChatEntry {
       this.#lists,
       this.#files,
       this.#fileLimit,
+      this.#folds,
     );
     return this.#built;
   }
@@ -129,5 +138,6 @@ export function memoryChat(options: MemoryChatOptions = {}): MemoryChat {
     options.lists ?? false,
     options.files ?? false,
     options.fileLimit,
+    options.folds ?? false,
   );
 }

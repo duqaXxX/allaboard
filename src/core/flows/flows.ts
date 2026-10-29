@@ -7,6 +7,7 @@ import { rootGone } from "./gone.ts";
 import { Inbound } from "./inbound.ts";
 import { lists } from "./lists.ts";
 import { messages } from "./messages.ts";
+import { rewindFlow } from "./rewind.ts";
 import { type FlowDeps, Talk } from "./talk.ts";
 import { updating } from "./update.ts";
 
@@ -20,6 +21,7 @@ export function buildFlows(deps: FlowDeps): Built {
   const { setup, hold, terminal, answers } = asking(deps, talk);
   const { resume, bind, picks } = lists(deps, talk);
   const diff = diffFlow(deps, talk);
+  const rewind = rewindFlow(deps, talk);
   const allaboard = deps.updates === undefined ? undefined : updating(deps, deps.updates, talk);
   const flows: OtherFlows = {
     setup,
@@ -28,6 +30,7 @@ export function buildFlows(deps: FlowDeps): Built {
     resume,
     bind,
     diff,
+    rewind,
     ...(allaboard ? { allaboard } : {}),
   };
   const all = messages(deps, talk, flows);
@@ -54,6 +57,9 @@ export function buildFlows(deps: FlowDeps): Built {
       picked: (pick) => {
         if (pick.type === "update") return updatePicked(pick);
         if (pick.type === "diff-file" || pick.type === "diff-view") return diff.picked(pick);
+        if (pick.type === "rewind-point" || pick.type === "rewind-action") {
+          return rewind.picked(pick);
+        }
         return picks.picked(pick);
       },
       unbound: (channel) => talk.unbound(channel),

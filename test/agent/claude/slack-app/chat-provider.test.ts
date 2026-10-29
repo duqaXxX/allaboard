@@ -41,6 +41,7 @@ test("the provider names itself and supports every part of the seam", () => {
     activityLine: true,
     fileUpload: true,
     threadLists: true,
+    messageFold: true,
     commandSuggestions: true,
     loopCard: true,
     threadOpen: true,
