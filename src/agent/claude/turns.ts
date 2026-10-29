@@ -42,6 +42,17 @@ function hasToolResult(content: unknown): boolean {
 }
 
 /**
+ * Whether a user message is the record of a slash command (`/model haiku`, `/context`) rather than
+ * a prompt: Claude Code runs it as a turn of no model request (`num_turns` 0, measured on 2.1.312
+ * on 2026-10-29), and no checkpoint is taken for it.
+ */
+export function isCommandRecord(message: SessionMessage): boolean {
+  if (message.type !== "user" || !isRecord(message.message)) return false;
+  const text = texts(message.message.content, "text");
+  return text !== null && COMMAND_NAME.test(text);
+}
+
+/**
  * What the owner typed, as the terminal shows it, for a user message that opens a turn; null for
  * a message the owner did not type (a tool's result, a notification Claude Code injected).
  */

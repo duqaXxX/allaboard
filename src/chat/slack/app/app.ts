@@ -63,7 +63,12 @@ import {
   REFRESH_ACTION,
   SHOW_ALL_ACTION,
 } from "../home.ts";
-import { DIFF_FILE_ACTION, DIFF_VIEW_ACTION } from "../lists.ts";
+import {
+  DIFF_FILE_ACTION,
+  DIFF_VIEW_ACTION,
+  REWIND_ACTION_ACTION,
+  REWIND_POINT_ACTION,
+} from "../lists.ts";
 import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.ts";
 import { levelLogger } from "../quiet-logger.ts";
 import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
@@ -443,6 +448,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(UPDATE_ACTION, resumeBind.onUpdate);
   action(DIFF_FILE_ACTION, threadLists.onDiffFile);
   action(DIFF_VIEW_ACTION, threadLists.onDiffView);
+  action(REWIND_POINT_ACTION, threadLists.onRewindPoint);
+  action(REWIND_ACTION_ACTION, threadLists.onRewindAction);
 
   action(NEW_THREAD_ACTION, home.onHomeLink, { acknowledgeOnly: true });
   for (const actionId of FILTER_ACTIONS) action(actionId, home.onHomeFilter);

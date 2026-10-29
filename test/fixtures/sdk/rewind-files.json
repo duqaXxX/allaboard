@@ -1,0 +1,51 @@
+{
+  "session": "00000000-0000-4000-8000-000000000002",
+  "prompts": {
+    "P1": "00000000-0000-4000-8000-000000000001",
+    "P2": "00000000-0000-4000-8000-000000000007",
+    "P3": "00000000-0000-4000-8000-000000000026"
+  },
+  "results": {
+    "dry P1": {
+      "canRewind": true,
+      "filesChanged": [
+        "/private/work/project/a.txt",
+        "/private/work/project/b.txt",
+        "/private/work/project/tracked.txt"
+      ],
+      "insertions": 1,
+      "deletions": 3
+    },
+    "dry P2": {
+      "canRewind": true,
+      "filesChanged": [
+        "/private/work/project/a.txt",
+        "/private/work/project/b.txt",
+        "/private/work/project/tracked.txt"
+      ],
+      "insertions": 2,
+      "deletions": 3
+    },
+    "dry P3": {
+      "canRewind": true,
+      "filesChanged": [
+        "/private/work/project/a.txt",
+        "/private/work/project/tracked.txt"
+      ],
+      "insertions": 2,
+      "deletions": 2
+    },
+    "dry unknown uuid": {
+      "canRewind": false,
+      "error": "No file checkpoint found for this message."
+    },
+    "real P2": {
+      "canRewind": true,
+      "skippedLinks": 0
+    },
+    "real P3 (forward)": {
+      "canRewind": true,
+      "skippedLinks": 0
+    }
+  }
+}

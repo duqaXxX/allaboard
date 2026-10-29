@@ -325,6 +325,10 @@ export interface WorldOptions {
   readonly suggests?: boolean;
   /** The chat posts lists in a thread and shares files into it (`threadLists`, `ThreadChat.share`). */
   readonly diff?: boolean;
+  /** The chat posts lists in a thread and folds a message into its title (`threadLists`, `messageFold`). */
+  readonly rewind?: boolean;
+  /** With `rewind`: the chat folds no message (`messageFold` false). */
+  readonly noFold?: boolean;
   /** With `diff`: the most bytes the chat takes as one shared file. */
   readonly fileLimit?: number;
   /** The chat has reactions: a word that took effect is marked on the owner's message. */
@@ -447,8 +451,9 @@ export class MessagesWorld {
       earlier?.chat ??
       memoryChat({
         suggestions: options.suggests ?? false,
-        lists: options.diff ?? false,
+        lists: (options.diff ?? false) || (options.rewind ?? false),
         files: options.diff ?? false,
+        folds: (options.rewind ?? false) && options.noFold !== true,
         ...(options.fileLimit !== undefined && { fileLimit: options.fileLimit }),
       });
     const provider = await chat.build({

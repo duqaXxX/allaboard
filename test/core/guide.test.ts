@@ -33,6 +33,9 @@ const FULL_GUIDE = [
   "**Changes**",
   "`!diff`, sent inside a session's thread, lists the files that differ from HEAD in its git repository, untracked ones included, with the lines added and removed; **Diff** on a row shares that file's diff into the thread, where Memory chat opens it in its file viewer. Once the session has edited files, a selector also shows the edits of one turn. It works in a repository you trusted.",
   "",
+  "**Going back**",
+  "`!rewind`, sent inside a session's thread, lists the session's prompts. Pick one to restore the code to how it was when you sent it, the conversation to before it, or both; the replies you went back over stay in the thread, folded under **Removed by rewind**, and the prompt is posted again to send. It waits until nothing runs.",
+  "",
   "**Bypass**",
   "`!bypass on`, sent inside a session's thread, lets Plain run every tool without asking in that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ bypass while it is on.",
   "",
@@ -85,6 +88,7 @@ const APPROVALS = line("When Plain asks permission");
 const SESSIONS = line("`!status` typed in the channel");
 const FILES = ["**Files**", line("`!open`, sent inside")];
 const CHANGES = ["**Changes**", line("`!diff`, sent inside")];
+const REWIND = ["**Going back**", line("`!rewind`, sent inside")];
 const BYPASS = ["**Bypass**", line("`!bypass on`")];
 const PLAN = ["**Plan mode**", line("`!plan`, sent inside")];
 const TAGS = ["**Tags**", line("`!tag <name>`, sent inside")];
@@ -218,6 +222,12 @@ test("without fileUpload the Files section is gone", () => {
 test("without diff the Changes section is gone", () => {
   const { removed, added } = difference(linesOf({ diff: false }));
   assert.deepEqual(removed, CHANGES);
+  assert.deepEqual(added, []);
+});
+
+test("without rewind the Going back section is gone", () => {
+  const { removed, added } = difference(linesOf({ rewind: false }));
+  assert.deepEqual(removed, REWIND);
   assert.deepEqual(added, []);
 });
 

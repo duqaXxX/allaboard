@@ -18,6 +18,7 @@ import {
   type OwnerAnswer,
   type OwnerList,
   type OwnerRequest,
+  type RewindAction,
   type RunningList,
   type ThreadList,
   type ThreadRef,
@@ -64,6 +65,8 @@ export interface StoredMessage {
   /** A reply the daemon has not ended. */
   unfinished: boolean;
   deleted: boolean;
+  /** Folded by a rewind: what the message showed before, now behind the title it shows. */
+  inside: string | null;
 }
 
 /** A message as a test reads it: a copy, so what it holds does not change under the reader. */
@@ -75,6 +78,8 @@ export interface ShownMessage {
   readonly pressable: boolean;
   readonly unfinished: boolean;
   readonly topLevel: boolean;
+  /** What a folded message holds behind its title (`text`); null for a message that is not folded. */
+  readonly inside: string | null;
 }
 
 /** A request the owner can answer: the daemon asked it and nobody answered or withdrew it. */
@@ -162,6 +167,16 @@ export interface Person {
    */
   picksView(list: MessageId, view: string): Promise<boolean>;
   /**
+   * Picks the prompt `promptId` in the open rewind list `list`. Throws when the list is not open
+   * or has no such prompt. Resolves with whether the pick reached the daemon.
+   */
+  picksPoint(list: MessageId, promptId: string): Promise<boolean>;
+  /**
+   * Uses the control of `action` in the open rewind actions `list`. Throws when the list is not
+   * open or offers no such control. Resolves with whether the pick reached the daemon.
+   */
+  picksAction(list: MessageId, action: RewindAction): Promise<boolean>;
+  /**
    * Sends `text` from the field of the open suggestion `suggestion`, the way its Enter does: it
    * reaches the daemon as a message of the thread, with the id of the message that typed the
    * word. Throws when no such suggestion is open. Resolves with whether it reached the daemon.
@@ -193,8 +208,8 @@ export function refOf(message: StoredMessage): ThreadRef {
 }
 
 function shown(message: StoredMessage): ShownMessage {
-  const { id, author, kind, text, pressable, unfinished, topLevel } = message;
-  return { id, author, kind, text, pressable, unfinished, topLevel };
+  const { id, author, kind, text, pressable, unfinished, topLevel, inside } = message;
+  return { id, author, kind, text, pressable, unfinished, topLevel, inside };
 }
 
 /** A reply the room places the list of: the same rule as Slack's, over this room's counter. */
@@ -293,6 +308,8 @@ export class Room {
       picks: (list, row) => this.#picks(owns, list, row),
       picksFile: (list, path) => this.#picksFile(owns, list, path),
       picksView: (list, view) => this.#picksView(owns, list, view),
+      picksPoint: (list, promptId) => this.#picksPoint(owns, list, promptId),
+      picksAction: (list, action) => this.#picksAction(owns, list, action),
       types: (suggestion, text) => this.#types(owns, suggestion, text),
       picksOnPage: (version) => this.#picksOnPage(owns, version),
       deletes: (said) => this.#deletes(said, tenant === HOME),
@@ -495,6 +512,7 @@ export class Room {
       pressable: false,
       unfinished: false,
       deleted: false,
+      inside: null,
     };
     this.#messages.push(message);
     return message;
@@ -608,9 +626,51 @@ export class Room {
     return true;
   }
 
+  async #picksPoint(owns: boolean, id: MessageId, promptId: string): Promise<boolean> {
+    const open = this.#threadLists.get(id);
+    if (open === undefined) throw new Error(`no open thread list ${id}`);
+    if (open.list.type !== "rewind-points") throw new Error(`list ${id} is no rewind list`);
+    if (!open.list.points.some((point) => point.id === promptId)) {
+      throw new Error(`no prompt ${promptId} in the list`);
+    }
+    if (!owns || this.#inbound === null) return false;
+    await this.#inbound.picked({
+      type: "rewind-point",
+      ref: open.ref,
+      session: open.list.session,
+      promptId,
+      list: id,
+    });
+    return true;
+  }
+
+  async #picksAction(owns: boolean, id: MessageId, action: RewindAction): Promise<boolean> {
+    const open = this.#threadLists.get(id);
+    if (open === undefined) throw new Error(`no open thread list ${id}`);
+    if (open.list.type !== "rewind-actions") throw new Error(`list ${id} is no rewind actions`);
+    const { files, conversation } = open.list;
+    const offered =
+      action === "cancel" ||
+      (action === "code" && files !== null) ||
+      (action === "conversation" && conversation) ||
+      (action === "both" && files !== null && conversation);
+    if (!offered) throw new Error(`the list offers no ${action}`);
+    if (!owns || this.#inbound === null) return false;
+    await this.#inbound.picked({
+      type: "rewind-action",
+      ref: open.ref,
+      session: open.list.session,
+      promptId: open.list.point.id,
+      action,
+      list: id,
+    });
+    return true;
+  }
+
   async #picksFile(owns: boolean, id: MessageId, path: string): Promise<boolean> {
     const open = this.#threadLists.get(id);
     if (open === undefined) throw new Error(`no open thread list ${id}`);
+    if (open.list.type !== "diff") throw new Error(`list ${id} is no diff list`);
     if (!open.list.files.some((file) => file.path === path)) {
       throw new Error(`no file ${path} in the list`);
     }
@@ -630,6 +690,7 @@ export class Room {
   async #picksView(owns: boolean, id: MessageId, view: string): Promise<boolean> {
     const open = this.#threadLists.get(id);
     if (open === undefined) throw new Error(`no open thread list ${id}`);
+    if (open.list.type !== "diff") throw new Error(`list ${id} is no diff list`);
     if (!open.list.views.some((offered) => offered.id === view)) {
       throw new Error(`no view ${view} in the list`);
     }

@@ -545,6 +545,69 @@ export const DIFF_FILE_TOO_LARGE = naming(
 export const DIFF_FILE_FAILED = "git could not read the diff of `{path}`.";
 export const DIFF_FILE_REFUSED = naming("{chat} did not take the diff of `{path}`: {error}.");
 export const DIFF_VIEW_GONE = "That view is no longer available. Send `!diff` again.";
+// `!rewind`'s answers.
+export const REWIND_TOP_LEVEL = "`!rewind` works inside a session's thread, not in the channel.";
+export const REWIND_UNAVAILABLE = naming(
+  "`!rewind` is not offered here: {chat} cannot show a list with controls, or {agent} cannot go " +
+    "back to an earlier prompt.",
+);
+export const REWIND_NOT_STARTED = "This session has not started yet: send it a message first.";
+export const REWIND_NONE = "This session has no prompt to go back to yet.";
+export const REWIND_BUSY =
+  "`!rewind` waits until nothing runs here: a turn, a question or approval waiting for you, or " +
+  "background work. `!stop` ends them; then send `!rewind` again.";
+export const REWIND_TITLE = "Go back to a prompt";
+export const REWIND_ACTIONS_TITLE = "Go back to";
+export const REWIND_STALE = "That list belongs to another session. Send `!rewind` again.";
+export const REWIND_POINT_GONE = "That prompt is no longer in the session. Send `!rewind` again.";
+// At a prompt where no file changed and the conversation cannot be cut (the first prompt).
+export const REWIND_NOTHING = "There is nothing to restore at that prompt.";
+export const REWIND_CANCELLED = "Left as it was.";
+// The list, once an action ran.
+export const REWIND_DONE = "Went back.";
+// A second pick while an action runs, and a pick of a list whose action already ran.
+export const REWIND_UNDER_WAY = "`!rewind` is already going back; wait for it to finish.";
+export const REWIND_ALREADY = "That rewind is already done.";
+// A cut that waited for a prompt was not kept: the session changed since.
+export const REWIND_DROPPED_TERMINAL =
+  "The rewind you made earlier is dropped: a terminal resumes the whole conversation, the turns " +
+  "you went back over included.";
+export const REWIND_DROPPED =
+  "The rewind you made earlier was not kept: the session changed since, so it goes on with the " +
+  "whole conversation, the turns you went back over included.";
+// `{count}` files, with the lines the restore adds back and removes, as {agent} counted them.
+export const REWIND_CODE_DONE =
+  "Restored the code to how it was at that prompt: {count} {files}, +{insertions} −{deletions}.";
+export const REWIND_CODE_SKIPPED =
+  " {skipped} {files} left alone: a link or a file that is not a regular file is not restored.";
+export const REWIND_CODE_FAILED = naming("{agent} could not restore the code: {reason}");
+export const REWIND_FILE = "file";
+export const REWIND_FILES = "files";
+export const REWIND_CONVERSATION_DONE = naming(
+  "Went back to before that prompt: {agent} no longer sees it or anything after it. The cut " +
+    "holds once you send a message. The prompt follows, to send again.",
+);
+export const REWIND_REFUSED = naming(
+  "{agent} could not cut the conversation there, so it is as it was.",
+);
+export const REWIND_REFUSED_AFTER_CODE = naming(
+  "The code was restored, but {agent} could not cut the conversation there, so it is as it was.",
+);
+export const REWIND_BUSY_AFTER_CODE =
+  "The code was restored, but something started to run, so the conversation is as it was. " +
+  "`!rewind` again, once nothing runs.";
+// Under the replies the rewind could not mark as removed.
+export const REWIND_NOT_MARKED = naming(
+  "{chat} would not mark {count} of the replies after that prompt as removed: they stay as they were.",
+);
+export const REWIND_NO_FOLD = naming(
+  "{chat} cannot mark the replies after that prompt as removed: they stay as they were.",
+);
+export const REWIND_UNKNOWN_REPLIES =
+  "The replies of turns that ran before allaboard last started are not marked as removed: " +
+  "allaboard does not keep which messages they were.";
+// The title of a reply's message that a rewind went back over.
+export const REWOUND_TITLE = "Removed by rewind";
 export const TERMINAL_TOP_LEVEL =
   "`!terminal` works inside a session's thread, not in the channel.";
 // Shown only for an agent with no terminal to continue a session in.
@@ -687,6 +750,9 @@ export const HELP_WORDS: readonly Named[] = [
     "included, as the terminal's `/diff` lists them; a button per file shares its diff into the " +
     "thread, and once the session edited files a selector shows a turn's edits; inside a " +
     "thread, refused in the channel",
+  "`!rewind` go back to an earlier prompt of this session, as the terminal's `/rewind` does: " +
+    "pick a prompt, then restore the code, the conversation or both; the replies you went back " +
+    "over stay in the thread, marked as removed; inside a thread, refused in the channel",
   "`!bind [folder]` the folders {agent} trusts, or bind this channel to one, its path " +
     "relative to the allowed root; in the channel, refused inside a thread",
   "`!bypass on|off` run every tool without asking, until `!bypass off`; it survives a " +
@@ -857,6 +923,13 @@ export const GUIDE_DIFF = naming(
     "shares that file's diff into the thread, where {chat} opens it in its file viewer. Once the " +
     "session has edited files, a selector also shows the edits of one turn. It works in a " +
     "repository you trusted.",
+);
+export const GUIDE_REWIND = naming(
+  "**Going back**\n" +
+    "`!rewind`, sent inside a session's thread, lists the session's prompts. Pick one to restore " +
+    "the code to how it was when you sent it, the conversation to before it, or both; the " +
+    "replies you went back over stay in the thread, folded under **Removed by rewind**, and the " +
+    "prompt is posted again to send. It waits until nothing runs.",
 );
 export const GUIDE_BYPASS = naming(
   "**Bypass**\n" +

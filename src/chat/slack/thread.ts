@@ -58,10 +58,11 @@ import { SlackChannel } from "./channel.ts";
 import type { ChannelLine } from "./channel-line.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
 import type { ThreadDeletion } from "./delete.ts";
+import { foldMessage } from "./fold.ts";
 import { formatFooter, slackTime } from "./footer.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
-import { diffBlocks } from "./lists.ts";
+import { listBlocks } from "./lists.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
 import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
@@ -208,6 +209,7 @@ const CAPABILITIES = {
   activityLine: true,
   fileUpload: true,
   threadLists: true,
+  messageFold: true,
   commandSuggestions: true,
   loopCard: true,
   threadOpen: true,
@@ -884,7 +886,7 @@ export class SlackThread implements ThreadChat {
 
   async offer(list: ThreadList, title: string, replacing?: MessageId): Promise<MessageId> {
     // Built to Block Kit's reference by the module that makes them: opaque to the library's types.
-    const blocks = diffBlocks(list, title) as unknown as KnownBlock[];
+    const blocks = listBlocks(list, title) as unknown as KnownBlock[];
     try {
       if (replacing !== undefined) {
         // One more chat.update against the app's budget, which every reply draws from.
@@ -908,6 +910,23 @@ export class SlackThread implements ThreadChat {
     } catch (error) {
       if (error instanceof Cancelled || error instanceof ChatError) throw error;
       throw new ChatError(describe(error), { cause: error });
+    }
+  }
+
+  async fold(message: MessageId, title: string): Promise<boolean> {
+    try {
+      return await foldMessage(
+        this.slack,
+        this.options.limiter,
+        this.channel,
+        this.threadTs,
+        message,
+        title,
+      );
+    } catch (error) {
+      // The message stays as it was: the core says the replies were not all marked.
+      logger.warning(`could not fold a message of ${this.channel}: ${describe(error)}`);
+      return false;
     }
   }
 

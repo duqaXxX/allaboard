@@ -63,6 +63,11 @@ export interface Diff {
   readonly kind: "diff";
 }
 
+/** `!rewind`: the session's prompts in a list, to go back to one: its code, its conversation or both. */
+export interface Rewind {
+  readonly kind: "rewind";
+}
+
 /** `!terminal`: the session moves to a terminal on the host, a running turn with it. */
 export interface Terminal {
   readonly kind: "terminal";
@@ -136,6 +141,7 @@ export type Word =
   | Terminal
   | Fork
   | Diff
+  | Rewind
   | Resume
   | Open
   | Tag
@@ -160,6 +166,7 @@ export const WORD = {
   terminal: "terminal",
   fork: "fork",
   diff: "diff",
+  rewind: "rewind",
   resume: "resume",
   open: "open",
   tag: "tag",
@@ -252,6 +259,9 @@ export function parseBang(text: string): Command | null {
     case "diff":
       // The terminal's `/diff` takes no argument; anything after the word is a mistake.
       return rest === "" ? { kind: "diff" } : { kind: "invalid" };
+    case "rewind":
+      // The terminal's `/rewind` takes no argument either.
+      return rest === "" ? { kind: "rewind" } : { kind: "invalid" };
     case "resume":
       return { kind: "resume", target: rest };
     case "open":

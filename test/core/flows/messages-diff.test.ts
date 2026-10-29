@@ -32,7 +32,9 @@ async function repositoryWorld(t: Parameters<typeof MessagesWorld.make>[0], trus
 function listOf(world: MessagesWorld, ref: ThreadRef) {
   const [open] = world.chat.threadLists().filter((list) => list.ref.thread === ref.thread);
   assert.ok(open, "a list is open in the thread");
-  return open;
+  const { list } = open;
+  assert.equal(list.type, "diff");
+  return { ...open, list: list as Extract<typeof list, { type: "diff" }> };
 }
 
 test("!diff lists the changed files of the repository with their counts", async (t) => {

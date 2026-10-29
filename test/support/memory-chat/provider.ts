@@ -42,6 +42,7 @@ const CAPABILITIES: ChatCapabilities = {
   activityLine: false,
   fileUpload: false,
   threadLists: false,
+  messageFold: false,
   threadTags: false,
   threadTitles: false,
   threadDelete: false,
@@ -102,7 +103,11 @@ class MemoryReply implements Reply, Placed {
   readonly #landing: Promise<boolean>;
   #resolveLanding: (landed: boolean) => void = () => {};
 
-  constructor(room: Room, ref: ThreadRef, onOpen: OpenMessageChange) {
+  /** Present with `messageFold`. */
+  readonly posted?: () => readonly MessageId[];
+
+  constructor(room: Room, ref: ThreadRef, onOpen: OpenMessageChange, folds = false) {
+    if (folds) this.posted = () => (this.#message === null ? [] : [this.#message.id]);
     this.#room = room;
     this.#ref = ref;
     this.#onOpen = onOpen;
@@ -292,8 +297,21 @@ function answered(
 // The loop card of each thread, by room: a thread object is made afresh for every lookup.
 const loopCards = new WeakMap<Room, Map<string, StoredMessage>>();
 
-/** A list as one message: its title, then a line per file with its counts. */
+/** A list as one message: its title, then a line per file with its counts, or per prompt. */
 function listText(list: ThreadList, title: string): string {
+  if (list.type === "rewind-points") {
+    return [title, ...list.points.map((point) => point.text)].join("\n");
+  }
+  if (list.type === "rewind-actions") {
+    const { files } = list;
+    return [
+      `${title}: ${list.point.text}`,
+      ...(files === null
+        ? []
+        : [`code: ${files.count} files +${files.insertions} -${files.deletions}`]),
+      ...(list.conversation ? ["conversation"] : []),
+    ].join("\n");
+  }
   const rows = list.files.map((file) =>
     file.binary ? `${file.path} binary` : `${file.path} +${file.added} -${file.removed}`,
   );
@@ -312,10 +330,32 @@ class MemoryThread implements ThreadChat {
     readonly title: string;
     readonly content: Uint8Array;
   }) => Promise<void>;
+  /** Present with `messageFold`. */
+  readonly fold?: (message: MessageId, title: string) => Promise<boolean>;
+  readonly #folds: boolean;
 
-  constructor(room: Room, ref: ThreadRef, lists: boolean, files: boolean) {
+  constructor(room: Room, ref: ThreadRef, lists: boolean, files: boolean, folds: boolean) {
     this.#room = room;
     this.#ref = ref;
+    this.#folds = folds;
+    if (folds) {
+      // The title is what the message shows now; what it showed is kept behind it.
+      this.fold = async (id, title) => {
+        const message = room.message(id);
+        if (message === null || message.channel !== ref.channel) return false;
+        try {
+          const inside = message.text;
+          room.edit(message, title);
+          message.inside = inside;
+        } catch (error) {
+          if (!(error instanceof ChatError)) throw error;
+          return false;
+        }
+        message.kind = "notice";
+        room.settled(id);
+        return true;
+      };
+    }
     if (lists) {
       this.offer = async (list, title, replacing) => {
         const text = listText(list, title);
@@ -344,7 +384,7 @@ class MemoryThread implements ThreadChat {
   }
 
   openReply(onOpenMessage: OpenMessageChange): Reply {
-    return new MemoryReply(this.#room, this.#ref, onOpenMessage);
+    return new MemoryReply(this.#room, this.#ref, onOpenMessage, this.#folds);
   }
 
   showRunning(list: RunningList | null): void {
@@ -509,6 +549,7 @@ export class MemoryProvider implements ChatProvider {
   readonly #room: Room;
   readonly #lists: boolean;
   readonly #files: boolean;
+  readonly #folds: boolean;
   #inbound: ChatInbound | null = null;
 
   constructor(
@@ -518,16 +559,19 @@ export class MemoryProvider implements ChatProvider {
     lists = false,
     files = false,
     fileLimit = 1 << 20,
+    folds = false,
   ) {
     this.#room = room;
     this.identities = identities;
     this.#lists = lists;
     this.#files = files;
+    this.#folds = folds;
     if (files) this.fileLimit = fileLimit;
     this.capabilities = {
       ...CAPABILITIES,
       commandSuggestions: suggests,
       threadLists: lists,
+      messageFold: folds,
       fileUpload: files,
     };
     if (suggests) {
@@ -548,7 +592,7 @@ export class MemoryProvider implements ChatProvider {
   thread(ref: ThreadRef): ThreadChat {
     // A thread is a name the chat gave out: the core builds none from something else (a message id).
     if (this.#room.openedAt(ref) === null) this.#room.stray(`thread ${ref.channel}/${ref.thread}`);
-    return new MemoryThread(this.#room, ref, this.#lists, this.#files);
+    return new MemoryThread(this.#room, ref, this.#lists, this.#files, this.#folds);
   }
 
   channel(channel: string): ChannelChat {

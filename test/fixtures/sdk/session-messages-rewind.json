@@ -1,0 +1,1347 @@
+[
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000001",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": "Using the Write tool, create a.txt containing exactly: one"
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:19.217Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000003",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "c3ludGhldGljLXNpZ25hdHVyZQ=="
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 25847,
+        "cache_read_input_tokens": 15576,
+        "output_tokens": 233,
+        "output_tokens_details": {
+          "thinking_tokens": 142
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 25847,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 233,
+            "cache_read_input_tokens": 15576,
+            "cache_creation_input_tokens": 25847,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 25847
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:21.935Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000004",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Write",
+          "input": {
+            "file_path": "/private/work/project/a.txt",
+            "content": "one"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 25847,
+        "cache_read_input_tokens": 15576,
+        "output_tokens": 233,
+        "output_tokens_details": {
+          "thinking_tokens": 142
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 25847,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 233,
+            "cache_read_input_tokens": 15576,
+            "cache_creation_input_tokens": 25847,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 25847
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:21.945Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000005",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "File created successfully at: /private/work/project/a.txt (file state is current in your context — no need to Read it back)"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:22.095Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000006",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I created `/private/work/project/a.txt` containing `one` (no trailing newline). Nothing is left to do."
+        }
+      ],
+      "container": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 3448,
+        "cache_read_input_tokens": 41423,
+        "output_tokens": 50,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 3448,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 50,
+            "cache_read_input_tokens": 41423,
+            "cache_creation_input_tokens": 3448,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 3448
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:23.734Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000007",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": "Using the Edit tool change a.txt to exactly: two. Using the Write tool create b.txt containing: bee. With a Bash echo create c.txt containing: sea. Using the Edit tool change tracked.txt to exactly: edited2."
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:23.815Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000008",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "c3ludGhldGljLXNpZ25hdHVyZQ=="
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 157,
+        "cache_read_input_tokens": 44871,
+        "output_tokens": 759,
+        "output_tokens_details": {
+          "thinking_tokens": 419
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 157,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 759,
+            "cache_read_input_tokens": 44871,
+            "cache_creation_input_tokens": 157,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 157
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:27.367Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000009",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Read",
+          "input": {
+            "file_path": "/private/work/project/a.txt"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 157,
+        "cache_read_input_tokens": 44871,
+        "output_tokens": 759,
+        "output_tokens_details": {
+          "thinking_tokens": 419
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 157,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 759,
+            "cache_read_input_tokens": 44871,
+            "cache_creation_input_tokens": 157,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 157
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:27.533Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000010",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "1\tone"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:27.644Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000011",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Read",
+          "input": {
+            "file_path": "/private/work/project/tracked.txt"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 157,
+        "cache_read_input_tokens": 44871,
+        "output_tokens": 759,
+        "output_tokens_details": {
+          "thinking_tokens": 419
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 157,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 759,
+            "cache_read_input_tokens": 44871,
+            "cache_creation_input_tokens": 157,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 157
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:27.716Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000012",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "1\torig\n2\t"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:27.777Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000013",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Write",
+          "input": {
+            "file_path": "/private/work/project/b.txt",
+            "content": "bee"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 157,
+        "cache_read_input_tokens": 44871,
+        "output_tokens": 759,
+        "output_tokens_details": {
+          "thinking_tokens": 419
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 157,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 759,
+            "cache_read_input_tokens": 44871,
+            "cache_creation_input_tokens": 157,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 157
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:27.944Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000014",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Bash",
+          "input": {
+            "command": "echo -n sea > c.txt && cat c.txt",
+            "description": "Create c.txt with echo and print its content"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 157,
+        "cache_read_input_tokens": 44871,
+        "output_tokens": 759,
+        "output_tokens_details": {
+          "thinking_tokens": 419
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 157,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 759,
+            "cache_read_input_tokens": 44871,
+            "cache_creation_input_tokens": 157,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 157
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:28.262Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000015",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "File created successfully at: /private/work/project/b.txt (file state is current in your context — no need to Read it back)"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:29.775Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000016",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "sea",
+          "is_error": false
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:30.026Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000017",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Edit",
+          "input": {
+            "replace_all": false,
+            "file_path": "/private/work/project/a.txt",
+            "old_string": "one",
+            "new_string": "two"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 944,
+        "cache_read_input_tokens": 45028,
+        "output_tokens": 236,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 944,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 236,
+            "cache_read_input_tokens": 45028,
+            "cache_creation_input_tokens": 944,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 944
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:31.665Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000018",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Edit",
+          "input": {
+            "replace_all": false,
+            "file_path": "/private/work/project/tracked.txt",
+            "old_string": "orig\n",
+            "new_string": "edited2\n"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 944,
+        "cache_read_input_tokens": 45028,
+        "output_tokens": 236,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 944,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 236,
+            "cache_read_input_tokens": 45028,
+            "cache_creation_input_tokens": 944,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 944
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:31.966Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000019",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "The file /private/work/project/a.txt has been updated successfully. (file state is current in your context — no need to Read it back)"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:32.100Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000020",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "The file /private/work/project/tracked.txt has been updated successfully. (file state is current in your context — no need to Read it back)"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:32.201Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000021",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "c3ludGhldGljLXNpZ25hdHVyZQ=="
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 416,
+        "cache_read_input_tokens": 45972,
+        "output_tokens": 372,
+        "output_tokens_details": {
+          "thinking_tokens": 237
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 416,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 372,
+            "cache_read_input_tokens": 45972,
+            "cache_creation_input_tokens": 416,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 416
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:34.726Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000022",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Bash",
+          "input": {
+            "command": "od -c tracked.txt && od -c a.txt && od -c b.txt && od -c c.txt",
+            "description": "Dump bytes of the four files to verify contents"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 416,
+        "cache_read_input_tokens": 45972,
+        "output_tokens": 372,
+        "output_tokens_details": {
+          "thinking_tokens": 237
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 416,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 372,
+            "cache_read_input_tokens": 45972,
+            "cache_creation_input_tokens": 416,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 416
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:35.103Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000023",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "0000000    e   d   i   t   e   d   2  \\n                                \n0000010\n0000000    t   w   o                                                    \n0000003\n0000000    b   e   e                                                    \n0000003\n0000000    s   e   a                                                    \n0000003",
+          "is_error": false
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:35.743Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000024",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "c3ludGhldGljLXNpZ25hdHVyZQ=="
+        }
+      ],
+      "container": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 481,
+        "cache_read_input_tokens": 46388,
+        "output_tokens": 393,
+        "output_tokens_details": {
+          "thinking_tokens": 231
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 481,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 393,
+            "cache_read_input_tokens": 46388,
+            "cache_creation_input_tokens": 481,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 481
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:38.595Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000025",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "All four files now have the requested contents, checked byte-by-byte with `od -c`:\n\n- `a.txt`: `two` (edited with Edit)\n- `b.txt`: `bee` (created with Write)\n- `c.txt`: `sea` (created with `echo -n sea > c.txt`, so there is no trailing newline)\n- `tracked.txt`: `edited2` followed by a newline (edited with Edit; I kept the file's existing trailing newline)\n\nNothing is left to do."
+        }
+      ],
+      "container": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 481,
+        "cache_read_input_tokens": 46388,
+        "output_tokens": 393,
+        "output_tokens_details": {
+          "thinking_tokens": 231
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 481,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 393,
+            "cache_read_input_tokens": 46388,
+            "cache_creation_input_tokens": 481,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 481
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:39.169Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000026",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": "Using the Edit tool change a.txt to exactly: three. Using the Edit tool change tracked.txt to exactly: edited3."
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:39.255Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000027",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Edit",
+          "input": {
+            "replace_all": false,
+            "file_path": "/private/work/project/a.txt",
+            "old_string": "two",
+            "new_string": "three"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 464,
+        "cache_read_input_tokens": 46869,
+        "output_tokens": 237,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 464,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 237,
+            "cache_read_input_tokens": 46869,
+            "cache_creation_input_tokens": 464,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 464
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:41.866Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000028",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_synthetic",
+          "name": "Edit",
+          "input": {
+            "replace_all": false,
+            "file_path": "/private/work/project/tracked.txt",
+            "old_string": "edited2\n",
+            "new_string": "edited3\n"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ],
+      "container": null,
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 464,
+        "cache_read_input_tokens": 46869,
+        "output_tokens": 237,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 464,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 237,
+            "cache_read_input_tokens": 46869,
+            "cache_creation_input_tokens": 464,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 464
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:42.124Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000029",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "The file /private/work/project/a.txt has been updated successfully. (file state is current in your context — no need to Read it back)"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:42.262Z"
+  },
+  {
+    "type": "user",
+    "uuid": "00000000-0000-4000-8000-000000000030",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_synthetic",
+          "type": "tool_result",
+          "content": "The file /private/work/project/tracked.txt has been updated successfully. (file state is current in your context — no need to Read it back)"
+        }
+      ]
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:42.362Z"
+  },
+  {
+    "type": "assistant",
+    "uuid": "00000000-0000-4000-8000-000000000031",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "message": {
+      "model": "claude-haiku-5-5",
+      "id": "msg_synthetic",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Both edits succeeded:\n\n- `a.txt` now contains `three` (no trailing newline, same as before).\n- `tracked.txt` now contains `edited3` followed by its existing trailing newline.\n\nNothing is left to do."
+        }
+      ],
+      "container": null,
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "stop_details": null,
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 417,
+        "cache_read_input_tokens": 47333,
+        "output_tokens": 77,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 417,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 77,
+            "cache_read_input_tokens": 47333,
+            "cache_creation_input_tokens": 417,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 417
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "input_transformations": [],
+      "diagnostics": null,
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "parent_agent_id": null,
+    "timestamp": "2026-10-29T01:39:43.857Z"
+  }
+]

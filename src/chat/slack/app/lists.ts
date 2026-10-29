@@ -5,7 +5,8 @@
  * core is told of. The list itself is drawn by `SlackThread.offer`.
  */
 
-import { parseValue } from "../lists.ts";
+import type { RewindAction } from "../../seam.ts";
+import { parseValue, REWIND_ACTIONS } from "../lists.ts";
 import type { Answers, AppParts } from "./answers.ts";
 import { interactionActor } from "./guards.ts";
 import {
@@ -63,6 +64,47 @@ export class ThreadLists {
       ref: { channel, thread },
       session,
       view,
+      list: messageTs(body),
+    });
+  };
+
+  /** The selector of a rewind list: the prompt picked. */
+  onRewindPoint = async (ack: Ack, body: Payload): Promise<void> => {
+    await ack();
+    const [user, team] = interactionActor(body);
+    const channel = text(record(body.channel).id);
+    const thread = clickThread(body);
+    if (!(await this.answers.admitted(user, team, channel, thread)) || channel === null) return;
+    const value = parseValue(String(record(firstAction(body).selected_option).value), 2);
+    if (value === null) return;
+    const [session, promptId] = value as [string, string];
+    await this.parts.inbound.picked({
+      type: "rewind-point",
+      ref: { channel, thread },
+      session,
+      promptId,
+      list: messageTs(body),
+    });
+  };
+
+  /** A button of the actions at a prompt. */
+  onRewindAction = async (ack: Ack, body: Payload): Promise<void> => {
+    await ack();
+    const [user, team] = interactionActor(body);
+    const channel = text(record(body.channel).id);
+    const thread = clickThread(body);
+    if (!(await this.answers.admitted(user, team, channel, thread)) || channel === null) return;
+    const value = parseValue(String(firstAction(body).value), 3);
+    if (value === null) return;
+    const [session, promptId, action] = value as [string, string, string];
+    // The action is untrusted like the rest: a word that is none of the four is no pick.
+    if (!REWIND_ACTIONS.includes(action as RewindAction)) return;
+    await this.parts.inbound.picked({
+      type: "rewind-action",
+      ref: { channel, thread },
+      session,
+      promptId,
+      action: action as RewindAction,
       list: messageTs(body),
     });
   };

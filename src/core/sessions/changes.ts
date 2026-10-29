@@ -48,6 +48,15 @@ export class TurnChanges {
     }
   }
 
+  /** A rewind dropped the turns of the prompts `ids`: their edits are not the session's. */
+  forgetIds(ids: readonly string[]): void {
+    for (const id of ids) {
+      this.numbers.delete(id);
+      this.edits.delete(id);
+    }
+    if (this.current !== null && ids.includes(this.current)) this.current = null;
+  }
+
   /** How many turns' places are held, for a test. */
   get tracked(): number {
     return this.numbers.size;

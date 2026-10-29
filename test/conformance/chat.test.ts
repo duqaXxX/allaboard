@@ -10,14 +10,18 @@
  */
 import type { App, Receiver } from "@slack/bolt";
 import type { Question } from "../../src/agent/seam.ts";
-import type { ThreadRef } from "../../src/chat/seam.ts";
+import type { ThreadList, ThreadRef } from "../../src/chat/seam.ts";
 import { ChannelGuard } from "../../src/chat/slack/app/guards.ts";
 import { BIND_ACTION } from "../../src/chat/slack/bind.ts";
 import { HOLD_CANCEL, HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
 import {
+  actionValue,
   DIFF_FILE_ACTION,
   DIFF_VIEW_ACTION,
   fileValue,
+  pointValue,
+  REWIND_ACTION_ACTION,
+  REWIND_POINT_ACTION,
   viewValue,
 } from "../../src/chat/slack/lists.ts";
 import {
@@ -74,6 +78,20 @@ import {
 
 const STEADY: Clock = { sleep: async () => {}, time: () => 1_780_000_000 };
 
+/** The diff list a `ThreadListed` holds. */
+function diffList(listed: { list: ThreadList }): Extract<ThreadList, { type: "diff" }> {
+  if (listed.list.type !== "diff") throw new Error("not a diff list");
+  return listed.list;
+}
+
+/** The actions of a rewind list a `ThreadListed` holds. */
+function actionsList(listed: {
+  list: ThreadList;
+}): Extract<ThreadList, { type: "rewind-actions" }> {
+  if (listed.list.type !== "rewind-actions") throw new Error("not a rewind actions list");
+  return listed.list;
+}
+
 function memoryPerson(
   person: ReturnType<ReturnType<typeof memoryChat>["as"]>,
   who: string,
@@ -95,6 +113,12 @@ function memoryPerson(
     picksView: async (listed, view) => {
       await person.picksView(listed.message, view);
     },
+    picksPoint: async (listed, promptId) => {
+      await person.picksPoint(listed.message, promptId);
+    },
+    picksAction: async (listed, action) => {
+      await person.picksAction(listed.message, action);
+    },
     deletes: async (said) => {
       await person.deletes(said);
     },
@@ -106,7 +130,7 @@ function memoryPerson(
 }
 
 async function memoryRig(threadIds: "own" | "opening" = "own"): Promise<ChatRig> {
-  const chat = memoryChat({ suggestions: true, threadIds, lists: true });
+  const chat = memoryChat({ suggestions: true, threadIds, lists: true, folds: true });
   const provider = await chat.build({
     variables: {},
     allowedRoot: "/work",
@@ -130,7 +154,8 @@ async function memoryRig(threadIds: "own" | "opening" = "own"): Promise<ChatRig>
     read: (scope) =>
       chat.messages(scope.channel, scope.thread).map((m) => ({
         id: m.id,
-        text: m.text,
+        // A folded message shows its title, and keeps what it showed inside.
+        text: m.inside === null ? m.text : `${m.text}\n${m.inside}`,
         pressable: m.pressable,
         ownerOnly: false,
       })),
@@ -317,7 +342,7 @@ function slackPerson(
       await dispatch(
         clickIn(
           DIFF_FILE_ACTION,
-          fileValue(listed.list.session, listed.list.view, path),
+          fileValue(listed.list.session, diffList(listed).view, path),
           listed.ref.channel,
           listed.ref.thread,
           { messageTs: listed.message, user: userOf(user, world) },
@@ -329,6 +354,28 @@ function slackPerson(
         selectIn(
           DIFF_VIEW_ACTION,
           viewValue(listed.list.session, view),
+          listed.ref.channel,
+          listed.ref.thread,
+          { messageTs: listed.message, user: userOf(user, world) },
+        ),
+      );
+    },
+    picksPoint: async (listed, promptId): Promise<void> => {
+      await dispatch(
+        selectIn(
+          REWIND_POINT_ACTION,
+          pointValue(listed.list.session, promptId),
+          listed.ref.channel,
+          listed.ref.thread,
+          { messageTs: listed.message, user: userOf(user, world) },
+        ),
+      );
+    },
+    picksAction: async (listed, action): Promise<void> => {
+      await dispatch(
+        clickIn(
+          REWIND_ACTION_ACTION,
+          actionValue(listed.list.session, actionsList(listed).point.id, action),
           listed.ref.channel,
           listed.ref.thread,
           { messageTs: listed.message, user: userOf(user, world) },
