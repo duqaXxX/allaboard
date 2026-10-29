@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A test fails on a markdown paragraph or a source comment written in Italian (`test/docs.test.ts`,
+  `test/english.test.ts`, detector in `test/support/english.ts`).
 - `!rewind` inside a thread goes back to an earlier prompt of the session, as the terminal's
   `/rewind` does: a selector lists the prompts, newest first, and a pick offers **Restore code and
   conversation**, **Restore conversation**, **Restore code** (the code ones only where a dry run

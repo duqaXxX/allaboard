@@ -162,6 +162,9 @@ from the sources, with the types stripped, so they need no build; they start no 
 and open no connection. One file: `node --test test/config.test.ts`. `npm run format` applies
 Biome's fixes, and `npm run build` compiles `src/` to `dist/`.
 
+Prose, comments and commit messages are English; `test/docs.test.ts` (markdown) and
+`test/english.test.ts` (source comments) fail on an Italian paragraph.
+
 CI runs the tests on Linux, macOS and Windows, and it is the judge for the systems you do not
 run: a test can pass on one system and fail on another (outside macOS every lock is a listening
 socket or pipe, and Windows has no POSIX signals). A pull request is ready once every job is
