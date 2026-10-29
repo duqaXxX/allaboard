@@ -1059,7 +1059,7 @@ async function goal(s: Stage): Promise<Seen> {
   const once = reply.split("Goal set:").length === 2 && reply.length > line.length;
   const detail =
     opens && once ? "" : `opens with the line: ${opens}, once and with a reply: ${once}`;
-  // The store's entries, which the back end turns into `goal_changed`.
+  // The transcript's entries, which the back end turns into `goal_changed`.
   const goals = turn.events.flatMap((event) => (event.type === "goal_changed" ? [event.goal] : []));
   const ended = turn.events.findIndex((event) => event.type === "turn_ended");
   const last = turn.events.findLastIndex((event) => event.type === "goal_changed");

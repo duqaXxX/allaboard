@@ -119,13 +119,14 @@ async function started(
 
 /**
  * A transcript in a folder of its own, removed when the test ends: the file a script's `written`
- * appends to, and the session's reader of it, which waits for the stream to name the session.
+ * appends to, and the session's reader of it, which knows the file once the stream names the
+ * session (the recordings' first record names `cce8a58a-…`).
  */
 async function transcriptOf(t: TestContext): Promise<{ path: string; transcript: Transcript }> {
   const folder = await mkdtemp(join(tmpdir(), "transcript-"));
   t.after(() => rm(folder, { recursive: true, force: true }));
-  const path = join(folder, "68da9311-0000-4000-8000-000000000001.jsonl");
-  return { path, transcript: new Transcript(async () => path) };
+  const path = join(folder, "cce8a58a-5d75-487b-a79a-2f38a183fea7.jsonl");
+  return { path, transcript: new Transcript(async () => path, { project: folder }) };
 }
 
 /** The events up to and including the first of `type`, or all of them when the stream ends. */
@@ -256,6 +257,13 @@ test("a session runs under the SDK's own entrypoint, whatever it inherits", LIMI
   });
   const { query } = await started(t, {}, { variables: { [name]: "cli" } });
   assert.equal(query.options.env?.[name], "sdk-ts");
+});
+
+// Claude Code then writes a turn's transcript to disk before it yields the turn's result.
+test("a session's transcript is written out before each result", LIMIT, async (t) => {
+  const name = "CLAUDE_CODE_EAGER_FLUSH";
+  const { query } = await started(t, {}, { variables: { [name]: "0" } });
+  assert.equal(query.options.env?.[name], "1");
 });
 
 test("a variable the daemon's environment sets wins over a default", LIMIT, async (t) => {
@@ -707,6 +715,54 @@ test(
       seen.findLastIndex((event) => event.type === "goal_changed"),
       seen.length - 2,
     );
+  },
+);
+
+// The SDK runs a hook from the loop that queues the stream's records, without waiting for them to
+// be read (`readMessages`, `sdk.mjs` 0.3.312): records that came before a hook may still be in line
+// behind a slow read of the transcript when it runs.
+test(
+  "a hook's events come after every record that came before it, a read held or not",
+  LIMIT,
+  async (t) => {
+    const { path } = await transcriptOf(t);
+    let release = (): void => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reads = 0;
+    // The first read of the turn is held until the hook has run.
+    const transcript = new Transcript(async () => {
+      reads += 1;
+      if (reads === 1) await held;
+      return path;
+    });
+    const { session, query, events } = await started(
+      t,
+      { turns: [TOOLS.slice(0, -1)] },
+      { transcript },
+    );
+    await session.send(PROMPT);
+    // Every record before the result has come; the hook runs as Claude Code's Stop does, then the
+    // result comes, and only then is the held read let go.
+    await pause();
+    const stop = query.options.hooks?.Stop?.[0]?.hooks[0];
+    assert.ok(stop !== undefined);
+    // Not awaited, as the SDK does not await it (`handleControlRequest`).
+    const hooked = stop(STOP as never, undefined, { signal: new AbortController().signal });
+    query.inject([TOOLS.at(-1) as JsonObject]);
+    await pause();
+    release();
+    await hooked;
+    const seen = await until(events, "turn_ended");
+    const types = seen.map((event) => event.type);
+    assert.deepEqual(types.slice(-4), [
+      "effort_observed",
+      "scheduled_jobs",
+      "folder_changed",
+      "turn_ended",
+    ]);
+    assert.ok(types.indexOf("effort_observed") > types.lastIndexOf("message_ended"));
   },
 );
 

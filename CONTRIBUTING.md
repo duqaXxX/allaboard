@@ -287,8 +287,11 @@ value, method and option of the SDK the source depends on, against the release i
 the package no longer defines is BROKEN and stops the run with exit status 3 before any token is
 spent. A row marked `reference` that the published
 [reference](https://code.claude.com/docs/en/agent-sdk/typescript) no longer names is UNPROVEN and
-is listed to be read by hand. The rows the reference never named and no claim covers are counted;
-`node probe/main.ts --surface` lists them and checks the table alone, with no token spent. A
+is listed to be read by hand. The same step reads the bundled CLI for the variables the daemon
+sets that only Claude Code's own source reads (`CLI_VARIABLES` in `probe/surface.ts`): one the
+binary no longer names, or a CLI that cannot be read, stops the run with exit status 3 as well.
+The rows the reference never named and no claim covers are counted;
+`node probe/main.ts --surface` lists them and runs both checks, with no token spent. A
 change that reads a new field, key or value of the SDK adds its row there in the same pull
 request; `test/agent/claude/sdk-surface.test.ts` fails on an imported SDK name with no row.
 

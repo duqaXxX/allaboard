@@ -67,7 +67,11 @@ a release with no notice, so it is the first place to look when a release misbeh
    `reference` row it reports as UNPROVEN is no longer named in the reference: read that section
    and move the row to `package` or `measured` if the reference dropped it, or correct it if the
    reference renamed it. When it reports the reference could not be read, read the sections of
-   the `reference` rows by hand.
+   the `reference` rows by hand. The same run reads the bundled CLI for the variables in
+   `CLI_VARIABLES` of `probe/surface.ts` (`CLAUDE_CODE_EAGER_FLUSH`), which no page documents:
+   BROKEN when the binary no longer names one, and no certificate when no bundled CLI of the
+   platform can be read. A name in the binary is not proof the CLI still acts on it: read how the
+   release orders a turn's transcript lines and its `result` before pinning it.
 5. Run `test/agent/claude/translate.test.ts` on the recordings: it fails on a recorded kind that
    the translator neither reads nor lists.
 6. Update the versions and the date at the top of this file.
@@ -544,9 +548,14 @@ no check covers them here.
   read 2026-10-29) and types them so; the daemon passes no store, which the SDK refuses beside
   `enableFileCheckpointing`. `entrypoint` comes from `CLAUDE_CODE_ENTRYPOINT`, which the SDK sets
   to `"sdk-ts"` only when the environment it is given has none (`sdk.mjs` 0.3.312);
-  `session.ts: ClaudeSession.#options` sets it. On 2026-10-29 (SDK 0.3.312) the `goal_status` and
-  `stop_hook_summary` lines of a turn were on disk when its `result` arrived, in three turns of
-  three, which claims P33 and P42 see again on each release.
+  `session.ts: ClaudeSession.#options` sets it. The same options set `CLAUDE_CODE_EAGER_FLUSH`,
+  which no page documents: in Claude Code 2.1.312's own source it makes the CLI drain its
+  transcript queue (drained every 100 ms otherwise) before it yields a turn's `result`. On
+  2026-10-29 (SDK 0.3.312) a turn's `goal_status` and `stop_hook_summary` lines were on disk when
+  its `result` arrived in 13 turns of 13 without it and 10 of 10 with it; claims P33 and P42 see
+  the order again on each release. The SDK runs a hook from the loop that queues the stream's
+  records and does not await it (`readMessages`, `sdk.mjs` 0.3.312), which `ClaudeSession.#work`
+  orders behind the records that came before it.
 - `listing.ts` derives the folder of a folder's transcripts by a rule read in the package's
   `sdk.mjs` 0.3.296, which nothing documents. `test/agent/claude/listing.test.ts` writes a
   transcript where the rule puts it and has the SDK's own `listSessions` find it. `lastMessageMs`

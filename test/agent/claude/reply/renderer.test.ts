@@ -969,7 +969,7 @@ test("a goal the next prompt resumes says each failed check and its achievement"
 });
 
 // A refusal of the owner's stop hooks, on a recorded turn (`stop-hook-block.jsonl`, SDK 0.3.310,
-// 2026-10-27): its summary comes from the session store between the answer the turn wrote before it
+// 2026-10-27): its summary comes from the transcript between the answer the turn wrote before it
 // and the one after (`stop-hook-block-store.json`, measured the same day in three runs).
 test("stop hooks that refused to end a turn are said in the terminal's words, where the turn is", async () => {
   const events = recordedEvents("stop-hook-block");
