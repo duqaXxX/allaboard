@@ -3,12 +3,14 @@
  * the thread with a control per file, and the file's diff shared when the control is used. The
  * repository is a real temporary one, reached through an agent that keeps a record of trust.
  */
+
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { ThreadRef } from "../../../src/chat/seam.ts";
 import * as texts from "../../../src/core/texts.ts";
+import { shellQuote } from "../../../src/text.ts";
 import { commitAll } from "../../support/files.ts";
 import { committed } from "../../support/git-layouts.ts";
 import { call, say } from "../../support/plain-agent.ts";
@@ -96,7 +98,7 @@ test("a repository the owner has not trusted is refused with the line that asks 
   await world.settle();
   const line = world.shown(ref).at(-1) ?? "";
   assert.ok(line.includes("has not trusted this repository"), line);
-  assert.ok(line.includes(`cd ${repo} && plain`), line);
+  assert.ok(line.includes(`cd ${shellQuote(repo)} && plain`), line);
   assert.deepEqual(world.chat.threadLists(), []);
 });
 

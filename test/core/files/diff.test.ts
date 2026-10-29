@@ -151,12 +151,13 @@ test("a binary file has no text patch, and a file no longer changed has an empty
   });
 });
 
+// `[a].txt` rather than `*.txt`: Windows forbids `*` in a file name, and a bracket is a glob too.
 test("a path is a literal name, never an option or a pattern", async () => {
   const root = app();
-  write(root, "*.txt", "star\n");
+  write(root, "[a].txt", "bracket\n");
   write(root, "a.txt", "a\n");
-  const found = await diffPatch(await plainRepository(root), "*.txt", LIMIT, new FakeClock());
-  assert.match(found?.text ?? "", /\+star/);
+  const found = await diffPatch(await plainRepository(root), "[a].txt", LIMIT, new FakeClock());
+  assert.match(found?.text ?? "", /\+bracket/);
   assert.doesNotMatch(found?.text ?? "", /\+a\n/);
   assert.deepEqual(await diffPatch(await plainRepository(root), "--stat", LIMIT, new FakeClock()), {
     binary: false,
