@@ -8,7 +8,7 @@
  * setting of the owner's the agent cannot use.
  */
 import type { Clock } from "../clock.ts";
-import type { ModuleSetup } from "../module-setup.ts";
+import type { ModuleSetup, ModuleWords } from "../module-setup.ts";
 
 /**
  * The agent refused to resume the session a start named (its transcript is gone): the thread
@@ -1082,6 +1082,11 @@ export interface AgentEntry {
    * one such section per agent module, and a test reads each from here.
    */
   readonly limitsHeading: string;
+  /**
+   * What only this agent has: its libraries and its own terms. Required: a module that has none
+   * declares empty lists. `test/vocabulary.test.ts` fails on each outside the module.
+   */
+  readonly words: ModuleWords;
   /**
    * The agent's own command, as the owner's terminal runs it. The service's `PATH` holds its
    * folder, so a session's commands find it as the terminal's do. Absent, nothing is added.

@@ -61,6 +61,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `test/vocabulary.test.ts` now fails on a name of the agent's SDK (read from `docs/sdk-surface.md`), a model alias or an `AgentWords` string behind the command prefix in the core, the chat or the entry files, on a Slack timestamp or id in the tests of the core and the scenarios, and on a scenario that reaches an agent module; `docs/architecture.md` and `CONTRIBUTING.md` state which tests run which modules (#129).
+- The words only one module has leave the central list of `test/vocabulary.test.ts`: each agent and chat entry declares them as a required `words` (`ModuleWords`, `src/agent/claude/words.ts`, `src/chat/slack/words.ts`), and the test fails on the Slack literals (`chat.update`, `blocks`, `team_id`, `ts`...) in the core and the entry files, on a Web API method name outside the modules, and on a tool name in an entry file (#129).
 - The tests of the core and the scenarios no longer reach a chat module: they take `FakeClock` and
   `AsyncEvent` from `test/support/fake-clock.ts`, the ids of `test/support/ids.ts` (`chan-1`,
   `thread-1`, `msg-1`) and the owner `alice` in place of Slack's, and the guard's list of

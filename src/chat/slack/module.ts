@@ -33,6 +33,7 @@ import { RootEditor } from "./tag.ts";
 import { SETUP_SLACK_APP } from "./texts.ts";
 import { SlackChat } from "./thread.ts";
 import { wrongKind } from "./tokens.ts";
+import { MODULE_WORDS } from "./words.ts";
 
 export const logger = getLogger("allaboard.chat.slack.module");
 
@@ -226,6 +227,7 @@ export function slackChat(options: SlackOptions = {}): ChatEntry {
     required: ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_OWNER_USER_ID"],
     optional: ["SLACK_USER_TOKEN", MENTION_VARIABLE],
     limitsHeading: LIMITS_HEADING,
+    words: MODULE_WORDS,
     setup: (instance) => slackSetup(instance, options.probe),
     async build(context: ChatContext): Promise<ChatProvider> {
       checkTokens(context);

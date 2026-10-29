@@ -131,6 +131,7 @@ function registryOf(backend: AgentBackend, slack: SlackOptions = {}): Registry {
         tools: NO_TOOL_WORDS,
         toolNames: [],
         limitsHeading: "Limits of a test agent",
+        words: { names: [], literals: [], patterns: [] },
         build: () => backend,
       },
     },
@@ -486,6 +487,7 @@ test("a session the daemon starts receives the name of its instance", async (t) 
         tools: NO_TOOL_WORDS,
         toolNames: [],
         limitsHeading: "Limits of a test agent",
+        words: { names: [], literals: [], patterns: [] },
         build: (context) => {
           backend = claudeAgent({ query: sdk.query, home: claudeHome }).build(context);
           return backend;
@@ -1499,6 +1501,7 @@ test("an agent setting that cannot be used ends with 1 and logs its sentence", a
         tools: NO_TOOL_WORDS,
         toolNames: [],
         limitsHeading: "Limits of a test agent",
+        words: { names: [], literals: [], patterns: [] },
         build: () => {
           throw new AgentConfigError("SETTING must be an absolute path");
         },

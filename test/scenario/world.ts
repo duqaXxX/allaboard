@@ -223,12 +223,14 @@ export class World {
       tools: this.entry.tools,
       toolNames: [],
       limitsHeading: "Limits of a test agent",
+      words: { names: [], literals: [], patterns: [] },
       build: (context) => watched(this.entry.build(context), this.undeclared, "agent"),
     };
     const chat: ChatEntry = {
       required: [],
       optional: [],
       limitsHeading: "Limits of a test chat",
+      words: { names: [], literals: [], patterns: [] },
       build: async (context) => this.#watchStart(await this.chat.build(context)),
     };
     this.registry = {

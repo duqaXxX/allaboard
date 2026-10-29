@@ -30,6 +30,7 @@ test("the plain agent and the memory chat, named in the configuration, run a ses
           tools: NO_TOOL_WORDS,
           toolNames: [],
           limitsHeading: "Limits of a test agent",
+          words: { names: [], literals: [], patterns: [] },
           build: () => {
             built.push("other-agent");
             throw new Error("an agent the configuration did not name was built");
@@ -41,6 +42,7 @@ test("the plain agent and the memory chat, named in the configuration, run a ses
           required: [],
           optional: [],
           limitsHeading: "Limits of a test chat",
+          words: { names: [], literals: [], patterns: [] },
           build: async () => {
             built.push("other-chat");
             throw new Error("a chat the configuration did not name was built");
@@ -108,6 +110,7 @@ function registryOf(built: Built): Registry {
     tools: NO_TOOL_WORDS,
     toolNames: [],
     limitsHeading: "Limits of a test agent",
+    words: { names: [], literals: [], patterns: [] },
     build: ({ variables }) => {
       built.agents.push([name, key === undefined ? undefined : variables[key]]);
       return new FakeAgentBackend([]);
@@ -117,6 +120,7 @@ function registryOf(built: Built): Registry {
     required: key === undefined ? [] : [key],
     optional: [],
     limitsHeading: "Limits of a test chat",
+    words: { names: [], literals: [], patterns: [] },
     build: async ({ variables }) => {
       built.chats.push([name, key === undefined ? undefined : variables[key]]);
       throw STOPPED;

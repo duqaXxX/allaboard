@@ -5,6 +5,7 @@ import type { Check, ModuleSetup } from "../../module-setup.ts";
 import { AgentConfigError, type AgentEntry } from "../seam.ts";
 import { ClaudeBackend, type ClaudeBackendOptions } from "./backend.ts";
 import { TOOL_NAMES, TOOLS } from "./tools.ts";
+import { MODULE_WORDS } from "./words.ts";
 
 // Claude Code's own variables the owner may set in the daemon's file; each reaches a thread's
 // session as written, and Claude Code judges its value. `BASH_DEFAULT_TIMEOUT_MS`, in
@@ -123,6 +124,7 @@ export function claudeAgent(options: ClaudeBackendOptions = {}): AgentEntry {
     tools: TOOLS,
     toolNames: TOOL_NAMES,
     limitsHeading: LIMITS_HEADING,
+    words: MODULE_WORDS,
     executable: "claude",
     setup: () => claudeSetup(options.home ?? homedir()),
     build: (context) => {

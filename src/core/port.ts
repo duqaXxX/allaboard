@@ -11,7 +11,7 @@
 import type { AgentBackend } from "../agent/seam.ts";
 import type { ChatProvider } from "../chat/seam.ts";
 import type { Clock } from "../clock.ts";
-import type { ModuleSetup } from "../module-setup.ts";
+import type { ModuleSetup, ModuleWords } from "../module-setup.ts";
 import type { Instance } from "./instance.ts";
 import type { CleanupPage } from "./port/cleanup.ts";
 import type { FilesSessions, FilesState } from "./port/file-flows.ts";
@@ -85,6 +85,11 @@ export interface ChatEntry {
    * one such section per chat module, and a test reads each from here.
    */
   readonly limitsHeading: string;
+  /**
+   * What only this chat has: its libraries, its API's names and its own terms. Required: a module
+   * that has none declares empty lists. `test/vocabulary.test.ts` fails on each outside the module.
+   */
+  readonly words: ModuleWords;
   /**
    * Builds the provider and learns who it is in the chat. Rejects with `ConfigError` when a
    * variable holds what the chat refuses.

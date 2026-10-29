@@ -49,7 +49,8 @@ may find a seam that needs a change: open an issue before writing one.
    against what the module does (a member present exactly when it is declared, a list that matches
    the capabilities) and runs the checks of a capability only for a module that declares it.
 3. Export an entry (`AgentEntry` or `ChatEntry`): the variables the module reads, `required` and
-   `optional`, and `build`. Either entry may also give `setup`, the questions `allaboard setup`
+   `optional`, `limitsHeading`, `words` (`ModuleWords`: the `names` only the module has, whole-string
+   `literals`, and `patterns` for the names of its API; empty lists when there are none) and `build`. Either entry may also give `setup`, the questions `allaboard setup`
    asks to write its variables (`src/chat/slack/onboarding.ts`, `claudeSetup` in
    `src/agent/claude/module.ts`); without it the owner writes them by hand. A module's setup must
    ask or set every variable it declares, and ask for no other: `test/setup-coverage.test.ts`
@@ -97,17 +98,24 @@ The core and the chat hold nothing that only one agent does: no tool name or inp
 prefix, no status or end word of an SDK, no settings layer, no list sentinel, no turn shape or
 event order measured on one agent. Each is a field of the seam, a `Capabilities` flag or an
 `AgentWords` entry that the module fills, and a seam member that a capability gates is optional.
-The tests follow the same line: those under `test/core/` and `test/chat/` use the plain agent
-(`test/support/plain-agent.ts`) and never reach `src/agent/<module>/`, directly or through a
-support file or a source file (`src/registry.ts` imports the modules). A test that runs the core over one module's recorded stream lives under
-`test/agent/<module>/`. `test/vocabulary.test.ts` enforces both, and fails on a string literal in `src/core/` or
-`src/chat/` equal to any name in the entry's `toolNames` or its vocabulary, but in a constant it
-lists by name in `LABELS` (a task kind's label, a button's).
+The tests follow the same line: those under `test/core/`, `test/chat/` and `test/scenario/` use
+the plain agent (`test/support/plain-agent.ts`) and never reach `src/agent/<module>/`, directly or
+through a support file or a source file (`src/registry.ts` imports the modules; a scenario reaches
+it only through the daemon, with a registry of its own). A test that runs the core over one module's recorded stream lives under
+`test/agent/<module>/`. `test/vocabulary.test.ts` enforces both, and fails on: a string literal in `src/core/`,
+`src/chat/` or an entry file (`src/host/` and the files at the top of `src/`, but the registry)
+equal to any name in the entry's `toolNames` or its vocabulary, but in a constant it lists by
+name in `LABELS` (a task kind's label, a button's); a name of the agent's SDK there, read from
+`docs/sdk-surface.md`, a model alias of the recorded model list, and an `AgentWords` string
+behind the command prefix (`/clear`), apart from the few it lists with a reason; a literal of a
+module's `words` (`blocks`, `team_id`) in the core or an entry file; and a Web API method name
+(`chat.update`) anywhere outside the modules.
 
 The same line holds for the chat (invariant 9): nothing under `src/core/` holds what only one
 chat does. A test under `test/core/` or `test/scenario/` uses the memory chat and neutral ids (`chan-1`,
 `thread-1`, `msg-1` from `test/support/ids.ts`, the owner `alice`) and never reaches
-`src/chat/<module>/`, directly or through a support file such as `test/support/fake-slack.ts`;
+`src/chat/<module>/`, directly or through a support file such as `test/support/fake-slack.ts`,
+and holds no Slack timestamp or id (`1700000000.000100`, `U000ALICE`);
 the helpers that are not a chat's (`FakeClock`, `AsyncEvent`) come from their own files. A test
 of the core through a provider lives under `test/chat/<module>/`. `test/vocabulary.test.ts`
 enforces the imports. A new chat adds its rig to `test/conformance/chat.test.ts`, with the
@@ -132,8 +140,9 @@ read. A new module adds its package to `LIBRARIES` in that test. `test/vocabular
 an identifier or a string outside the module directories under `src/agent/` and `src/chat/` and
 `src/registry.ts` that names an agent or a chat: the name of each module directory is one of the
 words, read from the disk, so a module's own words stay in its directory and a text of the core
-takes the module's name from `AgentBackend.name` or `ChatProvider.name`. A new module adds the
-words only it has (its library, what it calls things) to `MODULE_WORDS` in that test.
+takes the module's name from `AgentBackend.name` or `ChatProvider.name`. A new module declares
+the words only it has (its library, what it calls things, the names of its API) as `words` on its
+entry, a required field, in a `words.ts` of its directory.
 
 ## Checks
 
