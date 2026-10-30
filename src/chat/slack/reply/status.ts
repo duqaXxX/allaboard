@@ -215,6 +215,7 @@ export class StatusReaction {
    * Slack, or neither.
    */
   async #add(state: Status): Promise<"added" | "gone" | "failed"> {
+    this.#traceCall("add", state, "sent");
     try {
       await this.#slack.reactions.add({
         channel: this.#channel,
@@ -223,17 +224,22 @@ export class StatusReaction {
       });
     } catch (error) {
       const code = describe(error);
-      if (code === "already_reacted") return "added";
+      if (code === "already_reacted") {
+        this.#traceCall("add", state, code);
+        return "added";
+      }
       if (code === "missing_scope") this.#noteMissingScope();
       else {
         this.#log.warning(`reactions.add failed on ${this.#channel}/${this.#rootTs}: ${code}`);
       }
       return gone(error) ? "gone" : "failed";
     }
+    this.#traceCall("add", state, "ok");
     return "added";
   }
 
   async #remove(state: Status): Promise<void> {
+    this.#traceCall("remove", state, "sent");
     try {
       await this.#slack.reactions.remove({
         channel: this.#channel,
@@ -242,12 +248,26 @@ export class StatusReaction {
       });
     } catch (error) {
       const code = describe(error);
-      if (code === "no_reaction") return;
+      if (code === "no_reaction") {
+        this.#traceCall("remove", state, code);
+        return;
+      }
       if (code === "missing_scope") this.#noteMissingScope();
       else {
         this.#log.warning(`reactions.remove failed on ${this.#channel}/${this.#rootTs}: ${code}`);
       }
+      return;
     }
+    this.#traceCall("remove", state, "ok");
+  }
+
+  // TEMPORARY, remove when #96 closes: each reaction call when it is sent and the answers no other
+  // line logs (`ok`, `already_reacted`, `no_reaction`). A failure has its own warning; `sent` with
+  // no answer is a call cut off. The client's retries are below this layer and not counted.
+  #traceCall(method: "add" | "remove", state: Status, answer: string): void {
+    this.#log.info(
+      `reactions.${method} ${state} on ${this.#channel}/${this.#rootTs}: ${answer} (temporary, #96)`,
+    );
   }
 
   #noteMissingScope(): void {

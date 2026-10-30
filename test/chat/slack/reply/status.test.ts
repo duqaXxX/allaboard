@@ -94,7 +94,7 @@ test("already reacted on add counts as done", async () => {
   slack.responses["reactions.add"] = rejected("already_reacted");
   const sr = reaction(slack, log);
   await sr.show(Status.WORKING); // never rejects
-  assert.ok(!log.text.includes("already_reacted"));
+  assert.ok(!log.text.includes("failed on"));
 });
 
 test("no reaction on remove counts as done", async () => {
@@ -104,7 +104,26 @@ test("no reaction on remove counts as done", async () => {
   const sr = reaction(slack, log);
   await sr.show(Status.WORKING);
   await sr.show(Status.WAITING); // the remove of the previous reaction never rejects
-  assert.ok(!log.text.includes("no_reaction"));
+  assert.ok(!log.text.includes("failed on"));
+});
+
+// Temporary, with the trace it checks: both go when #96 closes.
+test("each reaction call is traced when sent and with the answer no other line logs", async () => {
+  const slack = new FakeSlack();
+  const log = new Lines();
+  slack.responses["reactions.remove"] = rejected("no_reaction");
+  const sr = reaction(slack, log);
+  await sr.show(Status.WORKING);
+  await sr.show(Status.WAITING);
+  const traced = log.text.split("\n").filter((line) => line.includes("(temporary, #96)"));
+  const addOk = traced.findIndex((line) => line.includes("reactions.add") && line.includes(": ok"));
+  const addSent = traced.findIndex(
+    (line) => line.includes("reactions.add") && line.includes(": sent"),
+  );
+  assert.ok(addSent >= 0 && addSent < addOk);
+  assert.ok(
+    traced.some((line) => line.includes("reactions.remove") && line.includes("no_reaction")),
+  );
 });
 
 test("another error is logged with the ids and swallowed", async () => {
