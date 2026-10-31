@@ -812,6 +812,53 @@ Mac needs an app of its own, as each instance does.
 The lock is held for as long as the daemon runs and is released with it. A folder left behind
 after a stop is empty and harmless.
 
+### Moving to another workspace
+
+A new Slack app installs only in its own workspace, and reaching another takes an OAuth flow
+([App lifecycle & distribution](https://docs.slack.dev/app-management/distribution/), read
+2026-10-30), which allaboard does not have. So another workspace means another app, and these
+values change together:
+
+| Variable | In the new workspace |
+|---|---|
+| `SLACK_BOT_TOKEN` | the new app's; the daemon reads the workspace from it |
+| `SLACK_APP_TOKEN` | the new app's, generated as in Part 1; the connection uses it |
+| `SLACK_USER_TOKEN` | the new app's, or leave the line out |
+| `SLACK_OWNER_USER_ID` | your member ID there, copied as in Part 1: it differs in each workspace |
+
+A channel cannot be moved with its threads. Its sessions are on the machine, so they continue in a
+new channel:
+
+1. While the daemon still serves the old workspace, let the running turns end, then send
+   `!terminal` in each thread whose session is open. That closes the session's process: two
+   processes on one session split the conversation.
+2. To keep the old workspace too, add an instance for the new one, from step 13, on the same
+   Claude Code login: an instance with a `CLAUDE_CONFIG_DIR` of its own does not see the old
+   sessions. To leave it, write the new values in the instance's `.env` and restart the instance.
+3. In the new workspace, create a private channel with you and the bot, and send
+   `!bind <folder>` there, naming the same folder.
+4. If the instance's `.env` was rewritten, press **Refresh** on the Home tab or restart the
+   instance. That runs the cleanup, which forgets the old channels and threads
+   (`forgot channel ...: Slack no longer has it`) once a channel of the new workspace is bound.
+5. Send `!resume` there, or `!resume <id or name>`, once for each session you want to continue.
+   Each one continues in a thread of its own, with bypass never chosen and no `/effort` level, and
+   a session you do not resume stays on disk, for later.
+
+The old threads stay in the old workspace. Slack's export on the Free and Pro plans covers public
+channels only
+([Export your workspace data](https://slack.com/help/articles/201658943-Export-your-workspace-data),
+read 2026-10-30), and these channels are private.
+
+Until the cleanup of step 4 has run, the old threads still hold their sessions. `!resume` lists no
+row for such a session, only a count of those open elsewhere, and `!resume <id or name>` answers
+`This session is already open in another thread: <link>.`, where the link can show as the thread's
+id, since the new bot cannot reach it. While none of the bound channels answers, the log says
+`Slack finds none of the ... bound channels: nothing is forgotten`.
+
+An instance added for the new workspace has a `state.json` of its own, so nothing refuses a resume
+there. A message sent afterwards in the old thread writes to the same session and splits the
+conversation: see [Instances that share a login and a folder](#instances-that-share-a-login-and-a-folder).
+
 ### A development copy beside the release
 
 Install a build of a clone in a prefix of its own, never in npm's global one, which holds the
@@ -1847,6 +1894,9 @@ of the Node executable in System Settings, if you gave it one.
 | `allaboard needs Node 22.19.0 or later and this is Node ...` in the log, or on the terminal | The Node that runs allaboard is older than 22.19; the process ends with status 1. Install a newer Node, beside yours if you want ([A Node of its own](#a-node-of-its-own)), and run `allaboard` again. The LaunchAgent names the Node executable in its plist: change it there too |
 | `ALLOWED_ROOT must be an absolute path, or one starting with ~/; it is "..."` | `ALLOWED_ROOT` in `.env` is a relative path, which would be read from the folder the process starts in. Write the whole path, or start it with `~/` |
 | `another allaboard is running` in the log | A second daemon of the same instance tried to start; one daemon runs per instance |
+| `SLACK_USER_TOKEN must be the owner's own token, in the bot's workspace` in the log, repeated while the LaunchAgent restarts the daemon | Slack's `auth.test` for `SLACK_USER_TOKEN` names a user other than `SLACK_OWNER_USER_ID`, or a workspace other than the one of `SLACK_BOT_TOKEN`. After a change of workspace it is usually the member ID: [Moving to another workspace](#moving-to-another-workspace). The `user_id` and `team_id` of each token's answer show which |
+| The daemon starts and connects, and answers none of your messages | `SLACK_OWNER_USER_ID` is not your member ID in the bot's workspace, and with no `SLACK_USER_TOKEN` nothing checks it at start: every message is ignored as someone else's. [Moving to another workspace](#moving-to-another-workspace) |
+| The daemon is down and you need a session's id, which `!status` shows | The id is the name of the session's file, in the folder under `~/.claude/projects/` (or under the instance's `CLAUDE_CONFIG_DIR`) named after the project's path. Continue it in the terminal as in [Continuing a session in the terminal](#continuing-a-session-in-the-terminal) |
 | The app has no **Home** tab, or it stays empty | **Home Tab** is off in the app's settings, and the log says `the Home tab is not enabled in the Slack app`: turn it on under **App Home**, **Show Tabs**, then restart allaboard |
 | `forgot channel ...: Slack no longer has it` in the log | The channel was deleted, or the bot was removed from it: its binding and its threads are gone from `state.json`. If the bot is back in it, send `!bind` there again |
 | `Slack finds none of the ... bound channels: nothing is forgotten` in the log | Every bound channel is out of the bot's reach: check that `SLACK_BOT_TOKEN` is the one of this workspace and that the bot is still in its channels |
