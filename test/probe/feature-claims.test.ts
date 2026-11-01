@@ -371,6 +371,20 @@ const childEnd = notification("b1", "toolu_child", {
   summary: 'Background command "Sleep 20" completed (exit code 0)',
 });
 
+/** The message that carries a subagent's report to its parent, with or without the flag. */
+const handBack = (flagged: boolean) => ({
+  type: "user",
+  message: { role: "user", content: "Another Claude session sent a message: ..." },
+  origin: {
+    kind: "peer",
+    from: "a1",
+    senderTaskId: "a1",
+    name: "general-purpose",
+    body: "[Subagent hand-back] The report follows:\n  slept",
+    ...(flagged && { handback: true }),
+  },
+});
+
 function played(raw: object[]): SessionEvent[] {
   const translator = new Translator();
   return raw.flatMap((record) => translator.translate(record));
@@ -378,8 +392,16 @@ function played(raw: object[]): SessionEvent[] {
 
 test("a subagent still running its command at the first notification is waiting, then done", async () => {
   const { handbackFacts, judgeHandback } = await scenes();
-  const auto = [agentStart, childStart, agentNote("started"), childEnd, agentNote("slept")];
+  const auto = [
+    agentStart,
+    childStart,
+    agentNote("started"),
+    childEnd,
+    agentNote("slept"),
+    handBack(true),
+  ];
   const facts = handbackFacts(played(auto), auto);
+  assert.equal(facts.flagged, true);
   assert.deepEqual(facts.notifications, [
     { form: "note", handback: "send", reportText: true, running: 1 },
     { form: "note", handback: "send", reportText: true, running: 0 },
@@ -408,6 +430,23 @@ test("a subagent still running its command at the first notification is waiting,
   // The facts hold no summary text and no id.
   assert.ok(!JSON.stringify(done.seen).includes("a1"));
   assert.ok(!JSON.stringify(done.seen).includes("slept"));
+});
+
+test("an auto mode hand-back without origin.handback does not hold", async () => {
+  const { handbackFacts, judgeHandback } = await scenes();
+  const raw = [
+    agentStart,
+    childStart,
+    agentNote("started"),
+    childEnd,
+    agentNote("slept"),
+    handBack(false),
+  ];
+  const facts = handbackFacts(played(raw), raw);
+  assert.equal(facts.flagged, false);
+  const judged = judgeHandback({ bypass: facts, auto: facts });
+  assert.equal(judged.holds, false);
+  assert.match(judged.detail, /origin\.handback/);
 });
 
 test("a subagent that started no background task is not a caused hand-back", async () => {

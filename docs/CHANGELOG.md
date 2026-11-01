@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A message a background subagent sends its parent while it runs is drawn in the reply as
+  `Message from <name>:` and the text as a quote; its hand-back draws none (`subagent_message`,
+  #135).
 - A shared `.ts`, `.tsx`, `.mts` or `.cts` file is sent as a TypeScript snippet when its bytes are
   not binary, as Slack typed a `.ts` as `Binary` (`read.shareFile`).
 - A test fails on a markdown paragraph or a source comment written in Italian (`test/docs.test.ts`,

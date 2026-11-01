@@ -8,7 +8,15 @@
      "type": "markdown"
     },
     {
-     "text": "started.\n\nThe worker sent `halfway there` to this session as instructed. It is still running its 25-second sleep and has not reported `finished` yet. I'll report again when its completion notification arrives.\n\nThe worker finished. It sent `halfway there` to this session, ran the 25-second sleep, and replied `finished`. It used 4 tool calls and about 41.5k subagent tokens over 33 seconds. Nothing is left to do.",
+     "text": "started.",
+     "type": "markdown"
+    },
+    {
+     "text": "Message from general-purpose:\n> halfway there",
+     "type": "markdown"
+    },
+    {
+     "text": "The worker sent `halfway there` to this session as instructed. It is still running its 25-second sleep and has not reported `finished` yet. I'll report again when its completion notification arrives.\n\nThe worker finished. It sent `halfway there` to this session, ran the 25-second sleep, and replied `finished`. It used 4 tool calls and about 41.5k subagent tokens over 33 seconds. Nothing is left to do.",
      "type": "markdown"
     },
     {
@@ -30,7 +38,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Worker: send message, then sleep)\n⎿ Running in background\n\nstarted.\n\nThe worker sent `halfway there` to this session as instructed. It is still running its 25-second sleep and has not reported `finished` yet. I'll report again when its completion notification arrives.\n\nThe worker finished. It sent `halfway there` to this session, ran the 25-second sleep, and replied `finished`. It used 4 tool calls and about 41.5k subagent tokens over 33 seconds. Nothing is left to do."
+   "**Agent**(Worker: send message, then sleep)\n⎿ Running in background\n\nstarted.\n\nMessage from general-purpose:\n> halfway there\n\nThe worker sent `halfway there` to this session as instructed. It is still running its 25-second sleep and has not reported `finished` yet. I'll report again when its completion notification arrives.\n\nThe worker finished. It sent `halfway there` to this session, ran the 25-second sleep, and replied `finished`. It used 4 tool calls and about 41.5k subagent tokens over 33 seconds. Nothing is left to do."
   ],
   "pushes": 1
  },
@@ -87,7 +95,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\nThe worker sen",
+      "text": "\n\nMessage from general-purpose:\n> halfway there",
       "type": "markdown_text"
      }
     ],
@@ -101,7 +109,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "t `halfway the",
+      "text": "\n\nThe worker sen",
       "type": "markdown_text"
      }
     ],
@@ -115,7 +123,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "re` to this se",
+      "text": "t `halfway the",
       "type": "markdown_text"
      }
     ],
@@ -129,7 +137,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ssion as instr",
+      "text": "re` to this se",
       "type": "markdown_text"
      }
     ],
@@ -143,7 +151,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ucted. It is s",
+      "text": "ssion as instr",
       "type": "markdown_text"
      }
     ],
@@ -157,7 +165,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "till running i",
+      "text": "ucted. It is s",
       "type": "markdown_text"
      }
     ],
@@ -171,7 +179,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ts 25-second s",
+      "text": "till running i",
       "type": "markdown_text"
      }
     ],
@@ -185,7 +193,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "leep and has n",
+      "text": "ts 25-second s",
       "type": "markdown_text"
      }
     ],
@@ -199,7 +207,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ot reported `f",
+      "text": "leep and has n",
       "type": "markdown_text"
      }
     ],
@@ -213,7 +221,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "inished` yet. ",
+      "text": "ot reported `f",
       "type": "markdown_text"
      }
     ],
@@ -227,7 +235,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "I'll report ag",
+      "text": "inished` yet. ",
       "type": "markdown_text"
      }
     ],
@@ -241,7 +249,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ain when its c",
+      "text": "I'll report ag",
       "type": "markdown_text"
      }
     ],
@@ -255,7 +263,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ompletion noti",
+      "text": "ain when its c",
       "type": "markdown_text"
      }
     ],
@@ -269,7 +277,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "fication arriv",
+      "text": "ompletion noti",
       "type": "markdown_text"
      }
     ],
@@ -283,7 +291,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "es.",
+      "text": "fication arriv",
       "type": "markdown_text"
      }
     ],
@@ -297,7 +305,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\nThe worker fi",
+      "text": "es.",
       "type": "markdown_text"
      }
     ],
@@ -311,7 +319,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "nished. It se",
+      "text": "\n\nThe worker fi",
       "type": "markdown_text"
      }
     ],
@@ -325,7 +333,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "nt `halfway t",
+      "text": "nished. It se",
       "type": "markdown_text"
      }
     ],
@@ -339,7 +347,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "here` to this",
+      "text": "nt `halfway t",
       "type": "markdown_text"
      }
     ],
@@ -353,7 +361,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " session, ran",
+      "text": "here` to this",
       "type": "markdown_text"
      }
     ],
@@ -367,7 +375,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " the 25-secon",
+      "text": " session, ran",
       "type": "markdown_text"
      }
     ],
@@ -381,7 +389,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "d sleep, and ",
+      "text": " the 25-secon",
       "type": "markdown_text"
      }
     ],
@@ -395,7 +403,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "replied `fini",
+      "text": "d sleep, and ",
       "type": "markdown_text"
      }
     ],
@@ -409,7 +417,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "shed`. It use",
+      "text": "replied `fini",
       "type": "markdown_text"
      }
     ],
@@ -423,7 +431,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "d 4 tool call",
+      "text": "shed`. It use",
       "type": "markdown_text"
      }
     ],
@@ -437,7 +445,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "s and about 4",
+      "text": "d 4 tool call",
       "type": "markdown_text"
      }
     ],
@@ -451,7 +459,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "1.5k subagent",
+      "text": "s and about 4",
       "type": "markdown_text"
      }
     ],
@@ -465,7 +473,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " tokens over ",
+      "text": "1.5k subagent",
       "type": "markdown_text"
      }
     ],
@@ -479,7 +487,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "33 seconds. N",
+      "text": " tokens over ",
       "type": "markdown_text"
      }
     ],
@@ -493,7 +501,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "othing is lef",
+      "text": "33 seconds. N",
       "type": "markdown_text"
      }
     ],
@@ -507,6 +515,20 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "text": "othing is lef",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 34,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
       "text": "t to do.",
       "type": "markdown_text"
      }
@@ -516,7 +538,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 35,
+   "after_sink_call": 36,
    "args": {
     "channel": "C000CHAN",
     "ts": "1790000000.000001"
@@ -524,7 +546,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 35,
+   "after_sink_call": 36,
    "args": {
     "blocks": [
      {
@@ -532,7 +554,15 @@
       "type": "markdown"
      },
      {
-      "text": "started.\n\nThe worker sent `halfway there` to this session as instructed. It is still running its 25-second sleep and has not reported `finished` yet. I'll report again when its completion notification arrives.\n\nThe worker finished. It sent `halfway there` to this session, ran the 25-second sleep, and replied `finished`. It used 4 tool calls and about 41.5k subagent tokens over 33 seconds. Nothing is left to do.",
+      "text": "started.",
+      "type": "markdown"
+     },
+     {
+      "text": "Message from general-purpose:\n> halfway there",
+      "type": "markdown"
+     },
+     {
+      "text": "The worker sent `halfway there` to this session as instructed. It is still running its 25-second sleep and has not reported `finished` yet. I'll report again when its completion notification arrives.\n\nThe worker finished. It sent `halfway there` to this session, ran the 25-second sleep, and replied `finished`. It used 4 tool calls and about 41.5k subagent tokens over 33 seconds. Nothing is left to do.",
       "type": "markdown"
      },
      {

@@ -838,6 +838,13 @@ export type SessionEvent =
    * core needs no declaration and draws it when it comes.
    */
   | { readonly type: "peer_message"; readonly text: string }
+  /**
+   * A background subagent sent the session a message while it ran (the terminal's `Message from
+   * @name`). `from` is the subagent's name as the agent calls it, `text` the message as it wrote
+   * it. Both are non-empty. It comes right after `report_started`, which names the task whose
+   * answer the turn it opens is. The subagent's final report is no such message.
+   */
+  | { readonly type: "subagent_message"; readonly from: string; readonly text: string }
   | {
       readonly type: "turn_ended";
       readonly sessionId: string | null;

@@ -62,7 +62,7 @@ What crosses the agent seam:
 | Crossing | Direction | What |
 |---|---|---|
 | commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions` and `aliveSessions` (with `sessionListing`), `folderTrusted`, `trustedRepository` and `untrustedRepository` (with `folderTrust`), `usageLimits`, `tagSession`, `forkSession` (with `sessionForks`), `prompts` (with `fileRestore` or `conversationRewind`), `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask` (with `subagents` or `backgroundTasks`), `setPermissionMode`, `setModel`, `setEffort` (with `liveEffort`), `contextUsage`, `restoreFiles` (with `fileRestore`), `loaded` (with `loadedContext`), `info`, `close` |
-| events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), word that the running turn took a task's notification (`notification_folded`), a message from another of the owner's sessions (`peer_message`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
+| events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), word that the running turn took a task's notification (`notification_folded`), a message from another of the owner's sessions (`peer_message`), a message a background subagent sent while it ran (`subagent_message`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
 | declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, and `AgentBackend.tools`, the `ToolVocabulary` of the tools the terminal shows in words or a preview of its own (also on the `AgentEntry`, readable without a back end; `NO_TOOL_WORDS` for an agent with none), which `Previews` of `src/core/reply/previews.ts` draws and every other tool shows generically, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
 
@@ -371,8 +371,8 @@ core checks the capability and the member before it calls one; a module that dec
 `folderTrust` with no `folderTrusted` has no folder trusted. `AgentInfo.models` is an empty list
 without `models`. `AgentWords.terminal` is null for an agent with no terminal to continue in: the
 core answers `!terminal` with `texts.TERMINAL_UNAVAILABLE`, leaves the terminal line out of
-`!status` and does not look for terminals that hold a session. `SessionEvent.peer_message` needs
-no capability: an agent whose sessions cannot message each other never emits it.
+`!status` and does not look for terminals that hold a session. `SessionEvent.peer_message` and `SessionEvent.subagent_message` need
+no capability: an agent whose sessions cannot message each other, or whose subagents send no message, never emits them.
 
 ### What a chat must do that the types do not say
 
@@ -1396,7 +1396,7 @@ closed when the start returns (`ThreadSession.connect`).
 - One reader task follows `AgentSession.events` for the life of the agent session
   (`ThreadSession.read`). A turn has no start event: it starts at the first event of
   `constants.TURN_EVENTS` that arrives with no turn running (a message's start, a text, a call, an
-  error message, another session's message, a turn's end), or earlier at a `task_started` with no call id that comes while a
+  error message, another session's message, a subagent's message, a turn's end), or earlier at a `task_started` with no call id that comes while a
   message is sent and no report turn is expected: a skill with `context: fork` typed as a command
   runs its agent before the turn's first message, and streams none of that agent's calls, so its
   line shows the command while it works. A task event that names a call held by a reply whose

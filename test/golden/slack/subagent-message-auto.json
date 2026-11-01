@@ -8,7 +8,15 @@
      "type": "markdown"
     },
     {
-     "text": "started.\n\nThe worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do.",
+     "text": "started.",
+     "type": "markdown"
+    },
+    {
+     "text": "Message from general-purpose:\n> halfway there",
+     "type": "markdown"
+    },
+    {
+     "text": "The worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do.",
      "type": "markdown"
     },
     {
@@ -30,7 +38,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background\n\nstarted.\n\nThe worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do."
+   "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background\n\nstarted.\n\nMessage from general-purpose:\n> halfway there\n\nThe worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do."
   ],
   "pushes": 1
  },
@@ -87,7 +95,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\nThe worker sen",
+      "text": "\n\nMessage from general-purpose:\n> halfway there",
       "type": "markdown_text"
      }
     ],
@@ -101,7 +109,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "t \"halfway the",
+      "text": "\n\nThe worker sen",
       "type": "markdown_text"
      }
     ],
@@ -115,7 +123,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "re\" and is sti",
+      "text": "t \"halfway the",
       "type": "markdown_text"
      }
     ],
@@ -129,7 +137,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ll running its",
+      "text": "re\" and is sti",
       "type": "markdown_text"
      }
     ],
@@ -143,7 +151,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " 25-second sle",
+      "text": "ll running its",
       "type": "markdown_text"
      }
     ],
@@ -157,7 +165,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ep. Its `finis",
+      "text": " 25-second sle",
       "type": "markdown_text"
      }
     ],
@@ -171,7 +179,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "hed` reply wil",
+      "text": "ep. Its `finis",
       "type": "markdown_text"
      }
     ],
@@ -185,7 +193,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "l arrive as a ",
+      "text": "hed` reply wil",
       "type": "markdown_text"
      }
     ],
@@ -199,7 +207,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "completion not",
+      "text": "l arrive as a ",
       "type": "markdown_text"
      }
     ],
@@ -213,7 +221,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ification.",
+      "text": "completion not",
       "type": "markdown_text"
      }
     ],
@@ -227,7 +235,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\nThe worker finis",
+      "text": "ification.",
       "type": "markdown_text"
      }
     ],
@@ -241,7 +249,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "hed. It sent \"ha",
+      "text": "\n\nThe worker finis",
       "type": "markdown_text"
      }
     ],
@@ -255,7 +263,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "lfway there\" to ",
+      "text": "hed. It sent \"ha",
       "type": "markdown_text"
      }
     ],
@@ -269,7 +277,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "this session and",
+      "text": "lfway there\" to ",
       "type": "markdown_text"
      }
     ],
@@ -283,7 +291,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " ran the 25-seco",
+      "text": "this session and",
       "type": "markdown_text"
      }
     ],
@@ -297,7 +305,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "nd sleep with no",
+      "text": " ran the 25-seco",
       "type": "markdown_text"
      }
     ],
@@ -311,7 +319,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " output, then re",
+      "text": "nd sleep with no",
       "type": "markdown_text"
      }
     ],
@@ -325,7 +333,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "plied `finished`",
+      "text": " output, then re",
       "type": "markdown_text"
      }
     ],
@@ -339,7 +347,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": ". Nothing is lef",
+      "text": "plied `finished`",
       "type": "markdown_text"
      }
     ],
@@ -353,6 +361,20 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "text": ". Nothing is lef",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 23,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
       "text": "t to do.",
       "type": "markdown_text"
      }
@@ -362,7 +384,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 24,
+   "after_sink_call": 25,
    "args": {
     "channel": "C000CHAN",
     "ts": "1790000000.000001"
@@ -370,7 +392,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 24,
+   "after_sink_call": 25,
    "args": {
     "blocks": [
      {
@@ -378,7 +400,15 @@
       "type": "markdown"
      },
      {
-      "text": "started.\n\nThe worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do.",
+      "text": "started.",
+      "type": "markdown"
+     },
+     {
+      "text": "Message from general-purpose:\n> halfway there",
+      "type": "markdown"
+     },
+     {
+      "text": "The worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do.",
       "type": "markdown"
      },
      {

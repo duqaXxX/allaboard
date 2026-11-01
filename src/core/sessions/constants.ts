@@ -15,6 +15,7 @@ export const TURN_EVENTS: ReadonlySet<SessionEventType> = new Set([
   "agent_error",
   "model_refused",
   "peer_message",
+  "subagent_message",
   "turn_ended",
 ]);
 export const TASK_EVENTS: ReadonlySet<SessionEventType> = new Set([

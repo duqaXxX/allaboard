@@ -139,6 +139,12 @@
      }
     },
     {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nMessage from general-purpose:\n> halfway there",
+     "notice": true
+    },
+    {
      "call": "task",
      "update": {
       "calls": 0,
@@ -453,6 +459,12 @@
     "ending": false,
     "markdown": "ted.",
     "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nMessage from general-purpose:\n> halfway there",
+    "notice": true
    },
    {
     "call": "text",
