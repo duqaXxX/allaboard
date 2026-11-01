@@ -1694,7 +1694,7 @@ is `SDKSessionInfo.customTitle` (see `docs/sdk-surface.md`).
 
 What `!open` offers, which of it changed since a thread started and which paths are safe to read
 are the core's, in `src/core/files/` (`listing`, `changed`, `read`, `paths`, `waiting`), written
-for any chat. A provider reaches them through `core/port.ts`; the Slack provider's picker, modal and
+for any chat. A provider reaches them through `core/port.ts`; the Slack provider's search message and
 upload are in [Opening a file](slack-provider.md#opening-a-file).
 
 The search reads the folder from disk, and the changed files come from git:
@@ -1711,8 +1711,8 @@ The search reads the folder from disk, and the changed files come from git:
   repositories of a folder are kept for 5 seconds, and git runs in at most 4 at once.
 - **No match.** A kept listing is never the reason for "no match": `Listings.search` lists the
   folder again first. A search over an incomplete listing says so (`Found.complete`): `!open
-  <words>` answers `texts.OPEN_NO_MATCH_PARTIAL` and the modal adds the same line under its rows.
-  The files that match are checked on disk only until the modal's ten rows are full.
+  <words>` answers `texts.OPEN_NO_MATCH_PARTIAL` and the search message adds the same line under its buttons.
+  Every file that matches is checked on disk, outside the listing's budget.
 - **Changed files.** The union over the same repositories (`changed.changedIn`): `status` under
   `--no-optional-locks` plus `diff-tree` from the repository's start commit to `HEAD`. No command
   writes the index, so none can leave an `index.lock` that stops the owner's own `git`.

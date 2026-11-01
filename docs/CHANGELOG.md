@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A shared `.ts`, `.tsx`, `.mts` or `.cts` file is sent as a TypeScript snippet when its bytes are
+  not binary, as Slack typed a `.ts` as `Binary` (`read.shareFile`).
 - A test fails on a markdown paragraph or a source comment written in Italian (`test/docs.test.ts`,
   `test/english.test.ts`, detector in `test/support/english.ts`).
 - `!rewind` inside a thread goes back to an earlier prompt of the session, as the terminal's
@@ -81,6 +83,15 @@ All notable changes to this project are documented here. The format follows
   registry, linked from `docs/architecture.md` (#129).
 
 ### Changed
+
+- `!open` shows a message only the owner sees, with a search field and up to 5 buttons, in place of
+  the `Choose a file` button and its modal. The buttons are the files changed in the session, newest
+  first; Enter in the field replaces the message with one holding the words and the best 5 matches,
+  and a button shares its file into the thread and takes the message away (`search.searchBlocks`,
+  `Open.onOpenSearch`, `Open.onOpenFile`). `!open <words>` with several matches shows the same
+  message. The picker modal and its code (`modal.modalView`, `modal.ModalUpdates`) are removed.
+- A done end with no reply to carry the owner's mention writes no `Done` line in the thread; a
+  failure keeps its `Failed` line (`SlackThread.tellEnd`).
 
 - `test/vocabulary.test.ts` now fails on a name of the agent's SDK (read from `docs/sdk-surface.md`), a model alias or an `AgentWords` string behind the command prefix in the core, the chat or the entry files, on a Slack timestamp or id in the tests of the core and the scenarios, and on a scenario that reaches an agent module; `docs/architecture.md` and `CONTRIBUTING.md` state which tests run which modules (#129).
 - The words only one module has leave the central list of `test/vocabulary.test.ts`: each agent and chat entry declares them as a required `words` (`ModuleWords`, `src/agent/claude/words.ts`, `src/chat/slack/words.ts`), and the test fails on the Slack literals (`chat.update`, `blocks`, `team_id`, `ts`...) in the core and the entry files, on a Web API method name outside the modules, and on a tool name in an entry file (#129).

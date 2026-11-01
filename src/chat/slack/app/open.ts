@@ -1,13 +1,13 @@
 /**
- * `!open`: a file of a session's folder shared into its thread, by name or through the picker's
- * modal. The logic is the core's (`core/files/`) and `openfile/`; these are its handlers.
+ * `!open`: a file of a session's folder shared into its thread, by name or through the message
+ * only the owner sees (a search field and a few files as buttons). The logic is the core's
+ * (`core/files/`) and `openfile/`; these are its handlers.
  *
- * The listing a click starts is a promise that began with the click, and a signal that gives it
- * up when the click is done: a walk or a git call in flight is never cut, the signal only stops
- * what would follow it.
+ * The message is ephemeral and is replaced as `Suggestions` replaces its own: a search posts a new
+ * one and takes the old one away (`delete_original`), since rewriting an ephemeral message
+ * through `response_url` showed the new one in the channel too (seen 2026-10-21, desktop).
  */
 import {
-  Cancelled,
   changedIn,
   type Found,
   fill,
@@ -21,34 +21,20 @@ import {
 } from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
 import { errorCode } from "../../../values.ts";
-import {
-  BadTarget,
-  choiceBlock,
-  chosenIn,
-  ModalUpdates,
-  matchesBlocks,
-  modalView,
-  OPEN_WAIT,
-  pickerBlocks,
-  QUERY_BLOCK,
-  QUERY_LIMIT,
-  ROW_LIMIT,
-  Target,
-  typedIn,
-} from "../openfile/modal.ts";
 import { SNIPPET_LIMIT, uploadFile } from "../openfile/read.ts";
+import { QUERY_LIMIT, searchBlocks } from "../openfile/search.ts";
 import { take } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { shownAsWritten } from "../reply/escape.ts";
 import * as slackTexts from "../texts.ts";
 import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
-import { interactionActor, isOwner } from "./guards.ts";
+import { interactionActor } from "./guards.ts";
 import {
   type Ack,
-  actionKey,
   clickThread,
   firstAction,
   type Payload,
+  type Respond,
   record,
   text,
 } from "./wire.ts";
@@ -69,17 +55,14 @@ export function startedAt(threadTs: string): number | null {
   return Number.isSafeInteger(when) ? when : null;
 }
 
-/** A listing a click started: its answer once it has one. */
-interface Finding {
-  readonly promise: Promise<Found>;
-  found: Found | null;
-}
+// How many of the search's messages are remembered as already searched from.
+const SEARCHES_KEPT = 16;
 
 export class Open {
+  private readonly clicked = new Set<string>();
+  private readonly searched = new Set<string>();
   private readonly parts: AppParts;
   private readonly answers: Answers;
-  /** The open picker modals, so that an older update of one never overwrites a newer one. */
-  private readonly modals = new ModalUpdates();
 
   constructor(parts: AppParts, answers: Answers) {
     this.parts = parts;
@@ -99,15 +82,13 @@ export class Open {
   }
 
   /**
-   * `!open` typed in a session's thread: a picker alone; with words, the file they name as a
-   * path, else the file whose name contains them, else the files that do. A file is opened on
-   * its own only when it is the one match of a listing that is complete.
+   * `!open` typed in a session's thread: the search message alone; with words, the file they
+   * name as a path, else the file whose name contains them, else the files that do. A file is
+   * opened on its own only when it is the one match of a listing that is complete.
    */
   async openWord(channel: string, threadTs: string, folder: string, words: string): Promise<void> {
     if (!words) {
-      await this.answers.deliver(channel, threadTs, slackTexts.OPEN_FALLBACK, pickerBlocks(), {
-        ephemeral: false,
-      });
+      await this.showSearch(channel, threadTs, "", await this.foundFiles(folder, threadTs, ""));
       return;
     }
     if ((await regularFiles(folder, [words])).length > 0) {
@@ -116,53 +97,48 @@ export class Open {
     }
     const found = await this.foundFiles(folder, threadTs, words);
     const [only] = found.paths;
-    if (only === undefined) {
-      const shown = shownAsWritten(words);
-      const noMatch = found.complete ? slackTexts.OPEN_NO_MATCH : slackTexts.OPEN_NO_MATCH_PARTIAL;
-      await this.answers.tellOwner(channel, threadTs, fill(noMatch, { words: shown }));
-    } else if (found.paths.length === 1 && found.complete) {
+    if (only !== undefined && found.paths.length === 1 && found.complete) {
       await this.openFile(channel, threadTs, folder, only);
     } else {
-      await this.answers.deliver(
-        channel,
-        threadTs,
-        slackTexts.OPEN_FALLBACK,
-        matchesBlocks(words, found.paths, found.complete),
-        { ephemeral: false },
-      );
+      await this.showSearch(channel, threadTs, words, found);
     }
   }
 
-  /**
-   * What the picker's rows are chosen from, as paths from `folder`: with no `words`, the files
-   * changed in the session, newest first (the union over the folder's repositories, none when
-   * there is no repository or nothing changed); else the files whose path contains them, in
-   * `rank`'s order, of which at most `limit` are checked on disk (`Listings.search`). Never
-   * rejects but for the signal: a listing that fails is empty and incomplete.
-   */
-  async foundFiles(
-    folder: string,
+  /** Posts the message only the owner sees, its field holding `words` and `found` as buttons. */
+  private async showSearch(
+    channel: string,
     threadTs: string,
     words: string,
-    options: { readonly limit?: number; readonly signal?: AbortSignal } = {},
-  ): Promise<Found> {
+    found: Found,
+  ): Promise<void> {
+    await this.answers.deliver(
+      channel,
+      threadTs,
+      slackTexts.OPEN_FALLBACK,
+      searchBlocks(words, found),
+      { ephemeral: true },
+    );
+  }
+
+  /**
+   * What the buttons are chosen from, as paths from `folder`: with no `words`, the files
+   * changed in the session, newest first (the union over the folder's repositories, none when
+   * there is no repository or nothing changed); else the files whose path contains them, in
+   * `rank`'s order (`Listings.search`). A
+   * listing that fails is empty and incomplete.
+   */
+  async foundFiles(folder: string, threadTs: string, words: string): Promise<Found> {
     const { listings } = this.parts;
-    const { limit, signal } = options;
     try {
       if (!words) {
-        const repositories = await listings.repositories(folder, { ...(signal && { signal }) });
-        signal?.throwIfAborted();
+        const repositories = await listings.repositories(folder);
         const names = await changedIn(folder, repositories, startedAt(threadTs));
-        signal?.throwIfAborted();
         const paths = await newestFirst(folder, names);
         return { paths, count: paths.length, complete: true };
       }
-      return await listings.search(folder, words, {
-        ...(limit !== undefined && { limit }),
-        ...(signal && { signal }),
-      });
+      return await listings.search(folder, words);
     } catch (error) {
-      if (signal?.aborted || isCancelled(error)) throw error;
+      if (isCancelled(error)) throw error;
       logger.warning(`could not list files for a search: ${describe(error)}`);
       return { paths: [], count: 0, complete: false };
     }
@@ -170,14 +146,14 @@ export class Open {
 
   /**
    * Share the file `relative` names under `folder` into the thread, which Slack shows in its own
-   * viewer; no line of ours on success. `relative` is untrusted.
+   * viewer; no line of ours on success. True when it was shared. `relative` is untrusted.
    */
   async openFile(
     channel: string,
     threadTs: string,
     folder: string,
     relative: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const { slack, sessions } = this.parts;
     const shown = shownAsWritten(relative);
     let content: Buffer;
@@ -196,7 +172,7 @@ export class Open {
           threadTs,
           fill(slackTexts.OPEN_NOT_A_FILE, { path: shown }),
         );
-        return;
+        return false;
       }
       if (error instanceof TooLarge) {
         await this.answers.tellOwner(
@@ -204,16 +180,16 @@ export class Open {
           threadTs,
           fill(named(slackTexts.OPEN_TOO_LARGE, this.parts.names), { path: shown }),
         );
-        return;
+        return false;
       }
       throw error;
     }
     if (content.length === 0) {
       // Refused here, not left to whatever Slack answers to an upload of length 0.
       await this.answers.tellOwner(channel, threadTs, fill(slackTexts.OPEN_EMPTY, { path: shown }));
-      return;
+      return false;
     }
-    if (this.answers.stopped) return;
+    if (this.answers.stopped) return false;
     try {
       await uploadFile(slack, channel, threadTs, content, relative);
     } catch (error) {
@@ -227,238 +203,38 @@ export class Open {
         told = fill(named(slackTexts.OPEN_TOO_LARGE, this.parts.names), { path: shown });
       else told = fill(slackTexts.OPEN_FAILED, { path: shown, error: code });
       await this.answers.tellOwner(channel, threadTs, told);
-      return;
+      return false;
     }
     // Slack clears a thread's status line when the app shares into it.
     sessions.wrote(channel, threadTs);
+    return true;
   }
 
   /**
-   * Put the rows for `words` into the open modal `viewId`, unless a newer update has been taken
-   * meanwhile (`ModalUpdates`): `key` orders them. No `hash` goes with it: this daemon is the
-   * only writer of its modals, and `modals` makes the newest update the last.
+   * Enter in the search field: a new message is posted and the old one taken away, the new field
+   * holding the words and its buttons the best matches, or the changed files again when the
+   * field is empty. The channel and the thread come from the click; the words are untrusted and
+   * only match names inside the thread's own folder.
    */
-  private async updateModal(
-    viewId: string,
-    key: number,
-    target: Target,
-    words: string,
-    found: () => Promise<Found>,
-  ): Promise<void> {
-    const { slack } = this.parts;
-    // (sync) Taken as the event comes in: the characters of one search are handled side by
-    // side, and what orders their updates is the key each one claimed, not when it finishes.
-    if (!this.modals.claim(viewId, key)) return;
-    await this.modals.lock(viewId).run(async () => {
-      if (!this.modals.current(viewId, key)) return;
-      const rows = await found();
-      if (!this.modals.current(viewId, key) || this.answers.stopped) return;
-      const view = modalView(target, words, rows.paths, {
-        count: rows.count,
-        complete: rows.complete,
-      });
-      try {
-        await slack.views.update({ view_id: viewId, view });
-      } catch (error) {
-        if (isCancelled(error)) throw error;
-        logger.warning(`could not update the file picker: ${describe(error)}`);
-      }
-    });
-  }
-
-  /**
-   * `finding`'s answer when it has one within `seconds` of the clock, else null. A listing that
-   * had already ended when no time was left is taken too.
-   */
-  private async awaited(finding: Finding, seconds: number): Promise<Found | null> {
-    if (seconds > 0 && finding.found === null) {
-      const waited = new AbortController();
-      await Promise.race([
-        finding.promise.then(
-          () => {},
-          () => {},
-        ),
-        this.parts.clock.sleep(seconds, waited.signal).catch(() => {}),
-      ]);
-      waited.abort(new Cancelled());
-    }
-    // One turn of the event loop: a listing that ended as the time ran out is still taken.
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    return finding.found;
-  }
-
-  /**
-   * Open the picker's modal on the click `triggerId` came with, which lives 3 seconds: with the
-   * rows when `finding` has them by OPEN_WAIT after the click came in (`entered`, on the
-   * handlers' clock), else without them and filled by an update.
-   */
-  private async openModal(
-    channel: string,
-    threadTs: string,
-    finding: Finding,
-    triggerId: string | null,
-    words: string,
-    entered: number,
-  ): Promise<void> {
-    const { slack, clock } = this.parts;
-    const target = new Target(channel, threadTs);
-    const left = OPEN_WAIT - (clock.time() - entered);
-    const found = await this.awaited(finding, Math.max(left, 0));
-    const first =
-      found === null
-        ? modalView(target, words, null, { opening: true })
-        : modalView(target, words, found.paths, {
-            count: found.count,
-            complete: found.complete,
-            opening: true,
-          });
-    if (this.answers.stopped) return;
-    let viewId: unknown;
-    try {
-      if (triggerId === null) throw new TypeError("the click carries no trigger_id");
-      const opened = await slack.views.open({ trigger_id: triggerId, view: first });
-      viewId = opened.view?.id;
-    } catch (error) {
-      if (isCancelled(error)) throw error;
-      // an expired trigger_id, say
-      const message = fill(slackTexts.OPEN_FORM_NOT_OPENED, { error: describe(error) });
-      await this.answers.tellOwner(channel, threadTs, message);
-      return;
-    }
-    if (found === null && typeof viewId === "string") {
-      // Key 0: any keystroke typed meanwhile is newer.
-      await this.updateModal(viewId, 0.0, target, words, () => finding.promise);
-    }
-  }
-
-  /**
-   * The `Choose a file` button, of `!open` or of its several matches: opens the modal. The
-   * click's `trigger_id` lives 3 seconds, and the checks, the wait for the rows and `views.open`
-   * all come out of them: the listing starts at once, beside the channel check and counted from
-   * here.
-   */
-  onOpenChoose = async (ack: Ack, body: Payload): Promise<void> => {
+  onOpenSearch = async (ack: Ack, body: Payload, respond?: Respond): Promise<void> => {
     await ack();
-    const { identity, clock } = this.parts;
-    const entered = clock.time();
     const [user, team] = interactionActor(body);
     const channel = text(record(body.channel).id);
     const threadTs = clickThread(body);
-    let words = "";
-    let finding: Finding | null = null;
-    const given = new AbortController();
-    // What is local comes first: only the owner's click, in a session's thread, lists anything.
-    if (channel && isOwner(identity, user, team)) {
-      // The words only fill the field: what is listed is what they match in this thread's
-      // folder.
-      const typed = firstAction(body).value;
-      words = typeof typed === "string" ? searched(typed) : "";
-      const folder = this.threadFolder(channel, threadTs);
-      if (folder !== null) {
-        const listing: Finding = {
-          promise: this.foundFiles(folder, threadTs, words, {
-            limit: ROW_LIMIT,
-            signal: given.signal,
-          }),
-          found: null,
-        };
-        listing.promise.then(
-          (found) => {
-            listing.found = found;
-          },
-          () => {}, // given up: nobody reads it
-        );
-        finding = listing;
+    if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
+    // The message goes with its first Enter: a second one for it, a key held or an event sent
+    // twice, would post a second message.
+    const message = text(record(body.container).message_ts);
+    if (message !== null) {
+      if (this.searched.has(message)) return;
+      this.searched.add(message);
+      for (const oldest of this.searched) {
+        if (this.searched.size <= SEARCHES_KEPT) break;
+        this.searched.delete(oldest);
       }
     }
-    try {
-      if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
-      if (finding === null) {
-        await this.answers.tellOwner(channel, threadTs, texts.NOT_A_SESSION);
-        return;
-      }
-      const listed = finding;
-      await this.answers.replyOnFailure(
-        channel,
-        threadTs,
-        () => this.openModal(channel, threadTs, listed, text(body.trigger_id), words, entered),
-        (told) => this.answers.tellOwner(channel, threadTs, told),
-      );
-    } finally {
-      given.abort(new Cancelled());
-    }
-  };
-
-  /**
-   * A character typed in the modal's search field: its rows follow what is typed. Checked for
-   * the owner and the workspace alone, with no call to Slack for the channel: each character
-   * comes here, and the rows reach only the owner's own modal.
-   */
-  onOpenQuery = async (ack: Ack, body: Payload): Promise<void> => {
-    await ack();
-    const { identity, now } = this.parts;
-    if (this.answers.stopped) return;
-    const [user, team] = interactionActor(body);
-    if (!isOwner(identity, user, team)) {
-      logger.info("ignored an inbound event from someone other than the owner");
-      return;
-    }
-    const view = record(body.view);
-    let target: Target;
-    try {
-      target = Target.load(view.private_metadata);
-    } catch (error) {
-      if (error instanceof BadTarget) return;
-      throw error;
-    }
-    const viewId = view.id;
-    const folder = this.threadFolder(target.channel, target.threadTs);
-    if (folder === null || typeof viewId !== "string") return;
-    const action = firstAction(body);
-    const typed =
-      typeof action.value === "string" ? action.value : typedIn(record(view.state).values);
+    const typed = text(firstAction(body).value) ?? "";
     const words = searched(typed);
-    await this.updateModal(viewId, actionKey(action, now), target, words, () =>
-      this.foundFiles(folder, target.threadTs, words, { limit: ROW_LIMIT }),
-    );
-  };
-
-  /**
-   * Open, in the picker's modal: the row chosen is shared into the thread and the modal closes.
-   * The answer to Slack comes first and makes no call to it; the value and the metadata are
-   * untrusted, and the file is read from the folder of the thread's own session.
-   */
-  onOpenSubmit = async (ack: Ack, body: Payload): Promise<void> => {
-    const { identity } = this.parts;
-    const [user, team] = interactionActor(body);
-    const view = record(body.view);
-    let target: Target;
-    try {
-      target = Target.load(view.private_metadata);
-    } catch (error) {
-      if (!(error instanceof BadTarget)) throw error;
-      await ack();
-      return;
-    }
-    if (!isOwner(identity, user, team)) {
-      await ack();
-      logger.info("ignored an inbound event from someone other than the owner");
-      return;
-    }
-    const relative = chosenIn(view);
-    if (relative === null) {
-      // The error goes on the rows the view shows, whatever the state holds. With no row
-      // there is no such block to carry it: the search field does.
-      const rows = choiceBlock(view);
-      const block =
-        rows !== null && typeof rows.block_id === "string" ? rows.block_id : QUERY_BLOCK;
-      await ack({ response_action: "errors", errors: { [block]: slackTexts.OPEN_NONE_CHOSEN } });
-      return;
-    }
-    await ack();
-    if (typeof view.id === "string") this.modals.forget(view.id);
-    const { channel, threadTs } = target;
-    if (!(await this.answers.admitted(user, team, channel, threadTs))) return;
     const folder = this.threadFolder(channel, threadTs);
     if (folder === null) {
       await this.answers.tellOwner(channel, threadTs, texts.NOT_A_SESSION);
@@ -467,8 +243,58 @@ export class Open {
     await this.answers.replyOnFailure(
       channel,
       threadTs,
-      () => this.openFile(channel, threadTs, folder, relative),
+      async () => {
+        const found = await this.foundFiles(folder, threadTs, words);
+        // Posted first: a post that fails leaves the message it would have replaced.
+        try {
+          await this.showSearch(channel, threadTs, words, found);
+        } catch (error) {
+          // The message stays, and its field must answer again.
+          if (message !== null) this.searched.delete(message);
+          throw error;
+        }
+        await this.answers.takeBack(respond, "the file search");
+      },
       (told) => this.answers.tellOwner(channel, threadTs, told),
     );
+  };
+
+  /**
+   * A file button: the file is shared into the thread, then the message taken away. The button's
+   * value is untrusted, and the file is read from the folder of the thread's own session
+   * (`readOpenable` refuses anything outside it).
+   */
+  onOpenFile = async (ack: Ack, body: Payload, respond?: Respond): Promise<void> => {
+    await ack();
+    const [user, team] = interactionActor(body);
+    const channel = text(record(body.channel).id);
+    const threadTs = clickThread(body);
+    if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
+    // A second click while the first is at work shares nothing more.
+    const message = text(record(body.container).message_ts);
+    if (message !== null && this.clicked.has(message)) return;
+    if (message !== null) this.clicked.add(message);
+    const relative = text(firstAction(body).value);
+    const folder = this.threadFolder(channel, threadTs);
+    if (relative === null || folder === null) {
+      if (message !== null) this.clicked.delete(message);
+      await this.answers.tellOwner(channel, threadTs, texts.NOT_A_SESSION);
+      return;
+    }
+    try {
+      // Taken back only once shared: a refused file leaves the other buttons.
+      await this.answers.replyOnFailure(
+        channel,
+        threadTs,
+        async () => {
+          if (await this.openFile(channel, threadTs, folder, relative)) {
+            await this.answers.takeBack(respond, "the file search");
+          }
+        },
+        (told) => this.answers.tellOwner(channel, threadTs, told),
+      );
+    } finally {
+      if (message !== null) this.clicked.delete(message);
+    }
   };
 }

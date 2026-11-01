@@ -43,16 +43,7 @@ import { ChannelGuard, type Identity } from "../../src/chat/slack/app/guards.ts"
 import type { DeleteRefusal, PinnedRefusal } from "../../src/chat/slack/delete.ts";
 import { HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
 import { Home } from "../../src/chat/slack/home.ts";
-import {
-  CHOICE_ACTION,
-  CHOICE_BLOCK,
-  modalView,
-  OPEN_BUTTON_ACTION,
-  OPEN_FORM,
-  QUERY_ACTION,
-  QUERY_BLOCK,
-  Target,
-} from "../../src/chat/slack/openfile/modal.ts";
+import { OPEN_FIELD, OPEN_FIELD_BLOCK, OPEN_FILE } from "../../src/chat/slack/openfile/search.ts";
 import { type Limiter, UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
 import { QUESTION_FORM } from "../../src/chat/slack/requests.ts";
@@ -949,6 +940,51 @@ export function picked(index: number, value: string): Body {
 }
 
 /**
+ * What Slack sends for a modal: `view_submission` is the recorded Submit with the view in it,
+ * `block_actions` is built from the reference (no recording of one from a modal exists).
+ */
+export function viewEvent(
+  kind: "view_submission" | "block_actions",
+  values: Body,
+  options: {
+    readonly metadata?: string;
+    readonly user?: string;
+    readonly team?: string;
+    readonly viewHash?: string;
+    readonly blocks?: Body[];
+  } = {},
+): Body {
+  const view = {
+    id: VIEW_ID,
+    team_id: TEAM,
+    type: "modal",
+    blocks: options.blocks ?? [],
+    private_metadata: options.metadata ?? "",
+    callback_id: QUESTION_FORM,
+    state: { values },
+    hash: options.viewHash ?? "1790000000.h0",
+  };
+  let body: Body;
+  if (kind === "view_submission") {
+    body = recorded("submit");
+    Object.assign(body.view, view);
+  } else {
+    body = {
+      type: "block_actions",
+      team: { id: TEAM, domain: "example" },
+      user: { id: OWNER, username: "alice", name: "alice", team_id: TEAM },
+      api_app_id: "A000APP",
+      container: { type: "view", view_id: VIEW_ID },
+      trigger_id: "1.2.abc",
+      view,
+    };
+  }
+  body.user.id = options.user ?? OWNER;
+  body.team.id = options.team ?? TEAM;
+  return body;
+}
+
+/**
  * What Slack sends when a control of the question form dispatches an action (the block_actions
  * payload of a modal, from the reference read 2026-10-16: `container.type` "view", the `view`
  * with `id`, `hash`, `private_metadata` and `state.values`, and the action that fired). `view` is
@@ -1210,15 +1246,12 @@ export function gateLimiter(world: World, gate: AsyncEvent): void {
 }
 
 // --- `!open` ---
-// The payloads of the picker's modal follow the Slack reference, read 2026-10-05 on docs.slack.dev:
-// block_actions payload (an action from a view: `container.type` "view" with `view_id`, `view.id`,
-// `view.hash`, `view.private_metadata`, `view.state.values`, `actions[].action_ts`, and no
-// `channel`), view interaction payloads (`view_submission`, and the `response_action` "errors"),
-// views.open and views.update (`hash`, optional on an update, and the `hash_conflict` error of a
-// hash that is not the view's current one; read again 2026-10-06). The submit is the recorded
-// form-submit.json with the picker's view in it.
+// The message `!open` shows is ephemeral: a click on it, or Enter in its field, has the shape
+// measured on 2026-10-19 and 2026-10-21 (`ephemeralClick`, `fieldEnter`). The modal helpers below
+// are those of the question form, which is a modal too (views.open and views.update follow the
+// Slack reference, read 2026-10-05 and 2026-10-06: `hash`, optional on an update, and the
+// `hash_conflict` error of a hash that is not the view's current one).
 export const VIEW_ID = "V000PICK";
-export const OPEN_TARGET = new Target(CHANNEL, THREAD);
 
 /**
  * Slack's side of one modal as the references describe it: `views.open` answers the view's id
@@ -1255,23 +1288,6 @@ export class ModalSlack {
     this.hash = `1790000000.h${this.#count}`;
     return this.hash;
   }
-
-  /** What the view says about its rows: the radio group's label, else its context lines. */
-  labels(): string[] {
-    return (this.view.blocks as Body[])
-      .slice(1)
-      .map((block) => (block.type === "input" ? block.label.text : block.elements[0].text));
-  }
-
-  /** The paths of the radio group's rows, in order. */
-  rows(view: Body = this.view): string[] {
-    for (const block of view.blocks as Body[]) {
-      if (String(block.block_id ?? "").startsWith(CHOICE_BLOCK)) {
-        return (block.element.options as Body[]).map((option) => option.value);
-      }
-    }
-    return [];
-  }
 }
 
 /** The files the bot shared, as `files.completeUploadExternal` was asked to. */
@@ -1279,17 +1295,19 @@ export function opened(world: World): Body[] {
   return world.slack.callsTo("files.completeUploadExternal");
 }
 
-/** The messages the bot posted that hold the button of `!open`'s modal. */
-export function pickerPosts(world: World): Body[] {
+/** The ephemeral messages the bot posted that hold `!open`'s search field, in order. */
+export function searchPosts(world: World): Body[] {
   return world.slack
-    .callsTo("chat.postMessage")
+    .callsTo("chat.postEphemeral")
     .filter((post) =>
-      ((post.blocks ?? []) as Body[]).some((block) =>
-        ((block.elements ?? []) as Body[]).some(
-          (element) => element.action_id === OPEN_BUTTON_ACTION,
-        ),
-      ),
+      ((post.blocks ?? []) as Body[]).some((block) => block.block_id === OPEN_FIELD_BLOCK),
     );
+}
+
+/** The buttons of a search message's blocks, as `[label, path]` in order. */
+export function fileButtons(post: Body): Array<[label: string, path: string]> {
+  const row = ((post.blocks ?? []) as Body[]).find((block) => block.type === "actions");
+  return ((row?.elements ?? []) as Body[]).map((button) => [button.text.text, button.value]);
 }
 
 /**
@@ -1315,121 +1333,20 @@ export function put(root: string, name: string, text = "x\n"): string {
   return path;
 }
 
-/**
- * A click on the `Choose a file` button of a message in THREAD: the recorded button click
- * (`000-block_actions.json` shape), with the `trigger_id` a real click carries.
- */
-export function chooseClick(words = "", user: Body = {}): Body {
-  const body = clickIn(OPEN_BUTTON_ACTION, words, CHANNEL, THREAD, { user });
-  delete body.actions[0].selected_option;
-  body.actions[0].type = "button";
-  if (!words) delete body.actions[0].value;
-  body.trigger_id = "0000000000.0000000000.fake";
+let searchMessages = 200;
+
+/** Enter in the search field of `!open`'s message in THREAD, the text as it stands. */
+export function searchEnter(words: string, user: Body = {}, threadTs: string = THREAD): Body {
+  const body = fieldEnter(OPEN_FIELD, OPEN_FIELD_BLOCK, words, threadTs, user);
+  // Each Enter comes from the message the one before it posted.
+  searchMessages += 1;
+  body.container.message_ts = `1790192099.${String(searchMessages).padStart(6, "0")}`;
   return body;
 }
 
-/**
- * What Slack sends for the picker's modal: `view_submission` is the recorded Submit with the
- * picker's view in it, `block_actions` is built from the reference (no recording of one from a
- * modal exists).
- */
-export function viewEvent(
-  kind: "view_submission" | "block_actions",
-  values: Body,
-  options: {
-    readonly metadata?: string;
-    readonly user?: string;
-    readonly team?: string;
-    readonly viewHash?: string;
-    readonly blocks?: Body[];
-  } = {},
-): Body {
-  const view = {
-    id: VIEW_ID,
-    team_id: TEAM,
-    type: "modal",
-    blocks: options.blocks ?? modalView(OPEN_TARGET, "", ["a.py"]).blocks,
-    private_metadata: options.metadata ?? OPEN_TARGET.dump(),
-    callback_id: OPEN_FORM,
-    state: { values },
-    hash: options.viewHash ?? "1790000000.h0",
-  };
-  let body: Body;
-  if (kind === "view_submission") {
-    body = recorded("submit");
-    Object.assign(body.view, view);
-  } else {
-    body = {
-      type: "block_actions",
-      team: { id: TEAM, domain: "example" },
-      user: { id: OWNER, username: "alice", name: "alice", team_id: TEAM },
-      api_app_id: "A000APP",
-      container: { type: "view", view_id: VIEW_ID },
-      trigger_id: "1.2.abc",
-      view,
-    };
-  }
-  body.user.id = options.user ?? OWNER;
-  body.team.id = options.team ?? TEAM;
-  return body;
-}
-
-/**
- * One character typed in the search field (`on_character_entered`): the action carries the text
- * and its `action_ts`, and the view's state carries the same text.
- */
-export function typing(
-  text: string,
-  at = 1790000100.0,
-  options: Parameters<typeof viewEvent>[2] = {},
-): Body {
-  const values = { [QUERY_BLOCK]: { [QUERY_ACTION]: { type: "plain_text_input", value: text } } };
-  const body = viewEvent("block_actions", values, options);
-  body.actions = [
-    {
-      type: "plain_text_input",
-      block_id: QUERY_BLOCK,
-      action_id: QUERY_ACTION,
-      value: text,
-      action_ts: at.toFixed(6),
-    },
-  ];
-  return body;
-}
-
-export function shownChoiceId(blocks: Body[]): string {
-  const found = blocks.find((block) => String(block.block_id ?? "").startsWith(CHOICE_BLOCK));
-  if (found === undefined) throw new Error("the view shows no rows");
-  return found.block_id;
-}
-
-/**
- * The Submit of the picker's modal with `path` chosen (a radio group's state as form-submit.json
- * records it), or nothing chosen. The view holds `rows` (just `path` by default); the choice is in
- * the state of the block `under` (the rows' own block by default: Slack keeps the state of a block
- * id from one update to the next).
- */
-export function submitted(
-  path: string | null,
-  options: Parameters<typeof viewEvent>[2] & {
-    readonly rows?: string[];
-    readonly under?: string;
-  } = {},
-): Body {
-  const { rows, under, ...event } = options;
-  const shown = rows ?? (path === null ? [] : [path]);
-  const blocks = (event.blocks ?? modalView(OPEN_TARGET, "", shown).blocks) as Body[];
-  const option = path === null ? null : { text: { type: "plain_text", text: path }, value: path };
-  const blockId =
-    under ??
-    blocks.find((block) => String(block.block_id ?? "").startsWith(CHOICE_BLOCK))?.block_id;
-  const values: Body = {
-    [QUERY_BLOCK]: { [QUERY_ACTION]: { type: "plain_text_input", value: null } },
-  };
-  if (blockId !== undefined) {
-    values[blockId] = { [CHOICE_ACTION]: { type: "radio_buttons", selected_option: option } };
-  }
-  return viewEvent("view_submission", values, { ...event, blocks });
+/** A click on a file button of `!open`'s message in THREAD, carrying `path` as its value. */
+export function fileClick(path: string, user: Body = {}, threadTs: string = THREAD): Body {
+  return ephemeralPick(`${OPEN_FILE}:0`, path, threadTs, user);
 }
 
 /** `text` (an `!open` word) sent in THREAD, and the time its git commands need. */

@@ -86,7 +86,7 @@ async function contentOf(repository: Repository, path: string): Promise<Buffer |
 }
 
 /** Git's own test for binary content: a NUL byte in the first 8000 bytes. */
-function looksBinary(content: Buffer): boolean {
+export function looksBinary(content: Buffer): boolean {
   return content.subarray(0, 8000).includes(0);
 }
 

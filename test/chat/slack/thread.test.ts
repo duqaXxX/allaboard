@@ -354,7 +354,14 @@ test("an end told before the reply's own end is carried by the reply's end, once
   assert.equal(told[0]?.ts, slack.createdTs[0]); // the reply's own message, not a line of its own
 });
 
-test("with no reply to carry it, the end is told by a line of its own in the thread", async () => {
+test("with no reply to carry it, a done end writes nothing in the thread", async () => {
+  const { slack, thread } = made({ mentionOwner: true });
+  await thread.showStatus("done", { notify: true });
+  await drained();
+  assert.deepEqual(slack.callsTo("chat.postMessage"), []);
+});
+
+test("with no reply to carry it, a failure is told by a line of its own in the thread", async () => {
   const { slack, thread } = made({ mentionOwner: true });
   await thread.showStatus("error", { notify: true });
   await drained();

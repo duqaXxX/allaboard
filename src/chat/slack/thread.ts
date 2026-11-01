@@ -644,19 +644,20 @@ export class SlackThread implements ThreadChat {
    * Tells the owner `mention`, from the thread, that the session's work ended: a push from a
    * message of the thread opens the thread, where one from the channel opens the channel
    * (measured 2026-10-25 and 2026-10-26, iOS). On the newest reply's last message, out of sight
-   * (`ThreadPlaces.tell`); with no reply to carry it (a crash found at a start, a turn that showed
-   * nothing), a line of its own, the root's mark and word, whose words are rich text: an
-   * invisible `text` mention pushed beside a rich text block and never beside a section (measured
-   * 2026-10-26). Never rejects: a failure is logged by its code.
+   * (`ThreadPlaces.tell`). With no reply to carry it (a crash found at a start, a turn that showed
+   * nothing) a done end writes nothing: the root's mark says how the work ended. A failure keeps
+   * a line of its own, the push it needs, whose words are rich text: an invisible `text` mention
+   * pushed beside a rich text block and never beside a section (measured 2026-10-26). Never
+   * rejects: a failure is logged by its code.
    */
   private async tellEnd(kind: "done" | "failed", mention: string): Promise<void> {
     try {
       if (await (this.places ?? this.lease.peek())?.tell(mention)) return;
-      const [emoji, word] = kind === "done" ? [Status.DONE, "Done"] : [Status.ERROR, "Failed"];
+      if (kind === "done") return;
       const posted = await this.slack.chat.postMessage({
         channel: this.channel,
         thread_ts: this.threadTs,
-        text: `${word} <@${mention}>`,
+        text: `Failed <@${mention}>`,
         blocks: [
           {
             type: "rich_text",
@@ -664,8 +665,8 @@ export class SlackThread implements ThreadChat {
               {
                 type: "rich_text_section",
                 elements: [
-                  { type: "emoji", name: emoji },
-                  { type: "text", text: ` ${word}` },
+                  { type: "emoji", name: Status.ERROR },
+                  { type: "text", text: " Failed" },
                 ],
               },
             ],

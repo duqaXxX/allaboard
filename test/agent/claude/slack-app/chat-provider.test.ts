@@ -353,7 +353,7 @@ test("close writes the Home tab one last time", async (t) => {
   assert.equal(closed, 1);
 });
 
-test("openFile shares a file of the folder into the thread, or offers the picker", async (t) => {
+test("openFile shares a file of the folder into the thread, or offers the search", async (t) => {
   const world = worldOf(t);
   const { chat } = started(world);
   await chat.start(NOBODY);
@@ -368,8 +368,10 @@ test("openFile shares a file of the folder into the thread, or offers the picker
   assert.ok(done && done.channel_id === CHANNEL && done.thread_ts === THREAD);
   world.slack.apiCalls.length = 0;
   await chat.openFile(ref, folder, "");
-  const [picker] = world.slack.callsTo("chat.postMessage");
+  // The search message is the owner's alone: an ephemeral post, with no post to the thread.
+  const [picker] = world.slack.callsTo("chat.postEphemeral");
   assert.ok(picker && picker.text === slackTexts.OPEN_FALLBACK && picker.thread_ts === THREAD);
+  assert.deepEqual(world.slack.callsTo("chat.postMessage"), []);
   await chat.stop();
 });
 

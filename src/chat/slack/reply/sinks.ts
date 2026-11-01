@@ -957,7 +957,7 @@ export class ReplySink implements Sink {
    * 2026-10-26). The message is the reply's last of its own, above a closing message that holds
    * the footer alone. Written now when the reply's end has landed, else with the end's own write
    * while that is still to come. False when the reply has no message to carry it, or when its end
-   * failed: no write follows, and the thread tells him on a line of its own.
+   * failed: no write follows.
    */
   async tell(mention: string): Promise<boolean> {
     if (this.messages.findLast((message) => message.ts !== null) === undefined) return false;

@@ -4,7 +4,7 @@
  */
 import { posix } from "node:path";
 import type { WebClient } from "@slack/web-api";
-import { titleOf } from "../../../core/port.ts";
+import { looksBinary, titleOf } from "../../../core/port.ts";
 
 // Slack's documented limit for a snippet: `snippet_too_large` on `files.getUploadURLExternal`
 // (docs.slack.dev/reference/methods/files.getUploadURLExternal, read 2026-10-05).
@@ -44,11 +44,15 @@ export async function shareFile(
   filename: string,
   title: string,
 ): Promise<void> {
+  // Slack types a `.ts` by its own guess: a file of 256 KB came out `Binary` (seen 2026-10-31).
+  // Video shares these extensions, which is what the bytes rule out.
+  const typescript = /\.[cm]?ts$|\.tsx$/i.test(filename) && !looksBinary(content);
   await client.files.uploadV2({
     channel_id: channel,
     thread_ts: threadTs,
     file: content,
     filename,
     title,
+    ...(typescript && { snippet_type: "typescript" }),
   });
 }

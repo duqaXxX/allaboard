@@ -45,7 +45,7 @@ import { TIMED_OUT, within } from "./waiting.ts";
 export const logger = getLogger("allaboard.core.files");
 
 // A folder's listing is kept for LISTING_TTL (LISTING_PARTIAL_TTL when it is not complete), so
-// the keystrokes of one search do not walk the folder again, and a listing stops at
+// the repeats of one search do not walk the folder again, and a listing stops at
 // LISTING_BUDGET with what it found; LISTING_KEPT folders are kept at most. All in seconds.
 export const LISTING_BUDGET = 2.0;
 export const LISTING_TTL = 30.0;
@@ -301,7 +301,7 @@ export interface Listing {
  * is how many there are (the matches by name once the check stopped at the limit); `complete` is
  * false when the listing it came from was cut or failed. A search over an incomplete listing says
  * so to the owner: `!open <words>` answers `OPEN_NO_MATCH_PARTIAL` instead of "no match", posts the
- * matches with `OPEN_PARTIAL` instead of opening a single match on its own, and the modal adds the
+ * matches with `OPEN_PARTIAL` instead of opening a single match on its own, and the chat adds the
  * same line under its rows.
  */
 export interface Found {
@@ -404,9 +404,9 @@ export interface ListingsOptions {
 
 /**
  * The files of a session's folder for the search, and the repositories found in it, kept in
- * memory: the chat asks again on every keystroke, and a folder is not walked each time. A listing is
+ * memory: the chat may ask again at once, and a folder is not walked each time. A listing is
  * kept `ttl` seconds when it is complete and `partialTtl` when it ran out of time or git failed
- * for part of it, so a folder too large for the budget is not walked on each keystroke but is not
+ * for part of it, so a folder too large for the budget is not walked on each search but is not
  * taken for complete either. The repositories are kept `repositoriesTtl` seconds. At most `limit`
  * folders of each are kept (the oldest go first), and the expired ones are removed on the next
  * request. Requests for a folder that is being listed wait for that listing. A kept listing is
@@ -480,7 +480,7 @@ export class Listings {
       });
       return [{ files, complete, fresh: true }, complete ? this.#ttl : this.#partialTtl];
     } catch (error) {
-      // A search that finds nothing beats a modal that never loads.
+      // A search that finds nothing beats one that never answers.
       logger.warning(`could not list a folder's files: ${errorName(error)}`);
       return [{ files: [], complete: false, fresh: true }, null];
     }
