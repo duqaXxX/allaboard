@@ -103,6 +103,16 @@ export interface ThreadState {
   // start without it tells the copy that the original's background commands stopped. Ids and a
   // time, never content; null for any other thread, and in a file without it.
   readonly forkOf: ForkSource | null;
+  // The cut of a rewind no prompt has followed yet: the agent keeps a cut only once something is
+  // written after it, so a restart would lose it. Ids, never content; null when no cut waits, and
+  // in a file without it.
+  readonly pendingCut: PendingCut | null;
+}
+
+/** A rewind's cut waiting for its prompt: the prompt it is at, and the agent's token for it. */
+export interface PendingCut {
+  readonly at: string;
+  readonly token: string | null;
 }
 
 export interface ChannelRecord {
@@ -129,6 +139,7 @@ export function threadState(
     ended: null,
     rootPrompt: null,
     forkOf: null,
+    pendingCut: null,
     ...fields,
   };
 }
@@ -206,6 +217,14 @@ function parseForkOf(value: unknown): ForkSource | null {
   if (!isRaw(value)) return null;
   const { session_id: session, at } = value;
   return typeof session === "string" && typeof at === "string" ? { session, at } : null;
+}
+
+/** A thread's `pending_cut`; one that is not whole is read as none. */
+function parsePendingCut(value: unknown): PendingCut | null {
+  if (!isRaw(value)) return null;
+  const { at, token } = value;
+  if (typeof at !== "string" || (token !== null && typeof token !== "string")) return null;
+  return { at, token };
 }
 
 /** The restart notice a file holds; one that is not whole is read as none, as `update_notice` is. */
@@ -295,6 +314,7 @@ export function parseThread(raw: Raw): ThreadState {
     ended: statusOrNull(raw.ended),
     rootPrompt: stringOrNull(raw.root_prompt),
     forkOf: parseForkOf(raw.fork_of),
+    pendingCut: parsePendingCut(raw.pending_cut),
   };
 }
 
@@ -581,6 +601,15 @@ export class StateStore {
   setForkOf(channelId: string, threadId: string, source: ForkSource): void {
     const current = this.thread(channelId, threadId);
     if (current !== null) this.setThread(channelId, threadId, { ...current, forkOf: source });
+  }
+
+  /** Record the cut a rewind left waiting, or that none waits; a no-op for an unknown thread. */
+  setPendingCut(channelId: string, threadId: string, cut: PendingCut | null): void {
+    const current = this.thread(channelId, threadId);
+    if (current === null) return;
+    const stored = current.pendingCut;
+    if (stored?.at === cut?.at && stored?.token === cut?.token) return;
+    this.setThread(channelId, threadId, { ...current, pendingCut: cut });
   }
 
   /** Record the effort level a command set for a thread; a no-op for an unknown thread. */
@@ -939,6 +968,9 @@ export class StateStore {
                   root_prompt: t.rootPrompt,
                   ...(t.forkOf !== null && {
                     fork_of: { session_id: t.forkOf.session, at: t.forkOf.at },
+                  }),
+                  ...(t.pendingCut !== null && {
+                    pending_cut: { at: t.pendingCut.at, token: t.pendingCut.token },
                   }),
                 },
               ]),

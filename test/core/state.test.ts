@@ -1448,3 +1448,29 @@ test("a restart notice that could not be written is not kept in memory", () => {
   assert.throws(() => store.setRestartNotice({ channel: CHANNEL, message: "1.1", version: null }));
   assert.equal(store.restartNotice, null);
 });
+
+test("a waiting cut round trips, is written only when set, and a broken one reads as none", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  const store = new StateStore(path);
+  store.bind(CHANNEL, join(dir, "project"));
+  store.openThread(CHANNEL, THREAD);
+  assert.equal("pending_cut" in written(path), false);
+  store.setPendingCut(CHANNEL, THREAD, { at: "prompt-1", token: "entry-9" });
+  assert.deepEqual(written(path).pending_cut, { at: "prompt-1", token: "entry-9" });
+  assert.deepEqual(mustThread(new StateStore(path)).pendingCut, {
+    at: "prompt-1",
+    token: "entry-9",
+  });
+  store.setPendingCut(CHANNEL, THREAD, null);
+  assert.equal("pending_cut" in written(path), false);
+  store.setPendingCut(CHANNEL, "thread-unknown", { at: "p", token: null }); // unknown: a no-op
+  assert.equal(store.thread(CHANNEL, "thread-unknown"), null);
+  const broken = join(dir, "broken.json");
+  writeThreadFile(broken, dir, {
+    directory: dir,
+    session_id: SESSION,
+    pending_cut: { token: null },
+  });
+  assert.equal(mustThread(new StateStore(broken)).pendingCut, null);
+});
