@@ -386,7 +386,8 @@ export class World {
             return this.threadDeleteRefusal;
           },
           pinned: async () => this.pinnedRefusal,
-          clean: async (channelId: string) => {
+          survey: async () => ({ threads: 3, busy: 1, pinned: 0 }),
+          purge: async (channelId: string) => {
             this.channelCleans.push(channelId);
             return this.channelCleanLine;
           },

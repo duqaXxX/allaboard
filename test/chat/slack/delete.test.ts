@@ -756,3 +756,131 @@ test("a server failure on a notice stops the clean up, as on any message", async
     fill(slackTexts.HOME_CLEAN_FAILED, { error: "internal_error", deleted: 0, count: 0 }),
   );
 });
+
+function threadRoot(ts: string, user: string, fields: JsonObject = {}): JsonObject {
+  return loose(ts, user, "x", { thread_ts: ts, reply_count: 2, ...fields });
+}
+
+test("a purge deletes the threads, orphans too, keeps the others', and says the count", async () => {
+  const world = new World();
+  const orphan = "1790000040.000001";
+  const someone = "1790000041.000001";
+  const leftover = "1790000042.000001";
+  world.bot.responses["conversations.history"] = paged([
+    threadRoot(ROOT, OWNER),
+    threadRoot(orphan, OWNER),
+    threadRoot(someone, "U000BOB"),
+    loose(leftover, OWNER, "!clean-channel"),
+  ]);
+  world.bot.responses["conversations.replies"] = (args) =>
+    world.deleted(world.owner).includes(String(args.ts))
+      ? rejected("thread_not_found")
+      : { ok: true, messages: [threadRoot(String(args.ts), OWNER)], has_more: false };
+  assert.equal(
+    await world.deleter.purge(CHANNEL),
+    fill(slackTexts.CLEAN_WORD_DONE, { threads: 2, kept: 0, left: 0, deleted: 1, refused: 0 }),
+  );
+  assert.deepEqual(world.deleted(world.owner), [ROOT, orphan, leftover]);
+  assert.equal(world.state.thread(CHANNEL, ROOT), null);
+});
+
+test("a purge keeps a thread in use", async () => {
+  const world = new World();
+  world.free = false;
+  world.bot.responses["conversations.history"] = paged([threadRoot(ROOT, OWNER)]);
+  world.bot.responses["conversations.replies"] = paged([threadRoot(ROOT, OWNER)]);
+  assert.equal(
+    await world.deleter.purge(CHANNEL),
+    fill(slackTexts.CLEAN_WORD_DONE, { threads: 0, kept: 1, left: 0, deleted: 0, refused: 0 }),
+  );
+  assert.deepEqual(world.deleted(world.owner), []);
+  assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
+});
+
+test("a survey counts a pinned thread apart", async () => {
+  const world = new World();
+  world.bot.responses["conversations.history"] = paged([threadRoot(ROOT, OWNER)]);
+  world.bot.responses["conversations.replies"] = paged([
+    threadRoot(ROOT, OWNER, { pinned_to: [CHANNEL] }),
+  ]);
+  assert.deepEqual(await world.deleter.survey(CHANNEL), { threads: 0, busy: 0, pinned: 1 });
+});
+
+test("a failure stops a purge, and its line says so", async () => {
+  const world = new World();
+  world.bot.responses["conversations.history"] = paged([
+    threadRoot(ROOT, OWNER),
+    loose("1790000042.000001", OWNER, "!clean-channel"),
+  ]);
+  world.bot.responses["conversations.replies"] = paged([threadRoot(ROOT, OWNER)]);
+  world.owner.responses["chat.delete"] = new Error("network down");
+  const line = await world.deleter.purge(CHANNEL);
+  assert.ok(line?.includes(fill(slackTexts.CLEAN_WORD_STOPPED, { error: "Error" })), line ?? "");
+  assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
+});
+
+test("a purge of a channel that is not bound touches nothing", async () => {
+  const world = new World();
+  assert.equal(await world.deleter.purge("C000OTHER"), null);
+  assert.equal(world.bot.callsTo("conversations.history").length, 0);
+});
+
+test("a survey counts a thread that works or waits as staying", async () => {
+  for (const status of ["working", "waiting"] as const) {
+    const world = new World();
+    world.state.setStatusPending(CHANNEL, ROOT, status);
+    world.bot.responses["conversations.history"] = paged([threadRoot(ROOT, OWNER)]);
+    assert.deepEqual(await world.deleter.survey(CHANNEL), { threads: 0, busy: 1, pinned: 0 });
+  }
+});
+
+test("a survey lists an orphan with a file, a tombstone, and no thread that is gone", async () => {
+  const world = new World();
+  const file = "1790000050.000001";
+  const tombstone = "1790000051.000001";
+  const gone = "1790000052.000001";
+  const roots: Record<string, JsonObject[]> = {
+    [file]: [threadRoot(file, OWNER, { subtype: "file_share" })],
+    // A tombstone goes whether or not the history gives it a `thread_ts`.
+    [tombstone]: [
+      loose(tombstone, "USLACKBOT", "deleted", { subtype: "tombstone", reply_count: 1 }),
+      message("1790000053.000001", BOT),
+    ],
+  };
+  world.state.removeThread(CHANNEL, ROOT);
+  world.bot.responses["conversations.history"] = paged([
+    threadRoot(file, OWNER, { subtype: "file_share" }),
+    loose(tombstone, "USLACKBOT", "deleted", { subtype: "tombstone" }),
+    threadRoot(gone, OWNER),
+  ]);
+  world.bot.responses["conversations.replies"] = (args) => {
+    const found = roots[String(args.ts)];
+    return found ? { ok: true, messages: found, has_more: false } : rejected("thread_not_found");
+  };
+  assert.deepEqual(await world.deleter.survey(CHANNEL), { threads: 2, busy: 0, pinned: 0 });
+});
+
+test("a purge holds an orphan and frees it", async () => {
+  const world = new World();
+  const orphan = "1790000054.000001";
+  world.state.removeThread(CHANNEL, ROOT);
+  world.bot.responses["conversations.history"] = paged([threadRoot(orphan, OWNER)]);
+  world.bot.responses["conversations.replies"] = (args) =>
+    world.deleted(world.owner).includes(String(args.ts))
+      ? rejected("thread_not_found")
+      : { ok: true, messages: [threadRoot(orphan, OWNER)], has_more: false };
+  await world.deleter.purge(CHANNEL);
+  assert.deepEqual(world.released, [[CHANNEL, orphan]]);
+  assert.deepEqual(world.freed, [[CHANNEL, orphan]]);
+});
+
+test("a clean up takes the owner's file message with no reply, and no one else's", async () => {
+  const world = new World();
+  const own = "1790000055.000001";
+  world.bot.responses["conversations.history"] = paged([
+    loose(own, OWNER, "a file", { subtype: "file_share" }),
+    loose("1790000056.000001", "U000BOB", "a file", { subtype: "file_share" }),
+  ]);
+  await world.deleter.clean(CHANNEL);
+  assert.deepEqual(world.deleted(world.owner), [own]);
+});

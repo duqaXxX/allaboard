@@ -20,6 +20,10 @@
  * session is not touched: its transcript stays, and `!resume` lists it again once no thread
  * holds it.
  *
+ * Purging a channel (`!clean-channel`) deletes its threads one by one as above, those `state.json`
+ * no longer holds included, then cleans it up. A thread someone else started, whose root is neither
+ * the owner's nor the bot's, stays; a tombstone's thread goes, since nobody's root is left.
+ *
  * Cleaning up a channel reads its history (`conversations.history`, Tier 3, cursor pagination,
  * read 2026-10-05) and deletes the messages that are no thread and belong to no thread: "Detect
  * a threaded message by looking for a `thread_ts` value in the message object", and a parent
@@ -53,6 +57,8 @@ export const PAGE = 200;
 export const MESSAGE_NOT_FOUND = "message_not_found";
 export const CANT_DELETE = "cant_delete_message";
 export const THREAD_NOT_FOUND = "thread_not_found";
+/** The subtype of a prompt the owner sent with a file: a root like any other. */
+const FILE_SHARE = "file_share";
 /** The subtypes of Slack's notices about a channel. */
 const CHANNEL_NOTICE = /^(channel|group)_/;
 /** What says the token, the channel or Slack itself is the problem: no refusal of one notice. */
@@ -124,11 +130,20 @@ export type PinnedThreadCall = (
 export interface ThreadDeletion {
   readonly delete: DeleteThreadCall;
   readonly pinned: PinnedThreadCall;
-  /** Cleans a channel, as `ThreadDeleter.clean` does: the line to show, null if it is not bound. */
-  readonly clean: (channelId: string) => Promise<string | null>;
+  /** What `purge` would take and keep, as `ThreadDeleter.survey` reads it. */
+  readonly survey: (channelId: string) => Promise<ChannelSurvey>;
+  /** Empties a channel, as `ThreadDeleter.purge` does: the line that says how it went. */
+  readonly purge: (channelId: string) => Promise<string | null>;
 }
 
 /** What the deleter asks of the session manager (`SessionManager.release` and `.free`). */
+/** The threads a channel's purge would delete, and those it would keep and why. */
+export interface ChannelSurvey {
+  readonly threads: number;
+  readonly busy: number;
+  readonly pinned: number;
+}
+
 /** The part of the daemon's state a delete reads and writes. */
 export type DeleterState = Pick<StatePort, "thread" | "channels" | "removeThread">;
 
@@ -225,13 +240,15 @@ export class ThreadDeleter {
     if (this.#state.thread(channelId, threadTs) === null) {
       return null; // not a thread of the daemon's: nothing a click may delete
     }
-    return this.#oneAtATime.run(() => this.#delete(channelId, threadTs));
+    return this.#oneAtATime.run(() => {
+      if (this.#state.thread(channelId, threadTs) === null) {
+        return Promise.resolve(null); // deleted while this call waited its turn
+      }
+      return this.#delete(channelId, threadTs);
+    });
   }
 
   async #delete(channelId: string, threadTs: string): Promise<DeleteRefusal | null> {
-    if (this.#state.thread(channelId, threadTs) === null) {
-      return null; // deleted while this call waited its turn
-    }
     // No hold is taken before `release`, and a refused one took none: the hold on the thread is
     // then another's (a deletion of its first message being forgotten), not this call's to free.
     let notHeld = true;
@@ -366,30 +383,144 @@ export class ThreadDeleter {
     if (!this.#state.channels().includes(channelId)) {
       return null; // not a channel of the daemon's: nothing a click may clean
     }
-    return this.#oneAtATime.run(async () => {
-      let deleted = 0;
-      let refused = 0;
-      try {
-        for (const [ts, { author, notice }] of await this.#loose(channelId)) {
-          const gone = notice
-            ? await this.#removeNotice(channelId, ts, notice)
-            : await this.#remove(channelId, ts, author);
-          if (gone) deleted += 1;
-          else refused += 1;
-        }
-      } catch (error) {
-        logger.warning(`could not clean up ${channelId}: ${describe(error)}`);
-        return fill(slackTexts.HOME_CLEAN_FAILED, {
-          error: describe(error),
-          deleted,
-          count: refused,
-        });
+    const { deleted, refused, error } = await this.#oneAtATime.run(() =>
+      this.#cleanLoose(channelId),
+    );
+    if (error !== null) {
+      return fill(slackTexts.HOME_CLEAN_FAILED, { error, deleted, count: refused });
+    }
+    return refused > 0
+      ? fill(named(slackTexts.HOME_CLEAN_REFUSED, this.#names()), { deleted, count: refused })
+      : fill(slackTexts.HOME_CLEAN_DONE, { deleted });
+  }
+
+  /** Deletes what `#loose` finds, and says how far it went. Never throws. */
+  async #cleanLoose(
+    channelId: string,
+  ): Promise<{ deleted: number; refused: number; error: string | null }> {
+    let deleted = 0;
+    let refused = 0;
+    try {
+      for (const [ts, { author, notice }] of await this.#loose(channelId)) {
+        const gone = notice
+          ? await this.#removeNotice(channelId, ts, notice)
+          : await this.#remove(channelId, ts, author);
+        if (gone) deleted += 1;
+        else refused += 1;
       }
-      logger.info(`cleaned up ${channelId}: ${deleted} messages, ${refused} refused`);
-      return refused > 0
-        ? fill(named(slackTexts.HOME_CLEAN_REFUSED, this.#names()), { deleted, count: refused })
-        : fill(slackTexts.HOME_CLEAN_DONE, { deleted });
+    } catch (error) {
+      logger.warning(`could not clean up ${channelId}: ${describe(error)}`);
+      return { deleted, refused, error: describe(error) };
+    }
+    logger.info(`cleaned up ${channelId}: ${deleted} messages, ${refused} refused`);
+    return { deleted, refused, error: null };
+  }
+
+  /** What `purge` would take and keep, read now. Throws on a failed read. */
+  async survey(channelId: string): Promise<ChannelSurvey> {
+    let [threads, busy, pinned] = [0, 0, 0];
+    for (const ts of await this.#threadsOf(channelId)) {
+      const status = this.#state.thread(channelId, ts)?.status;
+      if (status === "working" || status === "waiting") busy += 1;
+      else if (pinnedOf(await this.#messages(channelId, ts), ts) !== null) pinned += 1;
+      else threads += 1;
+    }
+    return { threads, busy, pinned };
+  }
+
+  /**
+   * Delete a bound channel's threads one by one, each holding the lock only for itself, then clean
+   * it up. A thread in use or pinned stays, a failure stops the purge. Returns the line that says
+   * how it went, null for a channel that is not bound. Never throws.
+   */
+  async purge(channelId: string): Promise<string | null> {
+    if (!this.#state.channels().includes(channelId)) return null;
+    let [threads, kept, left] = [0, 0, 0];
+    let stop: string | null = null;
+    try {
+      for (const ts of await this.#threadsOf(channelId)) {
+        const refusal = await this.#oneAtATime.run(() => this.#delete(channelId, ts));
+        if (refusal === null) threads += 1;
+        else if (refusal.reason === "busy" || refusal.reason === "pinned") kept += 1;
+        else left += 1;
+        if (refusal?.reason === "failed") {
+          stop = refusal.error;
+          break;
+        }
+      }
+    } catch (error) {
+      logger.warning(`could not read the threads of ${channelId}: ${describe(error)}`);
+      stop = describe(error);
+    }
+    const loose =
+      stop === null
+        ? await this.#oneAtATime.run(() => this.#cleanLoose(channelId))
+        : { deleted: 0, refused: 0, error: stop };
+    const line = fill(slackTexts.CLEAN_WORD_DONE, {
+      threads,
+      kept,
+      left,
+      deleted: loose.deleted,
+      refused: loose.refused,
     });
+    return loose.error === null
+      ? line
+      : `${line} ${fill(slackTexts.CLEAN_WORD_STOPPED, { error: loose.error })}`;
+  }
+
+  /**
+   * The threads a purge deletes: those `state.json` holds, and the ones with a reply it no longer
+   * holds, whose root is the owner's, the bot's or a tombstone.
+   */
+  async #threadsOf(channelId: string): Promise<string[]> {
+    const found: string[] = [];
+    for await (const message of this.#history(channelId)) {
+      const ts = tsOf(message);
+      if (this.#state.thread(channelId, ts) !== null) {
+        found.push(ts);
+        continue;
+      }
+      const author = String(message.user || "");
+      const known = author === this.#botUserId || author === this.#ownerUserId;
+      const root = String(message.thread_ts ?? "") === ts;
+      const started = known && root && (!message.subtype || message.subtype === FILE_SHARE);
+      if ((isTombstone(message) || started) && (await this.#holdsReplies(channelId, ts))) {
+        found.push(ts);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Whether a thread still has a reply, for a purge that would delete it: unlike `#hasReplies`,
+   * which keeps what it cannot tell about, one gone or with no root in the answer is no thread.
+   */
+  async #holdsReplies(channelId: string, ts: string): Promise<boolean> {
+    let answer: unknown;
+    try {
+      answer = await this.#bot.conversations.replies({ channel: channelId, ts, limit: 1 });
+    } catch (error) {
+      if (describe(error) === THREAD_NOT_FOUND) return false;
+      throw error;
+    }
+    const messages = messagesOf(answer);
+    const root = messages.find((message) => String(message.ts) === ts);
+    return root !== undefined && (Boolean(root.reply_count) || messages.length > 1);
+  }
+
+  /** The channel's messages, page by page. */
+  async *#history(channelId: string): AsyncGenerator<Record<string, unknown>> {
+    let cursor: string | null = null;
+    for (;;) {
+      const page: unknown = await this.#bot.conversations.history({
+        channel: channelId,
+        limit: PAGE,
+        ...(cursor === null ? {} : { cursor }),
+      });
+      yield* messagesOf(page);
+      cursor = nextCursor(page);
+      if (cursor === null) return;
+    }
   }
 
   /**
@@ -413,35 +544,26 @@ export class ThreadDeleter {
   /** The channel's messages a clean-up deletes, `ts` to what is read of it, read page by page. */
   async #loose(channelId: string): Promise<Map<string, Loose>> {
     const found = new Map<string, Loose>();
-    let cursor: string | null = null;
-    for (;;) {
-      const page: unknown = await this.#bot.conversations.history({
-        channel: channelId,
-        limit: PAGE,
-        ...(cursor === null ? {} : { cursor }),
-      });
-      for (const message of messagesOf(page)) {
-        const ts = tsOf(message);
-        const author = String(message.user || "");
-        const threaded = message.thread_ts;
-        const subtype = String(message.subtype ?? "");
-        const notice = CHANNEL_NOTICE.test(subtype);
-        if ((subtype && !notice) || (threaded && String(threaded) !== ts)) {
-          continue; // another of Slack's own lines; or a thread's reply shown in the channel
-        }
-        if (!notice && author !== this.#botUserId && author !== this.#ownerUserId) continue;
-        if (this.#state.thread(channelId, ts) !== null) {
-          continue; // a thread of the daemon's with no reply yet
-        }
-        // The history carries `pinned_to` as `conversations.replies` does (measured 2026-10-20 on
-        // a free workspace: a hand-pinned `!help` outside a thread stayed through a clean-up).
-        if (isPinned(message)) continue; // the owner keeps it
-        if (threaded && (await this.#hasReplies(channelId, ts))) continue; // a thread
-        found.set(ts, { author, notice: notice ? subtype : null });
+    for await (const message of this.#history(channelId)) {
+      const ts = tsOf(message);
+      const author = String(message.user || "");
+      const threaded = message.thread_ts;
+      const subtype = String(message.subtype ?? "");
+      const notice = CHANNEL_NOTICE.test(subtype);
+      if ((subtype && !notice && subtype !== FILE_SHARE) || (threaded && String(threaded) !== ts)) {
+        continue; // another of Slack's own lines; or a thread's reply shown in the channel
       }
-      cursor = nextCursor(page);
-      if (cursor === null) return found;
+      if (!notice && author !== this.#botUserId && author !== this.#ownerUserId) continue;
+      if (this.#state.thread(channelId, ts) !== null) {
+        continue; // a thread of the daemon's with no reply yet
+      }
+      // The history carries `pinned_to` as `conversations.replies` does (measured 2026-10-20 on
+      // a free workspace: a hand-pinned `!help` outside a thread stayed through a clean-up).
+      if (isPinned(message)) continue; // the owner keeps it
+      if (threaded && (await this.#hasReplies(channelId, ts))) continue; // a thread
+      found.set(ts, { author, notice: notice ? subtype : null });
     }
+    return found;
   }
 
   /**

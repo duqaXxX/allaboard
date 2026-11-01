@@ -22,7 +22,11 @@ export type Ack = (answer?: ViewAnswer) => Promise<void>;
  * Bolt's `respond`, as far as a listener uses it: a post to the click's `response_url`, which
  * Bolt gives only to a payload that carries one. Rejects when Slack refused it.
  */
-export type Respond = (message: { readonly delete_original: true }) => Promise<unknown>;
+export type Respond = (
+  message:
+    | { readonly delete_original: true }
+    | { readonly replace_original: true; readonly text: string },
+) => Promise<unknown>;
 
 /** The object a field holds, or an empty one for anything else. */
 export function record(value: unknown): Payload {

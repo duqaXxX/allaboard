@@ -52,7 +52,7 @@ const FULL_GUIDE = [
   "`!delete-thread`, sent inside a session's thread, asks you to confirm, then deletes every message of the thread from Memory chat, yours and the bot's. The session stays in Plain: `!resume` lists it again. A thread that is working or waiting for you is not deleted: `!stop` it first.",
   "",
   "**Cleaning a channel**",
-  "`!clean-channel`, sent in the channel, asks you to confirm, then deletes from Memory chat what sits outside every thread: your messages with no reply, the bot's and Memory chat's notices. Threads with a reply stay.",
+  "`!clean-channel`, sent in the channel, says how many threads would go and stay and asks you to confirm, then deletes them from Memory chat with what sits outside them. The sessions stay in Plain: `!resume` lists them again.",
   "",
   "**Updates**",
   "`!allaboard` shows the version that runs and the latest one. `!allaboard update`, typed in the channel, offers the latest version with a button that installs it: running turns finish first, then allaboard restarts on the new version. `!allaboard restart` restarts it without installing anything. Both work only while allaboard runs as a service.",

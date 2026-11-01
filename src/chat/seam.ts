@@ -972,9 +972,9 @@ export interface ChatProvider {
    */
   deleteThread?(ref: ThreadRef): Promise<void>;
   /**
-   * `!clean-channel` typed in a channel: asks the owner alone to confirm, and on their yes deletes what
-   * sits in the channel outside every thread, as the chat's index cleans one; a no leaves
-   * everything as it was. Resolves once the question is shown. Present with `channelClean`.
+   * `!clean-channel` typed in a channel: asks the owner alone to confirm, and on their yes deletes
+   * its threads not in use or kept by the owner, and what sits outside them; the sessions stay. A no
+   * leaves everything as it was. Resolves once the question is shown. Present with `channelClean`.
    */
   cleanChannel?(channel: string): Promise<void>;
   /**

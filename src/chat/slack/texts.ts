@@ -221,7 +221,19 @@ const CLEAN_WHAT =
   "included, the bot's own messages, and Slack's notices where it lets you. Every thread that has a reply stays. This cannot be " +
   "undone and can take a few minutes.";
 export const HOME_CLEAN_TEXT = `Deletes from #{channel} ${CLEAN_WHAT}`;
-export const CLEAN_WORD_TEXT = `Deletes from this channel ${CLEAN_WHAT}`;
+// `!clean-channel`'s question: what goes and what stays, counted when it was asked.
+export const CLEAN_WORD_TEXT =
+  "Threads that go: {threads}, with or without a session, with every message in them. Threads " +
+  "that stay: {busy} working or waiting for you, {pinned} with a pinned message, and any someone " +
+  "else started. What sits outside a thread goes too: your messages there, the bot's, and " +
+  "Slack's notices where it lets you. The sessions stay, and `!resume` lists them again. This " +
+  "cannot be undone and can take a few minutes.";
+export const CLEAN_WORD_STARTED = "Cleaning up this channel. A line says how it went at the end.";
+export const CLEAN_WORD_DONE =
+  "Threads deleted: {threads}, kept: {kept}, not finished: {left}. Messages deleted: {deleted}, " +
+  "refused: {refused}.";
+export const CLEAN_WORD_STOPPED =
+  "It stopped on `{error}`: send `!clean-channel` again to continue.";
 export const HOME_CLEAN_CONFIRM = "Clean up";
 export const HOME_CHANNEL_CLEANING = ":hourglass_flowing_sand: cleaning up…";
 export const HOME_CLEANING_ONE = naming(

@@ -778,7 +778,7 @@ are not touched.
 In edit mode a channel's header carries a button (`home.CLEAN_ACTION`) with a `confirm` dialog that
 says what it deletes; `Home.clean` acts only in edit mode and on a bound channel, marks the channel
 (its header reads `texts.HOME_CHANNEL_CLEANING`, a section under the page's header
-`texts.HOME_CLEANING_ONE`), and publishes before and after. `!clean-channel` reaches the same method through `app/clean-channel.ts`, after an ephemeral question. `ThreadDeleter.clean` reads the channel
+`texts.HOME_CLEANING_ONE`), and publishes before and after. `!clean-channel` runs `ThreadDeleter.purge` through `app/clean-channel.ts`, after an ephemeral question that `ThreadDeleter.survey` counts: each thread as a delete does, those `state.json` no longer holds included, then this clean-up. `ThreadDeleter.clean` reads the channel
 page by page (`conversations.history`, cursor pagination) and takes the owner's and the bot's
 messages that carry no `subtype`, Slack's `channel_*` and `group_*` notices whoever they name, all
 that are no reply of a thread, and that `state.json` does not hold as a

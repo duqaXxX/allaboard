@@ -784,9 +784,9 @@ export const HELP_WORDS: readonly Named[] = [
   "`!delete-thread` delete every message of this session's thread from {chat}, once you confirm; " +
     "the session stays in {agent} and `!resume` lists it again; refused while the thread works " +
     "or waits for you; inside a thread, refused in the channel",
-  "`!clean-channel` delete from {chat} what sits in the channel outside every thread, once you confirm: " +
-    "your messages with no reply, the bot's and {chat}'s notices; threads with a reply stay; in the channel, refused inside a " +
-    "thread",
+  "`!clean-channel` delete from {chat} the channel's threads and what sits outside them, once " +
+    "you confirm; the sessions stay in {agent}; threads in use or pinned stay; in the channel, " +
+    "refused inside a thread",
   "`!! <command>` run a shell command in the session's folder, as the terminal's `!` does, " +
     "once you click Run; {agent} gets the command and its output and answers; inside a " +
     "thread, refused in the channel",
@@ -975,9 +975,9 @@ export const GUIDE_SHELL = naming(
 );
 export const GUIDE_CLEAN = naming(
   "**Cleaning a channel**\n" +
-    "`!clean-channel`, sent in the channel, asks you to confirm, then deletes from {chat} what sits " +
-    "outside every thread: your messages with no reply, the bot's and {chat}'s notices. Threads " +
-    "with a reply stay.",
+    "`!clean-channel`, sent in the channel, says how many threads would go and stay and asks " +
+    "you to confirm, then deletes them from {chat} with what sits outside them. The sessions stay " +
+    "in {agent}: `!resume` lists them again.",
 );
 export const GUIDE_DELETE = naming(
   "**Deleting a thread**\n" +
