@@ -196,7 +196,7 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
         if (!(await waitForTurn(ref, session))) return false;
         continue;
       }
-      if (found.every((holder) => session.terminalsAllowed.has(holder.id))) break;
+      if (found.every((holder) => session.terminalAllowed(holder.id))) break;
       const command = commandLine(session, terminal);
       const answer = await askOwner(deps, talk, ref, session, {
         kind: "terminal",
@@ -205,7 +205,7 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
         ends: { sent: texts.TERMINAL_SENT, cancelled: texts.NOT_SENT },
       });
       if (answer === null) return false;
-      for (const holder of found) session.terminalsAllowed.add(holder.id);
+      session.allowTerminals(found.map((holder) => holder.id));
       break;
     }
     // What the terminal wrote is resumed into only once the process here is closed, which the

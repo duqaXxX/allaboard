@@ -8,6 +8,7 @@
  * from a terminal is the parent process: the SDK starts Claude Code as a child of the daemon.
  */
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { isRecord } from "../../values.ts";
 import type { SessionHolder } from "../seam.ts";
 
@@ -42,14 +43,38 @@ export function listed(output: string, session: string): { pid: number; busy: bo
   );
 }
 
-/** Each pid of `ps -o pid= -o ppid=` output to its parent's. */
-export function parents(output: string): Map<number, number> {
-  const map = new Map<number, number>();
+/** A process as `ps` shows it: its parent, and when it started (null when `ps` gave none). */
+export interface Process {
+  readonly ppid: number;
+  readonly started: string | null;
+}
+
+/**
+ * Each pid of `ps -o pid= -o ppid= -o lstart=` output to its parent and start time. `lstart` is
+ * five words (`Sun Nov  1 16:09:50 2026` under the C locale, measured on macOS 2026-11-01), kept
+ * as one string with its spaces collapsed.
+ */
+export function parents(output: string): Map<number, Process> {
+  const map = new Map<number, Process>();
   for (const line of output.split("\n")) {
-    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
-    if (Number.isInteger(pid) && Number.isInteger(ppid)) map.set(pid as number, ppid as number);
+    const [pid, ppid, ...start] = line.trim().split(/\s+/);
+    if (Number.isInteger(Number(pid)) && Number.isInteger(Number(ppid)) && pid && ppid) {
+      map.set(Number(pid), {
+        ppid: Number(ppid),
+        started: start.length > 0 ? start.join(" ") : null,
+      });
+    }
   }
   return map;
+}
+
+/**
+ * The id of a holder: its pid and start time, since a pid alone is handed to another process once
+ * the first is gone and the id is stored. With no start time the id carries a random part, so it
+ * matches nothing stored and the owner is asked again (the safe side).
+ */
+export function holderId(pid: number, started: string | null | undefined): string {
+  return `${pid}@${started ?? `unknown-${randomUUID()}`}`;
 }
 
 export interface HoldersOptions {
@@ -75,12 +100,27 @@ export async function sessionHolders(
     const found = listed(await run(options.command, ["agents", "--json"], options.env), session);
     if (found.length === 0) return [];
     const pids = found.map((entry) => String(entry.pid)).join(",");
-    const family = parents(await run("ps", ["-o", "pid=", "-o", "ppid=", "-p", pids], options.env));
-    return found.map((entry) => ({
-      id: String(entry.pid),
-      own: family.get(entry.pid) === options.self,
-      busy: entry.busy,
-    }));
+    // `LC_ALL=C` and `TZ=UTC` keep `lstart` the same words, and the same hour, in every login.
+    const family = parents(
+      await run("ps", ["-o", "pid=", "-o", "ppid=", "-o", "lstart=", "-p", pids], {
+        ...options.env,
+        LC_ALL: "C",
+        TZ: "UTC",
+      }),
+    );
+    // A pid with no row is gone since the list was read: `ps -p` prints the live rows, and exits 1
+    // only when none is left, which reads as null.
+    return found.flatMap((entry) => {
+      const process = family.get(entry.pid);
+      if (process === undefined) return [];
+      return [
+        {
+          id: holderId(entry.pid, process.started),
+          own: process.ppid === options.self,
+          busy: entry.busy,
+        },
+      ];
+    });
   } catch {
     return null;
   }

@@ -84,6 +84,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The answer **Send here** to an open terminal is kept in `state.json` (`terminals_allowed`) across
+  a restart and an idle close, so a restart of allaboard or an idle close of the session
+  no longer asks again. A holder's id is now its pid and start time (`SessionHolder.id`), so a
+  reused pid is another terminal. The stored ids are replaced at the next answer and cleared when the
+  thread's session id changes (#140).
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.316, which bundles Claude Code 2.1.316. The
   release probe certified it on 2026-11-01: the SDK surface table holds and so do the claims. Its
   stream carries five paths and tools the fixtures do not hold, none of which the source reads, all

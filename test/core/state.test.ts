@@ -1474,3 +1474,35 @@ test("a waiting cut round trips, is written only when set, and a broken one read
   });
   assert.equal(mustThread(new StateStore(broken)).pendingCut, null);
 });
+
+test("the terminals the owner allowed round trip, are written only when set, and old files load", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  const store = new StateStore(path);
+  store.bind(CHANNEL, join(dir, "project"));
+  store.openThread(CHANNEL, THREAD);
+  assert.equal("terminals_allowed" in written(path), false);
+  assert.deepEqual(mustThread(store).terminalsAllowed, []);
+  store.setTerminalsAllowed(CHANNEL, THREAD, ["holder-a", "holder-b"]);
+  assert.deepEqual(written(path).terminals_allowed, ["holder-a", "holder-b"]);
+  assert.deepEqual(mustThread(new StateStore(path)).terminalsAllowed, ["holder-a", "holder-b"]);
+  store.setTerminalsAllowed(CHANNEL, THREAD, []);
+  assert.equal("terminals_allowed" in written(path), false);
+  store.setTerminalsAllowed(CHANNEL, "thread-unknown", ["x"]); // unknown: a no-op
+  assert.equal(store.thread(CHANNEL, "thread-unknown"), null);
+  // another session id is another conversation: its terminals are not the allowed ones
+  store.setTerminalsAllowed(CHANNEL, THREAD, ["holder-a"]);
+  store.setSession(CHANNEL, THREAD, SESSION);
+  assert.deepEqual(mustThread(store).terminalsAllowed, []);
+  store.setTerminalsAllowed(CHANNEL, THREAD, ["holder-a"]);
+  store.setSession(CHANNEL, THREAD, SESSION); // unchanged: kept
+  assert.deepEqual(mustThread(store).terminalsAllowed, ["holder-a"]);
+  store.setSession(CHANNEL, THREAD, "session-other");
+  assert.deepEqual(mustThread(store).terminalsAllowed, []);
+  const odd = join(dir, "odd.json");
+  writeThreadFile(odd, dir, { directory: dir, session_id: SESSION, terminals_allowed: [1, "ok"] });
+  assert.deepEqual(mustThread(new StateStore(odd)).terminalsAllowed, ["ok"]);
+  const old = join(dir, "old.json");
+  writeThreadFile(old, dir, { directory: dir, session_id: SESSION });
+  assert.deepEqual(mustThread(new StateStore(old)).terminalsAllowed, []);
+});

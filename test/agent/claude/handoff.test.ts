@@ -48,10 +48,10 @@ test("the list keeps the entries of the session, with whether each runs a turn",
 
 test("ps output gives each pid its parent", () => {
   assert.deepEqual(
-    [...parents("   10     1\n12  4242\n\n")],
+    [...parents("   10     1 Sun Nov  1 16:09:50 2026\n12  4242\n\n")],
     [
-      [10, 1],
-      [12, 4242],
+      [10, { ppid: 1, started: "Sun Nov 1 16:09:50 2026" }],
+      [12, { ppid: 4242, started: null }],
     ],
   );
 });
@@ -64,22 +64,23 @@ test("a holder whose parent is the daemon is its own, any other is a terminal", 
     self: 4242,
     run: async (command, args, env) => {
       calls.push(`${command} ${args.join(" ")} ${env.CLAUDE_CONFIG_DIR}`);
+      if (command === "ps") assert.deepEqual([env.LC_ALL, env.TZ], ["C", "UTC"]);
       if (command === "claude") {
         return agentsOutput([
           { pid: 10, sessionId: SESSION, status: "idle" },
           { pid: 12, sessionId: SESSION, status: "busy" },
         ]);
       }
-      return "10 4242\n12 777\n";
+      return "10 4242 Sun Nov  1 16:09:50 2026\n12 777 Sun Nov  1 17:00:01 2026\n";
     },
   });
   assert.deepEqual(holders, [
-    { id: "10", own: true, busy: false },
-    { id: "12", own: false, busy: true },
+    { id: "10@Sun Nov 1 16:09:50 2026", own: true, busy: false },
+    { id: "12@Sun Nov 1 17:00:01 2026", own: false, busy: true },
   ]);
   assert.deepEqual(calls, [
     "claude agents --json /work/login",
-    "ps -o pid= -o ppid= -p 10,12 /work/login",
+    "ps -o pid= -o ppid= -o lstart= -p 10,12 /work/login",
   ]);
 });
 
@@ -375,4 +376,32 @@ test("a notification's turn right after the turn going on joins neither", () => 
     { prompt: null, reply: "FINISHED" },
     { prompt: "Typed", reply: "Answered." },
   ]);
+});
+
+test("a holder ps gave no start time has an id no stored one matches", async () => {
+  const run = async (command: string) =>
+    command === "claude"
+      ? agentsOutput([{ pid: 10, sessionId: SESSION, status: "idle" }])
+      : "10 777\n";
+  const options = { command: "claude", env: {}, self: 1, run };
+  const first = await sessionHolders(SESSION, options);
+  const second = await sessionHolders(SESSION, options);
+  assert.match(first?.[0]?.id ?? "", /^10@unknown-/);
+  assert.notEqual(first?.[0]?.id, second?.[0]?.id);
+});
+
+test("a pid the list names but ps no longer shows is gone and left out", async () => {
+  const holders = await sessionHolders(SESSION, {
+    command: "claude",
+    env: {},
+    self: 1,
+    run: async (command) =>
+      command === "claude"
+        ? agentsOutput([
+            { pid: 10, sessionId: SESSION, status: "idle" },
+            { pid: 12, sessionId: SESSION, status: "idle" },
+          ])
+        : "12 777 Sun Nov  1 17:00:01 2026\n",
+  });
+  assert.deepEqual(holders, [{ id: "12@Sun Nov 1 17:00:01 2026", own: false, busy: false }]);
 });

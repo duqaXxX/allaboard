@@ -82,6 +82,74 @@ test("a terminal left open is asked about once, and Send here sends", async (t) 
   assert.equal(await again, false);
 });
 
+/** Plays Send here for the terminal `id`, through to the sent message. */
+async function allow(world: AskingWorld, agent: PlainAgent, ref: ThreadRef, id: string) {
+  agent.holders.set(SESSION, [idle(id)]);
+  const sent = world.flows.terminal.beforeSending(ref, world.session(ref));
+  const open = await world.asked(ref, "terminal");
+  assert.equal(await world.answers(open.requestId, { type: "terminal", go: true }), true);
+  assert.equal(await sent, true);
+}
+
+test("a terminal the owner allowed is not asked about again after a restart", async (t) => {
+  const { world, agent, ref } = await makeWorld(t);
+  await allow(world, agent, ref, "77@boot-1");
+  await world.sessions.closeAll();
+  const again = await AskingWorld.make(t, { agent, restartOf: world });
+  assert.deepEqual(again.state.thread(ref.channel, ref.thread)?.terminalsAllowed, ["77@boot-1"]);
+  assert.equal(await again.flows.terminal.beforeSending(ref, again.session(ref)), true);
+  assert.deepEqual(again.open(ref), []);
+});
+
+test("another process under the same pid is asked about after a restart", async (t) => {
+  const { world, agent, ref } = await makeWorld(t);
+  await allow(world, agent, ref, "77@boot-1");
+  await world.sessions.closeAll();
+  const again = await AskingWorld.make(t, { agent, restartOf: world });
+  agent.holders.set(SESSION, [idle("77@boot-2")]);
+  const sent = again.flows.terminal.beforeSending(ref, again.session(ref));
+  const open = await again.asked(ref, "terminal");
+  assert.equal(await again.answers(open.requestId, { type: "terminal", go: false }), true);
+  assert.equal(await sent, false);
+});
+
+test("an idle close keeps the answer", async (t) => {
+  const { world, agent, ref, session } = await makeWorld(t);
+  await allow(world, agent, ref, "77@boot-1");
+  await session.close();
+  const reopened = world.session(ref);
+  assert.notEqual(reopened, session);
+  assert.equal(await world.flows.terminal.beforeSending(ref, reopened), true);
+  assert.deepEqual(world.open(ref), []);
+});
+
+test("Cancel stores nothing", async (t) => {
+  const { world, agent, ref, session } = await makeWorld(t);
+  agent.holders.set(SESSION, [idle("77@boot-1")]);
+  const sent = world.flows.terminal.beforeSending(ref, session);
+  const open = await world.asked(ref, "terminal");
+  assert.equal(await world.answers(open.requestId, { type: "terminal", go: false }), true);
+  assert.equal(await sent, false);
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.terminalsAllowed, []);
+});
+
+test("a transient empty list does not lose the answer", async (t) => {
+  const { world, agent, ref, session } = await makeWorld(t);
+  await allow(world, agent, ref, "77@boot-1");
+  agent.holders.set(SESSION, []);
+  assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
+  agent.holders.set(SESSION, [idle("77@boot-1")]);
+  assert.equal(await world.flows.terminal.beforeSending(ref, session), true);
+  assert.deepEqual(world.open(ref), []);
+});
+
+test("a new answer replaces the stored ids with the terminals found", async (t) => {
+  const { world, agent, ref } = await makeWorld(t);
+  await allow(world, agent, ref, "77@boot-1");
+  await allow(world, agent, ref, "78@boot-1");
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.terminalsAllowed, ["78@boot-1"]);
+});
+
 test("Cancel beside an open terminal sends nothing, and the question says so", async (t) => {
   const { world, agent, ref, session } = await makeWorld(t);
   agent.holders.set(SESSION, [idle("77")]);

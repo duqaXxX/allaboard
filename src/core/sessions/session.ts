@@ -482,9 +482,6 @@ export class ThreadSession {
   // Memory only, handed on after a close as `goal` is; after a restart nothing is known, and
   // the session resumes from the record, which holds whatever a terminal wrote.
   saved: SavedMessage | null = null;
-  // The terminal processes the owner chose to write here beside (`Send here`), by holder id:
-  // he is asked once per terminal.
-  readonly terminalsAllowed = new Set<string>();
   // `!terminal` cut a turn here: what the terminal wrote before any typed prompt is that turn
   // going on, and only then is it shown as such (`takeForeignTurns`). Handed on after a close.
   movedMidTurn = false;
@@ -667,6 +664,18 @@ export class ThreadSession {
   /** Working or waiting for the owner: a thread that is never deleted (`SessionManager.release`). */
   get inUse(): boolean {
     return this.rewinding || this.waitingForOwner || !this.idle;
+  }
+
+  /** Whether the owner chose `Send here` for the terminal `id`: stored, so a restart keeps it. */
+  terminalAllowed(id: string): boolean {
+    return (
+      this.deps.state.thread(this.channelId, this.threadId)?.terminalsAllowed.includes(id) ?? false
+    );
+  }
+
+  /** Store `ids` as the terminals the owner allowed, replacing the earlier ones. */
+  allowTerminals(ids: readonly string[]): void {
+    this.deps.state.setTerminalsAllowed(this.channelId, this.threadId, ids);
   }
 
   /**
