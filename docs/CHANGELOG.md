@@ -178,6 +178,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The alias `docs/setup.md` gives for a Node of its own passes `--help` to allaboard, not to nvm,
+  and no longer prints `Running node ...`. An alias already in a shell profile keeps the old
+  behaviour until it is replaced with the new line.
 - No Claude Code session could start once sessions were started with file checkpoints for
   `!rewind`: every turn answered `Claude Code reported an error: Error`. The SDK refuses an
   `Options.sessionStore` beside `enableFileCheckpointing`, and a store was how the daemon received
