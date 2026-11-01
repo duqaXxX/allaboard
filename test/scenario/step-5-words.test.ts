@@ -130,6 +130,7 @@ const OFFERED_WORDS = texts.HELP_WORDS_ANY.map((line) => named(line, NAMES)).fil
       "`!tag",
       "`!untag",
       "`!delete-thread",
+      "`!clean-channel",
       "`!!",
     ].some((word) => line.startsWith(word)),
 );
@@ -327,6 +328,7 @@ test("!guide describes only what this agent and this chat can serve", async (t) 
       rewind: false,
       threadTags: false,
       threadDelete: false,
+      channelClean: false,
       shell: false,
       // The daemon always gives the core a way to update itself.
       updates: true,

@@ -773,16 +773,19 @@ are not touched.
 In edit mode a channel's header carries a button (`home.CLEAN_ACTION`) with a `confirm` dialog that
 says what it deletes; `Home.clean` acts only in edit mode and on a bound channel, marks the channel
 (its header reads `texts.HOME_CHANNEL_CLEANING`, a section under the page's header
-`texts.HOME_CLEANING_ONE`), and publishes before and after. `ThreadDeleter.clean` reads the channel
+`texts.HOME_CLEANING_ONE`), and publishes before and after. `!clean-channel` reaches the same method through `app/clean-channel.ts`, after an ephemeral question. `ThreadDeleter.clean` reads the channel
 page by page (`conversations.history`, cursor pagination) and takes the owner's and the bot's
-messages that carry no `subtype`, are no reply of a thread, and that `state.json` does not hold as a
+messages that carry no `subtype`, Slack's `channel_*` and `group_*` notices whoever they name, all
+that are no reply of a thread, and that `state.json` does not hold as a
 thread. One that carries `thread_ts` is taken only when `conversations.replies` on it, with
 `limit=1`, returns its root with no `reply_count`: a thread taken for a leftover would lose its
 root, so no answer, or one with no root, keeps the message. Each is deleted with its author's token,
-as a thread's messages are. It shares the deleter's lock, so one clean-up or delete runs at a time.
-A message Slack refuses to delete (`cant_delete_message`) is counted and the rest still goes
+as a thread's messages are, and a notice with the owner's. It shares the deleter's lock, so one clean-up or delete runs at a time.
+A message Slack refuses to delete (`cant_delete_message`), or a notice it refuses with any code but
+`NOT_A_REFUSAL` (logged with the code), is counted and the rest still goes
 (`texts.HOME_CLEAN_REFUSED`); any other failure stops the clean-up with `texts.HOME_CLEAN_FAILED`,
-and the same click later deletes what is left.
+and the same click later deletes what is left. A clean-up that ends says the count
+(`texts.HOME_CLEAN_DONE`).
 
 `Home.publish` never throws. `not_enabled` (the Home tab is off in the Slack app's settings) is
 logged once and ends the publishing for that run; any other failure is logged by its error code and

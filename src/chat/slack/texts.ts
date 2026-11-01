@@ -216,10 +216,12 @@ export const HOME_DELETE_CONFIRM = "Delete thread";
 export const HOME_DELETE_DENY = "Cancel";
 export const HOME_CLEAN = "Clean up";
 export const HOME_CLEAN_TITLE = "Clean up this channel?";
-export const HOME_CLEAN_TEXT =
-  "Deletes from #{channel} what sits outside a thread: your messages there that have no " +
-  "reply, commands like !stop included, and the bot's own messages. Every thread that has a " +
-  "reply stays. This cannot be undone and can take a few minutes.";
+const CLEAN_WHAT =
+  "what sits outside a thread: your messages there that have no reply, commands like !stop " +
+  "included, the bot's own messages, and Slack's notices where it lets you. Every thread that has a reply stays. This cannot be " +
+  "undone and can take a few minutes.";
+export const HOME_CLEAN_TEXT = `Deletes from #{channel} ${CLEAN_WHAT}`;
+export const CLEAN_WORD_TEXT = `Deletes from this channel ${CLEAN_WHAT}`;
 export const HOME_CLEAN_CONFIRM = "Clean up";
 export const HOME_CHANNEL_CLEANING = ":hourglass_flowing_sand: cleaning up…";
 export const HOME_CLEANING_ONE = naming(
@@ -231,15 +233,17 @@ export const HOME_CLEANING_MANY = naming(
     "fast messages are deleted: this can take a few minutes.",
 );
 export const HOME_CLEAN_FAILED =
-  "Could not clean up that channel (`{error}`). Clean it up again to continue.";
+  "Could not clean up that channel (`{error}`). Messages deleted: {deleted}, refused: {count}. " +
+  "Clean it up again to continue.";
 export const HOME_DELETE_REFUSED = naming(
   "{chat} refused to delete {count} of that thread's messages (`cant_delete_message`): they " +
     "are not yours or the bot's, or your workspace does not let you delete them. Every other " +
     "message is gone and the thread is still listed.",
 );
+export const HOME_CLEAN_DONE = "Messages deleted: {deleted}. Threads with a reply stay.";
 export const HOME_CLEAN_REFUSED = naming(
-  "{chat} refused to delete {count} of that channel's messages (`cant_delete_message`): your " +
-    "workspace does not let you delete them. Every other one is gone.",
+  "Messages deleted: {deleted}. {chat} refused to delete {count}, which stay. Threads with a " +
+    "reply stay.",
 );
 // A pinned thread is kept, by the Home tab's Delete and by `!delete-thread` alike. The first line
 // is for a root that carries a tag (`!untag` removes the tag and the pin), the second for a pin

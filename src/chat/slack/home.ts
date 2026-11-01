@@ -752,7 +752,7 @@ export interface HomeViewOptions {
  * when it stops short. With `canEdit` the row under the header carries Edit, and with
  * `canRefresh` Refresh beside it; in `editing` each session
  * that is not in use carries Delete and no channel carries New thread. `notices` are the lines
- * the deletes and clean-ups that did not end left, under the header; `deleting` is how many
+ * the deletes that did not end and the clean-ups left, under the header; `deleting` is how many
  * threads are being deleted or wait for it, said in a line of full size under the header, since a
  * row that says so can be one of those a channel does not show.
  */
@@ -882,7 +882,7 @@ export interface HomeOptions {
    * button, the page as it always was.
    */
   readonly delete?: DeleteThreadCall;
-  /** Cleans a channel up (`ThreadDeleter.clean`), and answers the line to show when it could not. */
+  /** Cleans a channel up (`ThreadDeleter.clean`), and answers the line to show. */
   readonly clean?: (channelId: string) => Promise<string | null>;
   /** The update line of the daemon (`UpdatesPage.line`), asked at each publish; null for none. */
   readonly update?: () => UpdateLine | null;

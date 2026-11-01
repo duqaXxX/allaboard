@@ -172,6 +172,12 @@ export const DELETE_THREAD_UNAVAILABLE = naming(
 export const DELETE_THREAD_BUSY =
   "Not deleted: this thread is working or waiting for you. Send `!stop` first, then " +
   "`!delete-thread` again.";
+// Shown only by a chat that cannot clean a channel.
+export const CLEAN_UNAVAILABLE = naming(
+  "{chat} cannot clean a channel here, so `!clean-channel` does nothing.",
+);
+export const CLEAN_UNBOUND =
+  "This channel is bound to no folder, so `!clean-channel` deletes nothing here.";
 export const WORD_IN_THREAD = "`!{word}` works in the channel, not inside a thread.";
 // `!stop` typed in a thread that holds no session: it would have stopped the whole channel.
 export const STOP_OUTSIDE_SESSION =
@@ -778,6 +784,9 @@ export const HELP_WORDS: readonly Named[] = [
   "`!delete-thread` delete every message of this session's thread from {chat}, once you confirm; " +
     "the session stays in {agent} and `!resume` lists it again; refused while the thread works " +
     "or waits for you; inside a thread, refused in the channel",
+  "`!clean-channel` delete from {chat} what sits in the channel outside every thread, once you confirm: " +
+    "your messages with no reply, the bot's and {chat}'s notices; threads with a reply stay; in the channel, refused inside a " +
+    "thread",
   "`!! <command>` run a shell command in the session's folder, as the terminal's `!` does, " +
     "once you click Run; {agent} gets the command and its output and answers; inside a " +
     "thread, refused in the channel",
@@ -963,6 +972,12 @@ export const GUIDE_SHELL = naming(
     "it with **Run** and **Cancel**, then runs it with Bash in the session's folder and shows " +
     "its output; {agent} gets the command and its output, and answers. `!stop` stops a command " +
     "that runs.",
+);
+export const GUIDE_CLEAN = naming(
+  "**Cleaning a channel**\n" +
+    "`!clean-channel`, sent in the channel, asks you to confirm, then deletes from {chat} what sits " +
+    "outside every thread: your messages with no reply, the bot's and {chat}'s notices. Threads " +
+    "with a reply stay.",
 );
 export const GUIDE_DELETE = naming(
   "**Deleting a thread**\n" +

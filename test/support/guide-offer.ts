@@ -18,6 +18,7 @@ export const EVERYTHING_OFFERED: GuideOffer = {
   rewind: true,
   threadTags: true,
   threadDelete: true,
+  channelClean: true,
   shell: true,
   updates: true,
 };

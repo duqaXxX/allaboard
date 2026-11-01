@@ -36,6 +36,8 @@ export interface GuideOffer {
   readonly threadTags: boolean;
   /** The chat deletes a thread (`threadDelete`). */
   readonly threadDelete: boolean;
+  /** The chat cleans a channel (`channelClean`). */
+  readonly channelClean: boolean;
   /** The agent reads a shell command's output (`shell`) and the instance has not turned it off. */
   readonly shell: boolean;
   /** allaboard can update itself: the host gave the daemon a way to (`!allaboard`). */
@@ -100,6 +102,7 @@ export function guideText(names: Names, offered: GuideOffer): string {
     ...(offered.threadTags ? [say(texts.GUIDE_TAGS)] : []),
     ...(offered.shell ? [say(texts.GUIDE_SHELL)] : []),
     ...(offered.threadDelete ? [say(texts.GUIDE_DELETE)] : []),
+    ...(offered.channelClean ? [say(texts.GUIDE_CLEAN)] : []),
     ...(offered.updates ? [texts.GUIDE_UPDATES] : []),
     texts.GUIDE_END,
   ];

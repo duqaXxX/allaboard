@@ -1702,7 +1702,11 @@ test("clean publishes at once takes no second click and shows a failure", async 
       started.push(channelId);
       begun.set();
       await finish.wait();
-      return texts.fill(slackTexts.HOME_CLEAN_FAILED, { error: "ratelimited" });
+      return texts.fill(slackTexts.HOME_CLEAN_FAILED, {
+        error: "ratelimited",
+        deleted: 0,
+        count: 0,
+      });
     },
   });
   await home.clean(CHANNEL); // out of edit mode: not a click the page offered
@@ -1724,7 +1728,11 @@ test("clean publishes at once takes no second click and shows a failure", async 
   await running;
   page = published(w.slack).at(-1) as Json;
   const name = (slackPayload("api-conversations-info").channel as Json).name;
-  const failed = texts.fill(slackTexts.HOME_CLEAN_FAILED, { error: "ratelimited" });
+  const failed = texts.fill(slackTexts.HOME_CLEAN_FAILED, {
+    error: "ratelimited",
+    deleted: 0,
+    count: 0,
+  });
   assert.ok(notes(page).includes(`#${name}: ${failed}`)); // it names the channel
   assert.equal(buttons(page, CLEAN_ACTION).length, 2);
   assert.ok(!titles(page).includes(namedText(slackTexts.HOME_CLEANING_ONE, PLAIN_NAMES)));

@@ -274,6 +274,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `threadTags` | `ChatProvider.tagThread` is absent, `!tag` and `!untag` answer that the chat cannot tag a thread (`texts.TAG_UNAVAILABLE`), and `!help` and `!guide` leave them out |
 | `threadTitles` | `ChatProvider.titleThread` is absent and the core reads no title for the root, whatever the agent declares |
 | `threadDelete` | `ChatProvider.deleteThread` is absent, `!delete-thread` answers that the chat cannot delete a thread (`texts.DELETE_THREAD_UNAVAILABLE`), and `!help` and `!guide` leave it out |
+| `channelClean` | `ChatProvider.cleanChannel` is absent, `!clean-channel` answers `texts.CLEAN_UNAVAILABLE` and is left out of `!help` and `!guide` |
 | `commandSuggestions` | `ChatProvider.suggestCommands` is absent: a `!word` that is no command goes to the agent as typed, and `!` alone is a prompt. With it, and with the agent's `commands` capability, `submitToSession` stops, inside a session's thread only, a word the session does not list (name or alias) right after `ensureConnected`: before the setup and the same-folder hold when the session is connected or never ran, after the hold when it ran and was closed (so a Cancel starts no process). It ranks the candidates (`commands.commandPool`, `commands.rankCandidates`) and hands them over; nothing reaches the agent. What the owner sends from the suggestion comes back through `ChatInbound.message` as an ordinary message |
 
 A chat is required to receive a message, to write a reply it can edit, and to put a request or a

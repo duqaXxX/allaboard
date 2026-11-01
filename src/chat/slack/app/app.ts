@@ -49,6 +49,7 @@ import { Listings } from "../../../core/port.ts";
 import type { ChatInbound, CommandSuggestion } from "../../seam.ts";
 import { download } from "../attachments.ts";
 import { BIND_ACTION } from "../bind.ts";
+import { CLEAN_CHANNEL_CANCEL, CLEAN_CHANNEL_CONFIRM } from "../clean-channel.ts";
 import type { ThreadDeletion } from "../delete.ts";
 import { DELETE_THREAD_CANCEL, DELETE_THREAD_CONFIRM } from "../delete-thread.ts";
 import { HOLD_CANCEL, HOLD_CONTINUE } from "../hold.ts";
@@ -94,6 +95,7 @@ import type { SlackChat } from "../thread.ts";
 import { UPDATE_ACTION } from "../update.ts";
 import * as voice from "../voice.ts";
 import { Answers, type AppConfig, type AppParts, type Fetch, logger } from "./answers.ts";
+import { CleanChannel } from "./clean-channel.ts";
 import { Clips } from "./clip.ts";
 import { DeleteThread } from "./delete-thread.ts";
 import {
@@ -188,6 +190,8 @@ export interface BuiltApp {
   openFile(channel: string, threadTs: string, folder: string, words: string): Promise<void>;
   /** `!delete-thread` typed in a session's thread: the question, for the owner alone. */
   askDelete(channel: string, threadTs: string): Promise<void>;
+  /** `!clean-channel`: asks the owner alone, in the channel. */
+  askClean(channel: string): Promise<void>;
   /** A `!word` that is no command, typed in a thread: the suggestion, for the owner alone. */
   suggest(channel: string, threadTs: string, suggestion: CommandSuggestion): Promise<void>;
 }
@@ -283,6 +287,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   const clips = new Clips(parts, answers);
   const home = new HomeControls(parts);
   const deleteThread = new DeleteThread(parts, answers);
+  const cleanChannel = new CleanChannel(parts, answers);
 
   const app = new App({
     receiver: options.receiver,
@@ -437,6 +442,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
 
   action(DELETE_THREAD_CONFIRM, deleteThread.onConfirm);
   action(DELETE_THREAD_CANCEL, deleteThread.onCancel);
+  action(CLEAN_CHANNEL_CONFIRM, cleanChannel.onConfirm);
+  action(CLEAN_CHANNEL_CANCEL, cleanChannel.onCancel);
 
   action(SUGGEST_EDIT, suggestions.onEdit);
   action(SUGGEST_SEND, suggestions.onSend);
@@ -475,6 +482,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     },
     openFile: (channel, threadTs, folder, words) => open.openWord(channel, threadTs, folder, words),
     askDelete: (channel, threadTs) => deleteThread.ask(channel, threadTs),
+    askClean: (channel) => cleanChannel.ask(channel),
     suggest: (channel, threadTs, suggestion) => suggestions.show(channel, threadTs, suggestion),
   };
 }

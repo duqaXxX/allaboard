@@ -585,6 +585,7 @@ export function chatConformance(
         assert.deepEqual(flags.map(([flag]) => flag).sort(), [
           "acknowledgement",
           "activityLine",
+          "channelClean",
           "commandSuggestions",
           "fileUpload",
           "loopCard",
@@ -679,6 +680,13 @@ export function chatConformance(
         assert.equal(
           typeof provider.deleteThread === "function",
           provider.capabilities.threadDelete,
+        );
+      });
+
+      check("has cleanChannel exactly when it declares channelClean", async ({ provider }) => {
+        assert.equal(
+          typeof provider.cleanChannel === "function",
+          provider.capabilities.channelClean,
         );
       });
 
