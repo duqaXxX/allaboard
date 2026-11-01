@@ -1,14 +1,18 @@
 /**
- * `!clean-channel` as the Slack provider hears it: a question only the owner sees, in the channel, with
- * Clean up and Cancel. The channel is cleaned by the Home tab's own deleter
- * (`ThreadDeleter.clean`), so both ways share one path and one rule. As with `!delete-thread`, the
- * question is ephemeral and either button takes it away with `respond({ delete_original: true })`.
+ * `!clean-channel` as the Slack provider hears it: a question only the owner sees, in the channel,
+ * with Clean up and Cancel, naming how many threads go and stay (`ThreadDeleter.survey`). Clean up
+ * runs `ThreadDeleter.purge`: the channel's threads, each as the Home tab's Delete does, then its
+ * Clean up. As with `!delete-thread`, the
+ * question is ephemeral: Cancel takes it away with `respond({ delete_original: true })`, and Clean up
+ * rewrites it into the outcome.
  */
 
-import { named, texts } from "../../../core/port.ts";
+import { fill, named, texts } from "../../../core/port.ts";
 import { cleanChannelBlocks } from "../clean-channel.ts";
+import type { ChannelSurvey } from "../delete.ts";
+import { describe } from "../reply/errors.ts";
 import * as slackTexts from "../texts.ts";
-import type { Answers, AppParts } from "./answers.ts";
+import { type Answers, type AppParts, logger } from "./answers.ts";
 import { interactionActor } from "./guards.ts";
 import { type Ack, type Payload, type Respond, record, text } from "./wire.ts";
 
@@ -28,12 +32,26 @@ export class CleanChannel {
 
   /** Shows the owner alone the question, in the channel; resolves once it is posted. */
   async ask(channel: string): Promise<void> {
-    await this.answers.deliver(channel, null, slackTexts.HOME_CLEAN_TITLE, cleanChannelBlocks(), {
-      ephemeral: true,
-    });
+    const { deletion } = this.parts;
+    if (deletion === undefined) return;
+    let survey: ChannelSurvey;
+    try {
+      survey = await deletion.survey(channel);
+    } catch (error) {
+      const line = fill(slackTexts.CLEAN_WORD_STOPPED, { error: describe(error) });
+      await this.answers.tellOwnerAbout(channel, "", "", line);
+      return;
+    }
+    await this.answers.deliver(
+      channel,
+      null,
+      slackTexts.HOME_CLEAN_TITLE,
+      cleanChannelBlocks(survey),
+      { ephemeral: true },
+    );
   }
 
-  /** Clean up: the question goes, then the messages; a clean up that stopped says why. */
+  /** Clean up: the question goes, then the threads and the messages; a line says how it went. */
   onConfirm = async (ack: Ack, body: Payload, respond?: Respond): Promise<void> => {
     const channel = await this.admitted(ack, body);
     if (channel === null) return;
@@ -45,10 +63,31 @@ export class CleanChannel {
       await this.answers.tellOwnerAbout(channel, question, question, line);
       return;
     }
-    await this.answers.takeBack(respond, "the clean up question");
-    const line = await deletion.clean(channel);
-    await this.answers.tellOwnerAbout(channel, question, question, line ?? texts.CLEAN_UNBOUND);
+    // One message from question to outcome, as Slack lets nothing delete an ephemeral one later.
+    if (!(await this.rewrite(respond, slackTexts.CLEAN_WORD_STARTED))) {
+      await this.answers.takeBack(respond, "the clean up question");
+      await this.answers.tellOwnerAbout(channel, question, question, slackTexts.CLEAN_WORD_STARTED);
+    }
+    const line = (await deletion.purge(channel)) ?? texts.CLEAN_UNBOUND;
+    if (!(await this.rewrite(respond, line))) {
+      await this.answers.tellOwnerAbout(channel, question, question, line);
+    }
   };
+
+  /**
+   * Rewrites the question in place, and says whether it could: `response_url` takes 5 answers
+   * within 30 minutes (Slack's interactivity reference, read 2026-11-01), which a long purge passes.
+   */
+  private async rewrite(respond: Respond | undefined, text: string): Promise<boolean> {
+    if (respond === undefined) return false;
+    try {
+      await respond({ replace_original: true, text });
+      return true;
+    } catch (error) {
+      logger.info(`could not rewrite the clean up question: ${describe(error)}`);
+      return false;
+    }
+  }
 
   /** Cancel: the question goes, and nothing else changes. */
   onCancel = async (ack: Ack, body: Payload, respond?: Respond): Promise<void> => {

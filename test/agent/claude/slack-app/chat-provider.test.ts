@@ -315,7 +315,12 @@ test("with the owner's token the provider declares threadTitles, has titleThread
 test("with a deleter the provider declares threadDelete, and deleteThread asks the owner in the thread", async (t) => {
   const world = worldOf(t);
   const { chat } = started(world, {
-    deletion: { delete: async () => null, pinned: async () => null, clean: async () => null },
+    deletion: {
+      delete: async () => null,
+      pinned: async () => null,
+      survey: async () => ({ threads: 0, busy: 0, pinned: 0 }),
+      purge: async () => null,
+    },
   });
   assert.equal(chat.capabilities.threadDelete, true);
   await chat.start(NOBODY);

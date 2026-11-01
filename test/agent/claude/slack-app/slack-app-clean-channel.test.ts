@@ -10,7 +10,7 @@ import {
   CLEAN_CHANNEL_CONFIRM,
 } from "../../../../src/chat/slack/clean-channel.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
-import { named, texts } from "../../../../src/core/port.ts";
+import { fill, named, texts } from "../../../../src/core/port.ts";
 import { CHANNEL, OWNER } from "../../../support/fake-slack.ts";
 import { NAMES } from "../../../support/names.ts";
 import {
@@ -37,7 +37,7 @@ test("the question is posted for the owner alone, in the channel, with its two b
   const [section, actions] = post.blocks as [Body, Body];
   assert.equal(
     section.text.text,
-    `*${slackTexts.HOME_CLEAN_TITLE}*\n${slackTexts.CLEAN_WORD_TEXT}`,
+    `*${slackTexts.HOME_CLEAN_TITLE}*\n${fill(slackTexts.CLEAN_WORD_TEXT, { threads: 3, busy: 1, pinned: 0 })}`,
   );
   assert.deepEqual(
     actions.elements.map((button: Body) => [button.action_id, button.style]),
@@ -49,26 +49,31 @@ test("the question is posted for the owner alone, in the channel, with its two b
   assert.equal(world.slack.callsTo("chat.postMessage").length, 0, "nothing that stays");
 });
 
-test("Clean up takes the question away and cleans the channel", async (t) => {
+test("Clean up rewrites the question into the outcome, and adds no message", async (t) => {
   const responses = respondedTo(t);
   const world = worldOf(t);
   world.channelCleanLine = "how it went";
   await world.dispatch(click(CLEAN_CHANNEL_CONFIRM));
   await world.settle();
-  assert.deepEqual(responses, [{ delete_original: true }]);
+  assert.deepEqual(
+    responses.map((posted) => posted.text),
+    [slackTexts.CLEAN_WORD_STARTED, "how it went"],
+  );
+  assert.ok(responses.every((posted) => posted.replace_original === true));
   assert.deepEqual(world.channelCleans, [CHANNEL]);
-  assert.deepEqual(world.ephemerals(), ["how it went"]);
+  assert.deepEqual(world.ephemerals(), []);
 });
 
-test("a clean up that stopped says why, for the owner alone, in the channel", async (t) => {
-  respondedTo(t);
+test("past what the question can be rewritten, the outcome is a message of its own", async (t) => {
+  respondedTo(t, 404);
   const world = worldOf(t);
-  world.channelCleanLine = "it stopped";
+  world.channelCleanLine = "how it went";
   await world.dispatch(click(CLEAN_CHANNEL_CONFIRM));
   await world.settle();
-  const [told] = world.slack.callsTo("chat.postEphemeral") as [Body];
+  assert.deepEqual(world.channelCleans, [CHANNEL]);
+  assert.deepEqual(world.ephemerals(), [slackTexts.CLEAN_WORD_STARTED, "how it went"]);
+  const told = world.slack.callsTo("chat.postEphemeral").at(-1) as Body;
   assert.equal(told.thread_ts, undefined);
-  assert.ok(world.ephemerals().at(-1)?.includes("it stopped"));
 });
 
 test("Cancel takes the question away and cleans nothing", async (t) => {

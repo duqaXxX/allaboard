@@ -1,3 +1,5 @@
+import { fill } from "../../core/port.ts";
+import type { ChannelSurvey } from "./delete.ts";
 import * as slackTexts from "./texts.ts";
 /** `!clean-channel`'s question as Slack blocks. */
 
@@ -5,17 +7,17 @@ export const CLEAN_CHANNEL_CONFIRM = "clean_channel_confirm";
 export const CLEAN_CHANNEL_CANCEL = "clean_channel_cancel";
 
 /**
- * The question in the channel: the Home tab's title and buttons, and its warning without the
- * channel's name, since the owner is in that channel. The click is read by its container, so the
+ * The question in the channel: the Home tab's title and buttons, and what would go and stay.
+ * The click is read by its container, so the
  * buttons hold no value.
  */
-export function cleanChannelBlocks(): Record<string, unknown>[] {
+export function cleanChannelBlocks(survey: ChannelSurvey): Record<string, unknown>[] {
   return [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*${slackTexts.HOME_CLEAN_TITLE}*\n${slackTexts.CLEAN_WORD_TEXT}`,
+        text: `*${slackTexts.HOME_CLEAN_TITLE}*\n${fill(slackTexts.CLEAN_WORD_TEXT, { ...survey })}`,
       },
     },
     {
