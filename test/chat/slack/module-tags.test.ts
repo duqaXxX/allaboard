@@ -1,7 +1,8 @@
 /**
  * Whether the provider can tag a thread follows the owner's user token: with it, `assemble` hands
- * the provider a `RootEditor` (for tags, and for titles) on the checked owner client (the same client the thread deleter
- * uses); without it, the provider declares no `threadTags` and has no `tagThread`.
+ * the provider a `RootEditor` (for tags, titles and pins) on the checked owner client (the same
+ * client the thread deleter uses); without it, the provider declares no `threadTags` and has no
+ * `tagThread`. Pins need the token's `pins:write` too.
  */
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -62,6 +63,8 @@ test("without the owner's token the provider cannot tag a thread", async () => {
   const { chat } = await built(null);
   assert.equal(chat.capabilities.threadTags, false);
   assert.equal(chat.tagThread, undefined);
+  assert.equal(chat.capabilities.threadPins, false);
+  assert.equal(chat.pinThread, undefined);
   assert.equal(chat.capabilities.threadTitles, false);
   assert.equal(chat.titleThread, undefined);
 });
@@ -92,7 +95,7 @@ test("with the owner's token the provider tags a root through the owner's client
     has_more: false,
   };
   await chat.tagThread?.({ channel: "C000CHAN", thread: ts }, "devops");
-  // The bot only reads; the edit and the pin are the owner's (the first message is the owner's).
+  // The bot only reads; the edit is the owner's (the first message is the owner's).
   // The channel's line, told the thread changed, looks once for a line an earlier run left.
   assert.deepEqual(
     slack.apiCalls.map((call) => call.method),
@@ -100,8 +103,10 @@ test("with the owner's token the provider tags a root through the owner's client
   );
   assert.deepEqual(
     owner.apiCalls.map((call) => call.method),
-    ["auth.test", "chat.update", "pins.add"],
+    ["auth.test", "chat.update"],
   );
+  await chat.pinThread?.({ channel: "C000CHAN", thread: ts }, true);
+  assert.equal(owner.apiCalls.at(-1)?.method, "pins.add");
 });
 
 test("a title is written by the owner's client alone, with no pin", async () => {
@@ -130,15 +135,20 @@ function warnings(t: TestContext): () => string {
   return () => warned.mock.calls.map((call) => String(call.arguments[0])).join("\n");
 }
 
-test("a user token without pins:write offers no tags, says so once, and still deletes and titles", async (t) => {
+test("a user token without pins:write offers no pins, says so once, and still tags, deletes and titles", async (t) => {
   const said = warnings(t);
   const { chat, owner } = await built(USER_TOKEN, ["identify", "chat:write"]);
-  assert.equal(chat.capabilities.threadTags, false);
+  assert.equal(chat.capabilities.threadPins, false);
+  assert.equal(chat.pinThread, undefined);
+  assert.equal(chat.capabilities.threadTags, true);
+  assert.equal(typeof chat.tagThread, "function");
   assert.equal(chat.capabilities.threadTitles, true);
   assert.equal(typeof chat.titleThread, "function");
-  assert.equal(chat.tagThread, undefined);
   assert.match(said(), /pins:write/);
-  assert.match(said(), /!tag is not offered until the app is reinstalled with that scope/);
+  assert.match(
+    said(),
+    /!pin and !unpin are not offered until the app is reinstalled with that scope/,
+  );
   assert.equal(said().split("\n").length, 1);
   assert.deepEqual(
     owner.apiCalls.map((call) => call.method),
@@ -146,11 +156,11 @@ test("a user token without pins:write offers no tags, says so once, and still de
   );
 });
 
-test("a user token whose scopes Slack does not list offers no tags, and the log says so", async (t) => {
+test("a user token whose scopes Slack does not list offers no pins, and the log says so", async (t) => {
   const said = warnings(t);
   const { chat } = await built(USER_TOKEN, null);
-  assert.equal(chat.capabilities.threadTags, false);
-  assert.equal(chat.tagThread, undefined);
+  assert.equal(chat.capabilities.threadPins, false);
+  assert.equal(chat.pinThread, undefined);
   assert.match(said(), /lists no scopes/);
 });
 

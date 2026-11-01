@@ -43,7 +43,10 @@ const FULL_GUIDE = [
   "`!plan`, sent inside a session's thread, makes Plain plan before it acts: it proposes a plan and asks you to approve it. `!plan off` leaves plan mode, and so does `!bypass on` or `!bypass off`. It belongs to the running session: a restart of allaboard or an idle close puts the session back in its normal mode.",
   "",
   "**Tags**",
-  "`!tag <name>`, sent inside a session's thread, marks it: Memory chat shows `[name]` at the start of the thread's first message and keeps the thread at hand, and where Plain can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose session has not started yet is marked in Memory chat alone.",
+  "`!tag <name>`, sent inside a session's thread, marks it: Memory chat shows `[name]` at the start of the thread's first message, and where Plain can tag a session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. `!untag` takes the tag away. A thread whose session has not started yet is marked in Memory chat alone.",
+  "",
+  "**Pins**",
+  "`!pin`, sent inside a session's thread, pins its first message in Memory chat, which keeps the thread at hand. `!unpin` takes the pin away, however it was made. A tag and a pin are independent.",
   "",
   "**Shell commands**",
   "`!!command`, sent inside a session's thread, is the terminal's `!command`: allaboard shows it with **Run** and **Cancel**, then runs it with Bash in the session's folder and shows its output; Plain gets the command and its output, and answers. `!stop` stops a command that runs.",
@@ -95,6 +98,7 @@ const REWIND = ["**Going back**", line("`!rewind`, sent inside")];
 const BYPASS = ["**Bypass**", line("`!bypass on`")];
 const PLAN = ["**Plan mode**", line("`!plan`, sent inside")];
 const TAGS = ["**Tags**", line("`!tag <name>`, sent inside")];
+const PINS = ["**Pins**", line("`!pin`, sent inside")];
 const DELETE = ["**Deleting a thread**", line("`!delete-thread`, sent inside")];
 const SHELL = ["**Shell commands**", line("`!!command`, sent inside")];
 
@@ -237,6 +241,12 @@ test("without rewind the Going back section is gone", () => {
 test("without threadTags the Tags section is gone", () => {
   const { removed, added } = difference(linesOf({ threadTags: false }));
   assert.deepEqual(removed, TAGS);
+  assert.deepEqual(added, []);
+});
+
+test("without threadPins the Pins section is gone", () => {
+  const { removed, added } = difference(linesOf({ threadPins: false }));
+  assert.deepEqual(removed, PINS);
   assert.deepEqual(added, []);
 });
 

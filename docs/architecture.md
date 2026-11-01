@@ -236,7 +236,7 @@ alike needs no capability. `effortLevels` and
 `!guide` is made of parts (`src/core/guide.ts`, `guideText`), and the words `!help` lists follow
 the same capabilities. A part appears when the pair declares what it describes: `folderTrust`,
 `models`, an agent with effort levels, a `bypass` mode, `commands`, `questions`,
-`backgroundTasks` and `sessionListing` of the agent, and `fileUpload` and `threadTags` of the chat.
+`backgroundTasks` and `sessionListing` of the agent, and `fileUpload`, `threadTags` and `threadPins` of the chat.
 
 | Agent capability | What the core does without it |
 |---|---|
@@ -272,6 +272,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `threadLists` | `ThreadChat.offer` is absent and `!diff` and `!rewind` are not offered: `!help`, `!guide` and the suggestions leave them out, and typing one answers `texts.DIFF_UNAVAILABLE` or `texts.REWIND_UNAVAILABLE`. The picks of such a list reach the core as `diff-file`, `diff-view`, `rewind-point` and `rewind-action` (`ListPick`) |
 | `messageFold` | `ThreadChat.fold` and `Reply.posted` are absent: `!rewind` still goes back, and a line says the replies after the prompt were not marked as removed (`texts.REWIND_NO_FOLD`) |
 | `threadTags` | `ChatProvider.tagThread` is absent, `!tag` and `!untag` answer that the chat cannot tag a thread (`texts.TAG_UNAVAILABLE`), and `!help` and `!guide` leave them out |
+| `threadPins` | `ChatProvider.pinThread` is absent, `!pin` and `!unpin` answer that the chat cannot pin a thread (`texts.PIN_UNAVAILABLE`), and `!help` and `!guide` leave them out |
 | `threadTitles` | `ChatProvider.titleThread` is absent and the core reads no title for the root, whatever the agent declares |
 | `threadDelete` | `ChatProvider.deleteThread` is absent, `!delete-thread` answers that the chat cannot delete a thread (`texts.DELETE_THREAD_UNAVAILABLE`), and `!help` and `!guide` leave it out |
 | `channelClean` | `ChatProvider.cleanChannel` is absent, `!clean-channel` answers `texts.CLEAN_UNAVAILABLE` and is left out of `!help` and `!guide` |

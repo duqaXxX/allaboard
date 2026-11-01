@@ -191,6 +191,8 @@ export interface ChatCapabilities {
   readonly messageFold: boolean;
   /** `ChatProvider.tagThread`. */
   readonly threadTags: boolean;
+  /** `ChatProvider.pinThread`. */
+  readonly threadPins: boolean;
   /** `ChatProvider.titleThread`. */
   readonly threadTitles: boolean;
   /** `ChatProvider.deleteThread`. */
@@ -947,10 +949,16 @@ export interface ChatProvider {
   readonly fileLimit?: number;
   /**
    * `!tag` and `!untag` typed in a session's thread: shows `tag` on the thread where the owner
-   * looks at the channel and keeps the thread at hand; null takes both away. Rejects with a
-   * `ChatError` when the chat refused. Present with `threadTags`.
+   * looks at the channel; null takes it away. Rejects with a `ChatError` when the chat refused.
+   * Present with `threadTags`.
    */
   tagThread?(ref: ThreadRef, tag: string | null): Promise<void>;
+  /**
+   * `!pin` and `!unpin` typed in a session's thread: keeps the thread at hand in its channel, or
+   * stops, whoever pinned it. Asking for what already holds is no failure. Rejects with a
+   * `ChatError` when the chat refused. Present with `threadPins`.
+   */
+  pinThread?(ref: ThreadRef, pinned: boolean): Promise<void>;
   /**
    * Makes the thread's root show `title`, and the tag it carries, and nothing else: the owner's
    * own words leave it. With `keep`, the chat reads the root once and hands `keep` the words it

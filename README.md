@@ -99,8 +99,10 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!open` | Shares a file of the session's folder into the thread |
 | `!diff` | Lists the files the session's git repository changed since HEAD, with a Diff button each |
 | `!rewind` | Goes back to an earlier prompt of the session: restores its code, its conversation or both |
-| `!tag <name>` | Tags and pins the thread's first message |
-| `!untag` | Takes the tag and the pin away |
+| `!tag <name>` | Tags the thread's first message and the session |
+| `!untag` | Takes the tag away |
+| `!pin` | Pins the thread's first message |
+| `!unpin` | Takes the pin away |
 | `!delete-thread` | Deletes the thread, once you confirm |
 | `!clean-channel` | Deletes the channel's threads and what sits outside them, once you confirm |
 | `!!<command>` | Runs a shell command in the session's folder once you click Run; Claude Code answers its output |

@@ -154,14 +154,19 @@ export const TAG_TOP_LEVEL =
 export const TAG_UNAVAILABLE = naming(
   "{chat} cannot tag a thread here, so `!tag` and `!untag` do nothing.",
 );
-// The chat refused the tag: nothing changed, and the agent's tag was not asked for.
-export const TAG_FAILED = naming(
-  "{chat} refused the tag: `{error}`. The thread may show part of the change; `!untag` takes it away.",
-);
+// The chat refused the tag: the agent's tag was not asked for.
+export const TAG_FAILED = naming("{chat} refused the tag: `{error}`.");
 // After the chat took the word: the agent's own tag is a second step that can fail alone.
 export const TAG_AGENT_FAILED = naming(
   "{chat} shows the change, but {agent}'s own tag for this session did not change.",
 );
+export const PIN_TOP_LEVEL =
+  "A pin belongs to one session: send `!pin` or `!unpin` inside its thread.";
+// Shown only by a chat that cannot pin a thread.
+export const PIN_UNAVAILABLE = naming(
+  "{chat} cannot pin a thread here, so `!pin` and `!unpin` do nothing.",
+);
+export const PIN_FAILED = naming("{chat} refused the pin: `{error}`.");
 export const DELETE_THREAD_TOP_LEVEL =
   "Deleting a thread belongs to one session: send `!delete-thread` inside its thread.";
 // Shown only by a chat that cannot delete a thread.
@@ -777,10 +782,14 @@ export const HELP_WORDS: readonly Named[] = [
     "its file viewer: the files changed in the session alone, or a path or part of a name; inside a thread, refused in " +
     "the channel",
   "`!tag <name>` mark this session's thread with a tag, 1 to 40 letters, digits, `.`, `_` or " +
-    "`-`: {chat} shows it on the thread's first message and keeps the thread at hand, and " +
-    "{agent} gets it on the session; inside a thread, refused in the channel",
-  "`!untag` take the tag and the mark away, with or without the tag's name after it; inside a " +
-    "thread, refused in the channel",
+    "`-`: {chat} shows it on the thread's first message, and {agent} gets it on the session; " +
+    "inside a thread, refused in the channel",
+  "`!untag` take the tag away, with or without the tag's name after it; inside a thread, refused " +
+    "in the channel",
+  "`!pin` keep this session's thread at hand: {chat} pins its first message; inside a thread, " +
+    "refused in the channel",
+  "`!unpin` take the pin off the thread's first message, however it was made; inside a thread, " +
+    "refused in the channel",
   "`!delete-thread` delete every message of this session's thread from {chat}, once you confirm; " +
     "the session stays in {agent} and `!resume` lists it again; refused while the thread works " +
     "or waits for you; inside a thread, refused in the channel",
@@ -961,10 +970,16 @@ export const GUIDE_PLAN = naming(
 export const GUIDE_TAGS = naming(
   "**Tags**\n" +
     "`!tag <name>`, sent inside a session's thread, marks it: {chat} shows `[name]` at the start " +
-    "of the thread's first message and keeps the thread at hand, and where {agent} can tag a " +
-    "session it gets the same tag. The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new " +
-    "`!tag` replaces the old one. `!untag` takes the tag and the mark away. A thread whose " +
-    "session has not started yet is marked in {chat} alone.",
+    "of the thread's first message, and where {agent} can tag a session it gets the same tag. " +
+    "The name is 1 to 40 letters, digits, `.`, `_` or `-`; a new `!tag` replaces the old one. " +
+    "`!untag` takes the tag away. A thread whose session has not started yet is marked in {chat} " +
+    "alone.",
+);
+export const GUIDE_PINS = naming(
+  "**Pins**\n" +
+    "`!pin`, sent inside a session's thread, pins its first message in {chat}, which keeps the " +
+    "thread at hand. `!unpin` takes the pin away, however it was " +
+    "made. A tag and a pin are independent.",
 );
 export const GUIDE_SHELL = naming(
   "**Shell commands**\n" +

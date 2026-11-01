@@ -1428,7 +1428,6 @@ test("a pinned row carries no Delete, whatever its status", () => {
 test("a delete the deleter refuses as pinned says so under the row's name, in its two words", async (t) => {
   const w = world(t);
   const answers: DeleteRefusal[] = [
-    { reason: "pinned", where: "tagged-root" },
     { reason: "pinned", where: "root" },
     { reason: "pinned", where: "reply" },
   ];
@@ -1436,12 +1435,9 @@ test("a delete the deleter refuses as pinned says so under the row's name, in it
   await home.edit(true);
   await home.delete(CHANNEL, OLD_THREAD);
   let page = published(w.slack).at(-1) as Json;
-  assert.ok(notes(page).includes(`“Fix the footer”: ${slackTexts.DELETE_PINNED_TAGGED}`));
-  await home.delete(CHANNEL, OLD_THREAD);
-  page = published(w.slack).at(-1) as Json;
   assert.ok(
     notes(page).includes(
-      `“Fix the footer”: ${namedText(slackTexts.DELETE_PINNED_BY_HAND, PLAIN_NAMES)}`,
+      `“Fix the footer”: ${namedText(slackTexts.DELETE_PINNED_ROOT, PLAIN_NAMES)}`,
     ),
   );
   await home.delete(CHANNEL, OLD_THREAD);
@@ -2309,6 +2305,17 @@ test("publish shows each thread's tag and pin, and a pinned thread outside the p
   );
   const line = notes(page).find((note) => note.includes("[devops]")) as string;
   assert.ok(line.startsWith(":pushpin: `[devops]` · ended · 19 replies"), line);
+});
+
+test("a chosen tag finds its threads whatever the period, and the other filters still apply", () => {
+  const old = row("Fix the footer", {
+    tag: "devops",
+    lastActivity: NOW.getTime() / 1000 - 30 * 86400,
+  });
+  assert.equal(matches(homeFilter(), old, NOW), false, "no tag chosen: the period holds");
+  assert.equal(matches(homeFilter({ tag: "devops" }), old, NOW), true);
+  assert.equal(matches(homeFilter({ tag: "ops" }), old, NOW), false);
+  assert.equal(matches(homeFilter({ tag: "devops", search: "parser" }), old, NOW), false);
 });
 
 test("a tag no root carries any more stops being a filter, a tag nobody could be asked about stays", async (t) => {

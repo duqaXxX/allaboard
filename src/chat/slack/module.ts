@@ -128,26 +128,26 @@ export async function ownerClient(
   return { client: owner, scopes: who.response_metadata?.scopes ?? null };
 }
 
-/** The scope `!tag` and `!untag` need beyond what the Home tab's Delete does (`chat:write`). */
+/** The scope `!pin` and `!unpin` need beyond what the Home tab's Delete does (`chat:write`). */
 export const PINS_SCOPE = "pins:write";
 
 /**
- * Whether the owner's token can pin, which `!tag` needs and a title does not. A token made before
- * the manifest asked for `pins:write` has the Delete's scope alone: tags are then not offered,
- * with one line saying why, and Delete and titles keep working. A token whose scopes Slack did
- * not report is not trusted with tags either.
+ * Whether the owner's token can pin, which `!pin` needs and a tag or a title does not. A token made
+ * before the manifest asked for `pins:write` has the Delete's scope alone: pins are then not
+ * offered, with one line saying why, and Delete, tags and titles keep working. A token whose scopes
+ * Slack did not report is not trusted with pins either.
  */
-export function canTag(owner: OwnerClient | null): boolean {
+export function canPin(owner: OwnerClient | null): boolean {
   if (owner === null) return false;
   if (owner.scopes === null) {
     logger.warning(
-      `Slack lists no scopes for SLACK_USER_TOKEN, so !tag and !untag are not offered: reinstall the app with the user scope ${PINS_SCOPE} (see ${setupGuide(SETUP_SLACK_APP)})`,
+      `Slack lists no scopes for SLACK_USER_TOKEN, so !pin and !unpin are not offered: reinstall the app with the user scope ${PINS_SCOPE} (see ${setupGuide(SETUP_SLACK_APP)})`,
     );
     return false;
   }
   if (!owner.scopes.includes(PINS_SCOPE)) {
     logger.warning(
-      `SLACK_USER_TOKEN lacks the scope ${PINS_SCOPE}, so !tag is not offered until the app is reinstalled with that scope (see ${setupGuide(SETUP_SLACK_APP)})`,
+      `SLACK_USER_TOKEN lacks the scope ${PINS_SCOPE}, so !pin and !unpin are not offered until the app is reinstalled with that scope (see ${setupGuide(SETUP_SLACK_APP)})`,
     );
     return false;
   }
@@ -309,7 +309,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     clock: context.clock,
     steady: context.steady,
     agent: () => context.core().agent,
-    ...(roots !== null && { roots, canTag: canTag(owner) }),
+    ...(roots !== null && { roots, canPin: canPin(owner) }),
     line: new ChannelLine(slack, {
       botUserId: identity.botUserId,
       // Read when the line changes, after the core exists.

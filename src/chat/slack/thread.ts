@@ -159,13 +159,13 @@ export interface SlackChatOptions {
    */
   readonly app?: SlackApp;
   /**
-   * Edits a thread's root with the owner's user token. Absent without that token: the provider
-   * then declares neither `threadTags` nor `threadTitles`. One editor serves both, so the edits of
-   * a root queue behind one another.
+   * Changes a thread's root with the owner's user token. Absent without that token: the provider
+   * then declares none of `threadTags`, `threadTitles` and `threadPins`. One editor serves them
+   * all, so the edits of a root queue behind one another.
    */
   readonly roots?: RootEditor;
-  /** Whether the token can pin, which tags need and titles do not (`module.canTag`). */
-  readonly canTag?: boolean;
+  /** Whether the token can pin, which tags and titles do not need (`module.canPin`). */
+  readonly canPin?: boolean;
   /**
    * Moves the channel's line to the bottom when the session's work ends (a `notify` status), and
    * when the agent asks the owner for an approval or an answer (`channel-line`), so the channel
@@ -215,7 +215,7 @@ const CAPABILITIES = {
   threadOpen: true,
 } as const satisfies Omit<
   ChatCapabilities,
-  "threadTags" | "threadTitles" | "threadDelete" | "channelClean"
+  "threadTags" | "threadPins" | "threadTitles" | "threadDelete" | "channelClean"
 >;
 
 /** The Slack provider: one `SlackThread` per thread, one `SlackChannel` per channel. */
@@ -235,8 +235,10 @@ export class SlackChat implements ChatProvider {
    * (`SlackChatOptions.line`): both show the sessions' status.
    */
   readonly index?: SessionIndex;
-  /** Present when the owner's user token is configured (`SlackChatOptions.roots`, `canTag`). */
+  /** Present when the owner's user token is configured (`SlackChatOptions.roots`). */
   readonly tagThread?: (ref: ThreadRef, tag: string | null) => Promise<void>;
+  /** Present when that token also holds the pin's scope (`SlackChatOptions.canPin`). */
+  readonly pinThread?: (ref: ThreadRef, pinned: boolean) => Promise<void>;
   /** Present when the owner's user token is configured (`SlackChatOptions.roots`). */
   readonly titleThread?: (
     ref: ThreadRef,
@@ -260,7 +262,8 @@ export class SlackChat implements ChatProvider {
     this.options = options;
     this.capabilities = {
       ...CAPABILITIES,
-      threadTags: options.roots !== undefined && options.canTag === true,
+      threadTags: options.roots !== undefined,
+      threadPins: options.roots !== undefined && options.canPin === true,
       threadTitles: options.roots !== undefined,
       threadDelete: options.app?.deletion !== undefined,
       channelClean: options.app?.deletion !== undefined,
@@ -290,10 +293,12 @@ export class SlackChat implements ChatProvider {
         this.index?.refresh([ref]);
       }
     };
-    if (roots !== undefined && options.canTag === true) {
-      this.tagThread = (ref, tag) => rereading(ref, () => roots.tag(ref.channel, ref.thread, tag));
+    if (roots !== undefined && options.canPin === true) {
+      this.pinThread = (ref, pinned) =>
+        rereading(ref, () => roots.pin(ref.channel, ref.thread, pinned));
     }
     if (roots !== undefined) {
+      this.tagThread = (ref, tag) => rereading(ref, () => roots.tag(ref.channel, ref.thread, tag));
       this.titleThread = async (ref, title, keep) => {
         // A title resolving after the stop began touches neither Slack nor the state.
         if (this.stopped.aborted) return;

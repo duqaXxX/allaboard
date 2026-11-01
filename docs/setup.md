@@ -179,30 +179,30 @@ leaks, regenerate it on the same page.
 The user token is the one that acts as you. It enables the Home tab's **Edit** mode, which
 deletes a session's whole thread and cleans up a channel (see "Deleting a thread" and "Cleaning
 up a channel" under "Using it"), the words `!clean-channel`, which cleans a channel, and `!delete-thread`, which deletes a thread from inside
-it, and the words `!tag` and `!untag`, which edit and pin the first message of a thread (see
-"Tagging a thread"). The same edit rewrites that message to the session's title (see "The title of
+it, the words `!tag` and `!untag`, which edit the first message of a thread (see "Tagging a thread"),
+and the words `!pin` and `!unpin`, which pin it (see "Pinning a thread"). The same edit rewrites that message to the session's title (see "The title of
 a thread"). Slack lets a bot delete or edit only its own messages (`chat.delete` and
 `chat.update` references), and the first message of a thread and your replies are yours, so
 changing them takes a token that acts as you. Without `SLACK_USER_TOKEN` in `.env` allaboard
 still starts and the Home tab still lists the sessions, with no **Edit** button;
-`!delete-thread`, `!tag` and `!untag` then answer that they do nothing, and `!help` and
-`!guide` leave them out.
+`!delete-thread`, `!tag`, `!untag`, `!pin` and `!unpin` then answer that they do nothing, and
+`!help` and `!guide` leave them out.
 
 The token needs the user scopes `chat:write` and `pins:write`, which the manifest asks for. It
 can post, edit, pin and delete messages as you, anywhere you can. allaboard uses it for these
 calls: `auth.test` at startup, to check the token is yours; `chat.delete`, on the messages that
 are not the bot's in a thread you chose to delete or a channel you chose to clean up;
 `chat.update`, on the first message of a thread you tagged or whose session has a title; and
-`pins.add` or `pins.remove` on that message. It is the one credential in `.env` that acts under your name: if you do not want
+`pins.add` or `pins.remove` on the first message of a thread you pinned or unpinned. It is the one credential in `.env` that acts under your name: if you do not want
 those features, leave it out of `.env`.
 
 An app created before the manifest asked for these user scopes has no such token, or a token
 without `pins:write`. Open **OAuth & Permissions**, and under **Scopes**, **User Token Scopes**,
 add `chat:write` and `pins:write`; reinstall the app to your workspace when Slack asks, and copy
-the **User OAuth Token**. An install that already has the token must do this once to use `!tag`
-and `!untag`: allaboard asks Slack at startup which scopes the token holds, and without
+the **User OAuth Token**. An install that already has the token must do this once to use `!pin`
+and `!unpin`: allaboard asks Slack at startup which scopes the token holds, and without
 `pins:write` it offers neither word, logs one line saying so, and keeps the Home tab's Delete and
-Clean up working with `chat:write` alone. A token for which Slack reports no scopes gets the
+Clean up, `!tag`, `!untag` and titles working with `chat:write` alone. A token for which Slack reports no scopes gets the
 same treatment.
 
 ### Find your member ID
@@ -337,7 +337,7 @@ belong to the daemon.
 | `SLACK_APP_TOKEN` | the `xapp-…` token |
 | `SLACK_OWNER_USER_ID` | your member ID, the only person the bot answers |
 | `ALLOWED_ROOT` | the directory `!bind` accepts paths under, for example `~/code` |
-| `SLACK_USER_TOKEN` | your own `xoxp-…` token, for the Home tab's Delete and Clean up, for `!delete-thread` and `!clean-channel`, for `!tag` and `!untag`, and for the session's title on the thread's first message; allaboard starts without it, and the Home tab then has no Edit button |
+| `SLACK_USER_TOKEN` | your own `xoxp-…` token, for the Home tab's Delete and Clean up, for `!delete-thread` and `!clean-channel`, for `!tag`, `!untag`, `!pin` and `!unpin`, and for the session's title on the thread's first message; allaboard starts without it, and the Home tab then has no Edit button |
 | `ALLABOARD_AGENT` | optional: the agent allaboard drives; `claude` when absent, the only one this release has |
 | `ALLABOARD_CHAT` | optional: the chat allaboard is driven from; `slack` when absent, the only one this release has |
 | `ALLABOARD_SHELL` | optional: `on` or `off`, whether `!!<command>` runs your shell commands; `on` when absent |
@@ -609,7 +609,7 @@ The bot answers one person, and the rest of this list protects what that person 
 - `~/.config/allaboard/.env` is mode `600`.
 - `SLACK_USER_TOKEN` acts as you in the whole workspace, and whoever reads `.env` can post and
   delete, edit and pin under your name. Leave the line out if you do not use the Home tab's Delete
-  or Clean up, `!delete-thread`, or `!tag` and `!untag`.
+  or Clean up, `!delete-thread`, `!tag`, `!untag`, `!pin` or `!unpin`.
 - A deleted first message makes allaboard forget its thread (see "Deleting a thread's first message
   by hand"). The event Slack sends names the message's author and its workspace but not who deleted
   it, so allaboard checks that the deleted message was yours, in your workspace, and that it is a
@@ -1091,17 +1091,16 @@ from goes on as it was. Use it when a session finds a problem that is not its ta
 ### Tagging a thread
 
 Once a thread turns out to matter, mark it from inside the thread: `!tag devops` puts
-`` `[devops]` `` at the start of the thread's first message, in inline code, and pins that message
-to the channel, so the channel's main view shows the tag and Slack's `Pinned by you` line, and
-Slack's search finds the tag word across channels. `!untag` removes both. One tag at a time: a
+`` `[devops]` `` at the start of the thread's first message, in inline code, so the channel's main
+view shows the tag and Slack's search finds the tag word across channels. `!untag` removes it. A
+tag does not pin the thread: `!pin` does that (see "Pinning a thread"). One tag at a time: a
 second `!tag` replaces the first. The name is 1 to 40 letters, digits, `.`, `_` or `-`, kept as
 you typed it.
 
 Both words need `SLACK_USER_TOKEN` (Part 1), because the first message is yours and Slack lets
 only its author edit it. They answer with a ✅ on your word and post nothing in the thread. The edit
-arrives as a changed message, which allaboard ignores, and no `pinned_item` message is posted;
-tagging, untagging, pinning and unpinning sent no push to iOS (measured 2026-10-19 on a
-dev workspace). The first message gains `(edited)`.
+arrives as a changed message, which allaboard ignores; tagging and untagging sent no push to iOS
+(measured 2026-10-19 on a dev workspace). The first message gains `(edited)`.
 
 The session in Claude Code is tagged with the same name, which the terminal's `/resume` picker
 prints as `#name` for the sessions it lists. A thread whose session has not started yet (the
@@ -1109,6 +1108,16 @@ setup is still open) is tagged in Slack alone. When only Claude Code's tag fails
 see says so and the tag in Slack stays. The tag is read back from the first message, so
 `state.json` keeps nothing of it. Text you wrote that starts with an inline-code `[name]` and a
 space reads as a tag.
+
+### Pinning a thread
+
+`!pin`, inside a thread, pins its first message to the channel, so the channel's main view shows
+Slack's `Pinned by you` line, the Home tab lists the session first in its channel, and neither Delete
+nor Clean up removes the thread. `!unpin` removes the pin, also one you made by hand in Slack. A pin
+and a tag are independent: a thread that an earlier version pinned with `!tag` keeps its pin after
+`!untag`, until `!unpin`. Both words need `SLACK_USER_TOKEN` with the user scope `pins:write`
+(Part 1). They answer with a ✅ on your word and post nothing in the thread; no `pinned_item` message
+is posted, and pinning and unpinning sent no push to iOS (measured 2026-10-19 on a dev workspace).
 
 ### The title of a thread
 
@@ -1128,7 +1137,7 @@ the first prompt, sometimes only after the third or a later turn, and keeps it; 
 on the message.
 
 The edit is the same user-token edit as a tag and needs `chat:write` alone: a token without
-`pins:write` has no `!tag` and still shows titles. The edit adds `(edited)`, posts nothing in the
+`pins:write` has no `!pin` and still shows titles. The edit adds `(edited)`, posts nothing in the
 thread and sends no push (measured for `!tag` on 2026-10-19). `!tag` and `!untag` keep working on
 a titled message: the tag goes before the title and `!untag` leaves the title. If you edit the
 message by hand, the next title replaces what you wrote. A failure to read or show a title, or to
@@ -1162,7 +1171,7 @@ a blank row before the next:
 - in small text, the status in a word (`working`, `waiting for you`, `ended`, `error`), the
   thread's number of replies and the time since its last reply, as the channel shows them under
   the root message, and an **Open** link, which opens the thread on its last message. A thread
-  you pinned with `!tag` starts this line with :pushpin:, and a tagged one with its tag in
+  you pinned starts this line with :pushpin:, and a tagged one with its tag in
   inline code, as in ``:pushpin: `[devops]` · ended · 30 replies · last reply 6 days ago · Open``.
 
 A pinned session is listed first in its channel, newest first among the pinned, and stays on the
@@ -1178,7 +1187,7 @@ Controls at the top of the page narrow it: a channel, a status, a period (`Last 
 `Today`, `Yesterday`, `Last 7 days`, `Last 30 days`, `Any time`, by the thread's last reply,
 the days being those of the machine allaboard runs on), a tag, and a search on the titles (type a
 word and press Enter). The tag menu lists the tags found on the page's threads, and appears once
-one thread has a tag. The page starts on `Last 48 hours`. The controls add up, and with a
+one thread has a tag; choosing a tag finds its threads whatever the period. The page starts on `Last 48 hours`. The controls add up, and with a
 channel, a status, a tag or a search chosen a channel shows every session that matches, not
 five. **Show all** chooses that channel. The choices last until allaboard restarts.
 
@@ -1201,8 +1210,8 @@ number of replies is read when a session starts or ends a turn, so a word typed 
 With `SLACK_USER_TOKEN` configured (Part 1), the row of buttons under the header line carries an
 **Edit** button, beside **Refresh**. In edit mode each session shows a red **Delete** button, the **New thread** buttons are
 left out, and **Done** leaves the mode. A session that is working or waiting for you has no
-Delete, and neither has one whose first message is pinned (`!tag` pins it; you may pin it by
-hand). A thread is also kept when any of its replies is pinned: the delete reads the whole
+Delete, and neither has one whose first message is pinned (`!pin` pins it; you may pin it by
+hand). A tag does not protect a thread from a delete. A thread is also kept when any of its replies is pinned: the delete reads the whole
 thread first, and refuses with the line `This thread is pinned, so it is not deleted.` (or `A
 message of this thread is pinned, so it is not deleted.` for a reply) and how to unpin it. A pin
 the page has not caught up with, or added while the delete runs, is caught the same way: the
@@ -1317,8 +1326,10 @@ a `!` is never a command.
 | `!open <path or words>` | Refused | Shares that file into the thread |
 | `!diff` | Refused | Lists the files that differ from HEAD in the session's git repository, with a **Diff** button each |
 | `!rewind` | Refused | Lists the session's prompts, to go back to one: restores its code, its conversation or both |
-| `!tag <name>` | Refused | Puts `[name]` at the start of the thread's first message, pins it, and tags the session in Claude Code |
-| `!untag` | Refused | Takes the tag and the pin away |
+| `!tag <name>` | Refused | Puts `[name]` at the start of the thread's first message and tags the session in Claude Code |
+| `!untag` | Refused | Takes the tag away |
+| `!pin` | Refused | Pins the thread's first message to the channel |
+| `!unpin` | Refused | Takes the pin away |
 | `!delete-thread` | Refused | Asks you to confirm, then deletes the thread |
 | `!clean-channel` | Asks you to confirm, then deletes the channel's threads and what sits outside them | Refused |
 | `!!<command>` | Refused | Asks you to confirm, runs the command in the session's folder, and Claude answers its output |
@@ -1384,10 +1395,16 @@ command the agent does not list is not offered.
   - In a thread: The terminal's `/rewind`. Posts a list of the session's prompts, newest first, in a selector of the newest 100 (the terminal keeps 100 checkpoints); commands such as `/model` are not prompts. Picking one runs a dry run of the file restore and replaces the list with the actions that apply there: **Restore code and conversation**, **Restore conversation**, **Restore code** (the two with code only where the dry run shows changes, with the number of files and the lines they change) and **Never mind**. The first prompt of a session offers the code alone: nothing precedes it to go back to. The terminal's **Summarize from here** and **Summarize up to here** are not offered ([limits](limits.md)). Restoring the code puts back the files Claude changed with its file tools, and files a Bash command or a subagent changed are not restored, as in the terminal. Restoring the conversation closes the session's process and starts it again without the prompt and everything after it, on the same session id: the replies from that prompt on stay in the thread, each message edited into one collapsed card titled `Removed by rewind` with its text inside (cut at 2,900 characters), nothing is deleted, and the prompt is posted again for you to copy and send, since the composer cannot be filled for you. The cut holds once you send a message; until then a restart of allaboard brings the dropped turns back. The messages of replies are remembered in memory only, so replies of turns it no longer remembers (those from before allaboard last started, for one) are not folded, and a line says so. Refused with a line while a turn runs, a question or approval waits for you, or background work runs: `!stop` first. Needs a chat that shows lists in a thread and an agent that can restore files or cut a conversation. A cut the agent refuses leaves the session as it was
 - `!tag <name>`
   - At the top level: Refused, in a post in the channel: ``A tag belongs to one session: send `!tag <name>` or `!untag` inside its thread.``
-  - In a thread: Puts `[name]`, in inline code, and a space at the start of the thread's first message, replacing a tag already there, and pins that message to the channel. The name is 1 to 40 letters, digits, `.`, `_` or `-`, kept as typed; a missing or refused name shows the list of words. The first message is yours, so the edit and the pin are made with `SLACK_USER_TOKEN` (user scopes `chat:write` and `pins:write`): Slack shows `Pinned by you`, adds `(edited)` to the message and posts nothing else. When the thread's session has an id, Claude Code's own tag for it is set to the same name too (its `/resume` picker prints it as `#name`); a thread whose session has not started yet is tagged in Slack alone. The answer is ✅ on your word and no line of text. The Home tab shows the tag and the pin on the session's row after the word ("Finding a session again: the Home tab"). A refusal by Slack reaches you in the error line of any failed word, with Slack's code; if only Claude Code's tag fails, ``Slack shows the change, but Claude Code's own tag for this session did not change.`` follows, and the tag in Slack stays. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot tag a thread here, so `!tag` and `!untag` do nothing.`` and `!help` and `!guide` leave it out
+  - In a thread: Puts `[name]`, in inline code, and a space at the start of the thread's first message, replacing a tag already there; the pin stays as it is. The name is 1 to 40 letters, digits, `.`, `_` or `-`, kept as typed; a missing or refused name shows the list of words. The first message is yours, so the edit is made with `SLACK_USER_TOKEN` (user scope `chat:write`): Slack adds `(edited)` to the message and posts nothing else. When the thread's session has an id, Claude Code's own tag for it is set to the same name too (its `/resume` picker prints it as `#name`); a thread whose session has not started yet is tagged in Slack alone. The answer is ✅ on your word and no line of text. The Home tab shows the tag on the session's row after the word ("Finding a session again: the Home tab"). A refusal by Slack reaches you in the error line of any failed word, with Slack's code; if only Claude Code's tag fails, ``Slack shows the change, but Claude Code's own tag for this session did not change.`` follows, and the tag in Slack stays. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot tag a thread here, so `!tag` and `!untag` do nothing.`` and `!help` and `!guide` leave it out
 - `!untag`
   - At the top level: Refused, as above
-  - In a thread: Removes the `[name]` prefix, unpins the first message when it carried a tag (a pin you made by hand on an untagged message stays) and clears Claude Code's tag for the session; the same answer and limits as `!tag`. The text it takes off must be exactly the inline-code `[name]` and a space that `!tag` writes
+  - In a thread: Removes the `[name]` prefix and clears Claude Code's tag for the session, and leaves the pin; the same answer and limits as `!tag`. The text it takes off must be exactly the inline-code `[name]` and a space that `!tag` writes
+- `!pin`
+  - At the top level: Refused, in a post in the channel: ``A pin belongs to one session: send `!pin` or `!unpin` inside its thread.``
+  - In a thread: Pins the first message to the channel, with `SLACK_USER_TOKEN` (user scope `pins:write`): Slack shows `Pinned by you` and posts nothing else. The tag stays as it is. A first message already pinned stays so. The answer is ✅ on your word and no line of text; a refusal by Slack reads ``Slack refused the pin: `code`.``. Without the token or the scope, the word answers ``Slack cannot pin a thread here, so `!pin` and `!unpin` do nothing.`` and `!help` and `!guide` leave it out
+- `!unpin`
+  - At the top level: Refused, as above
+  - In a thread: Unpins the first message, whoever pinned it, by hand included, and leaves the tag; the same answer and limits as `!pin`. A pinned reply stays pinned
 - `!delete-thread`
   - At the top level: Refused, in a post in the channel: ``Deleting a thread belongs to one session: send `!delete-thread` inside its thread.``
   - In a thread: Asks first, in a message only you see under your word, titled `Delete this thread?`, with the Home tab's warning and the buttons `Delete thread` and `Cancel`. Either button takes the question away; `Delete thread` then deletes the thread as the Home tab's Delete does ("Deleting a thread"). A thread that is working or waiting for you is refused before the question: ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` So is a thread with a pinned message: ``This thread is pinned, so it is not deleted. `!untag` removes its tag and its pin.`` when the first message carries a tag, ``This thread is pinned, so it is not deleted. Unpin its first message in Slack, then delete it.`` when it is pinned by hand, and ``A message of this thread is pinned, so it is not deleted. Unpin it in Slack, then delete it.`` when a reply is. A pin added after the question, or while the delete runs, is caught when you confirm, with the same line. Anything after the word shows the list of words. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot delete a thread here, so `!delete-thread` does nothing.`` and `!help` and `!guide` leave it out
@@ -2001,7 +2018,7 @@ The manifest asks for private channels only (`groups:history`, `groups:read`,
 `files:write` for `!open`, which shares a file of the session's folder into its thread, and
 `reactions:write` for the status reaction on a session's root message. It also asks for the user
 scopes `chat:write` and `pins:write`, which give the app your `xoxp-` token for the Home tab's
-Delete and Clean up, for `!delete-thread` and for `!tag` and `!untag` (Part 1, step 3). It subscribes to one more
+Delete and Clean up, for `!delete-thread`, for `!tag` and `!untag`, and for `!pin` and `!unpin` (Part 1, step 3). It subscribes to one more
 event, `file_change`, which is how the app learns that Slack has written the transcript of an
 audio clip you sent; reading it needs `files:read` and no scope of its own. It also switches on the
 app's **Home** tab, where allaboard keeps the list of your sessions; publishing it needs no

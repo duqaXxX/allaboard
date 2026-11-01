@@ -51,12 +51,12 @@ test("the question is posted for the owner alone, in the thread, with its two bu
 
 test("a pinned thread gets the refusal in place of the question", async (t) => {
   const world = worldOf(t);
-  world.pinnedRefusal = { reason: "pinned", where: "tagged-root" };
+  world.pinnedRefusal = { reason: "pinned", where: "root" };
   await world.built.askDelete(CHANNEL, THREAD);
   const posts = world.slack.callsTo("chat.postEphemeral") as Body[];
   assert.equal(posts.length, 1);
   const [post] = posts as [Body];
-  assert.equal(post.text, slackTexts.DELETE_PINNED_TAGGED);
+  assert.equal(post.text, named(slackTexts.DELETE_PINNED_ROOT, NAMES));
   assert.equal(post.thread_ts, THREAD);
   assert.equal(post.user, OWNER);
   assert.ok(
@@ -79,8 +79,7 @@ test("Delete thread takes the question away, then deletes the thread the click s
 // the Home tab's, which speak of a page and a button the thread does not have.
 const REFUSALS: readonly [DeleteRefusal, string][] = [
   [{ reason: "busy" }, texts.DELETE_THREAD_BUSY],
-  [{ reason: "pinned", where: "tagged-root" }, slackTexts.DELETE_PINNED_TAGGED],
-  [{ reason: "pinned", where: "root" }, named(slackTexts.DELETE_PINNED_BY_HAND, NAMES)],
+  [{ reason: "pinned", where: "root" }, named(slackTexts.DELETE_PINNED_ROOT, NAMES)],
   [{ reason: "pinned", where: "reply" }, named(slackTexts.DELETE_PINNED_REPLY, NAMES)],
   [
     { reason: "refused", count: 2 },

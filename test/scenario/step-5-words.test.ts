@@ -112,8 +112,8 @@ test("!stop ends the turn that runs, in a thread or in the channel, and says so 
   await world.finish();
 });
 
-// The words of the daemon this pair can serve: no bypass mode, no file upload and no thread tags,
-// so `!bypass`, `!open`, `!tag` and `!untag` are refused when typed and the help does not offer
+// The words of the daemon this pair can serve: no bypass mode, no file upload, no thread tags or pins,
+// so `!bypass`, `!open`, `!tag`, `!untag`, `!pin` and `!unpin` are refused when typed and the help does not offer
 // them. The daemon always has a way
 // to update itself, so `!allaboard` is offered. It keeps no record of trust: the `!bind` line is the
 // one that speaks of none.
@@ -129,6 +129,8 @@ const OFFERED_WORDS = texts.HELP_WORDS_ANY.map((line) => named(line, NAMES)).fil
       "`!rewind",
       "`!tag",
       "`!untag",
+      "`!pin",
+      "`!unpin",
       "`!delete-thread",
       "`!clean-channel",
       "`!!",
@@ -327,6 +329,7 @@ test("!guide describes only what this agent and this chat can serve", async (t) 
       diff: false,
       rewind: false,
       threadTags: false,
+      threadPins: false,
       threadDelete: false,
       channelClean: false,
       shell: false,

@@ -5,8 +5,18 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- `!tag` and `!untag` no longer pin: they handle the `[name]` prefix and the session's tag, and need
+  `chat:write` alone. A tagged thread that is not pinned can be deleted, and on the Home tab only
+  pinned threads come first. A thread pinned by an earlier `!tag` keeps its pin until `!unpin`
+  (#169).
+
 ### Added
 
+- `!pin` and `!unpin` pin and unpin the thread's first message, however the pin was made, and leave
+  the tag alone. They need `pins:write`; a token without it logs one line and offers neither word.
+  The chat seam gains the capability `threadPins` and `ChatProvider.pinThread` (#169).
 - `!clean-channel`, sent in a channel, asks the owner to confirm, then deletes the channel's threads
   and what the Home tab's Clean up deletes (#150). The Clean up itself now tries Slack's notices of the channel, those naming other
   members too, and always ends on a line with the count.

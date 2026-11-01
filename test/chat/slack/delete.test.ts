@@ -367,10 +367,10 @@ function pinnedRoot(tag: string | null): JsonObject {
 }
 
 for (const [tag, where] of [
-  ["devops", "tagged-root"],
+  ["devops", "root"],
   [null, "root"],
 ] as const) {
-  test(`a pinned root (${where}) is refused, and nothing is touched`, async () => {
+  test(`a pinned root (${tag ?? "no tag"}) is refused, and nothing is touched`, async () => {
     const world = new World();
     world.bot.responses["conversations.replies"] = paged([pinnedRoot(tag)]);
     assert.deepEqual(await world.deleter.delete(CHANNEL, ROOT), { reason: "pinned", where });
@@ -381,6 +381,14 @@ for (const [tag, where] of [
     assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
   });
 }
+
+test("a tag alone does not keep a thread from a delete", async () => {
+  const world = new World();
+  const { pinned_to: _pin, ...tagged } = pinnedRoot("devops");
+  world.bot.responses["conversations.replies"] = untilRootGone(world, paged([tagged]));
+  assert.equal(await world.deleter.delete(CHANNEL, ROOT), null);
+  assert.deepEqual(world.deleted(world.owner), [ROOT]);
+});
 
 test("a pinned reply refuses the delete before the session is released", async () => {
   const world = new World();
@@ -462,14 +470,10 @@ test("a pin added after the question is caught by the next delete", async () => 
   assert.deepEqual(await world.deleter.delete(CHANNEL, ROOT), { reason: "pinned", where: "root" });
 });
 
-test("the three pinned lines are worded for what is pinned", () => {
-  assert.equal(
-    pinnedLine({ reason: "pinned", where: "tagged-root" }, PLAIN_NAMES),
-    slackTexts.DELETE_PINNED_TAGGED,
-  );
+test("the two pinned lines are worded for what is pinned", () => {
   assert.equal(
     pinnedLine({ reason: "pinned", where: "root" }, PLAIN_NAMES),
-    named(slackTexts.DELETE_PINNED_BY_HAND, PLAIN_NAMES),
+    named(slackTexts.DELETE_PINNED_ROOT, PLAIN_NAMES),
   );
   assert.equal(
     pinnedLine({ reason: "pinned", where: "reply" }, PLAIN_NAMES),
