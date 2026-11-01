@@ -51,28 +51,33 @@ With [nvm](https://github.com/nvm-sh/nvm), whose README gives `nvm install`, `nv
 
 ```bash
 nvm install 22
-nvm exec 22 npm install -g allaboard
-nvm exec 22 allaboard --version
-nvm exec 22 allaboard service install
+nvm exec 22 -- npm install -g allaboard
+nvm exec 22 -- allaboard --version
+nvm exec 22 -- allaboard service install
 ```
 
-`nvm install 22` installs the latest 22.x beside your other versions. `nvm exec 22 <command>` runs
+`nvm install 22` installs the latest 22.x beside your other versions. `nvm exec 22 -- <command>` runs
 one command in a subshell with that version first on the `PATH`, which leaves your shell as it was.
 Global npm packages belong to the Node that installed them (nvm's `NVM_BIN` is where the active
 version's Node, npm and global packages live), so `allaboard` is installed for 22 only and the
 command is not on your default Node's `PATH`. Put an alias for it in your shell profile:
 
 ```bash
-alias allaboard='nvm exec 22 allaboard'
+alias allaboard='nvm exec --silent 22 -- allaboard'
 ```
+
+`--` stops nvm reading the arguments as its own: without it, `--help`, `-h` or `help` anywhere in
+the command prints nvm's help and allaboard never starts (the `nvm` function in `nvm.sh`, v0.39.7
+to v0.40.3, read 2026-11-01; nvm's own help documents `--silent` and not `--`). `--silent` drops the
+`Running node ...` line from the output of every command.
 
 `nvm which 22` prints the path of that Node, which `ProgramArguments` in the plist names. When 22
 is the first version nvm installs, nvm also makes it the default of new shells; `nvm alias default
 <version>` sets another.
 
 With nvm that path holds the version folder (`.../v22.x.y/bin/node`). When you remove that version,
-or replace it with a newer 22.x, the service stops starting. Run `nvm exec 22 allaboard service
-uninstall`, then `nvm exec 22 allaboard service install` again, with the version that is installed.
+or replace it with a newer 22.x, the service stops starting. Run `nvm exec 22 -- allaboard service
+uninstall`, then `nvm exec 22 -- allaboard service install` again, with the version that is installed.
 
 Without nvm, unpack an official archive from [nodejs.org/dist](https://nodejs.org/dist/) (each
 release folder lists the macOS archives and a `SHASUMS256.txt` to check them against) into a
@@ -1837,7 +1842,7 @@ change it, edit **Display Name** under **App Home** in the app's settings.
 ## Uninstalling
 
 Remove each instance's service first, then the package, then the files allaboard left. Run the
-commands with the Node allaboard was installed with (`nvm exec 22 …` if you followed
+commands with the Node allaboard was installed with (`nvm exec 22 -- …` if you followed
 [A Node of its own](#a-node-of-its-own)).
 
 1. For each instance `allaboard service list` shows, stop and remove its service. The uninstall
