@@ -28,6 +28,8 @@ function deleteLine(refusal: DeleteRefusal, names: Names): string {
       return pinnedLine(refusal, names);
     case "refused":
       return fill(named(slackTexts.THREAD_DELETE_REFUSED, names), { count: refusal.count });
+    case "left":
+      return fill(named(slackTexts.THREAD_DELETE_LEFT, names), { count: refusal.count });
     case "failed":
       return fill(slackTexts.THREAD_DELETE_FAILED, { error: refusal.error });
   }

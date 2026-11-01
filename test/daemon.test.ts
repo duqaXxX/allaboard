@@ -2108,15 +2108,22 @@ test("the deleter is given the bot client, then the owner's", async (t) => {
   storedThread(d);
   const own = "1780000000.000002";
   const bots = "1780000000.000003";
-  d.slack.responses["conversations.replies"] = {
-    ok: true,
-    messages: [
-      { type: "message", ts: IN_THREAD, user: OWNER, thread_ts: IN_THREAD, text: "x" },
-      { type: "message", ts: own, user: OWNER, thread_ts: IN_THREAD, text: "x" },
-      { type: "message", ts: bots, user: BOT, bot_id: "B000BOT", thread_ts: IN_THREAD, text: "x" },
-    ],
-    has_more: false,
-    response_metadata: { next_cursor: "" },
+  const threadMessages: Record<string, string>[] = [
+    { type: "message", ts: IN_THREAD, user: OWNER, thread_ts: IN_THREAD, text: "x" },
+    { type: "message", ts: own, user: OWNER, thread_ts: IN_THREAD, text: "x" },
+    { type: "message", ts: bots, user: BOT, bot_id: "B000BOT", thread_ts: IN_THREAD, text: "x" },
+  ];
+  // A message deleted is no longer read: the deleter asks again before it takes the root.
+  d.slack.responses["conversations.replies"] = () => {
+    const gone = [...d.slack.callsTo("chat.delete"), ...d.owner.callsTo("chat.delete")].map(
+      (call) => call.ts,
+    );
+    return {
+      ok: true,
+      messages: threadMessages.filter((message) => !gone.includes(message.ts)),
+      has_more: false,
+      response_metadata: { next_cursor: "" },
+    };
   };
   d.start();
   await d.booted();
@@ -2124,7 +2131,7 @@ test("the deleter is given the bot client, then the owner's", async (t) => {
   await d.deliver(homeAction({ type: "button", action_id: EDIT_ACTION, value: EDIT_ON }));
   const thread = `${CHANNEL}:${IN_THREAD}`;
   await d.deliver(homeAction({ type: "button", action_id: DELETE_ACTION, value: thread }));
-  await d.until(() => d.owner.callsTo("chat.delete").length > 0);
+  await d.until(() => d.owner.callsTo("chat.delete").length > 1);
   // What the bot wrote goes with the bot's token, everything else with the owner's.
   assert.deepEqual(
     d.slack.callsTo("chat.delete").map((call) => call.ts),

@@ -1235,6 +1235,7 @@ then stays on the page:
 |---|---|
 | `Not deleted: that thread is working or waiting for you.` | A turn runs in the thread, or an approval or a question waits for you: let it end, or send `!stop` in the thread |
 | `` Could not delete every message of that thread (`<Slack's error>`). Delete it again to continue. `` | Slack or the network failed half way: Delete continues with the messages that are left |
+| ``Slack still shows 2 of that thread's messages after the delete. Delete it again to continue.`` | A read after the delete still finds those messages |
 | `` Slack refused to delete 2 of that thread's messages (`cant_delete_message`): they are not yours or the bot's, or your workspace does not let you delete them. Every other message is gone and the thread is still listed. `` | The first message stays so the thread can still be opened: delete what is left by hand in Slack |
 
 `!delete-thread`, sent inside the thread, deletes it the same way without the Home tab: it asks
@@ -1247,6 +1248,7 @@ gone. A delete that does not end tells you why under your word, in a message onl
 |---|---|
 | ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` | The thread started working, or began to wait for you, after the question was shown |
 | `` Could not delete every message of this thread (`<Slack's error>`). Send `!delete-thread` again to continue. `` | Slack or the network failed half way: the word continues with the messages that are left |
+| ``Slack still shows 2 of this thread's messages after the delete. Send `!delete-thread` again to continue.`` | A read after the delete still finds those messages |
 | `` Slack refused to delete 2 of this thread's messages (`cant_delete_message`): they are not yours or the bot's, or your workspace does not let you delete them. Every other message is gone. `` | The first message stays so the thread can still be opened |
 
 A message you send in a thread while it is being deleted starts nothing: you are told
