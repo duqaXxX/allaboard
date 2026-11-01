@@ -69,7 +69,7 @@ import {
   REWIND_ACTION_ACTION,
   REWIND_POINT_ACTION,
 } from "../lists.ts";
-import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.ts";
+import { OPEN_FIELD, OPEN_FILE_ACTIONS } from "../openfile/search.ts";
 import { levelLogger } from "../quiet-logger.ts";
 import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
 import { describe } from "../reply/errors.ts";
@@ -431,9 +431,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
 
-  action(OPEN_BUTTON_ACTION, open.onOpenChoose);
-  action(QUERY_ACTION, open.onOpenQuery);
-  view(OPEN_FORM, open.onOpenSubmit);
+  action(OPEN_FIELD, open.onOpenSearch);
+  action(OPEN_FILE_ACTIONS, open.onOpenFile);
 
   action(DELETE_THREAD_CONFIRM, deleteThread.onConfirm);
   action(DELETE_THREAD_CANCEL, deleteThread.onCancel);

@@ -89,20 +89,3 @@ export function clickThread(body: Payload): string {
   const found = [container.thread_ts, message.thread_ts].find(truthy);
   return str(found === undefined ? message.ts : found);
 }
-
-/**
- * When an interaction happened, from its `action_ts`: what orders the updates it causes. `now`,
- * the arrival time in seconds, for a payload that carries none.
- *
- * `inf`, `nan` and digits grouped with `_`, which Slack never writes, are a payload that carries
- * no time.
- */
-export function actionKey(action: Payload, now: () => number): number {
-  const raw = action.action_ts;
-  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-  if (typeof raw === "string" && raw.trim() !== "") {
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return now();
-}

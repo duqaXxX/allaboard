@@ -43,6 +43,7 @@ import {
   REWIND_POINT_ACTION,
   viewValue,
 } from "../../../../src/chat/slack/lists.ts";
+import { OPEN_FILE_ACTIONS } from "../../../../src/chat/slack/openfile/search.ts";
 import {
   QUESTION_EDIT,
   SHELL_CANCEL,
@@ -73,7 +74,6 @@ import {
   answerClick,
   type Body,
   CLICK_THREAD,
-  chooseClick,
   chosenOption,
   click,
   clickIn,
@@ -84,6 +84,7 @@ import {
   FORM_THREAD,
   fieldEnter,
   fieldSend,
+  fileClick,
   formAction,
   HOME_THREAD,
   homeAction,
@@ -98,11 +99,10 @@ import {
   respondedTo,
   resumeClick,
   SESSION_A,
+  searchEnter,
   selectIn,
   setupState,
   submitOn,
-  submitted,
-  typing,
   updatingWorld,
   type World,
   worldOf,
@@ -403,38 +403,25 @@ const CASES: readonly Case[] = [
     },
   },
   {
-    listener: "action open_choose",
-    arrange: async (world, sender) => {
+    listener: "action open_search",
+    responds: true,
+    arrange: async (world, sender, responses) => {
       world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      put(join(world.root, "app"), "notes.txt", "hello\n");
       return {
-        body: chooseClick("", userOf(sender)),
-        acted: () => world.slack.callsTo("views.open").length > 0,
+        body: sentBy(searchEnter("notes"), sender),
+        acted: () => responses.length > 0 || world.slack.callsTo("chat.postEphemeral").length > 0,
       };
     },
   },
   {
-    listener: "action open_query",
-    arrange: async (world, sender) => {
-      world.state.openThread(CHANNEL, THREAD, SESSION_A);
-      new ModalSlack(world.slack);
-      const body = typing("notes", 1790000100, {
-        ...(sender === "stranger" && { user: STRANGER }),
-        ...(sender === "other workspace" && { team: OTHER_TEAM }),
-      });
-      return { body, acted: () => world.slack.callsTo("views.update").length > 0 };
-    },
-  },
-  {
-    listener: "view open_form",
+    listener: `action ${OPEN_FILE_ACTIONS}`,
+    responds: true,
     arrange: async (world, sender) => {
       world.state.openThread(CHANNEL, THREAD, SESSION_A);
       put(join(world.root, "app"), "notes.txt", "hello\n");
-      const body = submitted("notes.txt", {
-        ...(sender === "stranger" && { user: STRANGER }),
-        ...(sender === "other workspace" && { team: OTHER_TEAM }),
-      });
       return {
-        body,
+        body: sentBy(fileClick("notes.txt"), sender),
         acted: () => world.slack.callsTo("files.completeUploadExternal").length > 0,
       };
     },

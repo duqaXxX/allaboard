@@ -269,7 +269,8 @@ test("no command of open writes the index or leaves a lock", async () => {
   // Each command ran and answered, so that an unchanged index is not a command that failed:
   // a thread that began before this repository was made runs every command of `startCommit`
   // (the time, the entries up to it, all the entries, the first one's old value, the empty tree).
-  assert.equal(await startCommit(found, started(1)), emptyTree(folder));
+  // Git reads a date under nine digits as a day of the month, so `1` failed on every 1st.
+  assert.equal(await startCommit(found, started(100_000_000)), emptyTree(folder));
   assert.equal(
     await startCommit(found, started(Math.trunc(Date.now() / 1000) + 1)),
     git(folder, "rev-parse", "HEAD"),

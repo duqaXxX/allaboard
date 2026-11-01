@@ -14,10 +14,9 @@
  */
 import { randomUUID } from "node:crypto";
 import type { CommandSuggestion, InboundMessage } from "../../seam.ts";
-import { describe } from "../reply/errors.ts";
 import { parsePick, SUGGEST_EDIT, suggestionBlocks, typedMessage } from "../suggest.ts";
 import * as slackTexts from "../texts.ts";
-import { type Answers, type AppParts, logger } from "./answers.ts";
+import type { Answers, AppParts } from "./answers.ts";
 import { interactionActor } from "./guards.ts";
 import { type ThreadOrder, threadKey } from "./order.ts";
 import {
@@ -127,7 +126,7 @@ export class Suggestions {
       this.consumed.add(blockId);
       const oldest = this.consumed.values().next().value;
       if (this.consumed.size > KEPT * 10 && oldest !== undefined) this.consumed.delete(oldest);
-      withdrawn = this.withdraw(respond);
+      withdrawn = this.answers.takeBack(respond, "a command suggestion");
       handed = this.parts.inbound.message(typedIn(channel, threadTs, typed, sent));
     } finally {
       place.leave();
@@ -144,7 +143,7 @@ export class Suggestions {
     if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
     const action = firstAction(body);
     const pick = parsePick(text(action.value) ?? text(record(action.selected_option).value));
-    await this.withdraw(respond);
+    await this.answers.takeBack(respond, "a command suggestion");
     const suggestion = pick === null ? undefined : this.kept.get(pick.id);
     const candidate = suggestion?.candidates[pick?.index ?? -1];
     if (pick === null || suggestion === undefined || candidate === undefined) {
@@ -153,16 +152,6 @@ export class Suggestions {
     }
     await this.post(channel, threadTs, pick.id, suggestion, candidate.text);
   };
-
-  /** Takes the message away. A failure leaves it showing until a reload, and is logged. */
-  private async withdraw(respond: Respond | undefined): Promise<void> {
-    if (respond === undefined) return; // a click with no `response_url`: nothing to answer
-    try {
-      await respond({ delete_original: true });
-    } catch (error) {
-      logger.warning(`could not take back a command suggestion: ${describe(error)}`);
-    }
-  }
 }
 
 /**

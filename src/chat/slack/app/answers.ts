@@ -33,6 +33,7 @@ import type { Limiter } from "../reply/limiter.ts";
 import * as slackTexts from "../texts.ts";
 import type { SlackChat, SlackThread } from "../thread.ts";
 import { type ChannelGuard, type Identity, isOwner } from "./guards.ts";
+import type { Respond } from "./wire.ts";
 
 export const logger = getLogger("allaboard.chat.slack.app");
 
@@ -283,6 +284,19 @@ export class Answers {
       }
       logger.error(`a request failed in ${channel}/${threadTs}: ${describe(error)}`);
       await guarded(fill(named(texts.ERROR_REPLY, this.parts.names), { error: describe(error) }));
+    }
+  }
+
+  /**
+   * Takes the ephemeral message a click came from away (`respond` is the click's `response_url`).
+   * A failure leaves it showing until a reload, and is logged under `what`.
+   */
+  async takeBack(respond: Respond | undefined, what: string): Promise<void> {
+    if (respond === undefined) return; // a click with no `response_url`: nothing to answer
+    try {
+      await respond({ delete_original: true });
+    } catch (error) {
+      logger.warning(`could not take back ${what}: ${describe(error)}`);
     }
   }
 

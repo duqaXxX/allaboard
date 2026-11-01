@@ -763,7 +763,7 @@ export const HELP_WORDS: readonly Named[] = [
   "`!resume [session]` this directory's sessions, or resume one by id or name in the " +
     "thread of your `!resume` message; in the channel, refused inside a thread",
   "`!open [file]` share a file of the session's folder into the thread, where {chat} opens it in " +
-    "its file viewer: a picker alone, or a path or part of a name; inside a thread, refused in " +
+    "its file viewer: the files changed in the session alone, or a path or part of a name; inside a thread, refused in " +
     "the channel",
   "`!tag <name>` mark this session's thread with a tag, 1 to 40 letters, digits, `.`, `_` or " +
     "`-`: {chat} shows it on the thread's first message and keeps the thread at hand, and " +

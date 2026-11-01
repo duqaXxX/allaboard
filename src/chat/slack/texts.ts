@@ -36,33 +36,24 @@ export const REASON_SHARED = "it is shared with another workspace";
 export const REASON_MEMBERS = "it has members other than you and the bot";
 export const REASON_UNREADABLE = "the bot cannot read its details";
 export const OPEN_FALLBACK = "Open a file";
-export const OPEN_TITLE = "*Open a file*";
-export const OPEN_BUTTON = "Choose a file";
-export const OPEN_BY_NAME = "Or type `!open setup` to open a file by name.";
 export const OPEN_NO_MATCH = "No file matches `{words}`.";
 export const OPEN_NO_MATCH_PARTIAL =
   "No file matching `{words}` was found, but the folder could not be listed in full.";
-export const OPEN_MATCHES = "*{count} files match* `{words}`";
-export const OPEN_MATCHES_ONE = "*1 file matches* `{words}`";
 export const OPEN_PARTIAL =
   "The folder could not be listed in full, so some files may be missing here.";
 export const OPEN_MATCHES_CAPPED =
   "The first {shown} of {count} are listed: type more of the name to narrow it.";
 export const OPEN_MATCHES_TOO_LONG =
   "None of their paths is short enough to list: open one with `!open <path>`.";
-export const OPEN_MODAL_TITLE = "Open a file";
-export const OPEN_MODAL_SUBMIT = "Open";
-export const OPEN_MODAL_CLOSE = "Close";
 export const OPEN_QUERY_LABEL = "Search any file";
 export const OPEN_QUERY_HINT = "Type part of a name";
-export const OPEN_ROWS_CHANGED = "Changed in this session ({count}), newest first";
+export const OPEN_CHANGED =
+  "{count} files changed in this session, newest first. Type part of a name to find the others.";
+export const OPEN_CHANGED_ONE =
+  "1 file changed in this session. Type part of a name to find the others.";
 export const OPEN_ROWS_MATCH = "{count} files match";
 export const OPEN_ROWS_MATCH_ONE = "1 file matches";
 export const OPEN_TYPE_A_NAME = "No changed files to show. Type part of a name to find a file.";
-export const OPEN_LOADING = "Looking for files…";
-export const OPEN_NONE_CHOSEN = "Choose a file first.";
-export const OPEN_FORM_NOT_OPENED =
-  "The file list could not open (`{error}`). Click Choose a file again.";
 export const OPEN_NOT_A_FILE = "`{path}` is not a file inside this session's folder.";
 export const OPEN_TOO_LARGE = naming(
   "`{path}` is larger than 1 MB, the most {chat} opens in its file viewer.",

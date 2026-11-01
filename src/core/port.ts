@@ -108,6 +108,7 @@ export type { ChannelLookup, ThreadLookup } from "./cleanup.ts";
 export { TAG_NAME } from "./commands.ts";
 export { ConfigError } from "./config.ts";
 export { changedIn } from "./files/changed.ts";
+export { looksBinary } from "./files/diff.ts";
 export type { Found } from "./files/listing.ts";
 export { Listings } from "./files/listing.ts";
 export {

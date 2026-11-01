@@ -504,8 +504,8 @@ opens the channel. `SlackThread.ask` puts his mention in the `text` alone of eac
 waits on him, an approval or a question, whose heading is then a rich text block; at the end of
 the work `SlackThread.showStatus` (done or error, with `notify`) has `ThreadPlaces.tell` ask the
 newest reply (`ReplySink.tell`) to write its last message again, the same blocks, with the mention
-added to its `text`, once; with no reply to carry it, a line of its own (the root's mark and word,
-rich text) is posted in the thread. Measured on 2026-10-26 on iOS, phone locked, Slack desktop
+added to its `text`, once; with no reply to carry it, an error posts a line of its own (the root's
+mark and word, rich text) in the thread, and a done end writes nothing: the root's mark says it. Measured on 2026-10-26 on iOS, phone locked, Slack desktop
 closed, channel on **Just mentions**, the owner's **Thread replies** notifications off, one run
 each: an invisible `text` mention pushed beside a rich text block, a streamed message, and a
 request whose heading was rich text, never beside a section heading or a context block alone; an
@@ -534,31 +534,26 @@ viewer. The word reaches the provider as `ChatProvider.openFile`, which `words.w
 the session's folder and the words typed after `!open`; a chat that declares no `fileUpload`
 answers `texts.OPEN_UNAVAILABLE` instead. The core decides what is offered and which paths are safe
 to read (`src/core/files/`, described in [Files offered by `!open`](architecture.md#files-offered-by-open));
-the provider draws the picker and the modal and uploads the file. The mechanism of each step is in
+the provider draws the search message and uploads the file. The mechanism of each step is in
 the doc comments of the symbols named here.
 
-- **The picker.** `!open` alone posts a message with one button (`modal.pickerBlocks`);
-  `!open <words>` with several matches posts the count and the same button, carrying the words.
-  `Open.onOpenChoose` checks the owner, the workspace and the channel (`Answers.admitted`), takes
-  the folder from the thread's own entry in `state.json` (`Open.threadFolder`), never the
-  channel's, and opens the modal with `views.open`. The click's `trigger_id` lives 3 seconds, so
-  the rows are waited for `modal.OPEN_WAIT` (1 second) after the click; when they are not ready the
-  modal opens with a line that says the files are being listed, and an update fills it.
-- **The modal.** `modal.modalView` builds a search field that sends an event for each character
-  and, when there are rows, a radio group of at most `modal.ROW_LIMIT` (10) options: the file name
-  (shortened in its middle past 75 characters), its folder as the description, its path as the
-  value; a path over 150 characters gets no row. The thread travels in `private_metadata`
-  (`modal.Target`) and comes back untrusted: each handler resolves it to the folder of that
-  thread's own session.
-- **Typing.** `Open.onOpenQuery` checks the owner and the workspace alone, with no call to Slack
-  for the channel, and calls `Open.updateModal`. The updates of one modal are written in the order
-  of the events (`modal.ModalUpdates`), and one made stale while it waited is never sent. A
-  rejection by Slack is logged by its error code and dropped.
-- **Open.** `Open.onOpenSubmit` answers Slack first, without a call to it: with no row chosen an
-  error on the radio block (on the search field when there are no rows), else a plain
-  acknowledgement that closes the modal. A row counts only when it is among the options of the
-  submitted view's own radio block (`modal.chosenIn`).
-- **Reading and uploading.** The row's value is untrusted input: `read.readOpenable` of the core
+- **The message.** `!open` alone, and `!open <words>` with several matches or none, post an
+  ephemeral message under the owner's word (`Open.showSearch`, `search.searchBlocks`): an `input`
+  block with a `plain_text_input` that sends on Enter (`dispatch_action_config`), up to
+  `search.FILE_BUTTONS` (5) buttons and context lines. Without words the buttons are the session's
+  changed files, newest first; with words, the matches in `rank`'s order; all are checked on disk. A button is labelled with the last two segments of the path
+  (`search.labels`), or the path itself, shortened in its middle past 75 characters, when two
+  labels collide; its value is the path, and a path over 150 characters gets no button. The folder
+  comes from the thread's own entry in `state.json` (`Open.threadFolder`), never the channel's.
+- **Enter.** `Open.onOpenSearch` checks the owner, the workspace and the channel
+  (`Answers.admitted`), finds the files, posts a new message with `thread_ts`, then takes the old one
+  away with `delete_original` on the click's `response_url`: a rewrite through
+  `response_url` showed the new message in the channel too (seen 2026-10-21, desktop). The channel
+  and the thread come from the click's container (`clickThread`), as for the command suggestion.
+  An empty field is the changed files again.
+- **A file button.** `Open.onOpenFile` makes the same checks, and takes the message away once it has shared the
+  file as `!open <path>` does. The value is untrusted: `readOpenable` holds it to the folder.
+- **Reading and uploading.** The path is untrusted input: `read.readOpenable` of the core
   resolves it, holds it to the folder, opens it once and reads at most `read.SNIPPET_LIMIT`
   (1 MB, Slack's limit for a snippet); an empty file is refused (`texts.OPEN_EMPTY`), and any other
   failure is a `read.NotAFile` the owner reads as `texts.OPEN_NOT_A_FILE`. `read.uploadFile` sends
@@ -983,8 +978,7 @@ payload, calls the core through `ChatInbound`, and draws what the core asks to b
 the deleted-first-message listener (below, "A deleted first message"), the `file_change` event (below, "An audio clip"), the Approve, Deny, Answer and Skip buttons, the
 question form's Next and Submit, the same-folder hold's two buttons, a shell command's Run and Cancel, the setup's Model select and
 Start (its Effort select and Bypass checkbox are only acknowledged, since Start reads every
-control), the Bind and Resume buttons of the two lists, the Diff button and the view selector of a list in a thread, the Update button of the update offer, `!open`'s Choose a file button with its
-modal's search field and Open, and the session index's controls (its filters, Show all, Edit, Refresh, Delete,
+control), the Bind and Resume buttons of the two lists, the Diff button and the view selector of a list in a thread, the Update button of the update offer, `!open`'s search field and file buttons, and the session index's controls (its filters, Show all, Edit, Refresh, Delete,
 Clean up and Update, and its New thread link button, which is only acknowledged). The listeners are methods
 of the classes of `src/chat/slack/app/` (`Requests`, `Open`, `ResumeBind`, `Clips`,
 `HomeControls`), which share `Answers`: the checks, where an answer goes, and how a failure is told.
@@ -1019,8 +1013,8 @@ What stays in the provider is drawing and what only the provider has: the Model 
 the setup message, the question form's pages, `!open`, the Home tab's controls and the clips.
  Bolt acknowledges an event before its listener runs, and a
 click's listener acknowledges first; each then checks the owner, the workspace and the channel
-itself; a control of the session index, and a character typed in `!open`'s modal, come with no
-channel and check the owner and the workspace. Answer, on a question, opens its form
+itself; a control of the session index comes with no
+channel and checks the owner and the workspace. Answer, on a question, opens its form
 (`Requests.onQuestionOpen`) after the owner and workspace check alone, since the click's
 `trigger_id` lives 3 seconds and the channel check makes two calls to Slack; the channel is checked
 once the form is open, and a refused channel replaces the form with the reason

@@ -1305,7 +1305,7 @@ a `!` is never a command.
 | `!terminal` | Refused | Moves that session to a terminal, a running turn with it, and gives the command to run there |
 | `!fork [prompt]` | Refused | Copies that session into a new thread of the channel, which starts on the prompt or waits for your first message there |
 | `!help [text]` | Lists allaboard's own words | Lists them and the session's commands |
-| `!open` | Refused | Opens a file picker |
+| `!open` | Refused | Offers the recent changed files and a search, in a message only you see |
 | `!open <path or words>` | Refused | Shares that file into the thread |
 | `!diff` | Refused | Lists the files that differ from HEAD in the session's git repository, with a **Diff** button each |
 | `!rewind` | Refused | Lists the session's prompts, to go back to one: restores its code, its conversation or both |
@@ -1363,10 +1363,10 @@ command the agent does not list is not offered.
   - In a thread: The same line, then allaboard's own words and every command that session offers now, in an ephemeral message; with a text, only the lines whose name or description contains it, for example `!help model`
 - `!open`
   - At the top level: Refused, in a post in the channel: ``Opening a file belongs to one session: send `!open` inside its thread.``
-  - In a thread: Posts in the thread a message with a `Choose a file` button. It opens a modal with a search field and up to 10 rows, one for each file (its name, its folder below): the files changed in the session (left out when nothing changed or the folder holds no repository git may run in) while the field is empty, the files whose path contains what you type otherwise, updated on each character. `Open` shares the chosen row into the thread, where Slack opens it in its file viewer, and closes the modal; with no row chosen it says `Choose a file first.` and stays open
+  - In a thread: Posts under your word a message only you see, with a search field and up to 5 buttons, one for each file changed in the session, newest first (left out when nothing changed or the folder holds no repository git may run in), and a line that says how many were changed and to type part of a name to find the others. Enter in the field takes the message away and posts a new one: the field holding what you typed, a button for each of the best 5 files whose path contains it, and a line with how many match; an empty field shows the changed files again. A button shares its file into the thread, where Slack opens it in its file viewer, and takes the message away
 - `!open <path or words>`
   - At the top level: Refused, as above
-  - In a thread: Shares the file at that path, relative to the session's folder, into the thread. Words that are no path open the file whose path contains them, in the same listing as the search, ignoring case; several matches post ``N files match `<words>` `` with the `Choose a file` button, which opens the modal with the words in its field. ``No file matches `<words>`.`` when none does. A path outside the folder, one that is no regular file, an empty file and a file over 1 MB are refused with a line only you see; `files:write` missing says so, and any other refusal by Slack shows Slack's error code
+  - In a thread: Shares the file at that path, relative to the session's folder, into the thread. Words that are no path open the file whose path contains them, in the same listing as the search, ignoring case; several matches show the message above with the words in its field and the best 5 as buttons. ``No file matches `<words>`.`` shows under the field when none does. A path outside the folder, one that is no regular file, an empty file and a file over 1 MB are refused with a line only you see; `files:write` missing says so, and any other refusal by Slack shows Slack's error code
 - `!diff`
   - At the top level: Refused, in a post in the channel: ``!diff` works inside a session's thread, not in the channel.``
   - In a thread: The terminal's `/diff`, `Current` view. Posts a message listing the files that differ between the working tree and HEAD in the git repository that holds the session's folder, untracked files that `.gitignore` does not exclude included: the path, `+added −removed`, and a **Diff** button that shares that file's unified diff into the thread as `<name>.diff`, where Slack opens it in its file viewer. A binary file, or an untracked one over 1 MB, is listed as `binary` with no button. Past 45 files the message says how many more there are. Once the session has edited files with Claude's Write and Edit tools, a selector adds a view per turn (`T1`, `T2`, ...) that lists what that turn edited, from the hunks Claude Code reports for those calls, and shares only that turn's hunks; the turns are those this daemon ran since it started or the session's process last started, and a change made by a shell command appears under `Current` only. The list is read when you send the word and the diff when you press the button, so a file committed meanwhile answers ``<path>` no longer differs from HEAD.` A list made for another session answers ``That list belongs to another session. Send `!diff` again.`` Refused with ``This folder is not a git repository, so there is no diff to show.`` outside git; for a repository you have not trusted in Claude Code, with the line that asks for the trust; ``No changes: the working tree matches HEAD.`` when nothing differs. A diff over 1,048,576 bytes (Slack's limit for a snippet) is not collected: the line says ``The diff of `<path>` is over 1048576 bytes, the most Slack takes as one file.`` A path the list did not hold shares nothing. A refusal by Slack (`files:write` missing) shows Slack's code in the line
@@ -1418,11 +1418,12 @@ path checked, never following a link or exceeding 1 MB, and handed to Slack as b
 is built and kept, which repositories count and how the start of a thread is found are in
 [Files offered by `!open`](architecture.md#files-offered-by-open).
 
-The modal shows 10 rows, the most a Slack radio group holds, with the real count in the line above
-them. A file name over 75 characters is shortened in its middle with `…`, a folder over 75 from the
-left, and a path over 150 characters gets no row (Slack's limit for a value) and stays reachable by
-`!open <path>`. Typing is checked for the owner and the workspace alone, with no call to Slack about
-the channel; the rows go only to your own modal. `Open` also checks the channel.
+A button's label is the last two segments of the file's path (`openfile/search.ts`), or the whole
+path, shortened in its middle with `…` past 75 characters, when two of the buttons shown would read
+the same. A path over 150 characters gets no button (Slack's limit for a value the project keeps)
+and stays reachable by `!open <path>`. The message is ephemeral like the other words' answers
+below: it disappears when Slack reloads, and a search replaces it by deleting it and posting a new
+one. Enter and a button check the owner, the workspace and the channel.
 
 A word typed in the channel is answered by a normal post in the channel, which stays there. A word
 typed inside a session's thread is answered by an ephemeral message under it: Slack shows it with
@@ -1618,7 +1619,9 @@ With three settings, Slack pushes only when a session needs you:
 
 Then a push comes from the thread, and a tap on it opens the thread:
 
-- when a prompt's work ends, done or failed: the reply's last message is edited to mention you;
+- when a prompt's work ends, done or failed: the reply's last message is edited to mention you (a
+  done end with no reply to edit, or whose last write Slack refused, gives no push, and the root's
+  mark says it);
 - for each approval request and each question of Claude's: the request mentions you;
 - when a restart or a stop of allaboard cuts a session's work short, and when a crash did, at the
   next start: the reply's last message, or a `❌ Failed` line of its own when there is none.
@@ -1998,8 +2001,8 @@ If the bot token lacks `files:read`, `files:write` or `reactions:write`, add the
 scope on the app's **OAuth & Permissions** page, then reinstall the app to the workspace. Without
 `files:read`, every attached file is refused with `HTTP 302`; without `files:write`, `!open`
 answers that it needs the scope; without `reactions:write`, the status reaction is silently
-skipped (logged, never surfaced). The modal of `!open` needs nothing more in the manifest: its
-clicks, typed characters and submit arrive as interactivity events over the same Socket Mode
+skipped (logged, never surfaced). The search message of `!open` needs nothing more in the manifest: its
+Enter and its buttons arrive as interactivity events over the same Socket Mode
 connection as the other buttons.
 
 An audio clip needs the `file_change` event among the app's bot events. An app created from an
