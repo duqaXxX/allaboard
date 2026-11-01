@@ -56,8 +56,16 @@ test("any other argument, or a second one, is invalid and named", () => {
   });
 });
 
-test("service takes exactly one of its five actions", () => {
-  for (const action of ["install", "uninstall", "status", "restart", "list"] as const) {
+test("service takes exactly one of its seven actions", () => {
+  for (const action of [
+    "install",
+    "uninstall",
+    "status",
+    "restart",
+    "stop",
+    "start",
+    "list",
+  ] as const) {
     assert.deepEqual(parseArguments(["service", action]), {
       kind: "service",
       action,
@@ -66,10 +74,10 @@ test("service takes exactly one of its five actions", () => {
   }
   const needs = {
     kind: "invalid",
-    reason: "service needs one of: install, uninstall, status, restart, list",
+    reason: "service needs one of: install, uninstall, status, restart, stop, start, list",
   };
   assert.deepEqual(parseArguments(["service"]), needs);
-  assert.deepEqual(parseArguments(["service", "start"]), needs);
+  assert.deepEqual(parseArguments(["service", "pause"]), needs);
   assert.deepEqual(parseArguments(["service", "status", "now"]), {
     kind: "invalid",
     reason: 'unknown argument "now"',
@@ -157,7 +165,7 @@ test("service list is about every instance: it takes no --instance and ignores t
 
 test("the usage names --instance and service list", () => {
   assert.match(USAGE, /--instance <name>/);
-  assert.match(USAGE, /service <install\|uninstall\|status\|restart\|list>/);
+  assert.match(USAGE, /service <install\|uninstall\|status\|restart\|stop\|start\|list>/);
   assert.match(USAGE, /ALLABOARD_INSTANCE/);
 });
 
@@ -198,6 +206,8 @@ function fakeHost(report: Report): Host & { calls: string[] } {
     uninstall: answering("uninstall"),
     status: answering("status"),
     restart: answering("restart"),
+    stop: answering("stop"),
+    start: answering("start"),
     list: answering("list"),
     instances: () => ({ rows: [], refused: [] }),
     runningPid: () => null,

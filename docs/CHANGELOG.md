@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `allaboard service stop [--instance <name>]` unloads the service and keeps it installed and
+  stopped across logins and reboots; launchd ends turns still running within 60 seconds, so run it
+  with none running; `allaboard service
+  start [--instance <name>]` loads it again. `service status` now points to `start` for a service
+  that is installed and not loaded.
 - `!pin` and `!unpin` pin and unpin the thread's first message, however the pin was made, and leave
   the tag alone. They need `pins:write`; a token without it logs one line and offers neither word.
   The chat seam gains the capability `threadPins` and `ChatProvider.pinThread` (#169).

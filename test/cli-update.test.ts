@@ -176,6 +176,8 @@ function world(t: { after(fn: () => void): void }, setup: Setup = {}): World {
       install: fail,
       uninstall: fail,
       status: fail,
+      stop: fail,
+      start: fail,
       list: fail,
       runningPid: fail,
       instances: () => setup.listing?.(copy) ?? { rows, refused: [] },

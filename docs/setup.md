@@ -537,8 +537,9 @@ and sends both outputs to the log.
 Running `allaboard service install` again changes nothing while the service is loaded with the same
 plist. When the plist it would write differs (another Node, the package moved, `claude` found in
 another folder, a plist written by hand before this command existed), it refuses and writes nothing: run `allaboard service uninstall`,
-then `allaboard service install`. The uninstall stops the daemon, and ends turns still running after
-60 seconds.
+then `allaboard service install`, once `allaboard service status` says not installed. The uninstall
+returns at once and stops the daemon, which ends turns still running within 60 seconds; until the
+daemon has exited, the install refuses.
 
 ### Checkpoint 3: the service runs it
 
@@ -559,11 +560,13 @@ after each exit (`KeepAlive`), so the same line repeats until you fix it and res
 
 The log holds what the service did, never the content of your messages.
 
-To restart it, read its state, or remove it:
+To restart it, read its state, stop it and start it again, or remove it:
 
 ```bash
 allaboard service restart
 allaboard service status
+allaboard service stop
+allaboard service start
 allaboard service uninstall
 ```
 
@@ -572,7 +575,16 @@ allaboard service uninstall
 
 `restart` sends `SIGTERM` to the running daemon (`launchctl kill TERM gui/$(id -u)/local.allaboard`):
 running turns finish first, then launchd starts it again. `status` reads `launchctl list`.
-`uninstall` unloads the service (`launchctl bootout`) and removes the plist; it leaves
+`stop` keeps the service installed and unloads it (`launchctl disable`, then `launchctl bootout`):
+run it with no turn running, since launchd ends a turn still running within 60 seconds, its reply
+with it, and a session that runs `stop` itself is such a turn. The command returns at once, while the
+daemon may still be exiting: until `status` says not loaded, `status` and `list` still show it
+running, `start` refuses, `install` answers that it is loaded though it is about to go, and
+`restart` says launchd starts the daemon again though nothing will, so run these only after that. launchd then refuses to load the service until `start` or `install`, across
+logins and reboots. It leaves the plist, `.env`, `state.json` and the log. `start` loads the plist again
+(`launchctl enable`, then `launchctl bootstrap`), and refuses with status 1 when none is installed
+or the service is already loaded. `install` also clears a `stop`. `status` and `list` show a stopped
+service as installed and not loaded. `uninstall` unloads the service (`launchctl bootout`) and removes the plist; it leaves
 `~/.config/allaboard/` (`.env`, `state.json`) and the log folder, and names both; removing
 allaboard entirely is under [Uninstalling](#uninstalling). On a system other than macOS, `allaboard service` answers that the service exists on macOS only, with status 1.
 
@@ -785,7 +797,7 @@ instance it can manage: <reason>`. That is a plist that cannot be read, whose ar
 anything but the entry file with an optional `--instance <name>`, whose name breaks the name rule
 (including `default` and `allaboard`), whose `Label` is not `local.allaboard` or
 `local.allaboard.<name>` for the instance its arguments start, or whose file name is not that label
-with `.plist`. `service install`, `uninstall`, `status` and `restart` could not find such a file by
+with `.plist`. `service install`, `uninstall`, `status`, `restart`, `stop` and `start` could not find such a file by
 an instance name. Instances installed from one copy run it
 together: `npm install -g allaboard@latest` replaces that copy, and each of them needs its own
 `allaboard service restart --instance <name>` to run the new one. The update from Slack and
@@ -913,10 +925,12 @@ project folder is. The default instance, and any instance whose `.env` does not 
 No command renames an instance: its name is in its folder, its label and its log, so moving the
 folder between an uninstall and an install renames it. From `dev` to `lab`, at a time when no
 session of `dev` is working (the uninstall ends turns still running after 60 seconds), and from a
-terminal rather than a session of that instance, which the uninstall would stop:
+terminal rather than a session of that instance, which the uninstall would stop. The uninstall
+returns before the daemon has exited, so move the folder once `status` says not installed:
 
 ```bash
 allaboard service uninstall --instance dev
+allaboard service status --instance dev
 mv ~/.config/allaboard-dev ~/.config/allaboard-lab
 allaboard service install --instance lab
 ```
@@ -1795,7 +1809,7 @@ the step it is in and puts the old folder back (npm 11.17.0, 2026-10-17: exit st
 before), and the shutdown goes on once npm has ended, for at most 2 minutes (a failure's stop,
 which otherwise ends the process 30 seconds after the failure, waits that long too). The log then holds
 the failure of the install. A `SIGKILL` of npm would leave a half-written copy, which is why the
-daemon does not send one. `launchctl bootout` (which `allaboard service uninstall` and a logout
+daemon does not send one. `launchctl bootout` (which `allaboard service stop`, `allaboard service uninstall` and a logout
 run) is the exception: launchd kills the daemon `ExitTimeOut` (60 seconds) after it, and an
 install that takes longer than that is cut off the same way and can leave a half-written copy;
 the next `npm install -g allaboard@<version>` repairs it.

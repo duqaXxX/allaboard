@@ -290,6 +290,12 @@ export class Launchd implements ServiceManager {
     return "failure" in attempt ? failed(1, [attempt.failure]) : attempt.done;
   }
 
+  /** Clears a `stop`'s `disable`, which makes launchd refuse the `bootstrap`, then loads the plist. */
+  #load(): void {
+    this.#launchctl(["enable", this.#target]);
+    this.#launchctl(["bootstrap", `gui/${this.#options.uid}`, this.#plist]);
+  }
+
   install(program: Program): Report {
     return this.#guarded(() => {
       const text = plistFor(program, this.#log, this.#options.instance);
@@ -310,7 +316,7 @@ export class Launchd implements ServiceManager {
       if (lint.status !== 0) {
         return failed(1, [`plutil refused ${this.#plist}: ${(lint.stdout || lint.stderr).trim()}`]);
       }
-      this.#launchctl(["bootstrap", `gui/${this.#options.uid}`, this.#plist]);
+      this.#load();
       const copy = copyOf(program.main);
       const version = packageVersion(join(copy, "package.json"));
       return ok([
@@ -331,11 +337,14 @@ export class Launchd implements ServiceManager {
       if (!loaded && !present) return ok([`${this.#label} is not installed.`]);
       const out: string[] = [];
       if (loaded) {
-        // Returns once the daemon has exited: its drain is cut at `ExitTimeOut`.
+        // Returns at once, and launchd cuts the daemon's drain at `ExitTimeOut`. Waiting here would
+        // deadlock a command a session of this daemon runs: the drain waits for its turn.
         this.#launchctl(["bootout", this.#target]);
-        out.push(`Stopped ${this.#label}.`);
+        out.push(`Stopping ${this.#label}.`);
       }
       if (present) {
+        // A `stop`'s `disable` would otherwise outlive the service in launchd's database.
+        this.#launchctl(["enable", this.#target]);
         rmSync(this.#plist);
         out.push(`Removed ${this.#plist}.`);
       }
@@ -351,7 +360,7 @@ export class Launchd implements ServiceManager {
       const job = this.#job();
       if (job === null) {
         const line = existsSync(this.#plist)
-          ? `${this.#label} is installed and not loaded: ${this.#command("install")} loads it.`
+          ? `${this.#label} is installed and not loaded: ${this.#command("start")} loads it.`
           : `${this.#label} is not installed.`;
         return { code: 3, out: [line], err: [] };
       }
@@ -371,7 +380,9 @@ export class Launchd implements ServiceManager {
     return this.#guarded(() => {
       const job = this.#job();
       if (job === null) {
-        return failed(1, [`${this.#label} is not loaded: ${this.#command("install")} starts it.`]);
+        // `install` would rewrite a plist that exists for the copy running this command.
+        const action = existsSync(this.#plist) ? "start" : "install";
+        return failed(1, [`${this.#label} is not loaded: ${this.#command(action)} starts it.`]);
       }
       if (job.pid === null) {
         return failed(1, [
@@ -384,6 +395,58 @@ export class Launchd implements ServiceManager {
       return ok([
         `Sent SIGTERM to ${this.#label} (pid ${job.pid}): running turns finish first, then launchd starts it again.`,
       ]);
+    });
+  }
+
+  stop(): Report {
+    return this.#guarded(() => {
+      const loaded = this.#job() !== null;
+      const present = existsSync(this.#plist);
+      if (!present) {
+        return loaded
+          ? failed(1, [
+              `${this.#label} is loaded, and its plist ${this.#plist} is gone: nothing could start it again. ${this.#command("uninstall")} unloads it.`,
+            ])
+          : failed(1, [`${this.#label} is not installed.`]);
+      }
+      // `disable` keeps a login from loading the plist again and leaves a loaded job running. It
+      // comes first because a `stop` a session of this daemon runs may die with the daemon.
+      this.#launchctl(["disable", this.#target]);
+      const out: string[] = [];
+      if (loaded) {
+        const result = this.#options.run("launchctl", ["bootout", this.#target]);
+        if (result.status !== 0) {
+          // A job left running must not stay disabled: `start` and `install` refuse a loaded job,
+          // so nothing would clear it, and the next login would not load the service.
+          this.#options.run("launchctl", ["enable", this.#target]);
+          const said = (result.stderr || result.stdout).trim();
+          throw new LaunchctlError(`launchctl bootout failed${said === "" ? "" : `: ${said}`}`);
+        }
+        // Returns at once, and launchd cuts the daemon's drain at `ExitTimeOut`: see `uninstall`.
+        out.push(
+          `Stopping ${this.#label}: turns still running are ended within ${EXIT_TIMEOUT_SECONDS} seconds.`,
+        );
+      } else {
+        out.push(`${this.#label} is not loaded.`);
+      }
+      out.push(
+        `It stays stopped across logins and reboots: once ${this.#command("status")} says not loaded, ${this.#command("start")} loads it again.`,
+        `Left in place: ${this.#plist}, ${this.#options.configDir} (.env, state.json) and ${dirname(this.#log)}.`,
+      );
+      return ok(out);
+    });
+  }
+
+  start(): Report {
+    return this.#guarded(() => {
+      if (this.#job() !== null) return failed(1, [`${this.#label} is already loaded.`]);
+      if (!existsSync(this.#plist)) {
+        return failed(1, [
+          `${this.#label} is not installed: ${this.#command("install")} installs it.`,
+        ]);
+      }
+      this.#load();
+      return ok([`Loaded ${this.#label}: allaboard starts now and at every login.`]);
     });
   }
 
