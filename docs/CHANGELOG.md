@@ -189,6 +189,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A thread's delete reads the thread again after its root went: what Slack still shows is told to
+  the owner, where the delete used to report it gone, and a reply still shown keeps the root and the
+  thread (#148). A reply still there after the root went leaves a tombstone, which is forgotten.
 - A transcript line written during the hidden `/model` or `/goal clear` (a goal's `cleared`, for
   one) no longer comes out with the next visible record when the marks of the command's records
   missed it: a long folder name Claude Code hashed otherwise, or a failed `stat` on the command's

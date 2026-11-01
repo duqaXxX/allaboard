@@ -263,9 +263,17 @@ export const THREAD_DELETE_REFUSED = naming(
     "not yours or the bot's, or your workspace does not let you delete them. Every other " +
     "message is gone.",
 );
+export const THREAD_DELETE_LEFT = naming(
+  "{chat} still shows {count} of this thread's messages after the delete. Send `!delete-thread` " +
+    "again to continue.",
+);
 export const THREAD_DELETE_FAILED =
   "Could not delete every message of this thread (`{error}`). Send `!delete-thread` again to " +
   "continue.";
+export const HOME_DELETE_LEFT = naming(
+  "{chat} still shows {count} of that thread's messages after the delete. Delete it again to " +
+    "continue.",
+);
 export const HOME_DELETE_FAILED =
   "Could not delete every message of that thread (`{error}`). Delete it again to continue.";
 export const HOME_SHOW_ALL = "Show all {count}";

@@ -96,6 +96,17 @@ class World {
   }
 }
 
+/**
+ * `read`, until the owner's token deleted the thread's root: from then on Slack answers
+ * `thread_not_found`, as for a root deleted with no replies (measured 2026-10-20).
+ */
+function untilRootGone(world: World, read: (args: Args) => Answer): (args: Args) => Answer {
+  return (args) =>
+    world.deleted(world.owner).includes(String(args.ts))
+      ? rejected("thread_not_found")
+      : read(args);
+}
+
 test("each message is deleted by its author s token and the root last", async () => {
   const world = new World();
   const root = message(ROOT, OWNER);
@@ -104,14 +115,15 @@ test("each message is deleted by its author s token and the root last", async ()
     // Slack returns the root at the head of every page.
     [root, message("1790000003.000001", BOT)],
   );
-  world.bot.responses["conversations.replies"] = (args) =>
+  world.bot.responses["conversations.replies"] = untilRootGone(world, (args) =>
     world.deleted(world.bot).length === 0
       ? first(args)
-      : { ok: true, messages: [root], has_more: false };
+      : { ok: true, messages: [root], has_more: false },
+  );
   assert.equal(await world.deleter.delete(CHANNEL, ROOT), null);
   const asked = world.bot.callsTo("conversations.replies");
   // The whole thread once for its pins, before the session is released; then page by page, and
-  // once more before the root goes: no reply is left.
+  // once more before the root goes: no reply is left. Once more after it: nothing is.
   assert.deepEqual(
     asked.map((a) => [a.ts, a.limit, a.cursor]),
     [
@@ -119,6 +131,7 @@ test("each message is deleted by its author s token and the root last", async ()
       [ROOT, PAGE, "1"],
       [ROOT, PAGE, undefined],
       [ROOT, PAGE, "1"],
+      [ROOT, PAGE, undefined],
       [ROOT, PAGE, undefined],
     ],
   );
@@ -155,11 +168,17 @@ test("a thread the daemon does not hold is not touched", async () => {
 
 test("a message already gone does not stop the delete", async () => {
   const world = new World();
-  world.bot.responses["conversations.replies"] = paged([
-    message(ROOT, OWNER),
-    message("1790000001.000001", BOT),
-  ]);
+  const reply = message("1790000001.000001", BOT);
+  world.bot.responses["conversations.replies"] = untilRootGone(world, () => ({
+    ok: true,
+    messages:
+      world.deleted(world.bot).length === 0
+        ? [message(ROOT, OWNER), reply]
+        : [message(ROOT, OWNER)],
+    has_more: false,
+  }));
   world.bot.responses["chat.delete"] = rejected("message_not_found");
+  world.owner.responses["chat.delete"] = rejected("message_not_found");
   assert.equal(await world.deleter.delete(CHANNEL, ROOT), null);
   assert.deepEqual(world.deleted(world.owner), [ROOT]);
   assert.equal(world.state.thread(CHANNEL, ROOT), null);
@@ -204,16 +223,88 @@ test("a message that arrives while the thread goes is deleted before the root", 
   const late = message("1790000009.000001", OWNER);
   const listed = [message(ROOT, OWNER), message("1790000001.000001", BOT)];
   let reads = 0;
-  world.bot.responses["conversations.replies"] = () => {
+  world.bot.responses["conversations.replies"] = untilRootGone(world, () => {
     reads += 1;
     // The first read is for the pins. The owner replies after the second: the third shows it.
     const found = reads <= 2 ? listed : reads === 3 ? [listed[0] as JsonObject, late] : [listed[0]];
     return { ok: true, messages: found as JsonObject[], has_more: false };
-  };
+  });
   assert.equal(await world.deleter.delete(CHANNEL, ROOT), null);
   assert.deepEqual(world.deleted(world.bot), ["1790000001.000001"]);
   // the root last, with nothing under it
   assert.deepEqual(world.deleted(world.owner), [late.ts, ROOT]);
+});
+
+test("a root still shown after its delete is not called deleted", async () => {
+  const world = new World();
+  // The delete answers ok, and Slack goes on showing the root.
+  world.bot.responses["conversations.replies"] = paged([message(ROOT, OWNER)]);
+  assert.deepEqual(await world.deleter.delete(CHANNEL, ROOT), { reason: "left", count: 1 });
+  assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
+});
+
+test("a late reply slack refuses after the root went is counted as left", async () => {
+  const world = new World();
+  const late = message("1790000009.000001", BOT);
+  const tombstone = { ...message(ROOT, "USLACKBOT"), subtype: "tombstone" };
+  world.bot.responses["conversations.replies"] = () => ({
+    ok: true,
+    messages: world.deleted(world.owner).includes(ROOT)
+      ? [tombstone, late]
+      : [message(ROOT, OWNER)],
+    has_more: false,
+  });
+  world.bot.responses["chat.delete"] = rejected("cant_delete_message");
+  assert.deepEqual(await world.deleter.delete(CHANNEL, ROOT), { reason: "left", count: 1 });
+});
+
+test("a reply still shown after its delete keeps the root, and the delete can be asked again", async () => {
+  const world = new World();
+  const reply = message("1790000001.000001", BOT);
+  // Every call answers ok, and Slack goes on showing the reply (#148).
+  world.bot.responses["conversations.replies"] = paged([message(ROOT, OWNER), reply]);
+  assert.deepEqual(await world.deleter.delete(CHANNEL, ROOT), { reason: "left", count: 1 });
+  assert.deepEqual(world.deleted(world.owner), []); // the root stays above it
+  assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
+  assert.deepEqual(world.freed, [[CHANNEL, ROOT]]);
+  // The next ask finds the reply gone, and finishes.
+  world.bot.responses["conversations.replies"] = untilRootGone(
+    world,
+    paged([message(ROOT, OWNER)]),
+  );
+  assert.equal(await world.deleter.delete(CHANNEL, ROOT), null);
+  assert.deepEqual(world.deleted(world.owner), [ROOT]);
+  assert.equal(world.state.thread(CHANNEL, ROOT), null);
+});
+
+test("a reply that came after the last read goes, and the tombstone is not counted", async () => {
+  const world = new World();
+  const late = message("1790000009.000001", BOT);
+  const tombstone = { ...message(ROOT, "USLACKBOT"), subtype: "tombstone" };
+  world.bot.responses["conversations.replies"] = () => {
+    const rootGone = world.deleted(world.owner).includes(ROOT);
+    if (!rootGone) return { ok: true, messages: [message(ROOT, OWNER)], has_more: false };
+    return world.deleted(world.bot).includes(String(late.ts))
+      ? { ok: true, messages: [tombstone], has_more: false }
+      : { ok: true, messages: [tombstone, late], has_more: false };
+  };
+  assert.equal(await world.deleter.delete(CHANNEL, ROOT), null);
+  assert.deepEqual(world.deleted(world.bot), [late.ts]);
+  assert.equal(world.state.thread(CHANNEL, ROOT), null);
+});
+
+test("a delete asked again over a tombstone deletes its replies and never the tombstone", async () => {
+  const world = new World();
+  const reply = message("1790000001.000001", BOT);
+  const tombstone = { ...message(ROOT, "USLACKBOT"), subtype: "tombstone" };
+  world.bot.responses["conversations.replies"] = () =>
+    world.deleted(world.bot).length === 0
+      ? { ok: true, messages: [tombstone, reply], has_more: false }
+      : rejected("thread_not_found");
+  assert.equal(await world.deleter.delete(CHANNEL, ROOT), null);
+  assert.deepEqual(world.deleted(world.bot), [reply.ts]);
+  assert.deepEqual(world.deleted(world.owner), []);
+  assert.equal(world.state.thread(CHANNEL, ROOT), null);
 });
 
 test("a failure that is not slack s answer is a failure too", async () => {
@@ -237,11 +328,11 @@ test("threads are deleted one at a time", async () => {
   const world = new World();
   const other = "1790000100.000001";
   world.state.openThread(CHANNEL, other, SESSION);
-  world.bot.responses["conversations.replies"] = (args) => ({
+  world.bot.responses["conversations.replies"] = untilRootGone(world, (args) => ({
     ok: true,
     messages: [message(String(args.ts), OWNER)],
     has_more: false,
-  });
+  }));
   world.owner.gate = new AsyncEvent();
   world.owner.gateMethod = "chat.delete";
   const first = world.deleter.delete(CHANNEL, ROOT);

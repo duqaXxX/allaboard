@@ -661,6 +661,8 @@ function deleteLine(refusal: DeleteRefusal, names: Names): string {
       return pinnedLine(refusal, names);
     case "refused":
       return texts.fill(named(slackTexts.HOME_DELETE_REFUSED, names), { count: refusal.count });
+    case "left":
+      return texts.fill(named(slackTexts.HOME_DELETE_LEFT, names), { count: refusal.count });
     case "failed":
       return texts.fill(slackTexts.HOME_DELETE_FAILED, { error: refusal.error });
   }
