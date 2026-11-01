@@ -84,6 +84,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.316, which bundles Claude Code 2.1.316. The
+  release probe certified it on 2026-11-01: the SDK surface table holds and so do the claims. Its
+  stream carries five paths and tools the fixtures do not hold, none of which the source reads, all
+  accepted on 2.1.316: the tools `SendToProject` and `SendToProjectContext`, the 5-minute and
+  1-hour cache writes in `model_usage_since_last_result` on an error result, and
+  `ultrathink_available` in the init record. The probe reads a session's transcript where the
+  session writes it, under the owner's home (`ClaudeBackend`'s `projects`): P33 and P42 failed on
+  0.3.312 too once the back end read the transcript file. P45 reads the cut session's answer from
+  its text deltas.
 - `!open` shows a message only the owner sees, with a search field and up to 5 buttons, in place of
   the `Choose a file` button and its modal. The buttons are the files changed in the session, newest
   first; Enter in the field replaces the message with one holding the words and the best 5 matches,

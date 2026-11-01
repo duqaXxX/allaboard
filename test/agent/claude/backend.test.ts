@@ -369,6 +369,28 @@ test("the records and the transcripts are the config folder's", LIMIT, async (t)
   await backend.close();
 });
 
+test(
+  "the transcripts are read in the projects folder given, whatever the home",
+  LIMIT,
+  async (t) => {
+    const previous = process.env.CLAUDE_CONFIG_DIR;
+    delete process.env.CLAUDE_CONFIG_DIR;
+    t.after(() => {
+      if (previous !== undefined) process.env.CLAUDE_CONFIG_DIR = previous;
+    });
+    const project = join(tmp, "project");
+    await mkdir(project);
+    const projects = join(tmp, "owner-projects");
+    const folder = join(projects, project.replace(/[^a-zA-Z0-9]/g, "-"));
+    await mkdir(folder, { recursive: true });
+    const sid = "68da9311-0000-4000-8000-0000000000d2";
+    await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify({ type: "ledger" })}\n`);
+    const backend = new ClaudeBackend({ query: new FakeSdk().query, home, projects });
+    assert.deepEqual(await backend.aliveSessions(project), new Set([sid]));
+    await backend.close();
+  },
+);
+
 test("a backend with no config folder reads the home's records", LIMIT, async (t) => {
   const previous = process.env.CLAUDE_CONFIG_DIR;
   delete process.env.CLAUDE_CONFIG_DIR;

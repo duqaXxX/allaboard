@@ -188,7 +188,7 @@ async function main(): Promise<void> {
   // The owner's own `~/.claude.json` is not read: Chrome stays off for these sessions.
   const home = await folder("home");
   await writeFile(join(home, ".claude.json"), "{}");
-  const backend = new ClaudeBackend({ home });
+  const backend = new ClaudeBackend({ home, projects: projectsDir() });
   const owner = new Owner();
   const sessions: AgentSession[] = [];
   const directory = await folder("project");

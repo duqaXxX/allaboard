@@ -46,7 +46,9 @@
       "safety_stops:number": "2.1.304",
       "stop_reason:null": "2.1.304",
       "user_message_uuid:string": "2.1.304",
-      "user_message_uuids:array": "2.1.304"
+      "user_message_uuids:array": "2.1.304",
+      "model_usage_since_last_result.*.cacheCreationEphemeral1hInputTokens:number": "2.1.316",
+      "model_usage_since_last_result.*.cacheCreationEphemeral5mInputTokens:number": "2.1.316"
     },
     "result/success": {
       "modelUsage.*.cacheCreationEphemeral1hInputTokens:number": "2.1.312",
@@ -85,7 +87,8 @@
     "system/init": {
       "additional_directories:array": "2.1.304",
       "original_cwd:string": "2.1.304",
-      "user_message_uuids:array": "2.1.304"
+      "user_message_uuids:array": "2.1.304",
+      "ultrathink_available:boolean": "2.1.316"
     },
     "user": {
       "message.content[].content[].source.data:string": "2.1.304",
@@ -109,5 +112,8 @@
       "tool_use_result.toolsUsedLine:string": "2.1.312"
     }
   },
-  "tools": {}
+  "tools": {
+    "SendToProject": "2.1.316",
+    "SendToProjectContext": "2.1.316"
+  }
 }
