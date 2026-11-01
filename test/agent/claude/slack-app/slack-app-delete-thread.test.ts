@@ -86,6 +86,7 @@ const REFUSALS: readonly [DeleteRefusal, string][] = [
     { reason: "refused", count: 2 },
     fill(named(slackTexts.THREAD_DELETE_REFUSED, NAMES), { count: 2 }),
   ],
+  [{ reason: "left", count: 2 }, fill(named(slackTexts.THREAD_DELETE_LEFT, NAMES), { count: 2 })],
   [
     { reason: "failed", error: "ratelimited" },
     fill(slackTexts.THREAD_DELETE_FAILED, { error: "ratelimited" }),

@@ -757,6 +757,11 @@ The deleter then reads the thread page by page (`conversations.replies`, cursor 
 deletes its replies with `chat.delete`: the bot's own with the bot token, every other with the
 owner's. It reads the thread again after each pass and deletes the root only once a read shows no
 reply left, so a message that arrived meanwhile goes too and no reply is left under a deleted root.
+A reply still shown after its delete was accepted keeps the root and the entry, and returns the
+refusal `left` with its count, so the delete can be asked again. After the root it reads the thread
+once more: a late reply is deleted, a tombstone is not counted, and whatever else is shown returns
+`left`. A reply still there after the root went leaves a tombstone, which `rootGone` or the
+cleanup forgets: that reply is then deleted by hand.
 `message_not_found` counts as deleted. `cant_delete_message` (a message that is neither the owner's
 nor the bot's, or a workspace that does not let the owner delete) is counted and the delete goes on:
 with any such message the root stays, the thread stays in `state.json`, and the page says

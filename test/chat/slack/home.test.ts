@@ -1453,6 +1453,17 @@ test("a delete the deleter refuses as pinned says so under the row's name, in it
   );
 });
 
+test("a delete that left messages says how many under the row's name", async (t) => {
+  const w = world(t);
+  const home = makeHome(w, listing(w), {
+    delete: async (): Promise<DeleteRefusal> => ({ reason: "left", count: 2 }),
+  });
+  await home.edit(true);
+  await home.delete(CHANNEL, OLD_THREAD);
+  const line = texts.fill(namedText(slackTexts.HOME_DELETE_LEFT, PLAIN_NAMES), { count: 2 });
+  assert.ok(notes(published(w.slack).at(-1) as Json).includes(`“Fix the footer”: ${line}`));
+});
+
 test("a confirmation never passes the dialog s limit", () => {
   const long = row("word ".repeat(100), { replies: 1234, status: Status.DONE });
   const page = view([long], homeFilter(), {

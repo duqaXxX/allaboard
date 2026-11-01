@@ -14,7 +14,9 @@
  * limit after the time Slack asks for, which is what a delete's time is made of (measured
  * 2026-10-05 on a free workspace: 20 to 40 seconds a thread, with a rate limit met every few
  * calls), so threads are deleted one at a time. A delete that stops half way leaves the thread
- * in `state.json`, so asking again continues with the messages that are left. The Claude Code
+ * in `state.json`, so asking again continues with the messages that are left. The thread is read
+ * once more after its root went, and it is called deleted only if that read shows nothing left: a
+ * delete of dozens of threads reported some gone while messages stayed (#148). The Claude Code
  * session is not touched: its transcript stays, and `!resume` lists it again once no thread
  * holds it.
  *
@@ -37,6 +39,7 @@ import type { WebClient } from "@slack/web-api";
 import { fill, Mutex, type Names, named, type StatePort } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { isRecord } from "../../values.ts";
+import { isTombstone } from "./channels.ts";
 import { describe } from "./reply/errors.ts";
 import { isPinned, type RootMarks, rootMarks } from "./tag.ts";
 import * as slackTexts from "./texts.ts";
@@ -61,13 +64,15 @@ export interface PinnedRefusal {
 
 /**
  * Why a delete left the thread where it was: its session works or waits for the owner, a message
- * of it is pinned, Slack refused `count` of its messages, or a call failed with `error` half way.
+ * of it is pinned, Slack refused `count` of its messages, `count` of them were still there once the
+ * delete had done all it could, or a call failed with `error` half way.
  * Each place that offers a delete words it for itself.
  */
 export type DeleteRefusal =
   | { readonly reason: "busy" }
   | PinnedRefusal
   | { readonly reason: "refused"; readonly count: number }
+  | { readonly reason: "left"; readonly count: number }
   | { readonly reason: "failed"; readonly error: string };
 
 /** The line a pinned thread's delete is refused with. */
@@ -145,6 +150,8 @@ function tsOf(message: Record<string, unknown>): string {
 interface Seen {
   readonly author: string;
   readonly marks: RootMarks;
+  /** The root of a thread that lost it while replies remain: Slack's, not a message to delete. */
+  readonly tombstone: boolean;
 }
 
 /** The refusal for a pinned message among a thread's, the root's first; null for none. */
@@ -214,13 +221,17 @@ export class ThreadDeleter {
         notHeld = true;
         return { reason: "busy" };
       }
-      const { refused, pinned: kept } = await this.#empty(channelId, threadTs);
+      const { refused, pinned: kept, left } = await this.#empty(channelId, threadTs);
       // A message pinned meanwhile stays, and so does the root: no reply is left under a deleted
       // root, and a pinned message is never deleted.
       if (kept !== null) return kept;
       if (refused > 0) {
         // The root stays while a reply does, so the thread can still be opened.
         return { reason: "refused", count: refused };
+      }
+      if (left > 0) {
+        logger.warning(`deleted ${channelId}/${threadTs}, yet ${left} messages are still there`);
+        return { reason: "left", count: left };
       }
       this.#state.removeThread(channelId, threadTs);
     } catch (error) {
@@ -243,24 +254,55 @@ export class ThreadDeleter {
   }
 
   /**
-   * Delete the thread's replies, then its root. The thread is read again after each pass, so a
-   * message that arrived meanwhile goes too, and the root goes only once a read shows no reply
-   * left: a delete never leaves replies under a deleted root. A message pinned by then is not
-   * deleted, and neither is the root: `pinned` says what the last read found. Returns how many
-   * messages Slack refused to delete; the root stays when it is not zero.
+   * Delete the thread's replies, then its root, then read what is left. The thread is read again
+   * after each pass, so a message that arrived meanwhile goes too. The root goes only once a read
+   * shows no reply: while one is shown, whether pinned, refused or deleted with Slack still showing
+   * it, the root stays, so that the thread can be opened and listed and the delete asked again. A
+   * root gone with a reply under it (a tombstone) is forgotten by the cleanup. Returns how many
+   * messages Slack refused, what is pinned, and how many are still shown (`left`), a tombstone not
+   * counted. What arrives after the root went can only be counted in `left`.
    */
   async #empty(
     channelId: string,
     threadTs: string,
-  ): Promise<{ refused: number; pinned: PinnedRefusal | null }> {
+  ): Promise<{ refused: number; pinned: PinnedRefusal | null; left: number }> {
     const handled = new Set<string>();
     const refused = new Set<string>();
     const kept = new Set<string>();
-    let messages: Map<string, Seen>;
+    const messages = await this.#sweep(channelId, threadTs, handled, refused, kept);
+    // A reply skipped as pinned is still there even if a later read shows it unpinned.
+    const pinned =
+      pinnedOf(messages, threadTs) ??
+      (kept.size > 0 ? { reason: "pinned", where: "reply" as const } : null);
+    if (refused.size > 0 || pinned !== null) return { refused: refused.size, pinned, left: 0 };
+    const stillShown = [...messages.keys()].filter((ts) => ts !== threadTs).length;
+    if (stillShown > 0) return { refused: 0, pinned: null, left: stillShown };
+    const root = messages.get(threadTs);
+    if (root === undefined || root.tombstone) return { refused: 0, pinned: null, left: 0 };
+    if (!(await this.#remove(channelId, threadTs, root.author))) {
+      return { refused: 1, pinned: null, left: 0 };
+    }
+    // A reply that came between the last read and the root's delete goes here.
+    const after = await this.#sweep(channelId, threadTs, handled, new Set(), new Set());
+    const left = [...after.values()].filter((seen) => !seen.tombstone).length;
+    return { refused: 0, pinned: null, left };
+  }
+
+  /**
+   * Deletes the replies not `handled` yet until a read shows none, adding to `refused` what Slack
+   * refuses and to `kept` what is pinned. Returns what that last read found.
+   */
+  async #sweep(
+    channelId: string,
+    threadTs: string,
+    handled: Set<string>,
+    refused: Set<string>,
+    kept: Set<string>,
+  ): Promise<Map<string, Seen>> {
     for (;;) {
-      messages = await this.#messages(channelId, threadTs);
+      const messages = await this.#messages(channelId, threadTs);
       const replies = [...messages].filter(([ts]) => ts !== threadTs && !handled.has(ts));
-      if (replies.length === 0) break;
+      if (replies.length === 0) return messages;
       for (const [ts, seen] of replies) {
         handled.add(ts);
         if (seen.marks.pinned) {
@@ -270,16 +312,6 @@ export class ThreadDeleter {
         if (!(await this.#remove(channelId, ts, seen.author))) refused.add(ts);
       }
     }
-    // A reply skipped as pinned is still there even if a later read shows it unpinned: the root
-    // stays above it.
-    const pinned =
-      pinnedOf(messages, threadTs) ??
-      (kept.size > 0 ? { reason: "pinned", where: "reply" as const } : null);
-    const root = refused.size > 0 || pinned !== null ? undefined : messages.get(threadTs);
-    if (root !== undefined && !(await this.#remove(channelId, threadTs, root.author))) {
-      refused.add(threadTs);
-    }
-    return { refused: refused.size, pinned };
   }
 
   /**
@@ -398,7 +430,11 @@ export class ThreadDeleter {
         throw error;
       }
       for (const message of messagesOf(page)) {
-        found.set(tsOf(message), { author: String(message.user || ""), marks: rootMarks(message) });
+        found.set(tsOf(message), {
+          author: String(message.user || ""),
+          marks: rootMarks(message),
+          tombstone: isTombstone(message),
+        });
       }
       cursor = nextCursor(page);
       if (cursor === null) return found;
