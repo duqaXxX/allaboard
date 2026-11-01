@@ -521,6 +521,29 @@ export class ClaudeSession implements AgentSession {
     for (const event of this.#translator.translate(record)) this.#queue.push(event);
   }
 
+  /**
+   * The hidden command's end, for the lines its records' marks did not reach: when the mark of its
+   * `completed` or `cancelled` (`until`) is null, or the file was found elsewhere since it was
+   * taken (`pathAtMark`; a folder name Claude Code hashed otherwise gives marks of 0 against a path
+   * that never exists), one more hidden read follows, with a mark taken in line. A mark that is
+   * valid is kept: the caller is resolved at the `result`, so the next prompt may already be
+   * running and a mark taken here could cover its lines. On the two paths that do take it, it can
+   * cover next-turn lines already written, which are then dropped. Left as they were: a line flushed after
+   * this read, and a `stat` that keeps failing past the end of the command, are read with a later
+   * record.
+   */
+  async #dropCommandLines(
+    until: number | null | undefined,
+    pathAtMark: string | null,
+  ): Promise<void> {
+    const transcript = this.#config.transcript;
+    if (transcript === undefined) return;
+    const moved = transcript.path !== pathAtMark;
+    if (until !== null && until !== undefined && !moved) return;
+    await this.#readTranscript(null);
+    await this.#readTranscript(transcript.mark());
+  }
+
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
   async #pump(): Promise<void> {
     let reason = PROCESS_EXITED;
@@ -533,9 +556,16 @@ export class ClaudeSession implements AgentSession {
           this.#startRefused = record.is_error === true;
         }
         const until = this.#markOf(record);
+        const pathAtMark = this.#config.transcript?.path ?? null;
         const command = this.#command;
         if (command !== null) this.#readCommand(command, record);
         this.#inLine(() => this.#handle(record, until, command !== null), "a record");
+        if (command !== null && this.#command === null) {
+          this.#inLine(
+            () => this.#dropCommandLines(until, pathAtMark),
+            "the hidden command's last lines",
+          );
+        }
       }
     } catch (error) {
       reason = lostName(error);

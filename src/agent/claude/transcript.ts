@@ -161,9 +161,15 @@ export class Transcript {
     }
   }
 
+  /** Where the file is worked out or found to be, null while unknown: it moves once a read finds it. */
+  get path(): string | null {
+    return this.#path;
+  }
+
   /**
    * How far the transcript reaches now, taken as a stream record arrives so that the read for it
-   * stops there: its size, 0 for a file not written yet while nothing has been read, and null when
+   * stops there (the session takes one more, in line, when a hidden command ends: `ClaudeSession.
+   * #dropCommandLines`): its size, 0 for a file not written yet while nothing has been read, and null when
    * it cannot be measured (where it is not known yet, not a regular file, a `stat` that fails). A
    * `stat` of a few microseconds, done at once so that no line written after the record is taken
    * for one written before it.
