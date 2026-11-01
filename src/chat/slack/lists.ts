@@ -15,7 +15,6 @@ import * as slackTexts from "./texts.ts";
 export const DIFF_FILE_ACTION = "diff_file";
 export const DIFF_VIEW_ACTION = "diff_view";
 export const REWIND_POINT_ACTION = "rewind_point";
-export const REWIND_ACTION_ACTION = "rewind_action";
 
 type DiffList = Extract<ThreadList, { type: "diff" }>;
 type RewindPoints = Extract<ThreadList, { type: "rewind-points" }>;
@@ -164,6 +163,14 @@ export function actionValue(session: string, promptId: string, action: RewindAct
 /** The actions a button can carry, as `parseValue` reads them back. */
 export const REWIND_ACTIONS: readonly RewindAction[] = ["both", "conversation", "code", "cancel"];
 
+/**
+ * The `action_id` of an action's button: one per action, since Slack refuses a block with the same
+ * id twice (`invalid_blocks`, seen 2026-10-30; button element reference, read 2026-11-01).
+ */
+export function rewindActionId(action: RewindAction): string {
+  return `rewind_action_${action}`;
+}
+
 interface PointSelect {
   type: "actions";
   block_id: string;
@@ -241,7 +248,7 @@ function countsOf(files: NonNullable<RewindActions["files"]>): string {
 function actionBlocks(list: RewindActions, title: string): RewindBlock[] {
   const button = (action: RewindAction, label: string, primary = false) => ({
     type: "button" as const,
-    action_id: REWIND_ACTION_ACTION,
+    action_id: rewindActionId(action),
     value: actionValue(list.session, list.point.id, action),
     ...(primary && { style: "primary" as const }),
     text: { type: "plain_text" as const, text: take(label, POINT_TEXT) },

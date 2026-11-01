@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
+import { ChatError } from "../../../src/chat/seam.ts";
 import { logger } from "../../../src/core/flows/talk.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
@@ -399,6 +400,42 @@ test("a reply that would wake an idle session beside a busy one asks the hold fi
 });
 
 // --- A failure after the checks
+
+test("a refusal of the chat is named as the chat's, not the agent's", async (t) => {
+  const world = await MessagesWorld.make(t);
+  logged(t);
+  const ref = await world.opened();
+  await world.send({
+    ref,
+    id: "refused",
+    text: "x",
+    content: async () => {
+      throw new ChatError("refused_code", { failure: "refused" });
+    },
+  });
+  assert.equal(
+    world.shown(ref).at(-1),
+    fill(named(texts.CHAT_REFUSED_REPLY, PLAIN_NAMES), { error: "refused_code" }),
+  );
+});
+
+test("a failed call to the chat is named as such, not as a refusal", async (t) => {
+  const world = await MessagesWorld.make(t);
+  logged(t);
+  const ref = await world.opened();
+  await world.send({
+    ref,
+    id: "failed",
+    text: "x",
+    content: async () => {
+      throw new ChatError("no_answer", { failure: "failed" });
+    },
+  });
+  assert.equal(
+    world.shown(ref).at(-1),
+    fill(named(texts.CHAT_FAILED_REPLY, PLAIN_NAMES), { error: "no_answer" }),
+  );
+});
 
 test("a failure of a prompt reaches the owner in its thread", async (t) => {
   const world = await MessagesWorld.make(t);

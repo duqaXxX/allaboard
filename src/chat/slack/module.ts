@@ -27,7 +27,7 @@ import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
 import { MENTION_VARIABLE, mentionsOn, type ProbeClient, slackSetup } from "./onboarding.ts";
 import { type ClientOptions, repliesClient, sharedClient } from "./reply/clients.ts";
-import { describe } from "./reply/errors.ts";
+import { crossedError, describe } from "./reply/errors.ts";
 import { UpdateLimiter } from "./reply/limiter.ts";
 import { RootEditor } from "./tag.ts";
 import { SETUP_SLACK_APP } from "./texts.ts";
@@ -236,7 +236,7 @@ export function slackChat(options: SlackOptions = {}): ChatEntry {
       } catch (error) {
         // The daemon logs a start that failed by the name of its error: Slack's code, as before.
         if (error instanceof ConfigError || error instanceof ChatError) throw error;
-        throw new ChatError(describe(error), { cause: error });
+        throw crossedError(error);
       }
     },
   };

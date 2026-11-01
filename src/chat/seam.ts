@@ -210,13 +210,25 @@ export interface ChatCapabilities {
 export class ChatError extends Error {
   /** The chat will refuse the same call again, whenever it is made: retrying cannot help. */
   readonly permanent: boolean;
+  /** Who failed, which the line the owner reads says. */
+  readonly failure: ChatFailure;
 
-  constructor(code: string, options?: ErrorOptions & { readonly permanent?: boolean }) {
+  constructor(
+    code: string,
+    options?: ErrorOptions & { readonly permanent?: boolean; readonly failure?: ChatFailure },
+  ) {
     super(code, options);
     this.name = code;
     this.permanent = options?.permanent === true;
+    this.failure = options?.failure ?? "failed";
   }
 }
+
+/**
+ * `refused`: the chat answered no. `failed`: the call got no such answer (the network, a rate
+ * limit, a server error). `bug`: the failure is the daemon's own and the chat had no part in it.
+ */
+export type ChatFailure = "refused" | "failed" | "bug";
 
 /** A message of the chat, by the id its provider gives it. The core stores it and hands it back. */
 export type MessageId = string;

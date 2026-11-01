@@ -66,8 +66,9 @@ import {
 import {
   DIFF_FILE_ACTION,
   DIFF_VIEW_ACTION,
-  REWIND_ACTION_ACTION,
+  REWIND_ACTIONS,
   REWIND_POINT_ACTION,
+  rewindActionId,
 } from "../lists.ts";
 import { OPEN_FIELD, OPEN_FILE_ACTIONS } from "../openfile/search.ts";
 import { levelLogger } from "../quiet-logger.ts";
@@ -448,7 +449,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(DIFF_FILE_ACTION, threadLists.onDiffFile);
   action(DIFF_VIEW_ACTION, threadLists.onDiffView);
   action(REWIND_POINT_ACTION, threadLists.onRewindPoint);
-  action(REWIND_ACTION_ACTION, threadLists.onRewindAction);
+  for (const rewind of REWIND_ACTIONS) action(rewindActionId(rewind), threadLists.onRewindAction);
 
   action(NEW_THREAD_ACTION, home.onHomeLink, { acknowledgeOnly: true });
   for (const actionId of FILTER_ACTIONS) action(actionId, home.onHomeFilter);

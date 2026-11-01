@@ -1,6 +1,7 @@
 /** Every sentence the owner can read in the chat. English only; one place to review the wording. */
 import type { AgentBackend } from "../agent/seam.ts";
-import type { ChatProvider } from "../chat/seam.ts";
+import { ChatError, type ChatProvider } from "../chat/seam.ts";
+import { errorName } from "../values.ts";
 import { SETUP_SECTIONS, setupGuide } from "../version.ts";
 
 /**
@@ -190,6 +191,8 @@ export const UPGRADE_NOTICE = naming(
     "session: send !bypass on inside a thread.",
 );
 export const ERROR_REPLY = naming("{agent} reported an error: `{error}`");
+export const CHAT_REFUSED_REPLY = naming("{chat} refused this message: `{error}`");
+export const CHAT_FAILED_REPLY = naming("A call to {chat} failed: `{error}`");
 export const ENDED = "_This reply ended before an answer: {reason}._";
 export const ENDED_SHUTDOWN = "allaboard stopped";
 // Crash repair: what a reply the daemon died in the middle of ends with.
@@ -604,8 +607,8 @@ export const REWIND_NO_FOLD = naming(
   "{chat} cannot mark the replies after that prompt as removed: they stay as they were.",
 );
 export const REWIND_UNKNOWN_REPLIES =
-  "The replies of turns that ran before allaboard last started are not marked as removed: " +
-  "allaboard does not keep which messages they were.";
+  "The replies of some of these turns are not marked as removed: " +
+  "allaboard no longer knows which messages they were.";
 // The title of a reply's message that a rewind went back over.
 export const REWOUND_TITLE = "Removed by rewind";
 export const TERMINAL_TOP_LEVEL =
@@ -974,3 +977,15 @@ export const GUIDE_UPDATES =
   "first, then allaboard restarts on the new version. `!allaboard restart` restarts it without " +
   "installing anything. Both work only while allaboard runs as a service.";
 export const GUIDE_END = "`!guide` shows this text again.";
+
+/** The line a failed request answers with: it names who failed, and only the code of the failure. */
+export function failureReply(error: unknown, names: Names): string {
+  const failure = error instanceof ChatError ? error.failure : "bug";
+  const text =
+    failure === "refused"
+      ? CHAT_REFUSED_REPLY
+      : failure === "failed"
+        ? CHAT_FAILED_REPLY
+        : ERROR_REPLY;
+  return fill(named(text, names), { error: errorName(error) });
+}

@@ -1,5 +1,6 @@
 /** What a failed Slack call says, in words that are safe to log and to decide on. */
 import {
+  SlackError,
   WebAPIHTTPError,
   WebAPIPlatformError,
   WebAPIRateLimitedError,
@@ -8,6 +9,7 @@ import {
 } from "@slack/web-api";
 import { getLogger, type Logger } from "../../../log.ts";
 import { errorName } from "../../../values.ts";
+import { ChatError } from "../../seam.ts";
 
 // The sink's lines all go under one logger name. `sinks.ts` imports this logger and, through
 // `export *`, its callers get the `Logger` type from here.
@@ -48,6 +50,18 @@ export function describe(error: unknown): string {
   if (error instanceof WebAPIHTTPError) return `http_${error.statusCode}`;
   if (error instanceof WebAPIRequestError) return requestFailure(error.original);
   return errorName(error);
+}
+
+/** `error` as it crosses the seam: named by Slack's code, and saying who failed. */
+export function crossedError(error: unknown): ChatError {
+  if (error instanceof ChatError) return error;
+  const failure =
+    error instanceof WebAPIPlatformError
+      ? "refused"
+      : error instanceof SlackError
+        ? "failed"
+        : "bug";
+  return new ChatError(describe(error), { cause: error, failure });
 }
 
 // What Slack says of a message whose blocks, once it has translated the markdown ones, pass 50

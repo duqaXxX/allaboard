@@ -39,7 +39,7 @@ import { isRecord } from "../../values.ts";
 import { ChatError } from "../seam.ts";
 import { slackUnescape } from "./app/messages.ts";
 import { isTombstone } from "./channels.ts";
-import { describe, GONE } from "./reply/errors.ts";
+import { crossedError, describe, GONE } from "./reply/errors.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
 
 type Json = Record<string, unknown>;
@@ -70,7 +70,9 @@ async function permanently<T>(step: () => Promise<T>): Promise<T> {
   } catch (error) {
     const code = describe(error);
     // The same call is refused again at any later turn: say so, so the core stops asking.
-    if (REFUSED_FOR_GOOD.has(code)) throw new ChatError(code, { cause: error, permanent: true });
+    if (REFUSED_FOR_GOOD.has(code)) {
+      throw new ChatError(code, { cause: error, permanent: true, failure: "refused" });
+    }
     throw error;
   }
 }
@@ -301,7 +303,7 @@ export class RootEditor {
         return await work();
       } catch (error) {
         if (error instanceof ChatError) throw error;
-        throw new ChatError(describe(error), { cause: error });
+        throw crossedError(error);
       }
     });
     const tail = run.then(
@@ -324,7 +326,7 @@ export class RootEditor {
     // gone, and nothing of it is kept or edited. The same refusal `conversations.replies` gives
     // once the last reply is deleted too.
     if (isTombstone(root)) {
-      throw new ChatError("thread_not_found", { permanent: true });
+      throw new ChatError("thread_not_found", { permanent: true, failure: "refused" });
     }
     return root;
   }

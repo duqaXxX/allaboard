@@ -811,7 +811,7 @@ the thread, which stays: `texts.STOPPED_THREAD` when it stopped something,
 `texts.NOTHING_TO_STOP_THREAD` when nothing runs; `!open` posts its button in the thread.
 `messages.messages` chooses the same place for a word's failure, and `Talk.replyOnFailure` logs
 a report that itself fails instead of letting it throw, since a throw would reach the
-message flow's own failure path, which posts `texts.ERROR_REPLY` threaded under the word. The old-folder
+message flow's own failure path, which posts `texts.failureReply` (the line follows `ChatError.failure`) threaded under the word. The old-folder
 notice (`texts.OLD_THREAD_FOLDER`, shown on a prompt sent in a thread whose folder differs from the
 channel's current one) and `Not sent.` are lines for the owner alone as well. A Resume button carries
 `<session id>@<thread id>`, the thread of the owner's `!resume` message (`resume.parseResumeValue`);

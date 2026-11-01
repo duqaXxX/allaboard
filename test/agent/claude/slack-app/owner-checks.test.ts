@@ -39,8 +39,9 @@ import {
   DIFF_VIEW_ACTION,
   fileValue,
   pointValue,
-  REWIND_ACTION_ACTION,
+  REWIND_ACTIONS,
   REWIND_POINT_ACTION,
+  rewindActionId,
   viewValue,
 } from "../../../../src/chat/slack/lists.ts";
 import { OPEN_FILE_ACTIONS } from "../../../../src/chat/slack/openfile/search.ts";
@@ -499,15 +500,15 @@ const CASES: readonly Case[] = [
       };
     },
   },
-  {
-    listener: `action ${REWIND_ACTION_ACTION}`,
-    arrange: async (world, sender) => {
+  ...REWIND_ACTIONS.map((rewind) => ({
+    listener: `action ${rewindActionId(rewind)}`,
+    arrange: async (world: World, sender: Sender) => {
       world.state.openThread(CHANNEL, THREAD, SESSION_A);
       return {
         body: sentBy(
           clickIn(
-            REWIND_ACTION_ACTION,
-            actionValue("other-session", "p-1", "conversation"),
+            rewindActionId(rewind),
+            actionValue("other-session", "p-1", rewind),
             CHANNEL,
             THREAD,
             { messageTs: THREAD },
@@ -517,7 +518,7 @@ const CASES: readonly Case[] = [
         acted: () => world.ephemerals().includes(coreTexts.REWIND_STALE),
       };
     },
-  },
+  })),
   {
     listener: `action ${UPDATE_ACTION}`,
     updating: true,

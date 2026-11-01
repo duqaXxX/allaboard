@@ -20,8 +20,8 @@ import {
   DIFF_VIEW_ACTION,
   fileValue,
   pointValue,
-  REWIND_ACTION_ACTION,
   REWIND_POINT_ACTION,
+  rewindActionId,
   viewValue,
 } from "../../src/chat/slack/lists.ts";
 import {
@@ -374,7 +374,7 @@ function slackPerson(
     picksAction: async (listed, action): Promise<void> => {
       await dispatch(
         clickIn(
-          REWIND_ACTION_ACTION,
+          rewindActionId(action),
           actionValue(listed.list.session, actionsList(listed).point.id, action),
           listed.ref.channel,
           listed.ref.thread,

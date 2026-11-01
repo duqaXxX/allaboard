@@ -67,7 +67,7 @@ import { crossing, deliver, deliverNotice } from "./notice.ts";
 import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
 import { contextBlock, footerBlock, noticeText, split } from "./reply/blocks.ts";
-import { deleteRequest, describe } from "./reply/errors.ts";
+import { crossedError, deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { positionOf, ThreadPlaces } from "./reply/places.ts";
@@ -866,7 +866,7 @@ export class SlackThread implements ThreadChat {
     } catch (error) {
       // A wait that was cancelled is no refusal of the chat: it crosses as it is.
       if (error instanceof Cancelled) throw error;
-      throw new ChatError(describe(error), { cause: error });
+      throw crossedError(error);
     }
     // The message is the only handle on its buttons: one Slack did not name cannot be removed.
     if (typeof ts !== "string" || ts === "") throw new ChatError("no_ts");
@@ -910,7 +910,7 @@ export class SlackThread implements ThreadChat {
       return posted.ts;
     } catch (error) {
       if (error instanceof Cancelled || error instanceof ChatError) throw error;
-      throw new ChatError(describe(error), { cause: error });
+      throw crossedError(error);
     }
   }
 
@@ -947,7 +947,7 @@ export class SlackThread implements ThreadChat {
       );
     } catch (error) {
       // Slack's own code, never the file or its path.
-      throw new ChatError(describe(error), { cause: error });
+      throw crossedError(error);
     }
   }
 
@@ -975,7 +975,7 @@ export class SlackThread implements ThreadChat {
         blocks: answeredBlocks(questions, answers, this.names()) as unknown as KnownBlock[],
       });
     } catch (error) {
-      throw new ChatError(describe(error), { cause: error });
+      throw crossedError(error);
     }
   }
 

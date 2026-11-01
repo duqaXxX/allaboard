@@ -5,7 +5,7 @@ import type { ChannelLookup, ThreadLookup } from "../../core/port.ts";
 import { isRecord } from "../../values.ts";
 import { ChatError } from "../seam.ts";
 import { THREAD_NOT_FOUND } from "./delete.ts";
-import { describe } from "./reply/errors.ts";
+import { crossedError, describe } from "./reply/errors.ts";
 
 const CHANNEL_NOT_FOUND = "channel_not_found";
 
@@ -22,7 +22,7 @@ export function channelLookup(slack: WebClient): ChannelLookup {
     } catch (error) {
       const code = describe(error);
       if (code === CHANNEL_NOT_FOUND) return "gone";
-      throw new ChatError(code, { cause: error });
+      throw crossedError(error);
     }
   };
 }
@@ -58,7 +58,7 @@ export function threadLookup(slack: WebClient): ThreadLookup {
     } catch (error) {
       const code = describe(error);
       if (code === THREAD_NOT_FOUND) return "gone";
-      throw new ChatError(code, { cause: error });
+      throw crossedError(error);
     }
   };
 }
