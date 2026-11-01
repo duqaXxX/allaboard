@@ -1,0 +1,435 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "text": "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background",
+     "type": "markdown"
+    },
+    {
+     "text": "started.",
+     "type": "markdown"
+    },
+    {
+     "text": "Message from general-purpose:\n> halfway there",
+     "type": "markdown"
+    },
+    {
+     "text": "The worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do.",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn",
+       "verbatim": true
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   []
+  ],
+  "message_texts": [
+   "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background\n\nstarted.\n\nMessage from general-purpose:\n> halfway there\n\nThe worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do."
+  ],
+  "pushes": 1
+ },
+ "recording": "subagent-message-auto",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background",
+      "type": "markdown_text"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nstar",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ted.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nMessage from general-purpose:\n> halfway there",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nThe worker sen",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 5,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "t \"halfway the",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "re\" and is sti",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 7,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ll running its",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 8,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " 25-second sle",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 9,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ep. Its `finis",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 10,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "hed` reply wil",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "l arrive as a ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 12,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "completion not",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 13,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ification.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 14,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nThe worker finis",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 15,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "hed. It sent \"ha",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 16,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "lfway there\" to ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 17,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "this session and",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 18,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " ran the 25-seco",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 19,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "nd sleep with no",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 20,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " output, then re",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 21,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "plied `finished`",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 22,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": ". Nothing is lef",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 23,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "t to do.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 25,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 25,
+   "args": {
+    "blocks": [
+     {
+      "text": "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background",
+      "type": "markdown"
+     },
+     {
+      "text": "started.",
+      "type": "markdown"
+     },
+     {
+      "text": "Message from general-purpose:\n> halfway there",
+      "type": "markdown"
+     },
+     {
+      "text": "The worker sent \"halfway there\" and is still running its 25-second sleep. Its `finished` reply will arrive as a completion notification.\n\nThe worker finished. It sent \"halfway there\" to this session and ran the 25-second sleep with no output, then replied `finished`. Nothing is left to do.",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn",
+        "verbatim": true
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "started.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

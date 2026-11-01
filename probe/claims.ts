@@ -461,7 +461,9 @@ export const CLAIMS: readonly Claim[] = [
     "gesture",
     "a background subagent's end gives the back end a report in bypass mode (the summary is its " +
       "last words) and in auto mode (the summary is a note and the hand-back carries the words), " +
-      "and a subagent whose own background task still runs is seen running at its notification",
+      "and a subagent whose own background task still runs is seen running at its notification; " +
+      "in auto mode the hand-back message carries `origin.handback`, which tells it from the " +
+      "subagent's own messages",
     "src/agent/claude/translate.ts#Translator.translate",
     "in a thread with bypass off on Sonnet in auto mode, ask for a background subagent that " +
       'starts `sleep 20` in the background and ends at once; the thread shows `Agent "..." is ' +

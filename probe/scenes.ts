@@ -2284,6 +2284,11 @@ export interface HandbackFacts {
   readonly lastReport: boolean;
   /** Whether the back end read one of its ends as a report handed back (`reportSent`). */
   readonly sent: boolean;
+  /**
+   * Whether a message to the parent that names the subagent's task carries `origin.handback`,
+   * the flag the back end tells a hand-back by (`translate.ts`, `user`).
+   */
+  readonly flagged: boolean;
 }
 
 /**
@@ -2303,7 +2308,14 @@ export function handbackFacts(
     (event) => event.kind === "subagent" && event.background === true,
   );
   if (agent === undefined) {
-    return { started: 0, settled: false, notifications: [], lastReport: false, sent: false };
+    return {
+      started: 0,
+      settled: false,
+      notifications: [],
+      lastReport: false,
+      sent: false,
+      flagged: false,
+    };
   }
   const children = events.flatMap((event, at) =>
     event.type === "task_started" &&
@@ -2352,6 +2364,15 @@ export function handbackFacts(
     notifications,
     lastReport: (own.at(-1)?.event.report ?? null) !== null,
     sent: own.some((ending) => ending.event.reportSent),
+    flagged: raw.filter(isRecord).some((record) => {
+      const origin = isRecord(record.origin) ? record.origin : {};
+      return (
+        record.type === "user" &&
+        origin.kind === "peer" &&
+        origin.senderTaskId === agent.taskId &&
+        origin.handback === true
+      );
+    }),
   };
 }
 
@@ -2386,7 +2407,9 @@ export function judgeHandback(facts: {
       ? "auto: the last end carries no report"
       : !facts.auto.sent
         ? "auto: no notification reached the back end as a sent report"
-        : "";
+        : !facts.auto.flagged
+          ? "auto: the hand-back message carries no origin.handback"
+          : "";
   return observation(true, detail === "", detail, seen);
 }
 

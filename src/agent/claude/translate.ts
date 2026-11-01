@@ -361,7 +361,18 @@ function user(memory: Memory, record: WireRecord): SessionEvent[] {
   // session (another session's message) says nothing about a task's report.
   const origin = isRecord(record.origin) ? record.origin : {};
   const sender = origin.kind === "peer" ? string(origin.senderTaskId) : null;
-  if (sender !== null) return [{ type: "report_started", taskId: sender }];
+  if (sender !== null) {
+    const started: SessionEvent = { type: "report_started", taskId: sender };
+    // The subagent's report reaches the parent the same way as a message sent while it runs
+    // (recorded 2026-11-01 on 2.1.316, `subagent-message-{bypass,auto}.jsonl`) and is told by
+    // `origin.handback`, which `sdk.d.ts` 0.3.316 does not declare: measured on 2.1.296
+    // (`subagent-handback.jsonl`) and 2.1.316 (`subagent-message-auto.jsonl`). The pinned SDK's
+    // bundled CLI is the only one that runs, and probe claim P41 fails a release that drops it. `name` is the subagent's type, the terminal's `@name`.
+    const from = words(origin.name);
+    const text = words(origin.body);
+    if (origin.handback === true || from === null || text === null) return [started];
+    return [started, { type: "subagent_message", from, text }];
+  }
   // Another of the owner's sessions wrote (`SendMessage`): the record is replayed, its envelope
   // stripped into `body`, for a turn it opens from idle and inside a running one (recorded
   // 2026-10-28, `peer-message.jsonl`, `peer-message-in-turn.jsonl`). A record whose wire is not

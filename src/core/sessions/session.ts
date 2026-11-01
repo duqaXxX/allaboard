@@ -2878,7 +2878,9 @@ export class ThreadSession {
           return;
         }
       }
-      // A turn another session's message opens says so first: it is no run of a loop.
+      // A turn another session's message opens says so first: it is no run of a loop. A
+      // subagent's message needs no such test: `report_started` came first, and `opensRun` is
+      // false while a report is awaited.
       const run = worded && task === null && event.type !== "peer_message" && this.opensRun();
       await this.startTurn(worded, run);
       // A report turn has no prompt behind it: only now does `threadActivity` read it.

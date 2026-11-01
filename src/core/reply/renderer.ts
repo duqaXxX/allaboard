@@ -306,6 +306,14 @@ export class TurnRenderer {
         await this.#writeLaunches();
         await this.#line(texts.fill(texts.PEER_MESSAGE, { text: quoted(event.text) }));
         break;
+      case "subagent_message":
+        // A line in the reply already open. The text is quoted, so that markup it opens (a code
+        // fence) cannot swallow the lines after it; the chat keeps any mention from notifying.
+        await this.#writeLaunches();
+        await this.#line(
+          texts.fill(texts.SUBAGENT_MESSAGE, { name: event.from, text: quoted(event.text) }),
+        );
+        break;
       case "call_started":
         await this.#callStarted(event);
         break;
