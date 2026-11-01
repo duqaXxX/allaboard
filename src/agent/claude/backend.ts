@@ -145,6 +145,11 @@ export interface ClaudeBackendOptions {
    * too (the module writes it).
    */
   readonly configDir?: string;
+  /**
+   * Where sessions' transcripts are, when not under `home` or `configDir`: the probe's records of
+   * trust are in a home of its own, and its sessions write under the owner's.
+   */
+  readonly projects?: string;
   /** How the usage probe starts its session: `startBare`, unless a test gives another. */
   readonly bareStart?: BareStart;
   /** Every wait of the usage probe; the system clock when absent. */
@@ -189,7 +194,7 @@ export class ClaudeBackend implements AgentBackend {
     this.#variables = options.variables ?? {};
     // An empty variable is no folder, as Claude Code reads it.
     this.#configDir = options.configDir ?? (process.env.CLAUDE_CONFIG_DIR || undefined);
-    this.#projects = projectsDir(this.#configDir, this.#home);
+    this.#projects = options.projects ?? projectsDir(this.#configDir, this.#home);
     this.words = wordsFor(this.#configDir);
     this.shell = shellMode(this.#variables);
     this.#runOutput = options.runOutput;

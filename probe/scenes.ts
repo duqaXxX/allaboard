@@ -316,7 +316,7 @@ export class Stage {
     this.uploads = join(root, "uploads");
     this.records = records;
     this.query = tappedQuery(records);
-    this.backend = new ClaudeBackend({ home, query: this.query });
+    this.backend = new ClaudeBackend({ home, projects: projectsDir(), query: this.query });
   }
 
   options(folder: string, over: Partial<ClaudeStartOptions> = {}): ClaudeStartOptions {
@@ -2572,10 +2572,7 @@ async function conversationCut(s: Stage): Promise<Seen> {
   const asked = await cut.turn(
     "List every codeword I asked you to remember, comma separated, nothing else.",
   );
-  const answer = ofType(asked.events, "text")
-    .map((event) => event.text)
-    .join(" ")
-    .toLowerCase();
+  const answer = writtenIn(asked.events).toLowerCase();
   if (answer.trim() === "")
     return { P45: observation(false, false, "the cut session said nothing") };
   const sameId = sessionIdOf(cut.events) === id;
