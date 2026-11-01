@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { fitted, textOfMessage } from "../../../src/chat/slack/fold.ts";
-import { CARD_TEXT_LIMIT } from "../../../src/chat/slack/reply/blocks.ts";
+import { CARD_TEXT_LIMIT, footerBlock } from "../../../src/chat/slack/reply/blocks.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
 import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import { CHANNEL, rejected, THREAD } from "../../support/fake-slack.ts";
@@ -99,4 +99,15 @@ test("fold of a message Slack refuses to rewrite answers false", async () => {
   assert.ok(ts);
   slack.responses["chat.update"] = rejected("message_not_found");
   assert.equal(await thread.fold(ts, TITLE), false);
+});
+
+test("a reply's footer stays out of its folded text", () => {
+  const text = textOfMessage({
+    blocks: [
+      { type: "markdown", text: "the answer" },
+      { type: "divider" },
+      footerBlock("5s · done <!date^1^{time}|now> · :zap: bypass · *effort* low"),
+    ],
+  });
+  assert.equal(text, "the answer");
 });

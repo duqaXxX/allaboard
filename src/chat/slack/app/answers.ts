@@ -28,7 +28,7 @@ import type { ThreadDeletion } from "../delete.ts";
 import type { Home } from "../home.ts";
 import { deliver } from "../notice.ts";
 import { contextBlock, noticeText } from "../reply/blocks.ts";
-import { describe } from "../reply/errors.ts";
+import { crossedError, describe } from "../reply/errors.ts";
 import type { Limiter } from "../reply/limiter.ts";
 import * as slackTexts from "../texts.ts";
 import type { SlackChat, SlackThread } from "../thread.ts";
@@ -283,7 +283,8 @@ export class Answers {
         return;
       }
       logger.error(`a request failed in ${channel}/${threadTs}: ${describe(error)}`);
-      await guarded(fill(named(texts.ERROR_REPLY, this.parts.names), { error: describe(error) }));
+      // Work here calls Slack directly as well as through the seam.
+      await guarded(texts.failureReply(crossedError(error), this.parts.names));
     }
   }
 

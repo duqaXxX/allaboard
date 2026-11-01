@@ -169,7 +169,7 @@ export class Talk {
         return;
       }
       logger.error(`a request failed in ${ref.channel}/${ref.thread}: ${errorName(error)}`);
-      await guarded(fill(named(texts.ERROR_REPLY, this.deps.names), { error: errorName(error) }));
+      await guarded(texts.failureReply(error, this.deps.names));
     }
   }
 

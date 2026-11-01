@@ -8,7 +8,7 @@ import { Cancelled } from "../../core/port.ts";
 import { ChatError } from "../seam.ts";
 import { contextBlock, FALLBACK_LIMIT, noticeText } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
-import { describe } from "./reply/errors.ts";
+import { crossedError, describe } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
 
 /** Where a message goes: a thread of the channel, or the channel itself when `threadTs` is null. */
@@ -75,7 +75,7 @@ export async function crossing<T>(call: () => Promise<T>): Promise<T> {
     return await call();
   } catch (error) {
     if (error instanceof Cancelled) throw error;
-    throw new ChatError(describe(error), { cause: error });
+    throw crossedError(error);
   }
 }
 

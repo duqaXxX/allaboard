@@ -15,10 +15,10 @@ import {
   fileValue,
   listBlocks,
   parseValue,
-  REWIND_ACTION_ACTION,
   REWIND_ACTIONS,
   REWIND_POINT_ACTION,
   REWIND_POINTS,
+  rewindActionId,
   viewValue,
 } from "../../../src/chat/slack/lists.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
@@ -267,7 +267,10 @@ test("every action is a button carrying the session, the prompt and the action",
       slackTexts.REWIND_CANCEL,
     ],
   );
-  assert.ok(all.every((button) => button.action_id === REWIND_ACTION_ACTION));
+  assert.deepEqual(
+    all.map((button) => button.action_id),
+    REWIND_ACTIONS.map(rewindActionId),
+  );
   assert.deepEqual(
     all.map((button) => parseValue(button.value, 3)),
     REWIND_ACTIONS.map((action) => ["session-1", "p-2", action]),

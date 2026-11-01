@@ -178,6 +178,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Picking a prompt in `!rewind` no longer fails with `invalid_blocks`: each action button has its
+  own `action_id` (`rewindActionId`). A failed word or list now names who failed
+  (`failureReply`): the chat's refusal, a call to it that failed, or the agent's error for a bug of
+  the daemon's; a turn's own failure line is unchanged. The
+  fake Slack refuses a message's or view's blocks past the limits of Block Kit
+  (`test/support/block-kit.ts`), and a test passes a new session's options through the SDK's real
+  `query()` with no token.
 - The alias `docs/setup.md` gives for a Node of its own passes `--help` to allaboard, not to nvm,
   and no longer prints `Running node ...`. An alias already in a shell profile keeps the old
   behaviour until it is replaced with the new line.

@@ -1041,6 +1041,22 @@ test("long paths ahead of a short match leave its button", async (t) => {
   assert.ok(JSON.stringify(posted?.blocks).includes("needle-dir/a.md"));
 });
 
+test("a post Slack refuses is reported as Slack's refusal, not the agent's error", async (t) => {
+  const world = openWorld(t);
+  const project = projectOf(world);
+  await inAThread(world);
+  await world.settle();
+  put(project, "guide.md");
+  // The search's post is refused; the report of it goes through.
+  world.slack.responses["chat.postEphemeral"] = [
+    { ok: false, error: "invalid_blocks" },
+    { ok: true },
+  ];
+  await world.dispatch(searchEnter("guide"));
+  const said = world.slack.apiCalls.filter(({ method }) => method === "chat.postEphemeral");
+  assert.match(JSON.stringify(said.at(-1)?.args), /refused this message: `invalid_blocks`/);
+});
+
 test("a failed post keeps the message, and its field answers again", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);

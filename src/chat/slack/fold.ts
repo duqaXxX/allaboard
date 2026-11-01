@@ -8,7 +8,7 @@
  * Block shapes read: `markdown` (`text`), `section` and `header` (`text.text`), `context`
  * (`elements[].text`), `rich_text` (nested elements with `text`) and `task_card` (`title`,
  * `details`, `output`), per the Block Kit reference (docs.slack.dev/reference/block-kit/blocks,
- * read 2026-10-29). A message with no readable block gives its `text`.
+ * read 2026-10-29). A reply's footer is left out. A message with no readable block gives its `text`.
  */
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import { isRecord } from "../../values.ts";
@@ -38,7 +38,11 @@ function blockText(block: Json): string {
       return Array.isArray(block.elements)
         ? block.elements
             .flatMap((element) =>
-              isRecord(element) && typeof element.text === "string" ? [element.text] : [],
+              // `verbatim` is the footer's alone (`footerBlock`): its marks would show as written
+              // in a card, and the turn it describes is gone.
+              isRecord(element) && typeof element.text === "string" && element.verbatim !== true
+                ? [element.text]
+                : [],
             )
             .join(" ")
         : "";

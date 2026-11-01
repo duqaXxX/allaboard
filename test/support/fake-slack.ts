@@ -32,6 +32,7 @@ import {
   WebClient,
 } from "@slack/web-api";
 import { ASIDE_ID } from "../../src/chat/slack/reply/blocks.ts";
+import { callFaults } from "./block-kit.ts";
 import { type Json, type JsonObject, slackPayload } from "./fixtures.ts";
 import { PLAIN_NAME, PLAIN_TOOLS, PLAIN_WORDS } from "./plain-agent.ts";
 
@@ -517,6 +518,7 @@ export class FakeSlack extends WebClient {
     }
     const refused = this.#streamState(method, args);
     if (refused !== null) answer = refused;
+    if (callFaults(args).length > 0) answer = { ok: false, error: "invalid_blocks" };
     if (answer.ok !== false) this.#record(method, args, answer);
     // As `WebClient.apiCall` builds its result and refuses it.
     const result = structuredClone(answer);
