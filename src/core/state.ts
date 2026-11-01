@@ -107,6 +107,11 @@ export interface ThreadState {
   // written after it, so a restart would lose it. Ids, never content; null when no cut waits, and
   // in a file without it.
   readonly pendingCut: PendingCut | null;
+  // The terminal processes the owner answered `Send here` for, by the id the agent gives a
+  // process (`SessionHolder.id`, stable across restarts): he is asked once per terminal, across a
+  // restart and an idle close. Ids, never content; replaced at each answer, cleared when the
+  // thread's session id changes; empty in a file without it.
+  readonly terminalsAllowed: readonly string[];
 }
 
 /** A rewind's cut waiting for its prompt: the prompt it is at, and the agent's token for it. */
@@ -140,6 +145,7 @@ export function threadState(
     rootPrompt: null,
     forkOf: null,
     pendingCut: null,
+    terminalsAllowed: [],
     ...fields,
   };
 }
@@ -315,6 +321,7 @@ export function parseThread(raw: Raw): ThreadState {
     rootPrompt: stringOrNull(raw.root_prompt),
     forkOf: parseForkOf(raw.fork_of),
     pendingCut: parsePendingCut(raw.pending_cut),
+    terminalsAllowed: stringList(raw.terminals_allowed),
   };
 }
 
@@ -559,7 +566,8 @@ export class StateStore {
   setSession(channelId: string, threadId: string, sessionId: string | null): void {
     const current = this.thread(channelId, threadId);
     if (current !== null && current.sessionId !== sessionId) {
-      this.setThread(channelId, threadId, { ...current, sessionId });
+      // The terminals allowed were holders of the old session.
+      this.setThread(channelId, threadId, { ...current, sessionId, terminalsAllowed: [] });
     }
   }
 
@@ -610,6 +618,15 @@ export class StateStore {
     const stored = current.pendingCut;
     if (stored?.at === cut?.at && stored?.token === cut?.token) return;
     this.setThread(channelId, threadId, { ...current, pendingCut: cut });
+  }
+
+  /** Record the terminals the owner allowed; a no-op for an unknown thread or an unchanged list. */
+  setTerminalsAllowed(channelId: string, threadId: string, ids: readonly string[]): void {
+    const current = this.thread(channelId, threadId);
+    if (current === null) return;
+    const stored = current.terminalsAllowed;
+    if (stored.length === ids.length && stored.every((id, i) => id === ids[i])) return;
+    this.setThread(channelId, threadId, { ...current, terminalsAllowed: [...ids] });
   }
 
   /** Record the effort level a command set for a thread; a no-op for an unknown thread. */
@@ -971,6 +988,9 @@ export class StateStore {
                   }),
                   ...(t.pendingCut !== null && {
                     pending_cut: { at: t.pendingCut.at, token: t.pendingCut.token },
+                  }),
+                  ...(t.terminalsAllowed.length > 0 && {
+                    terminals_allowed: [...t.terminalsAllowed],
                   }),
                 },
               ]),

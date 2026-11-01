@@ -1013,7 +1013,7 @@ processes hold it open (`claude agents --json`, run with the instance's `CLAUDE_
   terminal. Your message waits here until that turn ends.` with a **Cancel** button. When the
   turn ends the notice reads `The terminal's turn ended.`, and the message goes on, after the
   question below if the terminal is still open.
-- A terminal open and idle: allaboard asks once per terminal, `⚠️ This session is also open in a
+- A terminal open and idle: allaboard asks once per terminal process (the answer is kept in `state.json`, so a restart of allaboard or an idle close does not ask again; the next answer replaces it, a new session id clears it, and it goes with the thread), `⚠️ This session is also open in a
   terminal. If you send this here, that terminal will not see it: before writing there, close it
   and run <command> again.`, with **Send here** and **Cancel**. The question becomes `Sent here.`
   or `Not sent.` A `!stop` sent while either is shown removes it, and `Not sent.` shows to you
@@ -1919,7 +1919,7 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice, the `/effort` level, the status of its root message, the ids and kinds of the replies and requests a crash repair needs, and the text the root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file), and for a thread `!fork` opened, the session it copies and when (`fork_of`), and for a rewind no message has followed yet, the prompt it cut at and the agent's token for it (`pending_cut`: two ids); at the top of the file, `update_notice` and `restart_notice`. The fields one by one and how they are written are in [State and the single-instance lock](architecture.md#state-and-the-single-instance-lock) |
+| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice, the `/effort` level, the status of its root message, the ids and kinds of the replies and requests a crash repair needs, and the text the root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file), and for a thread `!fork` opened, the session it copies and when (`fork_of`), and for a rewind no message has followed yet, the prompt it cut at and the agent's token for it (`pending_cut`: two ids), and the terminals you chose **Send here** for (`terminals_allowed`: one id of a process and its start time each, replaced at the next answer, cleared when the thread's session id changes); at the top of the file, `update_notice` and `restart_notice`. The fields one by one and how they are written are in [State and the single-instance lock](architecture.md#state-and-the-single-instance-lock) |
 
 `state.json` looks like this; you never need to edit it:
 

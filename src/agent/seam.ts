@@ -180,7 +180,11 @@ export interface Capabilities {
 
 /** A process that holds a session open, as `AgentBackend.sessionHolders` lists it. */
 export interface SessionHolder {
-  /** Tells this process from the others for as long as it runs. */
+  /**
+   * Tells this process from every other, ever: the core stores it (`state.json`) to remember an
+   * answer across a restart, so an id the system hands to a later process (a bare pid) is not
+   * enough. Opaque to the core, which only compares and stores it.
+   */
   readonly id: string;
   /** Whether it is the daemon's own: a session this daemon started. */
   readonly own: boolean;

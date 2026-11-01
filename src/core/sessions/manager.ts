@@ -129,7 +129,6 @@ export class SessionManager {
     let goal = this.goals.get(key) ?? null;
     let saved: SavedMessage | null = null;
     let rewinds = this.rewinds.get(key)?.memory ?? null;
-    let allowed: string[] = [];
     let moved = false;
     if (session?.closed) {
       // Discarded as soon as closing has started, not once it finishes: a message must never
@@ -142,7 +141,6 @@ export class SessionManager {
       saved = session.saved;
       session.rewinds.settle();
       rewinds = session.rewinds;
-      allowed = [...session.terminalsAllowed];
       moved = session.movedMidTurn;
       session = null;
     }
@@ -162,7 +160,6 @@ export class SessionManager {
         built.rewinds.token = pending?.token ?? null;
       }
       this.rewinds.delete(key);
-      for (const id of allowed) built.terminalsAllowed.add(id);
       built.movedMidTurn = moved;
       this.goals.delete(key);
       built.startsBlocked = this.startsBlocked;

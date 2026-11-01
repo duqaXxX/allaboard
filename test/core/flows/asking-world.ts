@@ -73,6 +73,11 @@ export interface WorldOptions {
   readonly agent?: AgentBackend;
   /** Hold every setup's summary (`rewrite`) until `gate.set()`. */
   readonly gated?: boolean;
+  /**
+   * An earlier world, to play a restart of the daemon: its folder, chat and channel stay, and
+   * `state.json` is read again from the disk. The folder is then the earlier world's to remove.
+   */
+  readonly restartOf?: AskingWorld;
 }
 
 export class AskingWorld {
@@ -102,13 +107,16 @@ export class AskingWorld {
     provider: ChatProvider,
     agent: AgentBackend,
     gated: boolean,
+    earlier: AskingWorld | undefined,
   ) {
     this.folder = folder;
     this.chat = chat;
     this.agent = agent;
-    this.channel = chat.openChannel("work");
     this.state = new StateStore(join(folder, "state.json"), { sync: NO_SYNC });
-    this.state.bind(this.channel, folder);
+    if (earlier === undefined) {
+      this.channel = chat.openChannel("work");
+      this.state.bind(this.channel, folder);
+    } else this.channel = earlier.channel;
     const names = namesOf(agent, provider);
     this.approvals = new Approvals(names);
     this.provider = gated ? rewriteGated(provider, this.gate) : provider;
@@ -148,8 +156,10 @@ export class AskingWorld {
 
   /** A world over the memory chat, with the plain agent unless `options.agent` names another. */
   static async make(t: TestContext, options: WorldOptions = {}): Promise<AskingWorld> {
-    const folder = realpathSync(mkdtempSync(join(tmpdir(), "allaboard-asking-")));
-    const chat = memoryChat();
+    const earlier = options.restartOf;
+    const folder =
+      earlier?.folder ?? realpathSync(mkdtempSync(join(tmpdir(), "allaboard-asking-")));
+    const chat = earlier?.chat ?? memoryChat();
     const provider = await chat.build({
       variables: {},
       allowedRoot: folder,
@@ -166,13 +176,15 @@ export class AskingWorld {
       provider,
       options.agent ?? new PlainAgent(),
       options.gated ?? false,
+      earlier,
     );
     await provider.start(world.inbound);
     t.after(async () => {
       world.gate.set();
       await world.sessions.closeAll();
       await provider.stop();
-      rmSync(folder, { recursive: true, force: true });
+      // A restart shares the folder with the world it replays: that one removes it.
+      if (earlier === undefined) rmSync(folder, { recursive: true, force: true });
     });
     return world;
   }
@@ -183,6 +195,13 @@ export class AskingWorld {
     const session = this.sessions.open(ref.channel, ref.thread);
     if (session === null) throw new Error("the channel is not bound");
     return { ref, session };
+  }
+
+  /** The live session of an existing thread, as its next message would open it. */
+  session(ref: ThreadRef): ThreadSession {
+    const session = this.sessions.open(ref.channel, ref.thread);
+    if (session === null) throw new Error("the channel is not bound");
+    return session;
   }
 
   /** The requests the owner can still answer, in the thread. */
