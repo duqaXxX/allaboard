@@ -216,6 +216,7 @@ test("install writes the plist, lints it and bootstraps it in the user's domain"
     [
       ["launchctl", "list"],
       ["plutil", "-lint", plistPath(path, null)],
+      ["launchctl", "enable", `gui/${UID}/${LABEL}`],
       ["launchctl", "bootstrap", `gui/${UID}`, plistPath(path, null)],
     ],
   );
@@ -253,6 +254,7 @@ test("install of a named instance writes and loads the plist of its own label", 
     [
       ["launchctl", "list"],
       ["plutil", "-lint", plistPath(path, "dev")],
+      ["launchctl", "enable", `gui/${UID}/${DEV_LABEL}`],
       ["launchctl", "bootstrap", `gui/${UID}`, plistPath(path, "dev")],
     ],
   );
@@ -370,7 +372,7 @@ test("uninstall boots the job out, removes the plist and names what it leaves", 
     args: ["bootout", `gui/${UID}/${LABEL}`],
   });
   assert.deepEqual(report.out, [
-    `Stopped ${LABEL}.`,
+    `Stopping ${LABEL}.`,
     `Removed ${plistPath(path, null)}.`,
     `Left in place: ${join(path, ".config", "allaboard")} (.env, state.json) and ${join(logPath(path, null), "..")}.`,
   ]);
@@ -438,6 +440,139 @@ test("restart of a job that is not loaded or not running sends nothing", (t) => 
   }
 });
 
+function installedPlist(path: string, instance: string | null = null): void {
+  mkdirSync(join(plistPath(path, instance), ".."), { recursive: true });
+  writeFileSync(plistPath(path, instance), "x");
+}
+
+test("stop disables the loaded job, then boots it out, and leaves every file", (t) => {
+  const path = home(t);
+  installedPlist(path);
+  const run = fakeRun(RUNNING);
+  const report = manager(path, run).stop();
+  assert.equal(report.code, 0);
+  assert.deepEqual(
+    run.calls.slice(1).map((call) => call.args),
+    [
+      ["disable", `gui/${UID}/${LABEL}`],
+      ["bootout", `gui/${UID}/${LABEL}`],
+    ],
+  );
+  assert.ok(existsSync(plistPath(path, null)));
+  assert.deepEqual(report.out, [
+    `Stopping ${LABEL}: turns still running are ended within 60 seconds.`,
+    "It stays stopped across logins and reboots: once `allaboard service status` says not loaded, `allaboard service start` loads it again.",
+    `Left in place: ${plistPath(path, null)}, ${join(path, ".config", "allaboard")} (.env, state.json) and ${join(logPath(path, null), "..")}.`,
+  ]);
+});
+
+test("stop of a service already unloaded still keeps a login from loading it", (t) => {
+  const path = home(t);
+  installedPlist(path);
+  const run = fakeRun(ABSENT);
+  const report = manager(path, run).stop();
+  assert.equal(report.code, 0);
+  assert.equal(report.out[0], `${LABEL} is not loaded.`);
+  assert.deepEqual(
+    run.calls.slice(1).map((call) => call.args[0]),
+    ["disable"],
+  );
+});
+
+test("stop with no plist refuses and leaves launchd alone", (t) => {
+  const absent = fakeRun(ABSENT);
+  assert.deepEqual(manager(home(t), absent).stop(), {
+    code: 1,
+    out: [],
+    err: [`${LABEL} is not installed.`],
+  });
+  assert.equal(absent.calls.length, 1);
+  const path = home(t);
+  const loaded = fakeRun(RUNNING);
+  const report = manager(path, loaded).stop();
+  assert.equal(report.code, 1);
+  assert.match(report.err[0] as string, /its plist .* is gone.*`allaboard service uninstall`/);
+  assert.equal(loaded.calls.length, 1);
+});
+
+test("a stop launchctl refuses fails with its words and leaves the job enabled", (t) => {
+  const path = home(t);
+  installedPlist(path);
+  const run = fakeRun(RUNNING, { "launchctl bootout": { status: 5, stderr: "Boot-out failed\n" } });
+  assert.deepEqual(manager(path, run).stop(), {
+    code: 1,
+    out: [],
+    err: ["launchctl bootout failed: Boot-out failed"],
+  });
+  assert.deepEqual(run.calls.at(-1)?.args, ["enable", `gui/${UID}/${LABEL}`]);
+});
+
+test("uninstall clears a stop's disable", (t) => {
+  const path = home(t);
+  installedPlist(path);
+  const run = fakeRun(ABSENT);
+  assert.equal(manager(path, run).uninstall().code, 0);
+  assert.deepEqual(run.calls[1]?.args, ["enable", `gui/${UID}/${LABEL}`]);
+});
+
+test("start enables the service, then loads the plist that exists", (t) => {
+  const path = home(t);
+  installedPlist(path);
+  const run = fakeRun(ABSENT);
+  assert.deepEqual(manager(path, run).start(), {
+    code: 0,
+    out: [`Loaded ${LABEL}: allaboard starts now and at every login.`],
+    err: [],
+  });
+  assert.deepEqual(
+    run.calls.slice(1).map((call) => call.args),
+    [
+      ["enable", `gui/${UID}/${LABEL}`],
+      ["bootstrap", `gui/${UID}`, plistPath(path, null)],
+    ],
+  );
+});
+
+test("start refuses a loaded service and a missing plist, and calls nothing more", (t) => {
+  const path = home(t);
+  installedPlist(path);
+  for (const listing of [RUNNING, STOPPED]) {
+    const run = fakeRun(listing);
+    assert.deepEqual(manager(path, run).start(), {
+      code: 1,
+      out: [],
+      err: [`${LABEL} is already loaded.`],
+    });
+    assert.equal(run.calls.length, 1);
+  }
+  const run = fakeRun(ABSENT);
+  assert.deepEqual(manager(home(t), run).start(), {
+    code: 1,
+    out: [],
+    err: [`${LABEL} is not installed: \`allaboard service install\` installs it.`],
+  });
+  assert.equal(run.calls.length, 1);
+});
+
+test("install enables a service a stop disabled before it loads the plist", (t) => {
+  const run = fakeRun(ABSENT);
+  assert.equal(manager(home(t), run).install(PROGRAM).code, 0);
+  const verbs = run.calls.filter((call) => call.command === "launchctl").map((c) => c.args[0]);
+  assert.deepEqual(verbs, ["list", "enable", "bootstrap"]);
+});
+
+test("stop and start of a named instance name it in the target and the command", (t) => {
+  const path = home(t);
+  installedPlist(path, "dev");
+  const run = fakeRun(`PID\tStatus\tLabel\n7\t0\t${DEV_LABEL}\n`);
+  const report = manager(path, run, "dev").stop();
+  assert.deepEqual(run.calls[1]?.args, ["disable", `gui/${UID}/${DEV_LABEL}`]);
+  assert.match(report.out[1] as string, /`allaboard service start --instance dev`/);
+  const absent = fakeRun(ABSENT);
+  manager(path, absent, "dev").start();
+  assert.deepEqual(absent.calls[1]?.args, ["enable", `gui/${UID}/${DEV_LABEL}`]);
+});
+
 test("a failing launchctl list fails the action with its words", (t) => {
   const run: Run = () => ({ status: 1, stdout: "", stderr: "Could not connect\n" });
   assert.deepEqual(manager(home(t), run).status(), {
@@ -473,7 +608,7 @@ test("uninstall, status and restart of a named instance act on its label alone",
     args: ["bootout", `gui/${UID}/${DEV_LABEL}`],
   });
   assert.deepEqual(report.out, [
-    `Stopped ${DEV_LABEL}.`,
+    `Stopping ${DEV_LABEL}.`,
     `Removed ${plistPath(path, "dev")}.`,
     `Left in place: ${join(path, ".config", "allaboard-dev")} (.env, state.json) and ${join(logPath(path, "dev"), "..")}.`,
   ]);
@@ -488,11 +623,11 @@ test("a named instance that is not installed or not loaded says its own command"
   writeFileSync(plistPath(path, "dev"), "x");
   assert.equal(
     manager(path, fakeRun(ABSENT), "dev").status().out[0],
-    `${DEV_LABEL} is installed and not loaded: \`allaboard service install --instance dev\` loads it.`,
+    `${DEV_LABEL} is installed and not loaded: \`allaboard service start --instance dev\` loads it.`,
   );
   assert.equal(
     manager(path, fakeRun(ABSENT), "dev").restart().err[0],
-    `${DEV_LABEL} is not loaded: \`allaboard service install --instance dev\` starts it.`,
+    `${DEV_LABEL} is not loaded: \`allaboard service start --instance dev\` starts it.`,
   );
 });
 

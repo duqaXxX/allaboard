@@ -158,6 +158,14 @@ export class FakeService implements ServiceManager {
     return { code: this.code, out: [], err: this.code === 0 ? [] : ["restart refused"] };
   }
 
+  stop(): Report {
+    throw new Error("a test never stops a service");
+  }
+
+  start(): Report {
+    throw new Error("a test never starts a service");
+  }
+
   list(): Report {
     return { code: 0, out: [], err: [] };
   }
