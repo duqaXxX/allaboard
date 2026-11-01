@@ -536,8 +536,10 @@ no check covers them here.
   rows are `package` because the reference page was not read for them.
 - `SDKMessageOrigin.body` marks a message from another of the owner's sessions only when no
   `senderTaskId` comes with it: `sdk.d.ts` 0.3.312 gives `body` to an in-process agent's message
-  too, and promises `senderTaskId` only for a background subagent. The recordings hold the two
-  shapes `peer-message.jsonl` and `subagent-handback.jsonl`, and no other in-process sender.
+  too, and promises `senderTaskId` only for a background subagent. The recordings hold the
+  shapes `peer-message.jsonl`, `subagent-handback.jsonl` and `subagent-message-{bypass,auto}.jsonl`
+  (a background subagent's message while it runs, `senderTaskId` set, 2026-11-01, Claude Code
+  2.1.316), and no other in-process sender.
 - `SDKControlInitializeResponse.current_permission_mode` is in `server-info.json` and in no
   declaration. `CanUseTool.title` is declared and was absent in both permission calls measured on
   SDK 0.3.296 on 2026-10-10. `"human"` of `SDKMessageOrigin.kind` is in no recording: the results

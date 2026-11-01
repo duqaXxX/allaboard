@@ -1,0 +1,541 @@
+{
+ "recording": "subagent-message-auto",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nstar",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ted.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "abad9e911475f33ea"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01L7y9w9KtJbdqnU9LFXFQaw",
+      "message": false,
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01L7y9w9KtJbdqnU9LFXFQaw",
+      "message": false,
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01QPHGSuRzzggL68sXe8uXrs",
+      "message": false,
+      "name": "SendMessage",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "SendMessage: main"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01QPHGSuRzzggL68sXe8uXrs",
+      "message": false,
+      "name": "SendMessage",
+      "output": "{\"success\":true,\"message\":\"Message queued for the main conversation's next turn.\"}",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "SendMessage: main"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c \"import time; time.sleep(25)\"",
+      "folded": null,
+      "id": "toolu_01JXZ6eShK9pLpBcz2FZp9hn",
+      "message": false,
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep 25 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The worker sen",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t \"halfway the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "re\" and is sti",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ll running its",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " 25-second sle",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ep. Its `finis",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "hed` reply wil",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "l arrive as a ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "completion not",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ification.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": [
+      {
+       "calls": 0,
+       "details": "$ python3 -c \"import time; time.sleep(25)\"",
+       "folded": null,
+       "id": "toolu_01JXZ6eShK9pLpBcz2FZp9hn",
+       "message": false,
+       "name": "Bash",
+       "output": null,
+       "preview": null,
+       "startedAt": 0,
+       "status": "complete",
+       "task": false,
+       "title": "Sleep 25 seconds"
+      }
+     ]
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01JL4yAL8E4qbZcu1BV3qPUd",
+      "message": false,
+      "name": "SubagentHandback",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "SubagentHandback: Sent \"halfway there\" to the parent session via SendMessage (q…"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01JL4yAL8E4qbZcu1BV3qPUd",
+      "message": false,
+      "name": "SubagentHandback",
+      "output": "{\"success\":true,\"message\":\"Report delivered to your caller.\"}",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "SubagentHandback: Sent \"halfway there\" to the parent session via SendMessage (q…"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-abad9e911475f33ea",
+      "message": false,
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "abad9e911475f33ea"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-abad9e911475f33ea",
+      "message": false,
+      "name": "task",
+      "output": "This agent's report was delivered to you as a message from \"abad9e911475f33ea\" (its SubagentHandback call). Read it there; it is not repeated here.",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "abad9e911475f33ea"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The worker finis",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "hed. It sent \"ha",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "lfway there\" to ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "this session and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " ran the 25-seco",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nd sleep with no",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " output, then re",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "plied `finished`",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". Nothing is lef",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t to do.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Worker: send message, sleep, finish)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nstar",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ted.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe worker sen",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t \"halfway the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "re\" and is sti",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ll running its",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " 25-second sle",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ep. Its `finis",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "hed` reply wil",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "l arrive as a ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "completion not",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ification.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe worker finis",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "hed. It sent \"ha",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "lfway there\" to ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "this session and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " ran the 25-seco",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nd sleep with no",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " output, then re",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "plied `finished`",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". Nothing is lef",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t to do.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

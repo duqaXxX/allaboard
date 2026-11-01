@@ -1,0 +1,654 @@
+{
+ "recording": "subagent-message-bypass",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Worker: send message, then sleep)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nstar",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ted.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "afb61a70a642ac9b1"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01SmiBP25PJ2TRrhCQqi5wAz",
+      "message": false,
+      "name": "SendMessage",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "SendMessage: halfway there"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01SmiBP25PJ2TRrhCQqi5wAz",
+      "message": false,
+      "name": "SendMessage",
+      "output": "<tool_use_error>InputValidationError: SendMessage failed due to the following issue:",
+      "preview": null,
+      "startedAt": null,
+      "status": "error",
+      "task": false,
+      "title": "SendMessage: halfway there"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01UbprGk22bj89cSGJBoT4a8",
+      "message": false,
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01UbprGk22bj89cSGJBoT4a8",
+      "message": false,
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_016XNRKJSuHXQU8csppvMVYf",
+      "message": false,
+      "name": "SendMessage",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "SendMessage: main"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_016XNRKJSuHXQU8csppvMVYf",
+      "message": false,
+      "name": "SendMessage",
+      "output": "{\"success\":true,\"message\":\"Message queued for the main conversation's next turn.\"}",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "SendMessage: main"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": "$ python3 -c \"import time; time.sleep(25)\"",
+      "folded": null,
+      "id": "toolu_01SFZY22x3oGU6aLnmZJYgy7",
+      "message": false,
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "startedAt": 0,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep for 25 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The worker sen",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t `halfway the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "re` to this se",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ssion as instr",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ucted. It is s",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "till running i",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ts 25-second s",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "leep and has n",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ot reported `f",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "inished` yet. ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "I'll report ag",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ain when its c",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ompletion noti",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "fication arriv",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "es.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": [
+      {
+       "calls": 0,
+       "details": "$ python3 -c \"import time; time.sleep(25)\"",
+       "folded": null,
+       "id": "toolu_01SFZY22x3oGU6aLnmZJYgy7",
+       "message": false,
+       "name": "Bash",
+       "output": null,
+       "preview": null,
+       "startedAt": 0,
+       "status": "complete",
+       "task": false,
+       "title": "Sleep for 25 seconds"
+      }
+     ]
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-afb61a70a642ac9b1",
+      "message": false,
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "afb61a70a642ac9b1"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-afb61a70a642ac9b1",
+      "message": false,
+      "name": "task",
+      "output": "finished",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": true,
+      "title": "afb61a70a642ac9b1"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The worker fi",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nished. It se",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "nt `halfway t",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "here` to this",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " session, ran",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the 25-secon",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "d sleep, and ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "replied `fini",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "shed`. It use",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "d 4 tool call",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "s and about 4",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "1.5k subagent",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " tokens over ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "33 seconds. N",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "othing is lef",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "t to do.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Worker: send message, then sleep)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nstar",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ted.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe worker sen",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t `halfway the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "re` to this se",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ssion as instr",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ucted. It is s",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "till running i",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ts 25-second s",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "leep and has n",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ot reported `f",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "inished` yet. ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "I'll report ag",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ain when its c",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ompletion noti",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "fication arriv",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "es.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe worker fi",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nished. It se",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "nt `halfway t",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "here` to this",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " session, ran",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the 25-secon",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "d sleep, and ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "replied `fini",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "shed`. It use",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "d 4 tool call",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "s and about 4",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "1.5k subagent",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " tokens over ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "33 seconds. N",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "othing is lef",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "t to do.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}
