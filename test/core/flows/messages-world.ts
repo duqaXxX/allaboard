@@ -188,6 +188,8 @@ interface Variant {
   readonly openFails: boolean;
   readonly tags: boolean;
   readonly tagFails: boolean;
+  readonly pins: boolean;
+  readonly pinFails: boolean;
   readonly titles: boolean;
   readonly titleAttempts: { count: number };
   readonly root: FakeRoot;
@@ -215,6 +217,7 @@ function variant(
   how: Variant,
   opened: Array<readonly [ThreadRef, string, string]>,
   tagged: Array<readonly [ThreadRef, string | null]>,
+  pinned: Array<readonly [ThreadRef, boolean]>,
   titled: Array<readonly [ThreadRef, string]>,
   deleted: ThreadRef[],
   cleaned: string[],
@@ -225,6 +228,7 @@ function variant(
     rootStatus: how.reactions,
     acknowledgement: how.reactions,
     threadTags: how.tags,
+    threadPins: how.pins,
     threadTitles: how.titles,
     threadDelete: how.deletes,
     channelClean: how.cleans,
@@ -266,6 +270,12 @@ function variant(
         return async (ref: ThreadRef, tag: string | null) => {
           if (how.tagFails) throw new ChatError("message_not_found");
           tagged.push([ref, tag]);
+        };
+      }
+      if (property === "pinThread" && how.pins) {
+        return async (ref: ThreadRef, pin: boolean) => {
+          if (how.pinFails) throw new ChatError("message_not_found");
+          pinned.push([ref, pin]);
         };
       }
       if (property === "titleThread" && how.titles) {
@@ -321,6 +331,10 @@ export interface WorldOptions {
   readonly tags?: boolean;
   /** `tagThread` rejects with a `ChatError`. */
   readonly tagFails?: boolean;
+  /** The chat can pin a thread; `pinThread` records its calls in `World.pinCalls`. */
+  readonly pins?: boolean;
+  /** `pinThread` rejects with a `ChatError`. */
+  readonly pinFails?: boolean;
   /** The chat can title a thread; `titleThread` records its calls in `World.titleCalls`. */
   readonly titles?: boolean;
   /** What the owner wrote in the root before it is titled (`World.root.text`). */
@@ -380,6 +394,8 @@ export class MessagesWorld {
   readonly fileCalls: Array<readonly [ThreadRef, string, string]> = [];
   /** Every `tagThread` the chat was asked for: the thread and the tag. */
   readonly tagCalls: Array<readonly [ThreadRef, string | null]> = [];
+  /** Every `pinThread` the chat was asked for: the thread and whether to pin. */
+  readonly pinCalls: Array<readonly [ThreadRef, boolean]> = [];
   /** Every `titleThread` the chat was asked for: the thread and the title. */
   readonly titleCalls: Array<readonly [ThreadRef, string]> = [];
   /** The thread's root as the chat holds it. */
@@ -423,6 +439,7 @@ export class MessagesWorld {
       how,
       this.fileCalls,
       this.tagCalls,
+      this.pinCalls,
       this.titleCalls,
       this.deleteCalls,
       this.cleanCalls,
@@ -491,6 +508,8 @@ export class MessagesWorld {
         openFails: options.openFails ?? false,
         tags: options.tags ?? false,
         tagFails: options.tagFails ?? false,
+        pins: options.pins ?? false,
+        pinFails: options.pinFails ?? false,
         titles: options.titles ?? false,
         titleAttempts: attempts,
         root: {

@@ -302,15 +302,16 @@ function casefold(text: string): string {
  * Whether `row` passes every chosen filter. The date is the thread's last reply: `today` and
  * `yesterday` are calendar days of the machine's own time zone, each instant read with the
  * offset in force at that instant (a day a clock change makes 23 or 25 hours long stays one day);
- * the others reach back from now. A pinned session passes the period whatever its last reply;
- * the channel, the status, the tag and the search still apply to it.
+ * the others reach back from now. A pinned session, and with a tag chosen a session carrying it,
+ * passes the period whatever its last reply, since the tag menu lists tags of any age; the
+ * channel, the status, the tag and the search still apply to it.
  */
 export function matches(filter: HomeFilter, row: HomeRow, now: Date): boolean {
   if (filter.channel && row.channelId !== filter.channel) return false;
   if (filter.status && row.status !== filter.status) return false;
   if (filter.tag && row.tag !== filter.tag) return false;
   if (filter.search && !casefold(row.title).includes(casefold(filter.search))) return false;
-  if (row.pinned) return true;
+  if (row.pinned || filter.tag) return true;
   if (filter.date === TODAY || filter.date === YESTERDAY) {
     const days = localDay(now.getTime() / 1000) - localDay(row.lastActivity);
     return days === (filter.date === TODAY ? 0 : 1);

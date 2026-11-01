@@ -258,12 +258,10 @@ export const HOME_CLEAN_REFUSED = naming(
     "reply stay.",
 );
 // A pinned thread is kept, by the Home tab's Delete and by `!delete-thread` alike. The first line
-// is for a root that carries a tag (`!untag` removes the tag and the pin), the second for a pin
-// the owner made by hand on the root, the third for a pinned reply; only the owner removes those.
-export const DELETE_PINNED_TAGGED =
-  "This thread is pinned, so it is not deleted. `!untag` removes its tag and its pin.";
-export const DELETE_PINNED_BY_HAND = naming(
-  "This thread is pinned, so it is not deleted. Unpin its first message in {chat}, then delete it.",
+// is for a pinned root, the second for a pinned reply, which only the owner unpins. A token without
+// the pin's scope refuses `!unpin` and still has {chat}'s own way.
+export const DELETE_PINNED_ROOT = naming(
+  "This thread is pinned, so it is not deleted. Unpin its first message with `!unpin` or in {chat}, then delete it.",
 );
 export const DELETE_PINNED_REPLY = naming(
   "A message of this thread is pinned, so it is not deleted. Unpin it in {chat}, then delete it.",

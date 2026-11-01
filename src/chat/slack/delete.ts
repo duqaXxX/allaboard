@@ -77,13 +77,12 @@ const NOT_A_REFUSAL: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * A pinned message keeps its thread: `where` says which one is pinned, the root with a tag (which
- * `!untag` removes with the pin), the root with a pin made by hand, or a reply under a root that
- * is not pinned.
+ * A pinned message keeps its thread: `where` says which one is pinned, the root or a reply under
+ * a root that is not pinned.
  */
 export interface PinnedRefusal {
   readonly reason: "pinned";
-  readonly where: "tagged-root" | "root" | "reply";
+  readonly where: "root" | "reply";
 }
 
 /**
@@ -102,10 +101,8 @@ export type DeleteRefusal =
 /** The line a pinned thread's delete is refused with. */
 export function pinnedLine(refusal: PinnedRefusal, names: Names): string {
   switch (refusal.where) {
-    case "tagged-root":
-      return slackTexts.DELETE_PINNED_TAGGED;
     case "root":
-      return named(slackTexts.DELETE_PINNED_BY_HAND, names);
+      return named(slackTexts.DELETE_PINNED_ROOT, names);
     case "reply":
       return named(slackTexts.DELETE_PINNED_REPLY, names);
   }
@@ -199,7 +196,7 @@ interface Seen {
 function pinnedOf(messages: ReadonlyMap<string, Seen>, threadTs: string): PinnedRefusal | null {
   const root = messages.get(threadTs);
   if (root?.marks.pinned) {
-    return { reason: "pinned", where: root.marks.tag === null ? "root" : "tagged-root" };
+    return { reason: "pinned", where: "root" };
   }
   return [...messages.values()].some((seen) => seen.marks.pinned)
     ? { reason: "pinned", where: "reply" }

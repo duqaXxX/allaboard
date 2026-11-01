@@ -1,13 +1,13 @@
 /**
- * The tag of a thread, shown on its root message and kept at hand by a pin: `!tag <name>` puts
- * an inline-code `[name]` and a space at the start of the root, replacing a tag already there,
- * and pins the root; `!untag` removes the prefix and, from a root that carried a tag, the pin (a
- * pin the owner made by hand on an untagged root is left alone).
+ * The tag of a thread, shown on its root message: `!tag <name>` puts an inline-code `[name]` and
+ * a space at the start of the root, replacing a tag already there; `!untag` removes the prefix.
+ * The pin of a thread is separate: `!pin` pins the root and `!unpin` unpins it, however the pin
+ * was made, and neither touches the tag.
  *
  * The root is the owner's own message, and `chat.update` changes only "messages posted by the
  * authenticated user" (docs.slack.dev/reference/methods/chat.update, read 2026-10-19), so the
- * edit and the pin both go through the owner's user token (`SLACK_USER_TOKEN`, scopes
- * `chat:write` and `pins:write`); the bot only reads the root. Measured on a dev workspace on
+ * edit (`chat:write`) and the pin (`pins:write`) both go through the owner's user token
+ * (`SLACK_USER_TOKEN`); the bot only reads the root. Measured on a dev workspace on
  * 2026-10-19: that token edits and pins the owner's root; no `pinned_item` message is posted;
  * no push reaches iOS for any of the four actions; the edit reaches the daemon as
  * `message_changed`, which `app/guards.ts` drops, so no prompt is sent; `conversations.replies`
@@ -228,7 +228,7 @@ interface Rewrite {
   readonly blocks: (blocks: readonly unknown[]) => unknown[];
 }
 
-/** Edits the root of a thread with the owner's own token: its tag and pin, its title line. */
+/** Changes the root of a thread with the owner's own token: its tag, its title line, its pin. */
 export class RootEditor {
   readonly #bot: WebClient;
   readonly #owner: WebClient;
@@ -242,22 +242,29 @@ export class RootEditor {
   }
 
   /**
-   * Puts `tag` on the root of `thread` and pins it, or with a null `tag` takes the tag away and, when the root carried one, the pin. Each
-   * step is skipped when the root is already as asked, so a repeat is harmless. Rejects with a
-   * `ChatError` carrying Slack's code when a call was refused.
+   * Puts `tag` on the root of `thread`, or with a null `tag` takes the tag away. Nothing is sent
+   * when the root is already as asked, so a repeat is harmless. Rejects with a `ChatError` carrying
+   * Slack's code when a call was refused.
    */
   tag(channel: string, thread: string, tag: string | null): Promise<void> {
     return this.#serially(channel, thread, async () => {
       const root = await this.#root(channel, thread);
-      const marks = rootMarks(root);
       await this.#edit(channel, thread, root, {
         text: (text) => retaggedText(text, tag),
         blocks: (blocks) => retaggedBlocks(blocks, tag),
       });
-      if (tag !== null && !marks.pinned) await this.#pin(channel, thread);
-      // Only a root that carried a tag is unpinned: a pin the owner made by hand stays.
-      if (tag === null && marks.pinned && marks.tag !== null) await this.#unpin(channel, thread);
     });
+  }
+
+  /**
+   * Pins the root of `thread`, or unpins it. Slack answers a pin already as asked with a code that
+   * is no failure, so nothing is read first. Rejects with a `ChatError` carrying Slack's code when
+   * a call was refused.
+   */
+  pin(channel: string, thread: string, pinned: boolean): Promise<void> {
+    return this.#serially(channel, thread, () =>
+      pinned ? this.#pin(channel, thread) : this.#unpin(channel, thread),
+    );
   }
 
   /**

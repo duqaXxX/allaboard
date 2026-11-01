@@ -34,6 +34,8 @@ export interface GuideOffer {
   readonly rewind: boolean;
   /** The chat tags a thread (`threadTags`). */
   readonly threadTags: boolean;
+  /** The chat pins a thread (`threadPins`). */
+  readonly threadPins: boolean;
   /** The chat deletes a thread (`threadDelete`). */
   readonly threadDelete: boolean;
   /** The chat cleans a channel (`channelClean`). */
@@ -100,6 +102,7 @@ export function guideText(names: Names, offered: GuideOffer): string {
     ...(offered.bypass ? [say(texts.GUIDE_BYPASS)] : []),
     ...(offered.plan ? [say(texts.GUIDE_PLAN)] : []),
     ...(offered.threadTags ? [say(texts.GUIDE_TAGS)] : []),
+    ...(offered.threadPins ? [say(texts.GUIDE_PINS)] : []),
     ...(offered.shell ? [say(texts.GUIDE_SHELL)] : []),
     ...(offered.threadDelete ? [say(texts.GUIDE_DELETE)] : []),
     ...(offered.channelClean ? [say(texts.GUIDE_CLEAN)] : []),

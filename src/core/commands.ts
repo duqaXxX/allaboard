@@ -95,6 +95,14 @@ export interface Untag {
   readonly kind: "untag";
 }
 
+export interface Pin {
+  readonly kind: "pin";
+}
+
+export interface Unpin {
+  readonly kind: "unpin";
+}
+
 export interface DeleteThread {
   readonly kind: "delete-thread";
 }
@@ -150,6 +158,8 @@ export type Word =
   | Open
   | Tag
   | Untag
+  | Pin
+  | Unpin
   | DeleteThread
   | Clean
   | Allaboard
@@ -176,6 +186,8 @@ export const WORD = {
   open: "open",
   tag: "tag",
   untag: "untag",
+  pin: "pin",
+  unpin: "unpin",
   "delete-thread": "delete-thread",
   "clean-channel": "clean-channel",
   allaboard: "allaboard",
@@ -279,6 +291,10 @@ export function parseBang(text: string): Command | null {
       // A thread has one tag, so `!untag devops` means `!untag`: what follows the word says
       // nothing more, and a word the owner typed must not reach the agent as a prompt.
       return { kind: "untag" };
+    case "pin":
+      return rest === "" ? { kind: "pin" } : { kind: "invalid" };
+    case "unpin":
+      return rest === "" ? { kind: "unpin" } : { kind: "invalid" };
     case "delete-thread":
       // Anything after it is a mistake: the help shows how it is written, and nothing is deleted.
       return rest === "" ? { kind: "delete-thread" } : { kind: "invalid" };

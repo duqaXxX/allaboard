@@ -46,11 +46,13 @@ test("the provider names itself and supports every part of the seam", () => {
     loopCard: true,
     threadOpen: true,
     threadTags: false,
+    threadPins: false,
     threadTitles: false,
     threadDelete: false,
     channelClean: false,
   });
   assert.equal(chat.tagThread, undefined, "no owner token, no tagThread");
+  assert.equal(chat.pinThread, undefined, "no owner token, no pinThread");
   assert.equal(chat.titleThread, undefined, "no owner token, no titleThread");
   assert.equal(chat.deleteThread, undefined, "no owner token, no deleteThread");
 });
@@ -178,7 +180,7 @@ function started(
   options: {
     stuck?: boolean;
     roots?: RootEditor;
-    canTag?: boolean;
+    canPin?: boolean;
     deletion?: ThreadDeletion;
   } = {},
 ) {
@@ -201,7 +203,7 @@ function started(
     agent: () => AGENT,
     limiter: world.limiter,
     clock: world.slackClock,
-    ...(options.roots !== undefined && { roots: options.roots, canTag: options.canTag ?? false }),
+    ...(options.roots !== undefined && { roots: options.roots, canPin: options.canPin ?? false }),
     app: {
       core: () => {
         cores += 1;
@@ -273,7 +275,7 @@ test("with the owner's token the provider declares threadTags, has tagThread, an
   t.mock.method(tagger, "tag", async (...args: unknown[]) => {
     tagged.push(args);
   });
-  const { chat } = started(world, { roots: tagger, canTag: true });
+  const { chat } = started(world, { roots: tagger });
   assert.equal(chat.capabilities.threadTags, true);
   assert.equal(typeof chat.tagThread, "function");
   const asked: unknown[] = [];
@@ -288,6 +290,27 @@ test("with the owner's token the provider declares threadTags, has tagThread, an
   assert.deepEqual(asked, [[ref], [ref]]);
 });
 
+test("with the pin's scope the provider declares threadPins, has pinThread, and refreshes the Home", async (t) => {
+  const world = worldOf(t);
+  const editor = new RootEditor(world.slack, new FakeSlack());
+  const pinned: unknown[] = [];
+  t.mock.method(editor, "pin", async (...args: unknown[]) => {
+    pinned.push(args);
+  });
+  const { chat } = started(world, { roots: editor, canPin: true });
+  assert.equal(chat.capabilities.threadPins, true);
+  const asked: unknown[] = [];
+  t.mock.method(world.home, "request", (changed?: unknown) => asked.push(changed));
+  const ref = { channel: CHANNEL, thread: THREAD };
+  await chat.pinThread?.(ref, true);
+  await chat.pinThread?.(ref, false);
+  assert.deepEqual(pinned, [
+    [CHANNEL, THREAD, true],
+    [CHANNEL, THREAD, false],
+  ]);
+  assert.deepEqual(asked, [[ref], [ref]]);
+});
+
 test("with the owner's token the provider declares threadTitles, has titleThread, and refreshes the Home", async (t) => {
   const world = worldOf(t);
   const titler = new RootEditor(world.slack, new FakeSlack());
@@ -297,8 +320,8 @@ test("with the owner's token the provider declares threadTitles, has titleThread
   });
   const { chat } = started(world, { roots: titler });
   assert.equal(chat.capabilities.threadTitles, true);
-  assert.equal(chat.capabilities.threadTags, false, "a titler alone offers no tags");
-  assert.equal(chat.tagThread, undefined);
+  assert.equal(chat.capabilities.threadPins, false, "without the scope, no pins");
+  assert.equal(chat.pinThread, undefined);
   const asked: unknown[] = [];
   t.mock.method(world.home, "request", (changed?: unknown) => asked.push(changed));
   const ref = { channel: CHANNEL, thread: THREAD };
@@ -337,7 +360,7 @@ test("a refused tag still asks the Home to read the root again, and the refusal 
   t.mock.method(tagger, "tag", async () => {
     throw new ChatError("missing_scope");
   });
-  const { chat } = started(world, { roots: tagger, canTag: true });
+  const { chat } = started(world, { roots: tagger });
   const asked: unknown[] = [];
   t.mock.method(world.home, "request", (changed?: unknown) => asked.push(changed));
   const ref = { channel: CHANNEL, thread: THREAD };

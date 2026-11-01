@@ -1421,6 +1421,7 @@ const WITHOUT_UPDATES = {
   ...EVERYTHING_OFFERED,
   updates: false,
   threadTags: false,
+  threadPins: false,
   threadDelete: false,
   channelClean: false,
 };

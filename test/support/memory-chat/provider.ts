@@ -44,6 +44,7 @@ const CAPABILITIES: ChatCapabilities = {
   threadLists: false,
   messageFold: false,
   threadTags: false,
+  threadPins: false,
   threadTitles: false,
   threadDelete: false,
   channelClean: false,

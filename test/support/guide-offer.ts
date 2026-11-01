@@ -17,6 +17,7 @@ export const EVERYTHING_OFFERED: GuideOffer = {
   diff: true,
   rewind: true,
   threadTags: true,
+  threadPins: true,
   threadDelete: true,
   channelClean: true,
   shell: true,

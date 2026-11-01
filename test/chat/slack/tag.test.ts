@@ -158,7 +158,7 @@ function made(message: JsonObject | Error): Made {
 
 const PLAIN = root([rich(HELLO)], "fix the footer ");
 
-test("a tag edits the root with the owner's client, then pins it", async () => {
+test("a tag edits the root with the owner's client, and does not pin it", async () => {
   const { bot, owner, tagger } = made(PLAIN);
   await tagger.tag(CHANNEL, THREAD, "devops");
   assert.deepEqual(bot.apiCalls, [
@@ -174,25 +174,13 @@ test("a tag edits the root with the owner's client, then pins it", async () => {
         blocks: [rich(TAG, SPACE, HELLO)],
       },
     },
-    { method: "pins.add", args: { channel: CHANNEL, timestamp: THREAD } },
   ]);
 });
 
-test("a root already tagged and pinned is neither edited nor pinned again", async () => {
-  const { owner, tagger } = made(
-    root([rich(TAG, SPACE, HELLO)], "`[devops]` fix the footer ", { pinned_to: [CHANNEL] }),
-  );
-  await tagger.tag(CHANNEL, THREAD, "devops");
-  assert.deepEqual(owner.apiCalls, []);
-});
-
-test("a tagged root that is not pinned is pinned without an edit", async () => {
+test("a root already tagged is not edited", async () => {
   const { owner, tagger } = made(root([rich(TAG, SPACE, HELLO)], "`[devops]` fix the footer "));
   await tagger.tag(CHANNEL, THREAD, "devops");
-  assert.deepEqual(
-    owner.apiCalls.map((call) => call.method),
-    ["pins.add"],
-  );
+  assert.deepEqual(owner.apiCalls, []);
 });
 
 test("another tag replaces the first and keeps the pin", async () => {
@@ -207,7 +195,7 @@ test("another tag replaces the first and keeps the pin", async () => {
   assert.equal(owner.apiCalls[0]?.args.text, "`[ops]` fix the footer ");
 });
 
-test("no tag takes the prefix off and unpins the root", async () => {
+test("no tag takes the prefix off and leaves the pin", async () => {
   const { owner, tagger } = made(
     root([rich(TAG, SPACE, HELLO)], "`[devops]` fix the footer ", { pinned_to: [CHANNEL] }),
   );
@@ -217,7 +205,6 @@ test("no tag takes the prefix off and unpins the root", async () => {
       method: "chat.update",
       args: { channel: CHANNEL, ts: THREAD, text: "fix the footer ", blocks: [rich(HELLO)] },
     },
-    { method: "pins.remove", args: { channel: CHANNEL, timestamp: THREAD } },
   ]);
 });
 
@@ -242,22 +229,25 @@ test("a root with no blocks is edited through its text alone", async () => {
   });
 });
 
+test("a pin touches only the pin, reads nothing and works whatever the root carries", async () => {
+  const { bot, owner, tagger } = made(root([rich(TAG, SPACE, HELLO)], "`[devops]` x"));
+  await tagger.pin(CHANNEL, THREAD, true);
+  await tagger.pin(CHANNEL, THREAD, false);
+  assert.deepEqual(owner.apiCalls, [
+    { method: "pins.add", args: { channel: CHANNEL, timestamp: THREAD } },
+    { method: "pins.remove", args: { channel: CHANNEL, timestamp: THREAD } },
+  ]);
+  assert.deepEqual(bot.apiCalls, []);
+});
+
 test("a pin that is already there, and one that is already gone, are not failures", async () => {
   const pinning = made(PLAIN);
   pinning.owner.responses["pins.add"] = rejected("already_pinned");
-  await pinning.tagger.tag(CHANNEL, THREAD, "devops");
-  assert.ok(pinning.owner.apiCalls.some((call) => call.method === "pins.add"));
-
+  await pinning.tagger.pin(CHANNEL, THREAD, true);
   for (const code of ["not_pinned", "no_pin"]) {
-    const unpinning = made(
-      root([rich(TAG, SPACE, HELLO)], "`[devops]` x", { pinned_to: [CHANNEL] }),
-    );
+    const unpinning = made(PLAIN);
     unpinning.owner.responses["pins.remove"] = rejected(code);
-    await unpinning.tagger.tag(CHANNEL, THREAD, null);
-    assert.ok(
-      unpinning.owner.apiCalls.some((call) => call.method === "pins.remove"),
-      code,
-    );
+    await unpinning.tagger.pin(CHANNEL, THREAD, false);
   }
 });
 
@@ -271,7 +261,7 @@ async function failure(promise: Promise<unknown>): Promise<ChatError> {
   throw new Error("it did not fail");
 }
 
-test("any other refusal is a ChatError named by Slack's code, and later steps do not run", async () => {
+test("any other refusal is a ChatError named by Slack's code", async () => {
   const reading = made(rejected("channel_not_found"));
   assert.equal(
     (await failure(reading.tagger.tag(CHANNEL, THREAD, "devops"))).name,
@@ -285,23 +275,15 @@ test("any other refusal is a ChatError named by Slack's code, and later steps do
     (await failure(editing.tagger.tag(CHANNEL, THREAD, "devops"))).name,
     "cant_update_message",
   );
-  assert.deepEqual(
-    editing.owner.apiCalls.map((call) => call.method),
-    ["chat.update"],
-    "a root that could not be edited is not pinned",
-  );
 
   const pinning = made(PLAIN);
   pinning.owner.responses["pins.add"] = rejected("too_many_pins");
-  assert.equal(
-    (await failure(pinning.tagger.tag(CHANNEL, THREAD, "devops"))).name,
-    "too_many_pins",
-  );
+  assert.equal((await failure(pinning.tagger.pin(CHANNEL, THREAD, true))).name, "too_many_pins");
 
-  const unpinning = made(root([rich(TAG, SPACE, HELLO)], "`[devops]` x", { pinned_to: [CHANNEL] }));
+  const unpinning = made(PLAIN);
   unpinning.owner.responses["pins.remove"] = rejected("restricted_action");
   assert.equal(
-    (await failure(unpinning.tagger.tag(CHANNEL, THREAD, null))).name,
+    (await failure(unpinning.tagger.pin(CHANNEL, THREAD, false))).name,
     "restricted_action",
   );
 });
@@ -585,5 +567,5 @@ test("a root returned as a tombstone is gone: nothing is kept, titled or tagged"
     (await failure(tagging.tagger.tag(CHANNEL, THREAD, "devops"))).name,
     "thread_not_found",
   );
-  assert.deepEqual(tagging.owner.apiCalls, [], "neither edited nor pinned");
+  assert.deepEqual(tagging.owner.apiCalls, [], "not edited");
 });

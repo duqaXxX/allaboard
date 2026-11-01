@@ -94,6 +94,10 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
     unserved.add(WORD.tag);
     unserved.add(WORD.untag);
   }
+  if (!chat.capabilities.threadPins) {
+    unserved.add(WORD.pin);
+    unserved.add(WORD.unpin);
+  }
   if (!chat.capabilities.threadDelete) unserved.add(WORD["delete-thread"]);
   if (!chat.capabilities.channelClean) unserved.add(WORD["clean-channel"]);
   if (!agent.capabilities.shellCommands || !deps.shellCommands) unserved.add(WORD.shell);
@@ -175,6 +179,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           diff: !unserved.has(WORD.diff),
           rewind: !unserved.has(WORD.rewind),
           threadTags: chat.capabilities.threadTags,
+          threadPins: chat.capabilities.threadPins,
           threadDelete: chat.capabilities.threadDelete,
           channelClean: chat.capabilities.channelClean,
           shell: have.shellCommands && deps.shellCommands,
@@ -357,6 +362,26 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           return;
         }
         await mirrorTag(ref, session, tag);
+        await talk.acknowledge(ref, message);
+        return;
+      }
+      case "pin":
+      case "unpin": {
+        if (session === null) {
+          await talk.inChannel(channel, texts.PIN_TOP_LEVEL);
+          return;
+        }
+        if (!chat.capabilities.threadPins || chat.pinThread === undefined) {
+          await talk.tell(ref, named(texts.PIN_UNAVAILABLE, names));
+          return;
+        }
+        try {
+          await chat.pinThread(ref, command.kind === "pin");
+        } catch (error) {
+          if (!(error instanceof ChatError)) throw error;
+          await talk.tell(ref, fill(named(texts.PIN_FAILED, names), { error: error.name }));
+          return;
+        }
         await talk.acknowledge(ref, message);
         return;
       }

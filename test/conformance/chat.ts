@@ -595,6 +595,7 @@ export function chatConformance(
           "threadDelete",
           "threadLists",
           "threadOpen",
+          "threadPins",
           "threadTags",
           "threadTitles",
         ]);
@@ -667,6 +668,10 @@ export function chatConformance(
 
       check("has tagThread exactly when it declares threadTags", async ({ provider }) => {
         assert.equal(typeof provider.tagThread === "function", provider.capabilities.threadTags);
+      });
+
+      check("has pinThread exactly when it declares threadPins", async ({ provider }) => {
+        assert.equal(typeof provider.pinThread === "function", provider.capabilities.threadPins);
       });
 
       check("has titleThread exactly when it declares threadTitles", async ({ provider }) => {

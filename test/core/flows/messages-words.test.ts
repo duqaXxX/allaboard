@@ -39,6 +39,8 @@ const UNSERVED = new Set([
   "rewind",
   "tag",
   "untag",
+  "pin",
+  "unpin",
   "delete-thread",
   "clean-channel",
   "allaboard",
@@ -109,6 +111,7 @@ const PLAIN_OFFER: GuideOffer = {
   diff: false,
   rewind: false,
   threadTags: false,
+  threadPins: false,
   threadDelete: false,
   channelClean: false,
   shell: false,
@@ -531,10 +534,6 @@ test("a refusal of the chat reaches the owner in the chat's name, and the agent'
   );
   assert.deepEqual(agent.tagCalls, []);
   assert.ok(!world.chat.strayCalls().includes(`acknowledge ${word.id}`));
-  // The edit may have landed before the pin was refused: the line must not say nothing changed.
-  const line = world.shown(ref).at(-1) ?? "";
-  assert.ok(!line.includes("nothing changed"), line);
-  assert.ok(line.includes("may show part of the change") && line.includes("`!untag`"), line);
 });
 
 test("a failure of the agent's tag leaves the chat's tag, tells the owner and still marks the word", async (t) => {
@@ -565,6 +564,70 @@ test("an agent that declares no session tags is left out: the chat is tagged alo
   await world.says("!tag devops", ref.thread);
   assert.deepEqual(world.tagCalls, [[ref, "devops"]]);
   assert.equal("tagSession" in world.agent, false);
+});
+
+// --- !pin and !unpin
+
+test("!pin and !unpin belong to a session, in the channel and in a thread that holds none", async (t) => {
+  const world = await MessagesWorld.make(t, { pins: true });
+  await world.says("!pin");
+  await world.says("!unpin");
+  const answers = () => world.inChannel().filter((line) => line === texts.PIN_TOP_LEVEL);
+  assert.equal(answers().length, 2);
+  const outside = world.chat.openThread(world.channel);
+  await world.says("!pin", outside.thread);
+  await world.says("!unpin", outside.thread);
+  assert.equal(answers().length, 4, "a thread that holds no session is answered in the channel");
+  assert.deepEqual(world.pinCalls, []);
+});
+
+test("!pin and !unpin change the pin alone: no tag, at the chat or the agent, and they mark the word", async (t) => {
+  const agent = new WithSessionTags();
+  const world = await MessagesWorld.make(t, { agent, tags: true, pins: true, reactions: true });
+  const ref = await world.opened();
+  const pin = await world.says("!pin", ref.thread);
+  const unpin = await world.says("!unpin", ref.thread);
+  assert.deepEqual(world.pinCalls, [
+    [ref, true],
+    [ref, false],
+  ]);
+  assert.deepEqual(world.tagCalls, []);
+  assert.deepEqual(agent.tagCalls, []);
+  assert.ok(world.chat.strayCalls().includes(`acknowledge ${pin.id}`));
+  assert.ok(world.chat.strayCalls().includes(`acknowledge ${unpin.id}`));
+});
+
+test("!tag and !untag leave the pin alone", async (t) => {
+  const world = await MessagesWorld.make(t, { tags: true, pins: true });
+  const ref = await world.opened();
+  await world.says("!tag devops", ref.thread);
+  await world.says("!untag", ref.thread);
+  assert.deepEqual(world.pinCalls, []);
+});
+
+test("!pin in a chat that cannot pin says so, the help leaves both words out, and tags stay", async (t) => {
+  const world = await MessagesWorld.make(t, { tags: true });
+  const ref = await world.opened();
+  await world.says("!pin", ref.thread);
+  assert.equal(world.shown(ref).at(-1), named(texts.PIN_UNAVAILABLE, PLAIN_NAMES));
+  await world.says("!unpin", ref.thread);
+  assert.equal(world.shown(ref).at(-1), named(texts.PIN_UNAVAILABLE, PLAIN_NAMES));
+  await world.says("!help", ref.thread);
+  const help = world.shown(ref).at(-1);
+  assert.ok(!help?.includes("`!pin"));
+  assert.ok(!help?.includes("`!unpin"));
+  assert.ok(help?.includes("`!tag"));
+});
+
+test("a pin the chat refuses reaches the owner in the chat's name, and the word is not marked", async (t) => {
+  const world = await MessagesWorld.make(t, { pins: true, pinFails: true, reactions: true });
+  const ref = await world.opened();
+  const word = await world.says("!pin", ref.thread);
+  assert.equal(
+    world.shown(ref).at(-1),
+    fill(named(texts.PIN_FAILED, PLAIN_NAMES), { error: "message_not_found" }),
+  );
+  assert.ok(!world.chat.strayCalls().includes(`acknowledge ${word.id}`));
 });
 
 // --- A failure of a word

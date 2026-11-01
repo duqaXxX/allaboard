@@ -85,6 +85,11 @@ const parseCases: [string, Command | null][] = [
   ["!UNTAG ", { kind: "untag" }],
   // A thread has one tag, so a name after the word says nothing more: never sent to the agent.
   ["!untag devops", { kind: "untag" }],
+  ["!pin", { kind: "pin" }],
+  ["!PIN ", { kind: "pin" }],
+  ["!pin now", { kind: "invalid" }],
+  ["!unpin", { kind: "unpin" }],
+  ["!unpin devops", { kind: "invalid" }],
   ["!delete-thread", { kind: "delete-thread" }],
   ["!DELETE-THREAD ", { kind: "delete-thread" }],
   // Anything after the word is a mistake: the help shows how it is written, nothing is deleted.

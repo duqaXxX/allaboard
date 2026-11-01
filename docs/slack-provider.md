@@ -871,23 +871,22 @@ Block Kit, so Send sits in an `actions` block right under the field.
 ### Tagging a thread
 
 `!tag` and `!untag` reach the provider as `SlackChat.tagThread`, which exists, with the capability
-`threadTags`, only when `module.canTag` found the owner's token (`module.ownerClient`) holding
-the user scope `pins:write`. The module builds one `tag.RootEditor` from the bot client and the
-owner's whenever the owner's token exists; tags use it only with that scope, and titles (below)
-need no more than `chat:write`.
+`threadTags`, whenever the owner's token (`module.ownerClient`) exists. `!pin` and `!unpin` reach it
+as `SlackChat.pinThread`, which exists, with the capability `threadPins`, only when `module.canPin`
+found that token holding the user scope `pins:write`. The module builds one `tag.RootEditor` from
+the bot client and the owner's whenever the owner's token exists; tags and titles (below) need no
+more than `chat:write`.
 `ownerClient` reads the token's scopes from `response_metadata.scopes` of its `auth.test`, which
 `@slack/web-api` fills from the `X-OAuth-Scopes` header. A token without the scope, or one for which
-Slack reports none, gets no tagger and one warning in the log; the thread deleter, which needs
-`chat:write` alone, is built either way. The first message of a thread is the owner's,
+Slack reports none, gets no `pinThread` and one warning in the log; tags, titles and the thread
+deleter, which need `chat:write` alone, are there either way. The first message of a thread is the owner's,
 and `chat.update` changes only messages posted by the authenticated user (method reference, read
 2026-10-19), so `RootEditor.tag` reads the root with the bot (`conversations.replies`, `limit=1`,
-the message whose `ts` is the thread) and writes with the owner: `chat.update`, then `pins.add` or
-`pins.remove`, the latter only for a root that carried a tag, so that a pin the owner made by hand
-on an untagged root stays. A step that would change nothing is skipped (a root already tagged as
-asked sends no edit, a pinned root is not pinned again), and `already_pinned`, `not_pinned` and `no_pin` are not
-failures (`pins.add` and `pins.remove` references, read 2026-10-19). Any other refusal rejects with
-a `ChatError` named by Slack's code, which `Talk.replyOnFailure` shows the owner, and the steps
-after it do not run.
+the message whose `ts` is the thread) and writes with the owner: `chat.update`. A root already tagged as asked sends no edit.
+`RootEditor.pin` reads nothing and calls `pins.add` or `pins.remove` with the owner's token, whoever
+made the pin; `already_pinned`, `not_pinned` and `no_pin` are not failures (`pins.add` and
+`pins.remove` references, read 2026-10-19). Any other refusal rejects with a `ChatError` named by
+Slack's code, which the core shows the owner (`texts.TAG_FAILED`, `texts.PIN_FAILED`).
 
 The tag lives in the root's own blocks and nowhere else. `tag.retaggedBlocks` takes off a leading
 tag, a `text` element in code style (`style.code` alone) whose text is `[name]` for a name that
@@ -902,7 +901,7 @@ alone (`tag.retaggedText`, the same prefix in backticks). `tag.rootMarks` reads 
 with such a code span and a space reads as a tag.
 
 The edit reaches the daemon as a `message_changed` event, which the message guards (`src/chat/slack/app/guards.ts`) drop, so no prompt is
-sent. After a call, whether it ended or was refused, `SlackChat.tagThread` asks the Home tab to
+sent. After a call, whether it ended or was refused, `SlackChat.tagThread` and `SlackChat.pinThread` ask the Home tab to
 read that root again (`SessionIndex.refresh`).
 
 ### Titling a thread
