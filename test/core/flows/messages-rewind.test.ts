@@ -370,6 +370,101 @@ test("after a restart the replies of earlier turns are not folded, and the owner
   assert.ok(again.shown(ref).includes("add the first feature"));
 });
 
+test("a cut no prompt followed holds across a restart, until a prompt keeps it", async (t) => {
+  const { world, store, ref, first } = await threadOf(t);
+  const actions = await openActions(world, ref, first);
+  await world.chat.as("alice").picksAction(actions.message, "conversation");
+  await world.settle();
+  const stored = world.state.thread(ref.channel, ref.thread)?.pendingCut;
+  assert.equal(stored?.at, first);
+
+  const restarted = new PlainAgent({ store, rewind: { files: true, conversation: true } });
+  const again = await MessagesWorld.make(t, { restartOf: world, agent: restarted, rewind: true });
+  restarted.next(say("after the cut"));
+  await again.says("go on from there", ref.thread);
+  await again.settle();
+  const start = restarted.starts.at(-1);
+  assert.equal(start?.rewindTo, first);
+  assert.equal(start?.rewindToken, stored?.token ?? undefined);
+  assert.equal(again.state.thread(ref.channel, ref.thread)?.pendingCut, null);
+});
+
+test("a cut the agent refuses after a restart is told once, and not stored any more", async (t) => {
+  const { world, store, ref, first } = await threadOf(t);
+  const actions = await openActions(world, ref, first);
+  await world.chat.as("alice").picksAction(actions.message, "conversation");
+  await world.settle();
+  const restarted = new PlainAgent({
+    store,
+    rewind: { files: true, conversation: true, refuse: true },
+  });
+  const again = await MessagesWorld.make(t, { restartOf: world, agent: restarted, rewind: true });
+  restarted.next(say("the whole conversation"));
+  await again.says("go on", ref.thread);
+  await again.settle();
+  assert.ok(again.shown(ref).includes(texts.REWIND_DROPPED));
+  assert.equal(restarted.starts.at(-1)?.rewindTo, undefined);
+  assert.equal(again.state.thread(ref.channel, ref.thread)?.pendingCut, null);
+});
+
+test("a move to a terminal during a rewind's start leaves no cut stored", async (t) => {
+  const { world, agent, ref, first } = await threadOf(t);
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session);
+  const start = agent.start.bind(agent);
+  let open = (): void => {};
+  const gate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  let reached = (): void => {};
+  const atStart = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  agent.start = async (options, handlers) => {
+    reached();
+    await gate;
+    return start(options, handlers);
+  };
+  const rewinding = session.rewindConversation(first, [first]);
+  await atStart;
+  await session.moveToTerminal();
+  open();
+  await rewinding;
+  assert.equal(world.state.thread(ref.channel, ref.thread)?.pendingCut, null);
+
+  // The process that start left holds the cut: the next message must not make it stick.
+  agent.start = start;
+  agent.next(say("the whole conversation"));
+  await world.says("go on", ref.thread);
+  await world.settle();
+  assert.equal(agent.starts.at(-1)?.rewindTo, undefined);
+});
+
+test("a failed write of the cut fails no prompt", async (t) => {
+  const { world, agent, ref, first } = await threadOf(t);
+  const actions = await openActions(world, ref, first);
+  await world.chat.as("alice").picksAction(actions.message, "conversation");
+  await world.settle();
+  t.mock.method(world.state, "setPendingCut", () => {
+    throw new Error("disk full");
+  });
+  agent.next(say("after the cut"));
+  await world.says("go on", ref.thread);
+  await world.settle();
+  assert.ok(world.shown(ref).some((line) => line.includes("after the cut")));
+});
+
+test("moving to a terminal drops a stored cut", async (t) => {
+  const { world, ref, first } = await threadOf(t);
+  const actions = await openActions(world, ref, first);
+  await world.chat.as("alice").picksAction(actions.message, "conversation");
+  await world.settle();
+  assert.notEqual(world.state.thread(ref.channel, ref.thread)?.pendingCut, null);
+  await world.says("!terminal", ref.thread);
+  await world.settle();
+  assert.equal(world.state.thread(ref.channel, ref.thread)?.pendingCut, null);
+});
+
 test("!rewind is refused in the channel, before a session started and with no prompt", async (t) => {
   const store = new PlainStore();
   const agent = new PlainAgent({ store, rewind: { files: true, conversation: true } });

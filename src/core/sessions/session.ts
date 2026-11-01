@@ -103,6 +103,7 @@ import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import { DENY, type Decision, toAnswer } from "../requests.ts";
 import { type Choice, DEFAULT } from "../setup.ts";
 import { runShell, shellHead } from "../shell.ts";
+import type { PendingCut } from "../state.ts";
 import { endsWork } from "../status.ts";
 import * as texts from "../texts.ts";
 import { TurnChanges, type TurnEdits } from "./changes.ts";
@@ -1211,15 +1212,19 @@ export class ThreadSession {
         try {
           await this.connectHeld();
           // A move to a terminal during the hold clears the cut: the rewind did not stand.
-          if (this.rewinds.cutAt !== promptId) return { outcome: "refused", ...none };
+          // The process just started holds the cut, and the next prompt would make it stick.
+          if (this.rewinds.cutAt !== promptId) {
+            await this.dropClientLocked();
+            return { outcome: "refused", ...none };
+          }
         } catch (error) {
-          this.rewinds.drop();
+          this.dropCut();
           if (!(error instanceof RewindRefused)) throw error;
           await this.connectHeld();
           return { outcome: "refused", ...none };
         }
       } catch (error) {
-        this.rewinds.drop();
+        this.dropCut();
         throw error;
       } finally {
         release();
@@ -1721,7 +1726,7 @@ export class ThreadSession {
   async moveToTerminal(): Promise<"cut" | "idle"> {
     // The terminal resumes the whole record (it ignores a cut), and what it writes lands after it.
     const waited = this.rewinds.cutAt !== null;
-    this.rewinds.drop();
+    this.dropCut();
     if (waited) {
       try {
         await this.post(texts.REWIND_DROPPED_TERMINAL);
@@ -2289,6 +2294,24 @@ export class ThreadSession {
     }
   }
 
+  /** No cut waits any more: it was kept, or it can no longer be asked for. */
+  private dropCut(): void {
+    this.rewinds.drop();
+    this.storeCut(null);
+  }
+
+  /**
+   * Stores the waiting cut. A failed write costs only what a restart would then lose, or a cut the
+   * agent refuses by its token, so it fails neither a start nor a prompt already sent.
+   */
+  private storeCut(cut: PendingCut | null): void {
+    try {
+      this.deps.state.setPendingCut(this.channelId, this.threadId, cut);
+    } catch (error) {
+      logger.warning(`could not store the rewind's cut in ${this.where}: ${errorName(error)}`);
+    }
+  }
+
   /**
    * A start with the cut of a rewind. A refusal is the rewind's to tell when it asked for the
    * start; otherwise (the cut is asked again after an idle close) the thread goes on with the
@@ -2302,11 +2325,15 @@ export class ThreadSession {
       const client = await start(cut, this.rewinds.token);
       // The token stands for the conversation as the cut found it: asked again, the agent
       // refuses the cut once someone else wrote to the session.
-      this.rewinds.token ??= client.rewindToken ?? null;
+      // A move to a terminal during the start dropped the cut: it stays dropped.
+      if (this.rewinds.cutAt === cut) {
+        this.rewinds.token ??= client.rewindToken ?? null;
+        this.storeCut({ at: cut, token: this.rewinds.token });
+      }
       return client;
     } catch (error) {
       if (!(error instanceof RewindRefused)) throw error;
-      this.rewinds.drop();
+      this.dropCut();
       if (this.rewinding) throw error;
       logger.warning(`the agent refused to cut the conversation again in ${this.where}`);
       try {
@@ -2383,7 +2410,7 @@ export class ThreadSession {
         this.taken = null;
         await cancellable(client.send({ id: turn.uuid, content: turn.prompt }), signal);
         // A prompt written after a cut is what makes the agent keep it.
-        this.rewinds.drop();
+        this.dropCut();
         await turn.done.wait(signal);
       } catch (error) {
         if (error instanceof Cancelled) throw error;

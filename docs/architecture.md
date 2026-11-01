@@ -607,7 +607,7 @@ fields of the `Config`, and each holds only non-enumerable properties, so a log 
 `StateStore` (in `state`) keeps, for each bound channel, its directory and, for each of its threads,
 the folder it was opened in, its Claude Code session id, its bypass choice (on, off, or never
 chosen), the effort level set with `/effort` and `ended`, the status of its root once it is done or
-in error (cleared when the root turns working or waiting again; read only by the session index), the text of its root as the owner wrote it, kept when the root is replaced by the session's title (`root_prompt`), and for a thread `!fork` opened the session its own is a copy of and when the copy was made (`fork_of`, `session_id` and `at`, written only when set), in
+in error (cleared when the root turns working or waiting again; read only by the session index), the cut of a rewind no prompt has followed yet (`pending_cut`: the prompt's id and the agent's token), the text of its root as the owner wrote it, kept when the root is replaced by the session's title (`root_prompt`), and for a thread `!fork` opened the session its own is a copy of and when the copy was made (`fork_of`, `session_id` and `at`, written only when set), in
 `state.json` in the instance's configuration folder (version 3: version 2 plus `agent` and `chat`, the names of the agent
 and the chat that wrote the file). `bypass` is `true` for on and `false` for not on; an
 explicit off also writes `bypass_off: true`, and a thread with `bypass` false and no `bypass_off`
@@ -1778,7 +1778,8 @@ the files or cuts the conversation, the chat draws two lists and folds messages
   request or a background task), and reads in use while it runs; it drops the client and starts the
   agent again with `StartOptions.rewindTo` under one hold of the connect lock, so no queued prompt
   connects between the two. The session id is kept. The agent keeps a cut only once a prompt is
-  written after it (Claude: measured 2026-10-29, SDK 0.3.312), so `RewindMemory.cutAt` stays set
+  written after it (Claude: measured 2026-10-29, SDK 0.3.312), so `RewindMemory.cutAt` stays set,
+  stored as `pending_cut` in `state.json` so that a restart keeps it,
   and every start asks for it again until a prompt is sent, with the agent's token for the
   conversation as the cut found it (`AgentSession.rewindToken`, `StartOptions.rewindToken`, opaque
   to the core): the agent refuses the cut once someone else wrote to the session, the thread goes
@@ -1795,7 +1796,7 @@ the files or cuts the conversation, the chat draws two lists and folds messages
   started, the prompt before it. After a cut the core folds every message from the picked prompt
   on (`ThreadChat.fold(message, texts.REWOUND_TITLE)`), posts the prompt again with `say`, and
   tells the owner. It keeps the last 50 prompts and is handed to the session that replaces a
-  closed one, as the goal is, with its replies let go of into ids. Nothing is stored in
+  closed one, as the goal is, with its replies let go of into ids. Replies are not stored in
   `state.json` (invariant 3): after a restart of allaboard the replies of earlier turns are not
   known and are not folded (`texts.REWIND_UNKNOWN_REPLIES`).
 - **Claude.** `claude/rewind.ts` reads `getSessionMessages`: the prompts are the user entries

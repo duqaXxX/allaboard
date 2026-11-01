@@ -155,6 +155,12 @@ export class SessionManager {
       built.goal = goal;
       built.saved = saved;
       if (rewinds !== null) built.rewinds = rewinds;
+      else {
+        // A cut a rewind left waiting when the daemon last stopped.
+        const pending = this.deps.state.thread(channelId, threadId)?.pendingCut ?? null;
+        built.rewinds.cutAt = pending?.at ?? null;
+        built.rewinds.token = pending?.token ?? null;
+      }
       this.rewinds.delete(key);
       for (const id of allowed) built.terminalsAllowed.add(id);
       built.movedMidTurn = moved;

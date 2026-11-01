@@ -178,6 +178,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A restart between `!rewind` and the next message no longer loses the cut: it is kept in
+  `state.json` (`pending_cut`: two ids) until a prompt follows it, `!terminal` drops it or the agent
+  refuses it.
 - Picking a prompt in `!rewind` no longer fails with `invalid_blocks`: each action button has its
   own `action_id` (`rewindActionId`). A failed word or list now names who failed
   (`failureReply`): the chat's refusal, a call to it that failed, or the agent's error for a bug of
