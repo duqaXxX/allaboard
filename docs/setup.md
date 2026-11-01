@@ -178,7 +178,7 @@ leaks, regenerate it on the same page.
 
 The user token is the one that acts as you. It enables the Home tab's **Edit** mode, which
 deletes a session's whole thread and cleans up a channel (see "Deleting a thread" and "Cleaning
-up a channel" under "Using it"), the word `!delete-thread`, which deletes a thread from inside
+up a channel" under "Using it"), the words `!clean-channel`, which cleans a channel, and `!delete-thread`, which deletes a thread from inside
 it, and the words `!tag` and `!untag`, which edit and pin the first message of a thread (see
 "Tagging a thread"). The same edit rewrites that message to the session's title (see "The title of
 a thread"). Slack lets a bot delete or edit only its own messages (`chat.delete` and
@@ -337,7 +337,7 @@ belong to the daemon.
 | `SLACK_APP_TOKEN` | the `xapp-…` token |
 | `SLACK_OWNER_USER_ID` | your member ID, the only person the bot answers |
 | `ALLOWED_ROOT` | the directory `!bind` accepts paths under, for example `~/code` |
-| `SLACK_USER_TOKEN` | your own `xoxp-…` token, for the Home tab's Delete and Clean up, for `!delete-thread`, for `!tag` and `!untag`, and for the session's title on the thread's first message; allaboard starts without it, and the Home tab then has no Edit button |
+| `SLACK_USER_TOKEN` | your own `xoxp-…` token, for the Home tab's Delete and Clean up, for `!delete-thread` and `!clean-channel`, for `!tag` and `!untag`, and for the session's title on the thread's first message; allaboard starts without it, and the Home tab then has no Edit button |
 | `ALLABOARD_AGENT` | optional: the agent allaboard drives; `claude` when absent, the only one this release has |
 | `ALLABOARD_CHAT` | optional: the chat allaboard is driven from; `slack` when absent, the only one this release has |
 | `ALLABOARD_SHELL` | optional: `on` or `off`, whether `!!<command>` runs your shell commands; `on` when absent |
@@ -1265,18 +1265,19 @@ thread whose replies are gone) and the bot's messages, its answers to your words
 asks first, in a dialog titled `Clean up this channel?`:
 
 ```
-Deletes from #cc-articles what sits outside a thread: your messages there that have no reply, commands like !stop included, and the bot's own messages. Every thread that has a reply stays. This cannot be undone and can take a few minutes.
+Deletes from #cc-articles what sits outside a thread: your messages there that have no reply, commands like !stop included, the bot's own messages, and Slack's notices where it lets you. Every thread that has a reply stays. This cannot be undone and can take a few minutes.
 ```
 
 What stays: every thread that has a reply, with or without a session, a message you just sent
-whose session is still being set up, a message pinned in the channel, and Slack's own lines such
-as a member joining. Do not keep notes of your own in a bound channel outside a thread unless
+whose session is still being set up, a message pinned in the channel, and a notice of Slack's (a member
+joining, a rename) that Slack refuses to delete. Do not keep notes of your own in a bound channel outside a thread unless
 you pin them: a clean-up takes the others for leftovers. While it runs the channel's name is followed by `cleaning up…`, a
 line under the header says so, and the button is gone; it runs after any delete already on its
 way. If Slack stops it, a line under the header names the channel and says
-`` Could not clean up that channel (`<Slack's error>`). Clean it up again to continue. ``
+`` Could not clean up that channel (`<Slack's error>`). Messages deleted: 3, refused: 0. Clean it up again to continue. ``
 If Slack refuses some messages, the rest still goes and the line reads
-`` Slack refused to delete 2 of that channel's messages (`cant_delete_message`): your workspace does not let you delete them. Every other one is gone. ``
+`` Messages deleted: 5. Slack refused to delete 2, which stay. Threads with a reply stay. ``
+When it ends with no refusal the line reads `Messages deleted: 5. Threads with a reply stay.`
 
 To keep the page one click away, star the app: open allaboard in Slack on desktop and
 click the star beside its name at the top of its page, or drag it from the apps list into
@@ -1319,6 +1320,7 @@ a `!` is never a command.
 | `!tag <name>` | Refused | Puts `[name]` at the start of the thread's first message, pins it, and tags the session in Claude Code |
 | `!untag` | Refused | Takes the tag and the pin away |
 | `!delete-thread` | Refused | Asks you to confirm, then deletes the thread |
+| `!clean-channel` | Asks you to confirm, then deletes what sits in the channel outside every thread | Refused |
 | `!!<command>` | Refused | Asks you to confirm, runs the command in the session's folder, and Claude answers its output |
 | `!resume` | Lists the sessions you can resume, with a **Resume** button each | Refused |
 | `!resume <id or name>` | Resumes that session in the thread of your message | Refused |
@@ -1389,6 +1391,9 @@ command the agent does not list is not offered.
 - `!delete-thread`
   - At the top level: Refused, in a post in the channel: ``Deleting a thread belongs to one session: send `!delete-thread` inside its thread.``
   - In a thread: Asks first, in a message only you see under your word, titled `Delete this thread?`, with the Home tab's warning and the buttons `Delete thread` and `Cancel`. Either button takes the question away; `Delete thread` then deletes the thread as the Home tab's Delete does ("Deleting a thread"). A thread that is working or waiting for you is refused before the question: ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` So is a thread with a pinned message: ``This thread is pinned, so it is not deleted. `!untag` removes its tag and its pin.`` when the first message carries a tag, ``This thread is pinned, so it is not deleted. Unpin its first message in Slack, then delete it.`` when it is pinned by hand, and ``A message of this thread is pinned, so it is not deleted. Unpin it in Slack, then delete it.`` when a reply is. A pin added after the question, or while the delete runs, is caught when you confirm, with the same line. Anything after the word shows the list of words. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot delete a thread here, so `!delete-thread` does nothing.`` and `!help` and `!guide` leave it out
+- `!clean-channel`
+  - At the top level: Asks first, in a message only you see, titled `Clean up this channel?`, with the buttons *Clean up* and *Cancel*. Clean up deletes what the Home tab's Clean up deletes; at the end a message only you see says how many messages went and how many Slack refused, or why it stopped. In a channel bound to no folder: ``This channel is bound to no folder, so `!clean-channel` deletes nothing here.`` Without `SLACK_USER_TOKEN` the word is left out of `!help` and `!guide`, and answers ``Slack cannot clean a channel here, so `!clean-channel` does nothing.``
+  - In a thread: Refused, in an ephemeral message: `` `!clean-channel` works in the channel, not inside a thread.``
 - `!!<command>`
   - At the top level: Refused, in a post in the channel: `` `!!` runs a shell command inside a session's thread.``
   - In a thread: The terminal's `!<command>`. Posts `Run this command in <folder>?` with the whole command in a code block and the buttons **Run** and **Cancel**. **Run** takes the request away and runs the command with Bash in the session's folder, with the environment a session gets and nothing on its input, for at most `BASH_DEFAULT_TIMEOUT_MS` (2 minutes when absent). The reply then shows `✓ exit 0 · 0.1 s` (or `✗ exit <code>`, `✗ ended by <signal>`, `✗ timed out after <n> s`), the command and the last 40 lines of its output, 3,000 characters at most, and Claude's answer below them in the same message: Claude Code gets the command and its output as the terminal adds them, each stream cut to 30,000 characters (its start and its end kept). **Cancel** answers `Not sent.` and runs nothing. A command confirmed while a turn runs waits for it, and a message you send after `!!` waits for the command. A process the command leaves in the background (`server &`) keeps running once the command returns. `!stop` ends a running command and what it started, shows `Stopped after <n> s.` with the output so far, and tells Claude nothing. A session whose first prompt was never sent answers `Send this session its first prompt before a shell command: it starts with its setup.`; an edited message never runs a command. Refused with ``Shell commands are turned off for this instance (`ALLABOARD_SHELL`).`` when the instance turned it off

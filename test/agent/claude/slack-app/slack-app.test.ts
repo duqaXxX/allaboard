@@ -1422,6 +1422,7 @@ const WITHOUT_UPDATES = {
   updates: false,
   threadTags: false,
   threadDelete: false,
+  channelClean: false,
 };
 
 test("bang guide works in an unbound channel", async (t) => {

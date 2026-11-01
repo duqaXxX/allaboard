@@ -102,8 +102,8 @@ export interface SlackApp {
   /** The session index: the Home tab. */
   readonly home: Home;
   /**
-   * Absent without the owner's user token: the provider then declares no `threadDelete` and has
-   * no `deleteThread`.
+   * Absent without the owner's user token: the provider then declares no `threadDelete` or
+   * `channelClean` and has no `deleteThread` or `cleanChannel`.
    */
   readonly deletion?: ThreadDeletion;
   /** The folder a message's files that are no image are saved in (`ChatContext.scratchDir`). */
@@ -213,7 +213,10 @@ const CAPABILITIES = {
   commandSuggestions: true,
   loopCard: true,
   threadOpen: true,
-} as const satisfies Omit<ChatCapabilities, "threadTags" | "threadTitles" | "threadDelete">;
+} as const satisfies Omit<
+  ChatCapabilities,
+  "threadTags" | "threadTitles" | "threadDelete" | "channelClean"
+>;
 
 /** The Slack provider: one `SlackThread` per thread, one `SlackChannel` per channel. */
 export class SlackChat implements ChatProvider {
@@ -242,6 +245,7 @@ export class SlackChat implements ChatProvider {
   ) => Promise<void>;
   /** Present when the owner's user token is configured (`SlackApp.deletion`). */
   readonly deleteThread?: (ref: ThreadRef) => Promise<void>;
+  readonly cleanChannel?: (channel: string) => Promise<void>;
   private readonly options: SlackChatOptions;
   private readonly stopping = new AbortController();
   private built: BuiltApp | null = null;
@@ -259,6 +263,7 @@ export class SlackChat implements ChatProvider {
       threadTags: options.roots !== undefined && options.canTag === true,
       threadTitles: options.roots !== undefined,
       threadDelete: options.app?.deletion !== undefined,
+      channelClean: options.app?.deletion !== undefined,
     };
     this.identities = [
       `${options.identity.teamId}:${options.identity.botUserId}`,
@@ -301,6 +306,10 @@ export class SlackChat implements ChatProvider {
       this.deleteThread = async (ref) => {
         if (this.built === null) throw new Error("the Slack app is not started");
         await this.built.askDelete(ref.channel, ref.thread);
+      };
+      this.cleanChannel = async (channel) => {
+        if (this.built === null) throw new Error("the Slack app is not started");
+        await this.built.askClean(channel);
       };
     }
   }

@@ -193,6 +193,7 @@ interface Variant {
   readonly root: FakeRoot;
   readonly titleFails: boolean | "permanent";
   readonly deletes: boolean;
+  readonly cleans: boolean;
 }
 
 /**
@@ -216,6 +217,7 @@ function variant(
   tagged: Array<readonly [ThreadRef, string | null]>,
   titled: Array<readonly [ThreadRef, string]>,
   deleted: ThreadRef[],
+  cleaned: string[],
 ): ChatProvider {
   const capabilities: ChatCapabilities = {
     ...inner.capabilities,
@@ -225,6 +227,7 @@ function variant(
     threadTags: how.tags,
     threadTitles: how.titles,
     threadDelete: how.deletes,
+    channelClean: how.cleans,
   };
   return new Proxy(inner, {
     get(target, property) {
@@ -291,6 +294,11 @@ function variant(
           titled.push([ref, title]);
         };
       }
+      if (property === "cleanChannel" && how.cleans) {
+        return async (channel: string) => {
+          cleaned.push(channel);
+        };
+      }
       if (property === "deleteThread" && how.deletes) {
         return async (ref: ThreadRef) => {
           deleted.push(ref);
@@ -321,6 +329,8 @@ export interface WorldOptions {
   readonly titleFails?: boolean | "permanent";
   /** The chat can delete a thread; `deleteThread` records its calls in `World.deleteCalls`. */
   readonly deletes?: boolean;
+  /** The chat can clean a channel; `cleanChannel` records its calls in `World.cleanCalls`. */
+  readonly cleans?: boolean;
   /** The chat suggests commands for a `!word` that is none (`suggestCommands`). */
   readonly suggests?: boolean;
   /** The chat posts lists in a thread and shares files into it (`threadLists`, `ThreadChat.share`). */
@@ -381,6 +391,7 @@ export class MessagesWorld {
   readonly #titleAttempts: { count: number };
   /** Every `deleteThread` the chat was asked for. */
   readonly deleteCalls: ThreadRef[] = [];
+  readonly cleanCalls: string[] = [];
   /** Wall-clock seconds as the flows read them. */
   now = 1_780_000_000;
   /** The update of the daemon, when the world was given a host. */
@@ -414,6 +425,7 @@ export class MessagesWorld {
       this.tagCalls,
       this.titleCalls,
       this.deleteCalls,
+      this.cleanCalls,
     );
     this.sessions = new SessionManager({
       chat: this.provider,
@@ -490,6 +502,7 @@ export class MessagesWorld {
         },
         titleFails: options.titleFails ?? false,
         deletes: options.deletes ?? false,
+        cleans: options.cleans ?? false,
       },
       options.host,
     );

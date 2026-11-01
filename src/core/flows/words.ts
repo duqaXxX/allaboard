@@ -95,6 +95,7 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
     unserved.add(WORD.untag);
   }
   if (!chat.capabilities.threadDelete) unserved.add(WORD["delete-thread"]);
+  if (!chat.capabilities.channelClean) unserved.add(WORD["clean-channel"]);
   if (!agent.capabilities.shellCommands || !deps.shellCommands) unserved.add(WORD.shell);
   // A daemon built without a way to update itself offers no `!allaboard`.
   if (others.allaboard === undefined) unserved.add(WORD.allaboard);
@@ -175,6 +176,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           rewind: !unserved.has(WORD.rewind),
           threadTags: chat.capabilities.threadTags,
           threadDelete: chat.capabilities.threadDelete,
+          channelClean: chat.capabilities.channelClean,
           shell: have.shellCommands && deps.shellCommands,
           updates: allaboard !== undefined,
         };
@@ -369,6 +371,17 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           await talk.tell(ref, texts.DELETE_THREAD_BUSY);
         } else {
           await chat.deleteThread(ref);
+        }
+        return;
+      case "clean-channel":
+        if (session !== null || outside) {
+          await talk.tell(ref, fill(texts.WORD_IN_THREAD, { word: WORD["clean-channel"] }));
+        } else if (!chat.capabilities.channelClean || chat.cleanChannel === undefined) {
+          await talk.inChannel(channel, named(texts.CLEAN_UNAVAILABLE, names));
+        } else {
+          // The deleter cleans only a bound channel: nothing is asked of what it would not touch.
+          if (state.channels().includes(channel)) await chat.cleanChannel(channel);
+          else await talk.inChannel(channel, texts.CLEAN_UNBOUND);
         }
         return;
       case "allaboard":

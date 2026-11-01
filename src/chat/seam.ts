@@ -195,6 +195,8 @@ export interface ChatCapabilities {
   readonly threadTitles: boolean;
   /** `ChatProvider.deleteThread`. */
   readonly threadDelete: boolean;
+  /** `ChatProvider.cleanChannel`. */
+  readonly channelClean: boolean;
   /** `ChannelChat.open`. */
   readonly threadOpen: boolean;
   /** `ChatProvider.suggestCommands`. */
@@ -969,6 +971,12 @@ export interface ChatProvider {
    * `threadDelete`.
    */
   deleteThread?(ref: ThreadRef): Promise<void>;
+  /**
+   * `!clean-channel` typed in a channel: asks the owner alone to confirm, and on their yes deletes what
+   * sits in the channel outside every thread, as the chat's index cleans one; a no leaves
+   * everything as it was. Resolves once the question is shown. Present with `channelClean`.
+   */
+  cleanChannel?(channel: string): Promise<void>;
   /**
    * A `!word` that is no command of the daemon's or the session's, typed in `ref`: shows the
    * owner alone, in the thread, a field holding exactly `typed` and the commands it could mean,

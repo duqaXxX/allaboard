@@ -10,6 +10,7 @@ import { helpText } from "../../../src/core/commands.ts";
 import { type GuideOffer, guideText } from "../../../src/core/guide.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
+import { OWNER } from "../../support/memory-chat.ts";
 import { goalChanged, hold, PLAIN_COMMANDS, type PlainAgent } from "../../support/plain-agent.ts";
 import {
   MessagesWorld,
@@ -39,6 +40,7 @@ const UNSERVED = new Set([
   "tag",
   "untag",
   "delete-thread",
+  "clean-channel",
   "allaboard",
   "!",
 ]);
@@ -108,6 +110,7 @@ const PLAIN_OFFER: GuideOffer = {
   rewind: false,
   threadTags: false,
   threadDelete: false,
+  channelClean: false,
   shell: false,
   updates: false,
 };
@@ -582,6 +585,44 @@ test("a word that fails in the channel is answered in the channel, and in a thre
   });
   await world.says("!status", ref.thread);
   assert.equal(world.shown(ref).at(-1), failed);
+});
+
+// --- !clean-channel
+
+test("!clean-channel in a bound channel hands the confirmation to the chat", async (t) => {
+  const world = await MessagesWorld.make(t, { cleans: true });
+  await world.says("!clean-channel");
+  assert.deepEqual(world.cleanCalls, [world.channel]);
+});
+
+test("!clean-channel in an unbound channel says so, and nothing is asked", async (t) => {
+  const world = await MessagesWorld.make(t, { cleans: true });
+  const free = world.chat.openChannel("free");
+  await world.chat.as(OWNER).says(free, "!clean-channel");
+  assert.ok(world.chat.texts(free).includes(texts.CLEAN_UNBOUND));
+  assert.deepEqual(world.cleanCalls, []);
+});
+
+test("!clean-channel in a session's thread is refused there, and nothing is asked", async (t) => {
+  const world = await MessagesWorld.make(t, { cleans: true });
+  const ref = await world.opened();
+  await world.says("!clean-channel", ref.thread);
+  assert.equal(world.shown(ref).at(-1), fill(texts.WORD_IN_THREAD, { word: "clean-channel" }));
+  assert.deepEqual(world.cleanCalls, []);
+});
+
+test("!clean-channel in a thread with no session is refused too", async (t) => {
+  const world = await MessagesWorld.make(t, { cleans: true });
+  const outside = world.chat.openThread(world.channel);
+  await world.says("!clean-channel", outside.thread);
+  assert.deepEqual(world.cleanCalls, []);
+});
+
+test("!clean-channel in a chat that cannot clean says so", async (t) => {
+  const world = await MessagesWorld.make(t);
+  await world.says("!clean-channel");
+  assert.ok(world.inChannel().includes(named(texts.CLEAN_UNAVAILABLE, PLAIN_NAMES)));
+  assert.deepEqual(world.cleanCalls, []);
 });
 
 // --- !delete-thread

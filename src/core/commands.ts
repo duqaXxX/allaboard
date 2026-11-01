@@ -99,6 +99,10 @@ export interface DeleteThread {
   readonly kind: "delete-thread";
 }
 
+export interface Clean {
+  readonly kind: "clean-channel";
+}
+
 export interface Guide {
   readonly kind: "guide";
 }
@@ -147,6 +151,7 @@ export type Word =
   | Tag
   | Untag
   | DeleteThread
+  | Clean
   | Allaboard
   | Shell
   | Invalid;
@@ -172,6 +177,7 @@ export const WORD = {
   tag: "tag",
   untag: "untag",
   "delete-thread": "delete-thread",
+  "clean-channel": "clean-channel",
   allaboard: "allaboard",
   // Typed `!!`: the `!` of the owner's words stands for the terminal's `/`, so `!!` stands for its `!`.
   shell: "!",
@@ -276,6 +282,8 @@ export function parseBang(text: string): Command | null {
     case "delete-thread":
       // Anything after it is a mistake: the help shows how it is written, and nothing is deleted.
       return rest === "" ? { kind: "delete-thread" } : { kind: "invalid" };
+    case "clean-channel":
+      return rest === "" ? { kind: "clean-channel" } : { kind: "invalid" };
     case "allaboard":
       switch (rest.toLowerCase()) {
         case "":
@@ -473,7 +481,12 @@ function distance(a: string, b: string): number {
 // The daemon's words a session's thread refuses (`!bind`, `!resume`, and `!allaboard update` or
 // `restart`, which are what `!allaboard` is offered for): a suggestion made in a thread leaves
 // them out.
-const REFUSED_IN_THREAD: ReadonlySet<string> = new Set([WORD.bind, WORD.resume, WORD.allaboard]);
+const REFUSED_IN_THREAD: ReadonlySet<string> = new Set([
+  WORD.bind,
+  WORD.resume,
+  WORD.allaboard,
+  WORD["clean-channel"],
+]);
 
 /**
  * The commands a typed `!word` could mean in a session's thread: the daemon's words that a thread

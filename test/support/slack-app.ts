@@ -249,6 +249,10 @@ export class World {
   readonly cleaned: string[] = [];
   /** Every thread `!delete-thread`'s Delete asked the deleter for, as the Home's `deleted`. */
   readonly threadDeletes: Array<[string, string]> = [];
+  /** Every channel `!clean-channel`'s Clean up asked the deleter for. */
+  readonly channelCleans: string[] = [];
+  /** What the deleter answers `!clean-channel`: null when it cleaned the channel. */
+  channelCleanLine: string | null = null;
   /** What the deleter answers `!delete-thread`: null for a thread it deleted. */
   threadDeleteRefusal: DeleteRefusal | null = null;
   /** What the deleter answers before `!delete-thread` asks its question: null for no pin. */
@@ -382,6 +386,10 @@ export class World {
             return this.threadDeleteRefusal;
           },
           pinned: async () => this.pinnedRefusal,
+          clean: async (channelId: string) => {
+            this.channelCleans.push(channelId);
+            return this.channelCleanLine;
+          },
         },
       }),
       chat: this.chat,

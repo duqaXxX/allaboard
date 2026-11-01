@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!clean-channel`, sent in a channel, asks the owner to confirm, then deletes what the Home tab's Clean up
+  deletes. The Clean up itself now tries Slack's notices of the channel, those naming other
+  members too, and always ends on a line with the count.
 - A message a background subagent sends its parent while it runs is drawn in the reply as
   `Message from <name>:` and the text as a quote; its hand-back draws none (`subagent_message`,
   #135).

@@ -46,6 +46,7 @@ const CAPABILITIES: ChatCapabilities = {
   threadTags: false,
   threadTitles: false,
   threadDelete: false,
+  channelClean: false,
   threadOpen: true,
   commandSuggestions: false,
   loopCard: true,

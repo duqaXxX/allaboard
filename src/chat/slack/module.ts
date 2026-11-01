@@ -333,6 +333,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
             threadDeleter.delete(channelId, threadId),
           pinned: (channelId: string, threadId: string) =>
             threadDeleter.pinned(channelId, threadId),
+          clean: (channelId: string) => threadDeleter.clean(channelId),
         },
       }),
       uploads,

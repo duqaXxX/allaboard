@@ -516,7 +516,13 @@ test("a clean up deletes what has no reply outside a thread", async () => {
     [
       loose(orphan, OWNER, "an old thread", { thread_ts: orphan, reply_count: 4 }),
       loose("1790000015.000001", "U000BOB", "!stop"),
-      loose("1790000016.000001", BOT, "joined", { subtype: "channel_join" }),
+      loose("1790000016.000001", "U000BOB", "joined", { subtype: "channel_join" }),
+      loose("1790000018.000001", OWNER, "renamed", { subtype: "group_name" }),
+      loose("1790000019.000001", OWNER, "pinned", {
+        subtype: "channel_name",
+        pinned_to: [CHANNEL],
+      }),
+      loose("1790000020.000001", OWNER, "a pin", { subtype: "pinned_item" }),
       loose(waiting, OWNER, "a prompt whose setup is open"),
       // A reply also sent to the channel belongs to its thread.
       loose("1790000017.000001", BOT, "done", { thread_ts: ROOT, subtype: "thread_broadcast" }),
@@ -534,7 +540,10 @@ test("a clean up deletes what has no reply outside a thread", async () => {
     messages: [roots[String(args.ts)] as JsonObject],
     has_more: false,
   });
-  assert.equal(await world.deleter.clean(CHANNEL), null);
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(slackTexts.HOME_CLEAN_DONE, { deleted: 6 }),
+  );
   const asked = world.bot.callsTo("conversations.history");
   assert.deepEqual(
     asked.map((a) => [a.channel, a.limit, a.cursor]),
@@ -553,7 +562,13 @@ test("a clean up deletes what has no reply outside a thread", async () => {
       [orphan, 1],
     ],
   );
-  assert.deepEqual(world.deleted(world.owner), ["1790000010.000001", "1790000012.000001", emptied]);
+  assert.deepEqual(world.deleted(world.owner), [
+    "1790000010.000001",
+    "1790000012.000001",
+    emptied,
+    "1790000016.000001",
+    "1790000018.000001",
+  ]);
   assert.deepEqual(world.deleted(world.bot), ["1790000011.000001"]);
   assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
   assert.deepEqual(world.released, []);
@@ -566,7 +581,10 @@ test("a clean up keeps a pinned message, whoever wrote it", async () => {
     loose("1790000011.000001", BOT, "a pinned bot line", { pinned_to: [CHANNEL] }),
     loose("1790000012.000001", OWNER, "a prompt nobody answered", { pinned_to: [] }),
   ]);
-  assert.equal(await world.deleter.clean(CHANNEL), null);
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(slackTexts.HOME_CLEAN_DONE, { deleted: 1 }),
+  );
   assert.deepEqual(world.deleted(world.owner), ["1790000012.000001"]);
   assert.deepEqual(world.deleted(world.bot), []);
 });
@@ -584,7 +602,10 @@ for (const [name, answer] of UNKNOWN_THREADS) {
       loose(ROOT, OWNER, "fix the footer", { thread_ts: ROOT }),
     ]);
     world.bot.responses["conversations.replies"] = answer;
-    assert.equal(await world.deleter.clean(CHANNEL), null);
+    assert.equal(
+      await world.deleter.clean(CHANNEL),
+      fill(slackTexts.HOME_CLEAN_DONE, { deleted: 0 }),
+    );
     assert.deepEqual(world.deleted(world.owner), []);
     assert.deepEqual(world.deleted(world.bot), []);
   });
@@ -599,7 +620,7 @@ test("a thread that cannot be asked about stops the clean up", async () => {
   world.bot.responses["conversations.replies"] = rejected("ratelimited");
   assert.equal(
     await world.deleter.clean(CHANNEL),
-    fill(slackTexts.HOME_CLEAN_FAILED, { error: "ratelimited" }),
+    fill(slackTexts.HOME_CLEAN_FAILED, { error: "ratelimited", deleted: 0, count: 0 }),
   );
   assert.deepEqual(world.deleted(world.owner), []);
 });
@@ -619,7 +640,10 @@ test("a clean up that slack stops says so", async () => {
   ]);
   world.owner.responses["chat.delete"] = rejected("internal_error");
   const notice = await world.deleter.clean(CHANNEL);
-  assert.equal(notice, fill(slackTexts.HOME_CLEAN_FAILED, { error: "internal_error" }));
+  assert.equal(
+    notice,
+    fill(slackTexts.HOME_CLEAN_FAILED, { error: "internal_error", deleted: 0, count: 0 }),
+  );
   assert.deepEqual(world.deleted(world.bot), []); // it stopped at the failure
 });
 
@@ -632,7 +656,103 @@ test("a clean up counts what slack refuses and deletes the rest", async () => {
   world.owner.responses["chat.delete"] = rejected("cant_delete_message");
   assert.equal(
     await world.deleter.clean(CHANNEL),
-    fill(named(slackTexts.HOME_CLEAN_REFUSED, PLAIN_NAMES), { count: 1 }),
+    fill(named(slackTexts.HOME_CLEAN_REFUSED, PLAIN_NAMES), { deleted: 1, count: 1 }),
   );
   assert.deepEqual(world.deleted(world.bot), ["1790000011.000001"]);
+});
+
+test("a notice with a reply, or that a thread holds, stays", async () => {
+  const world = new World();
+  const held = "1790000031.000001";
+  const replied = "1790000032.000001";
+  world.state.openThread(CHANNEL, held);
+  world.bot.responses["conversations.history"] = paged([
+    loose(held, OWNER, "renamed", { subtype: "channel_name" }),
+    loose(replied, OWNER, "joined", {
+      subtype: "channel_join",
+      thread_ts: replied,
+      reply_count: 3,
+    }),
+  ]);
+  world.bot.responses["conversations.replies"] = () => ({
+    ok: true,
+    messages: [
+      loose(replied, OWNER, "joined", {
+        subtype: "channel_join",
+        thread_ts: replied,
+        reply_count: 3,
+      }),
+    ],
+    has_more: false,
+  });
+  await world.deleter.clean(CHANNEL);
+  assert.deepEqual(world.deleted(world.owner), []);
+});
+
+test("any refusal of a notice is counted, and the clean up goes on", async () => {
+  const world = new World();
+  world.bot.responses["conversations.history"] = paged([
+    loose("1790000033.000001", OWNER, "renamed", { subtype: "channel_name" }),
+    loose("1790000034.000001", BOT, "Stopped."),
+  ]);
+  world.owner.responses["chat.delete"] = rejected("restricted_action");
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(named(slackTexts.HOME_CLEAN_REFUSED, PLAIN_NAMES), { deleted: 1, count: 1 }),
+  );
+  assert.deepEqual(world.deleted(world.bot), ["1790000034.000001"]);
+});
+
+test("a failure that is no refusal stops the clean up and says how far it went", async () => {
+  const world = new World();
+  world.bot.responses["conversations.history"] = paged([
+    loose("1790000034.000001", BOT, "Stopped."),
+    loose("1790000033.000001", OWNER, "renamed", { subtype: "channel_name" }),
+  ]);
+  world.owner.responses["chat.delete"] = new Error("network down");
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(slackTexts.HOME_CLEAN_FAILED, { error: "Error", deleted: 1, count: 0 }),
+  );
+});
+
+test("a failure of the owner's token on a notice stops the clean up and is named", async () => {
+  const world = new World();
+  world.bot.responses["conversations.history"] = paged([
+    loose("1790000033.000001", OWNER, "renamed", { subtype: "channel_name" }),
+  ]);
+  world.owner.responses["chat.delete"] = rejected("token_revoked");
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(slackTexts.HOME_CLEAN_FAILED, { error: "token_revoked", deleted: 0, count: 0 }),
+  );
+});
+
+test("the stopped line counts what slack refused before it", async () => {
+  const world = new World();
+  world.bot.responses["conversations.history"] = paged([
+    loose("1790000033.000001", OWNER, "renamed", { subtype: "channel_name" }),
+    loose("1790000035.000001", OWNER, "!stop"),
+  ]);
+  let calls = 0;
+  world.owner.responses["chat.delete"] = () => {
+    calls += 1;
+    return calls === 1 ? rejected("restricted_action") : new Error("network down");
+  };
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(slackTexts.HOME_CLEAN_FAILED, { error: "Error", deleted: 0, count: 1 }),
+  );
+});
+
+test("a server failure on a notice stops the clean up, as on any message", async () => {
+  const world = new World();
+  world.bot.responses["conversations.history"] = paged([
+    loose("1790000033.000001", OWNER, "renamed", { subtype: "channel_name" }),
+  ]);
+  world.owner.responses["chat.delete"] = rejected("internal_error");
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(slackTexts.HOME_CLEAN_FAILED, { error: "internal_error", deleted: 0, count: 0 }),
+  );
 });

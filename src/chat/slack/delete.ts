@@ -27,15 +27,17 @@
  * messages, read 2026-10-05). In a channel bound to a folder every message the owner sends
  * outside a thread is a prompt or a word for the daemon, so one with no reply is a leftover
  * whoever wrote it: the owner's and the bot's both go. What stays: a thread that has a reply, a
- * pinned message, a message with a `subtype` (Slack's own lines), anyone else's message, and a message
- * `state.json` holds as a thread whose first reply has not come yet. A message that carries
+ * pinned message, a message with any other `subtype`, anyone else's message, and a message
+ * `state.json` holds as a thread whose first reply has not come yet. Slack's notices of the channel (a rename, a join: `channel_*` and `group_*`, the message event's
+ * subtypes, read 2026-11-01) are tried with the owner's token whoever they name; the reference does
+ * not say whether a user can delete them, so any refusal of one is counted and logged with Slack's code. A message that carries
  * `thread_ts` is deleted only after `conversations.replies` on it, with `limit=1`, returned its
  * root with no `reply_count` (a root nobody replied to has none, measured 2026-10-01): the
  * reference does not say what a parent's count reads in the channel's history once its replies
  * are gone, and a thread taken for a leftover would lose its root.
  */
 
-import type { WebClient } from "@slack/web-api";
+import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
 import { fill, Mutex, type Names, named, type StatePort } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { isRecord } from "../../values.ts";
@@ -51,6 +53,22 @@ export const PAGE = 200;
 export const MESSAGE_NOT_FOUND = "message_not_found";
 export const CANT_DELETE = "cant_delete_message";
 export const THREAD_NOT_FOUND = "thread_not_found";
+/** The subtypes of Slack's notices about a channel. */
+const CHANNEL_NOTICE = /^(channel|group)_/;
+/** What says the token, the channel or Slack itself is the problem: no refusal of one notice. */
+const NOT_A_REFUSAL: ReadonlySet<string> = new Set([
+  "channel_not_found",
+  "fatal_error",
+  "internal_error",
+  "invalid_auth",
+  "no_permission",
+  "not_authed",
+  "service_unavailable",
+  "token_revoked",
+  "token_expired",
+  "account_inactive",
+  "missing_scope",
+]);
 
 /**
  * A pinned message keeps its thread: `where` says which one is pinned, the root with a tag (which
@@ -106,6 +124,8 @@ export type PinnedThreadCall = (
 export interface ThreadDeletion {
   readonly delete: DeleteThreadCall;
   readonly pinned: PinnedThreadCall;
+  /** Cleans a channel, as `ThreadDeleter.clean` does: the line to show, null if it is not bound. */
+  readonly clean: (channelId: string) => Promise<string | null>;
 }
 
 /** What the deleter asks of the session manager (`SessionManager.release` and `.free`). */
@@ -144,6 +164,12 @@ function nextCursor(answer: unknown): string | null {
 function tsOf(message: Record<string, unknown>): string {
   if (message.ts === undefined) throw new Error("a message without a ts");
   return String(message.ts);
+}
+
+/** A message a clean-up deletes: its author, and the subtype of a notice of Slack's. */
+interface Loose {
+  readonly author: string;
+  readonly notice: string | null;
 }
 
 /** A thread message as a delete reads it: its author's user id, and its tag and pin. */
@@ -333,35 +359,60 @@ export class ThreadDeleter {
 
   /**
    * Delete what sits in a bound channel outside every thread: the owner's messages and the
-   * bot's that have no reply. Returns null when done (or for a channel that is not bound), else
-   * the line that says why it stopped. Never throws.
+   * bot's that have no reply, and Slack's notices. Returns the line that says what it did or why
+   * it stopped, null for a channel that is not bound. Never throws.
    */
   async clean(channelId: string): Promise<string | null> {
     if (!this.#state.channels().includes(channelId)) {
       return null; // not a channel of the daemon's: nothing a click may clean
     }
     return this.#oneAtATime.run(async () => {
-      let loose = new Map<string, string>();
+      let deleted = 0;
       let refused = 0;
       try {
-        loose = await this.#loose(channelId);
-        for (const [ts, author] of loose) {
-          if (!(await this.#remove(channelId, ts, author))) refused += 1;
+        for (const [ts, { author, notice }] of await this.#loose(channelId)) {
+          const gone = notice
+            ? await this.#removeNotice(channelId, ts, notice)
+            : await this.#remove(channelId, ts, author);
+          if (gone) deleted += 1;
+          else refused += 1;
         }
       } catch (error) {
         logger.warning(`could not clean up ${channelId}: ${describe(error)}`);
-        return fill(slackTexts.HOME_CLEAN_FAILED, { error: describe(error) });
+        return fill(slackTexts.HOME_CLEAN_FAILED, {
+          error: describe(error),
+          deleted,
+          count: refused,
+        });
       }
-      logger.info(`cleaned up ${channelId}: ${loose.size} messages, ${refused} refused`);
+      logger.info(`cleaned up ${channelId}: ${deleted} messages, ${refused} refused`);
       return refused > 0
-        ? fill(named(slackTexts.HOME_CLEAN_REFUSED, this.#names()), { count: refused })
-        : null;
+        ? fill(named(slackTexts.HOME_CLEAN_REFUSED, this.#names()), { deleted, count: refused })
+        : fill(slackTexts.HOME_CLEAN_DONE, { deleted });
     });
   }
 
-  /** The channel's messages a clean-up deletes, `ts` to author, read page by page. */
-  async #loose(channelId: string): Promise<Map<string, string>> {
-    const found = new Map<string, string>();
+  /**
+   * Delete a notice of Slack's with the owner's token. False for any refusal of Slack's, whose code
+   * no reference names: one notice must not stop the clean up at every retry. A rate limit, a
+   * network failure or `NOT_A_REFUSAL` is none, and throws.
+   */
+  async #removeNotice(channelId: string, ts: string, subtype: string): Promise<boolean> {
+    try {
+      await this.#owner.chat.delete({ channel: channelId, ts });
+      return true;
+    } catch (error) {
+      if (!(error instanceof WebAPIPlatformError)) throw error;
+      if (describe(error) === MESSAGE_NOT_FOUND) return true;
+      if (NOT_A_REFUSAL.has(describe(error))) throw error;
+      logger.warning(`slack refused to delete a ${subtype} notice: ${describe(error)}`);
+      return false;
+    }
+  }
+
+  /** The channel's messages a clean-up deletes, `ts` to what is read of it, read page by page. */
+  async #loose(channelId: string): Promise<Map<string, Loose>> {
+    const found = new Map<string, Loose>();
     let cursor: string | null = null;
     for (;;) {
       const page: unknown = await this.#bot.conversations.history({
@@ -373,10 +424,12 @@ export class ThreadDeleter {
         const ts = tsOf(message);
         const author = String(message.user || "");
         const threaded = message.thread_ts;
-        if (message.subtype || (threaded && String(threaded) !== ts)) {
-          continue; // Slack's own line; or a thread's reply shown in the channel
+        const subtype = String(message.subtype ?? "");
+        const notice = CHANNEL_NOTICE.test(subtype);
+        if ((subtype && !notice) || (threaded && String(threaded) !== ts)) {
+          continue; // another of Slack's own lines; or a thread's reply shown in the channel
         }
-        if (author !== this.#botUserId && author !== this.#ownerUserId) continue;
+        if (!notice && author !== this.#botUserId && author !== this.#ownerUserId) continue;
         if (this.#state.thread(channelId, ts) !== null) {
           continue; // a thread of the daemon's with no reply yet
         }
@@ -384,7 +437,7 @@ export class ThreadDeleter {
         // a free workspace: a hand-pinned `!help` outside a thread stayed through a clean-up).
         if (isPinned(message)) continue; // the owner keeps it
         if (threaded && (await this.#hasReplies(channelId, ts))) continue; // a thread
-        found.set(ts, author);
+        found.set(ts, { author, notice: notice ? subtype : null });
       }
       cursor = nextCursor(page);
       if (cursor === null) return found;

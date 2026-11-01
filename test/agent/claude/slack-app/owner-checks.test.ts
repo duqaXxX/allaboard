@@ -11,6 +11,10 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  CLEAN_CHANNEL_CANCEL,
+  CLEAN_CHANNEL_CONFIRM,
+} from "../../../../src/chat/slack/clean-channel.ts";
+import {
   DELETE_THREAD_CANCEL,
   DELETE_THREAD_CONFIRM,
 } from "../../../../src/chat/slack/delete-thread.ts";
@@ -274,6 +278,22 @@ const CASES: readonly Case[] = [
         acted: () => pending.decided,
       };
     },
+  },
+  {
+    listener: `action ${CLEAN_CHANNEL_CONFIRM}`,
+    responds: true,
+    arrange: async (world, sender) => ({
+      body: sentBy(ephemeralClick(CLEAN_CHANNEL_CONFIRM, CLICK_THREAD), sender),
+      acted: () => world.channelCleans.length > 0,
+    }),
+  },
+  {
+    listener: `action ${CLEAN_CHANNEL_CANCEL}`,
+    responds: true,
+    arrange: async (_world, sender, responses) => ({
+      body: sentBy(ephemeralClick(CLEAN_CHANNEL_CANCEL, CLICK_THREAD), sender),
+      acted: () => responses.length > 0,
+    }),
   },
   {
     listener: `action ${DELETE_THREAD_CONFIRM}`,

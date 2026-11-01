@@ -89,6 +89,9 @@ const parseCases: [string, Command | null][] = [
   ["!DELETE-THREAD ", { kind: "delete-thread" }],
   // Anything after the word is a mistake: the help shows how it is written, nothing is deleted.
   ["!delete-thread now", { kind: "invalid" }],
+  ["!clean-channel", { kind: "clean-channel" }],
+  ["!CLEAN-CHANNEL ", { kind: "clean-channel" }],
+  ["!clean-channel now", { kind: "invalid" }],
   ["!delete", { kind: "passthrough", text: "delete" }],
   ["!bypass", { kind: "invalid" }],
   ["!bypass maybe", { kind: "invalid" }],
@@ -228,6 +231,7 @@ test("the guide and the help explain every word of the daemon", () => {
     "tag",
     "untag",
     "delete-thread",
+    "clean-channel",
     "allaboard",
     "!",
   ]) {
@@ -436,10 +440,10 @@ const OFFERED = [
 test("the pool holds the daemon's words first, then the session's commands by name", () => {
   const pool = poolOf(OFFERED);
   const daemon = pool.filter((c) => c.group === "daemon").map((c) => c.name);
-  // What a thread takes: `!bind`, `!resume` and `!allaboard` are refused there, and `!!` is no
+  // What a thread takes: `!bind`, `!resume`, `!allaboard` and `!clean-channel` are refused there, and `!!` is no
   // name a mistyped word could mean.
   const taken = Object.values(WORD).filter(
-    (w) => !["bind", "resume", "allaboard", WORD.shell].includes(w),
+    (w) => !["bind", "resume", "allaboard", "clean-channel", WORD.shell].includes(w),
   );
   assert.deepEqual(daemon.toSorted(), taken.toSorted());
   assert.deepEqual(
