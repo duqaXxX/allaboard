@@ -178,6 +178,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A transcript line written during the hidden `/model` or `/goal clear` (a goal's `cleared`, for
+  one) no longer comes out with the next visible record when the marks of the command's records
+  missed it: a long folder name Claude Code hashed otherwise, or a failed `stat` on the command's
+  last record. One more hidden read follows the command's end, only in those two cases. A line
+  flushed after it, or a `stat` that keeps failing past the end of the command, still comes out
+  with a later record.
 - A restart between `!rewind` and the next message no longer loses the cut: it is kept in
   `state.json` (`pending_cut`: two ids) until a prompt follows it, `!terminal` drops it or the agent
   refuses it.

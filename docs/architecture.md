@@ -1309,7 +1309,13 @@ closed when the start returns (`ThreadSession.connect`).
   command, its states, its output, its `result`, a status, the hooks that fire in it) stays in the
   back end and no event of it reaches the core; the caller resolves at the `result`, or at that
   `completed` when no result came; a `cancelled` naming the uuid ends it too and rejects the caller
-  that had no result. The `idle` the session says after it is read as any state: the activity line
+  that had no result. The transcript lines of the command's turn are hidden with its records, which
+  each carry the mark taken as they came. When the mark of the command's end is null, or the file
+  was found elsewhere since it was taken (a transcript folder hashed otherwise), one more hidden
+  read follows with a mark taken in line (`ClaudeSession.#dropCommandLines`); a valid mark is kept,
+  since the caller is resolved at the `result` and the next turn may already be writing. The in-line mark, on the two paths that take it, can cover next-turn lines already written, and those are dropped. A line
+  flushed after that read, or a `stat` that keeps failing past the command's end, is read with a
+  later record. The `idle` the session says after it is read as any state: the activity line
   does not change. An `interrupt()` while the command runs (`!stop`, which `ThreadSession.stop` forwards while a Start is applied) makes
   `setModel` reject and closes the session, so `ThreadSession.applySetup` undoes the setup and the
   owner gets `Not sent.`; the first prompt of a setup that went through runs on the chosen model.
