@@ -22,8 +22,8 @@ export const THREAD_WORKING = "Working…";
 export const THREAD_COMPACTING = "Compacting conversation…";
 export const THREAD_COMPACTING_STATUS = "is compacting the conversation…";
 export const THREAD_WORKING_STATUS = "is working…";
-export const RESTART_WAITS = "Restart waits for {counts} · !stop ends {them} now";
-export const RESTART_WAITS_STATUS = "is waiting to restart: {counts} still running";
+export const RESTART_WAITS = "Stop or restart waits for {counts} · !stop ends {them} now";
+export const RESTART_WAITS_STATUS = "is waiting to stop or restart: {counts} still running";
 
 // Slack drops plain spaces at the start of a line; no-break spaces stay and make the indent.
 export const NESTED = `${"\u00a0".repeat(4)}⎿ `;

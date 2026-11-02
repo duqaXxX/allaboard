@@ -204,6 +204,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- While the daemon drains, its messages say it is stopping or restarting: a `SIGTERM` does not say
+  which, and after `allaboard service stop` a message sent again got no answer (#176).
 - A thread's delete reads the thread again after its root went: what Slack still shows is told to
   the owner, where the delete used to report it gone, and a reply still shown keeps the root and the
   thread (#148). A reply still there after the root went leaves a tombstone, which is forgotten.

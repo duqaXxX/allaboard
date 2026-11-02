@@ -229,10 +229,10 @@ export const BECAUSE_MOVED = "the session moved to the terminal";
 export const MOVED_TO_TERMINAL = "Moved to the terminal, which continues this turn.";
 // The same, for work that had not reached the agent yet: nothing runs there for it.
 export const MOVED_BEFORE_SENT = "Moved to the terminal.";
-export const ENDED_RESTARTING = "allaboard is restarting; send your message again in a moment";
 // Never shown: an idle close always finds nothing running, sent or queued to end with it.
 export const ENDED_IDLE = "allaboard closed this idle session";
-export const RESTARTING = "allaboard is restarting; send this again in a moment.";
+export const RESTARTING =
+  "allaboard is updating, stopping or restarting; unless it is stopping, send this again in a moment.";
 
 // `!allaboard` and the update from the chat. A text that names the chat is `naming`;
 // the link to the changelog is drawn by the chat (its markup), beside `UPDATE_WHAT_CHANGED`.
@@ -291,7 +291,7 @@ export const UPDATE_COPY_HOLDS =
 // `allaboard update`): whose it is and which version are not known.
 export const UPDATE_ELSEWHERE = "An update of allaboard is already under way.";
 export const UPDATE_DRAINING =
-  "allaboard is restarting: send `!allaboard update` again once it is back.";
+  "allaboard is stopping or restarting: if it is restarting, send `!allaboard update` again once it is back.";
 export const UPDATE_FAILED_PERMISSION =
   "The update failed: npm may not write to {folder}. allaboard keeps running {installed}. npm's " +
   "message is in the log, {log}.";
@@ -328,7 +328,7 @@ export const UPDATE_NOT_TAKEN =
 // Under RESTARTING, and after a channel's `!status`, while a stop waits: one row per thread that
 // holds it.
 export const RESTART_WAITS_FOR = "It is waiting for:";
-export const RESTART_WAITS_HEADER = `allaboard is restarting. ${RESTART_WAITS_FOR}`;
+export const RESTART_WAITS_HEADER = `allaboard is stopping or restarting. ${RESTART_WAITS_FOR}`;
 export const RESTART_WAIT_ROW = "• {channel}, {link}: {hold}";
 export const RESTART_WAIT_SESSION = "Session"; // the link's label for a session with no title yet
 export const RESTART_WAIT_STOP = "`!stop` in a thread ends the wait there.";
@@ -467,7 +467,7 @@ export const ANSWERED = naming("User answered {author}'s questions:");
 export const STOPPED_CHANNEL = "Stopped what was running in this channel.";
 // The same as a message, only where the chat refuses the app an activity line.
 export const RESTART_WAITS_MESSAGE =
-  "allaboard is restarting once these background tasks end: {counts}. `!stop` ends them now.";
+  "allaboard stops or restarts once these background tasks end: {counts}. `!stop` ends them now.";
 export const NOTHING_TO_STOP = "Nothing is running in this channel.";
 // Both answers to `!stop` in a thread are posts that stay: an ephemeral line is gone on reload.
 export const STOPPED_THREAD = "Stopped.";

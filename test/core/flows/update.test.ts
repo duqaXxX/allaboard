@@ -374,7 +374,7 @@ test("a click on a daemon that is already stopping installs nothing", async (t) 
   await world.chat.as(OWNER).picks(list.message, VERSION);
   assert.equal(
     world.inChannel().at(-1),
-    "allaboard is restarting: send `!allaboard update` again once it is back.",
+    "allaboard is stopping or restarting: if it is restarting, send `!allaboard update` again once it is back.",
   );
   assert.deepEqual(host.installs, []);
   assert.ok(!host.calls.includes("lock"));
@@ -394,7 +394,7 @@ test("a stop that cancels the install before npm starts leaves a click installin
   assert.deepEqual(host.installs, [], "npm was not started");
   assert.equal(
     world.inChannel().at(-1),
-    "allaboard is restarting: send `!allaboard update` again once it is back.",
+    "allaboard is stopping or restarting: if it is restarting, send `!allaboard update` again once it is back.",
   );
   assert.equal(updates.phase.kind, "idle", "the claim is let go");
   assert.equal(world.sessions.startsBlocked, false);
@@ -426,7 +426,7 @@ test("a drain does not wait for a click that is still asking whether the copy up
   assert.deepEqual(host.installs, []);
   assert.equal(
     world.inChannel().at(-1),
-    "allaboard is restarting: send `!allaboard update` again once it is back.",
+    "allaboard is stopping or restarting: if it is restarting, send `!allaboard update` again once it is back.",
   );
   assert.equal(updates.phase.kind, "idle");
   assert.equal(

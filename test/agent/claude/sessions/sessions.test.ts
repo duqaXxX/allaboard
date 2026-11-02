@@ -3535,7 +3535,7 @@ test("a stop does not wait for a task its running turn starts afterwards", async
   assert.ok(turn.done.isSet);
   assert.ok(inside(session).runningTaskIds().length > 0); // still running: the shutdown ends it
   await h.sleep(0.05);
-  assert.ok(!statusLines(h).some((line) => line.startsWith("Restart waits")));
+  assert.ok(!statusLines(h).some((line) => line.startsWith("Stop or restart waits")));
   await h.manager.closeAll(); // the shutdown that follows
   const stored = thread(h);
   assert.ok(stored.openReplies.length === 0 && stored.status === null);
@@ -3561,7 +3561,7 @@ test("a stop still waits for a task the running turn started before it", async (
   // Said by the thread's status line, never by a message: no push, and nothing left behind.
   const waits = texts.fill(slackTexts.RESTART_WAITS, { counts: "1 shell", them: "it" });
   await h.until(() => statusLines(h).at(-1) === waits);
-  assert.equal(waits, "Restart waits for 1 shell · !stop ends it now");
+  assert.equal(waits, "Stop or restart waits for 1 shell · !stop ends it now");
   assert.deepEqual(h.slack.callsTo("chat.postMessage"), []);
   drain.cut.abort();
   await drain.promise;
@@ -3579,7 +3579,7 @@ test("a stop held by a background task says so and bang stop ends it", async (t)
   // Said by the thread's status line, never by a message: no push, and nothing left behind.
   const waits = texts.fill(slackTexts.RESTART_WAITS, { counts: "1 shell", them: "it" });
   await h.until(() => statusLines(h).at(-1) === waits);
-  assert.equal(waits, "Restart waits for 1 shell · !stop ends it now");
+  assert.equal(waits, "Stop or restart waits for 1 shell · !stop ends it now");
   assert.deepEqual(h.slack.callsTo("chat.postMessage"), []);
   assert.ok(await session.stop());
   // No turn was running: the process is closed, no task is stopped one by one, and

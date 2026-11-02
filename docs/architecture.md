@@ -1850,7 +1850,7 @@ An install under way is work the drain waits for: after a `SIGTERM` the drain en
 and the click (`Updates.track`, `Updates.settled`) have ended, so the daemon that exits has the
 new copy in place and the others restarted. A click inside `Updates.validate` (it is still
 asking npm whether the copy updates) is ended when the drain begins and tells the owner that
-allaboard is restarting, since a question that hangs would hold the drain for its whole limit; the
+allaboard is stopping or restarting, since a question that hangs would hold the drain for its whole limit; the
 same holds for a click that finds the install cancelled before npm starts. Any other click, the
 install and what follows it, is waited for. A stop with no drain (`SIGINT`, a failure), or a drain
 cut short by its limit, ends the install: `Updates.cancelInstall` aborts the signal npm was given,
