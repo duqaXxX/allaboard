@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.13.0] - 2026-11-02
+
 ### Changed
 
 - A message can carry `.xls`, `.xlsx`, `.docx`, `.pptx` and `.zip` files: each reaches the session
