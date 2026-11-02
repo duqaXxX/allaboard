@@ -209,7 +209,7 @@ test("the token never leaves for another host", async () => {
   assert.equal(server.calls.length, 0);
 });
 
-test("a message takes at most five images and fifteen megabytes", () => {
+test("a message takes at most ten images and fifteen megabytes", () => {
   // the maintainer, 2026-09-25: images stay in the history and are sent again at every turn.
   const image = shared("image", { size: 1_000_000 });
   assert.equal(imagesRefusal(Array(IMAGES_PER_MESSAGE).fill(image), PLAIN_NAMES), null);
@@ -272,26 +272,28 @@ const READABLE = [
   "application/x-yaml",
   "application/xml",
   "application/x-ipynb+json",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
 ];
 for (const mimetype of READABLE) {
-  test(`common readable files pass [${mimetype}]`, () => {
+  test(`common files pass [${mimetype}]`, () => {
     assert.equal(refusal(shared("snippet", { mimetype }), PLAIN_NAMES), null);
   });
 }
 
 const OTHERS: [string, string][] = [
-  ["application/zip", "application/zip"],
+  ["7z", "application/x-7z-compressed"],
   ["application/octet-stream", "application/octet-stream"],
   ["application/x-msdownload", "application/x-msdownload"],
-  [
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ],
+  ["macro-enabled workbook", "application/vnd.ms-excel.sheet.macroenabled.12"],
   ["empty", ""],
 ];
 for (const [name, mimetype] of OTHERS) {
   test(`other files are refused with their type [${name}]`, () => {
-    // the maintainer, 2026-09-25: the most common files only, those Claude reads.
+    // the maintainer, 2026-09-25: the most common files only.
     const shown = mimetype || "unknown";
     assert.equal(
       refusal(shared("snippet", { mimetype }), PLAIN_NAMES),

@@ -1499,11 +1499,11 @@ session never runs in two threads at once.
 ### Files in a message
 
 A message with files: Claude sees a JPEG, PNG, GIF or WebP image (up to 7.5 MB, 10 MB once base64-encoded, and 8000x8000 px;
-at most 5 images and 15 MB of images per message) as an image. Any other image type (SVG, HEIC,
+at most 10 images and 15 MB of images per message) as an image. Any other image type (SVG, HEIC,
 TIFF...) is refused. A text or source code file (JavaScript, shell, SQL and TOML
-included), a PDF, JSON, XML, YAML or Jupyter notebook file, up to 100 MB, reaches Claude as the path of a copy in `$TMPDIR/allaboard/` (an instance's own folder, see
+included), a PDF, JSON, XML, YAML, Jupyter notebook, Excel (`.xls`, `.xlsx`), Word (`.docx`), PowerPoint (`.pptx`) or zip file, up to 100 MB, reaches Claude as the path of a copy in `$TMPDIR/allaboard/` (an instance's own folder, see
 [Part 6](#part-6-a-second-instance)), kept 3 days; any other
-file (archives, Office documents, binaries) is refused. A file past a limit, or one that fails to
+file (other archives, `.doc`, `.ppt`, `.xlsm`, `.docm`, binaries) is refused. Claude Code's Read tool refuses `.xlsx` as binary, so reading such a file takes a command (a zip reaches the session unopened), and what it can read depends on what the Mac has installed. A file past a limit, or one that fails to
 download, stops the whole message, and the reply says which file and why.
 
 A reply is one message in the session's thread, and a native Slack stream. It appears when Claude

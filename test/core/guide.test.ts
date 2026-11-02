@@ -15,7 +15,7 @@ const FULL_GUIDE = [
   "",
   "**Get started**",
   "1. `!bind` lists the folders Plain trusts, with a Bind button each; `!bind <folder>` binds one by its path relative to your allowed root: `!bind my-project`. Plain must trust that folder first: open `plain` there once in the terminal and accept. `!bind` works only as a top-level message in the channel.",
-  "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its own, growing as Plain works, with a line for each tool it uses. Reply inside that thread to continue the same session. Attach images or files to a message: Plain sees a JPEG, PNG, GIF or WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML or notebook file from a copy saved on this Mac; other files are refused.",
+  "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its own, growing as Plain works, with a line for each tool it uses. Reply inside that thread to continue the same session. Attach images or files to a message: Plain sees a JPEG, PNG, GIF or WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML, notebook, Excel, Word, PowerPoint or zip file from a copy saved on this Mac; other files are refused.",
   "3. Before that first message is sent, the thread asks for the **Model**, the **Effort** (`Default` leaves Plain's own choice) and **Bypass permissions**; **Start** sends your message with those choices, and `!stop` cancels it instead.",
   "",
   "**Commands**",

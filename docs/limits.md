@@ -162,6 +162,7 @@ the conversation at a prompt (measured on the TypeScript SDK 0.3.303 on 2026-10-
 
 | What differs | In the terminal | From Slack | Looked into |
 |---|---|---|---|
+| Files in one message | No limit of its own on files dropped in | Slack's composer takes up to 10 files per message on desktop (help page "Add files to Slack", read 2026-11-02) | none |
 | The list of changed files | The panel scrolls through every file | A list shows the first 45 files and says how many more there are: Block Kit allows 50 blocks in a message | none |
 | Speaking a message | Dictation writes your words as you speak | You send an audio clip and choose **Generate transcript** on it: Slack writes no transcript by itself | none |
 | The language of what you said | The `language` setting decides | Slack picks the language it hears, clip by clip, and nothing lets an app choose it | [#17](https://github.com/duqaXxX/allaboard/issues/17) |

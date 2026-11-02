@@ -1865,12 +1865,12 @@ test("a failed download leaves no saved copy", async (t) => {
 test("too many images send nothing and download nothing", async (t) => {
   const world = worldOf(t);
   const body = sharedFile("image");
-  body.event.files = Array(6).fill(body.event.files[0]);
+  body.event.files = Array(11).fill(body.event.files[0]);
   await world.dispatch(body);
   assert.deepEqual(world.fetched, []);
   assert.deepEqual(world.queries(), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(namedText(slackTexts.UPLOAD_TOO_MANY, NAMES), { count: 6, limit: 5 }),
+    fill(namedText(slackTexts.UPLOAD_TOO_MANY, NAMES), { count: 11, limit: 10 }),
   ]);
 });
 
