@@ -1834,49 +1834,6 @@ failed or could not tell.
 To update by hand, `npm install -g allaboard@latest` then `allaboard service restart` for each
 instance on the copy works as before.
 
-### Moving from awaydesk
-
-allaboard was published as `awaydesk` up to 0.3.1. The two are separate npm packages, so
-`awaydesk update` and `!awaydesk update` never find allaboard. Every name moved with the package:
-the command, `~/.config/awaydesk[-<name>]/`, the LaunchAgent `local.awaydesk[.<name>]`, the logs
-in `~/Library/Logs/awaydesk/` and the variables `AWAYDESK_AGENT`, `AWAYDESK_CHAT` and
-`AWAYDESK_INSTANCE`. The format of `.env` and `state.json` is the same, so a copy keeps the
-tokens, the bound channels and the sessions of every thread.
-
-1. Stop and remove each service while no turn runs:
-
-   ```bash
-   awaydesk service uninstall                    # the default instance
-   awaydesk service uninstall --instance <name>  # each named one
-   ```
-
-2. Copy each instance's folder, keeping the mode of `.env`, and rename the variables in it:
-
-   ```bash
-   cp -Rp ~/.config/awaydesk ~/.config/allaboard
-   cp -Rp ~/.config/awaydesk-<name> ~/.config/allaboard-<name>   # each named one
-   sed -i '' 's/^AWAYDESK_/ALLABOARD_/' ~/.config/allaboard/.env ~/.config/allaboard-*/.env
-   ```
-
-3. Replace the package and install the services again:
-
-   ```bash
-   npm uninstall -g awaydesk
-   npm install -g allaboard
-   allaboard service install
-   allaboard service install --instance <name>  # each named one
-   ```
-
-4. Once each instance answers in Slack, delete what awaydesk left:
-
-   ```bash
-   rm -rf ~/.config/awaydesk ~/.config/awaydesk-* ~/.config/awaydesk_identities
-   rm -rf ~/.config/awaydesk_update ~/Library/Logs/awaydesk
-   ```
-
-The Slack apps and their tokens stay as they are. A bot keeps the name it was created with; to
-change it, edit **Display Name** under **App Home** in the app's settings.
-
 ## Uninstalling
 
 Remove each instance's service first, then the package, then the files allaboard left. Run the

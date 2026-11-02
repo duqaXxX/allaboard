@@ -776,22 +776,11 @@ All notable changes to this project are documented here. The format follows
   claims hold. The release offers one command the recorded `server-info.json` does not list,
   `/plugin-authoring`, as 0.3.301 did.
 
-## [0.4.0] - 2026-10-18
-
-### Changed
-
-- The project is renamed from awaydesk to allaboard: the npm package and its
-  command, the daemon's word `!allaboard`, the configuration folders `~/.config/allaboard[-<name>]`
-  and `~/.config/allaboard_identities`, the LaunchAgent labels `local.allaboard[.<name>]`, the
-  logs in `~/Library/Logs/allaboard/`, the variables `ALLABOARD_AGENT`, `ALLABOARD_CHAT` and
-  `ALLABOARD_INSTANCE`, the bot name in `slack-app-manifest.json` and the repository address. An
-  install of awaydesk moves by hand: `docs/setup.md`, "Moving from awaydesk".
-
 ## [0.3.1] - 2026-10-18
 
 ### Fixed
 
-- `docs/features.md`: the install from npm and `awaydesk update --check` as seen on a default
+- `docs/features.md`: the install from npm and `allaboard update --check` as seen on a default
   instance that went from 0.1.1 to 0.3.0 through the registry; they read "not run yet".
 
 ## [0.3.0] - 2026-10-18
@@ -804,34 +793,34 @@ All notable changes to this project are documented here. The format follows
   a daemon installs (`heldByARunningDaemon`): outside macOS it is a listening socket, and each
   wait went to its 10-second limit. Two tests whose subject Windows lacks (SIGTERM to a child, an
   `ENOTDIR` from the lock's folder) are skipped there, with the reason.
-- Updating awaydesk from Slack. `!awaydesk` shows the version that runs, the latest one npm
-  publishes and when npm was last asked (`src/core/flows/update.ts`). `!awaydesk update` posts, in
+- Updating allaboard from Slack. `!allaboard` shows the version that runs, the latest one npm
+  publishes and when npm was last asked (`src/core/flows/update.ts`). `!allaboard update` posts, in
   the channel, an offer with a link to what the version changed and an **Update to** button; the
-  click installs exactly the version the offer shows, and awaydesk restarts once running turns
-  finish (up to 29 minutes). `!awaydesk restart` restarts the same way, without installing. The
+  click installs exactly the version the offer shows, and allaboard restarts once running turns
+  finish (up to 29 minutes). `!allaboard restart` restarts the same way, without installing. The
   Home tab shows the same offer as a line under its header, with a button that asks through
   Slack's confirmation dialog, and the line follows the update through installing, restarting and
   failure (`src/chat/slack/update.ts`, `src/chat/slack/home.ts`). The owner is also told once per
   version, by a message only he sees under his first message after the daemon learned of it
   (`ChannelChat.tell`, an ephemeral message in the channel). The word, the offer's click and the Home
   tab's click each check the owner and the workspace on their own. `!help` and `!guide` list the word.
-- What updates and what does not. Only the copy `npm install -g` replaces: `$(npm root -g)/awaydesk`
+- What updates and what does not. Only the copy `npm install -g` replaces: `$(npm root -g)/allaboard`
   by real path, not a link, its version published on npm (`updatableCopy`, `src/host/npm.ts`). A
-  checkout, an `npm link` or an unpublished version is told so (`!awaydesk` says why it updates
+  checkout, an `npm link` or an unpublished version is told so (`!allaboard` says why it updates
   outside Slack) and gets no offer, no Home line and no notice. The update also needs a daemon
-  that a service starts again: `!awaydesk update` and `restart` on one that runs in a terminal say
-  how to make it a service (`awaydesk service install`).
+  that a service starts again: `!allaboard update` and `restart` on one that runs in a terminal say
+  how to make it a service (`allaboard service install`).
 - The order of a click: the machine's update lock, the copy and the service checked again,
-  `npm install -g awaydesk@<version>`, the copy's `package.json` read again, the restart of every
+  `npm install -g allaboard@<version>`, the copy's `package.json` read again, the restart of every
   other loaded instance on that copy, then this daemon's own drained stop. While npm replaces the
   copy no agent process starts (`SessionManager.blockStarts`): a message that would start one, a
-  word that connects a session and the usage probe wait, answered with `awaydesk is restarting;
+  word that connects a session and the usage probe wait, answered with `allaboard is restarting;
   send this again in a moment.`; a session already connected goes on. A failed install, or one
   that leaves another version in the copy, changes nothing: the old version keeps running, the
   block lifts, and the failure is told (npm's own message goes to the log).
-- `awaydesk update [--check] [--yes]` (`src/cli.ts`). `--check` prints the installed and the latest
+- `allaboard update [--check] [--yes]` (`src/cli.ts`). `--check` prints the installed and the latest
   version. `update` checks the copy, asks `Update? [y/N]` (it refuses without a terminal unless
-  `--yes`), takes the machine's update lock (`~/.config/awaydesk_update`, `UpdateUnderWay` in
+  `--yes`), takes the machine's update lock (`~/.config/allaboard_update`, `UpdateUnderWay` in
   `src/core/lock.ts`), installs, reads the copy's `package.json` again and restarts every running
   service of that copy, each after its running turns finish. It takes no `--instance`: it is about
   a copy, not an instance.
@@ -852,8 +841,8 @@ All notable changes to this project are documented here. The format follows
   runner takes an `AbortSignal` that sends the command `SIGTERM` and returns after its exit, and
   the registry questions use one that the shutdown aborts, so a hung `npm view` no longer holds it.
 - Every daemon of the machine reads the update lock (`updateHeld`, `src/core/lock.ts`) before it
-  starts an agent process and before `!awaydesk restart`, so another instance's install, or
-  `awaydesk update` in a terminal, blocks them too. The reading holds the lock for an instant at
+  starts an agent process and before `!allaboard restart`, so another instance's install, or
+  `allaboard update` in a terminal, blocks them too. The reading holds the lock for an instant at
   most (a shared lock on macOS, a connection on Linux and Windows), and the update's own take tries
   again for about 200 ms. An instance whose restart failed after an install is named on the offer
   and on the Home line, with the command that restarts it.
@@ -862,16 +851,16 @@ All notable changes to this project are documented here. The format follows
   gone (`npm uninstall -g` under a live daemon) ends the retries at the 10th such answer in a row:
   the answer about the copy is dropped so that nothing offers an update of it, and the next check
   comes with the 6-hour one. Any other answer, from a check or from a click, restarts the count.
-- A message after the restart. The line `!awaydesk restart` posts, and the offer of a click from a
-  channel, are rewritten in place once the new daemon is connected: `awaydesk restarted at
-  <HH:MM>.`, `Updated to awaydesk <version>.`, or `awaydesk restarted on <installed>, not on
+- A message after the restart. The line `!allaboard restart` posts, and the offer of a click from a
+  channel, are rewritten in place once the new daemon is connected: `allaboard restarted at
+  <HH:MM>.`, `Updated to allaboard <version>.`, or `allaboard restarted on <installed>, not on
   <asked>: the update did not take.` An edit sends no notification. `state.json` gains the
   top-level key `restart_notice` (`channel`, `message`, `version`), written before the stop is
   asked and removed by the next start whatever the outcome; the file stays at version 3. A click
   on the Home tab, a restart from a terminal, the other instances an update restarts, and an
   offer that names an instance that did not restart record nothing. A start takes the notice before
   the chat can hear the owner and forgets it only while it is still that one, so a restart asked as
-  the daemon connects keeps its own; a second `!awaydesk restart` while one is being answered is
+  the daemon connects keeps its own; a second `!allaboard restart` while one is being answered is
   told the daemon is restarting. `ChannelChat.notice` resolves with the id of the message it posted
   (null when the chat cannot say), which `Talk.postInChannel` hands to the flow
   (`src/core/flows/notices.ts`, `src/core/flows/update.ts`).
@@ -897,28 +886,28 @@ All notable changes to this project are documented here. The format follows
   manifest: add `chat:write` under User Token Scopes, reinstall and copy the token. The variable
   stays optional in the code: without it the daemon starts and the Home tab has no Edit button.
 - Several daemons on one machine, one per instance. An instance is a name: `--instance <name>`, or
-  `AWAYDESK_INSTANCE` when the flag is absent (`src/core/instance.ts`, read by `src/cli.ts`). The configuration folder
-  (`~/.config/awaydesk-<name>`), the folder for attached files (`$TMPDIR/awaydesk-<name>`, handed to the chat as `ChatContext.scratchDir`), the LaunchAgent
-  (`local.awaydesk.<name>`, started with `--instance <name>`) and the log
-  (`~/Library/Logs/awaydesk/<name>.log`) derive from it. The default instance keeps today's paths
-  and its plist, byte for byte. The daemon writes its name to its own `AWAYDESK_INSTANCE` (and
-  removes it for the default instance), which its sessions inherit, so an `awaydesk` command a
+  `ALLABOARD_INSTANCE` when the flag is absent (`src/core/instance.ts`, read by `src/cli.ts`). The configuration folder
+  (`~/.config/allaboard-<name>`), the folder for attached files (`$TMPDIR/allaboard-<name>`, handed to the chat as `ChatContext.scratchDir`), the LaunchAgent
+  (`local.allaboard.<name>`, started with `--instance <name>`) and the log
+  (`~/Library/Logs/allaboard/<name>.log`) derive from it. The default instance keeps today's paths
+  and its plist, byte for byte. The daemon writes its name to its own `ALLABOARD_INSTANCE` (and
+  removes it for the default instance), which its sessions inherit, so an `allaboard` command a
   session runs is about its own instance, under launchd and in a foreground run.
-- `awaydesk service list` shows every instance's service: loaded or not, the pid, the copy of the
+- `allaboard service list` shows every instance's service: loaded or not, the pid, the copy of the
   package it runs and that copy's version. The instance comes from the plist's `--instance`
   argument, checked against the plist's `Label`, its file name and the name rule; a plist that
   disagrees is named below the table as not an instance it can manage. A job `launchctl list` shows
   loaded whose plist file is gone is listed too, with `its plist is gone` after its state. The
-  default instance is written `(default)`, a word `--instance` refuses. `awaydesk service install`
+  default instance is written `(default)`, a word `--instance` refuses. `allaboard service install`
   prints the copy it puts in the plist and its version.
 - A second lock, on the chat app. `ChatProvider.identities` is a list of opaque keys, and for Slack
   it holds two: `<team id>:<bot user id>` (the bot token) and `app-token:<SHA-256 of the app-level
   token>` (the token Socket Mode connects with, hashed in the Slack module so the token never
   reaches the core). After the chat is built and before it connects, the daemon takes a lock on
-  each key, in order, in `~/.config/awaydesk_identities/<16 hex digits>/`, shared by every instance
+  each key, in order, in `~/.config/allaboard_identities/<16 hex digits>/`, shared by every instance
   of the user, and releases the ones it took if a later one is refused. A copied `.env` with the old
   tokens left in it, or with only one of the two replaced, no longer gives two daemons on one app:
-  the second ends before it opens its connection, with `another awaydesk instance is connected to
+  the second ends before it opens its connection, with `another allaboard instance is connected to
   this chat app (lock on <folder>): give each instance its own app`.
 
 - `CLAUDE_CONFIG_DIR` in an instance's `.env` gives it a Claude Code login of its own. The Claude
@@ -937,8 +926,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The instance name `awaydesk` is refused beside `default`: its log would be the default
-  instance's, `awaydesk.log`.
+- The instance name `allaboard` is refused beside `default`: its log would be the default
+  instance's, `allaboard.log`.
 - The rule that one daemon runs per machine is now one daemon per instance
   (`docs/setup.md`, Part 6).
 - The minimum Node is 22.19 (`engines.node` and `node-version.MINIMUM_NODE`) in place of 22.18.
@@ -951,16 +940,16 @@ All notable changes to this project are documented here. The format follows
   daemon and the command's wiring moved to `src/daemon.ts`, and `test/main.test.ts` to
   `test/daemon.test.ts`. `test/imports.test.ts` lets only `src/daemon.ts` import the registry and
   only `src/main.ts` import `src/daemon.ts`.
-- `docs/setup.md` has a section, "A Node of its own", on running awaydesk on a Node installed
+- `docs/setup.md` has a section, "A Node of its own", on running allaboard on a Node installed
   beside the terminal's, with nvm or with an unpacked official archive.
 
 ### Fixed
 
-- `awaydesk` on a Node older than the minimum printed a `SyntaxError` about `parseEnv` of
+- `allaboard` on a Node older than the minimum printed a `SyntaxError` about `parseEnv` of
   `node:util` (Node 18.19.0, measured on 2026-10-17) in place of its refusal. An ES module graph
   is linked whole before any module runs, so `require-node.ts`, the first import of `main.ts`,
   never ran. The entry now has no static import and loads the daemon only after the version
-  check, and the refusal says how to run awaydesk on a newer Node beside the current one and
+  check, and the refusal says how to run allaboard on a newer Node beside the current one and
   points at that section of `docs/setup.md`. `test/node-version.test.ts` fails on a static import
   in `src/main.ts` and on one in the modules the entry loads first. `src/require-node.ts` is
   removed.
@@ -978,15 +967,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- awaydesk is installed from the npm registry, `npm install -g awaydesk`, and `docs/setup.md`
+- allaboard is installed from the npm registry, `npm install -g allaboard`, and `docs/setup.md`
   starts there. Running a build of a clone is in `CONTRIBUTING.md`, Running your own build.
 - A text that sends you to the setup guide gives its address on GitHub, at the tag of the version
   that runs (`version.setupGuide`), since the package installed from npm does not carry `docs/`:
-  the refusal of an old Node, a missing `.env`, a folder macOS does not let awaydesk read, `!open`
+  the refusal of an old Node, a missing `.env`, a folder macOS does not let allaboard read, `!open`
   without the `files:write` scope, and the log line of a Home tab the Slack app does not enable.
 - The package on npm has a README of its own, `npm/README.md`, with links to GitHub pinned to the
   version's tag (the setup guide, its part on creating the Slack app, `slack-app-manifest.json`), and the repository keeps its README. `npm run build:npm` assembles the package in
-  `build/npm/awaydesk` (`.github/scripts/npm-package.mjs`): `dist`, a `package.json` with no
+  `build/npm/allaboard` (`.github/scripts/npm-package.mjs`): `dist`, a `package.json` with no
   scripts or devDependencies, `LICENSE`, `slack-app-manifest.json` and that README; `docs/` no
   longer ships in the package. The Release workflow publishes that folder. A changelog section
   longer than a GitHub Release takes (125,000 characters, as projects that hit it report) becomes
@@ -1000,14 +989,14 @@ All notable changes to this project are documented here. The format follows
   and Windows, the package is published to the npm registry through trusted publishing (no npm
   token, with provenance), and the GitHub Release is created with the version's section as notes.
   The procedure and the one-time setup on npmjs.com are in `CONTRIBUTING.md`, Releases.
-- `awaydesk --version` prints the installed version (the `version` of the package's own
-  `package.json`, `version.installedVersion`) and `awaydesk --help` the usage; both end
+- `allaboard --version` prints the installed version (the `version` of the package's own
+  `package.json`, `version.installedVersion`) and `allaboard --help` the usage; both end
   without reading `.env` or taking the lock. Any other argument is refused with the usage and
   status 2, so a mistyped argument starts no daemon. With no argument the command runs the daemon,
   as before. The arguments are read by `src/cli.ts`.
-- `awaydesk service install`, `uninstall`, `status` and `restart` manage the LaunchAgent
+- `allaboard service install`, `uninstall`, `status` and `restart` manage the LaunchAgent
   (`host/service/launchd.Launchd`), replacing the plist `docs/setup.md` had you write by hand.
-  `install` writes `~/Library/LaunchAgents/local.awaydesk.plist` with the same label, keys and log
+  `install` writes `~/Library/LaunchAgents/local.allaboard.plist` with the same label, keys and log
   as before, lints it with `plutil` and loads it with `launchctl bootstrap`; over a loaded job it
   changes nothing when the plist is the same and refuses, writing nothing, when it differs, since
   replacing it means a `bootout` that ends running turns after 60 seconds. The plist names the
@@ -1015,10 +1004,10 @@ All notable changes to this project are documented here. The format follows
   Node's. `restart` sends `SIGTERM` (`launchctl kill TERM`), the stop that lets turns finish;
   `status` reads `launchctl list`, whose columns `man launchctl` documents, and answers 0 when the
   daemon runs and 3 otherwise; `uninstall` boots the job out, removes the plist and names the
-  configuration and log folders it leaves. Elsewhere than on macOS `awaydesk service` answers that
-  it exists on macOS only. A plist written by hand is replaced with `awaydesk service uninstall`,
-  then `awaydesk service install`.
-- A host layer, `src/host/`, for what concerns the machine awaydesk is installed on (its version
+  configuration and log folders it leaves. Elsewhere than on macOS `allaboard service` answers that
+  it exists on macOS only. A plist written by hand is replaced with `allaboard service uninstall`,
+  then `allaboard service install`.
+- A host layer, `src/host/`, for what concerns the machine allaboard is installed on (its version
   today). It imports none of the three layers and none of them imports it; `test/imports.test.ts`
   holds both directions.
 
@@ -1061,7 +1050,7 @@ All notable changes to this project are documented here. The format follows
 - A crash while a question or an approval that opened the turn waits no longer leaves the thread
   with the owner's message alone. The turn had no reply message (a reply starts on
   its first write), so the repair on the next start deleted the request and nothing said the turn
-  stopped. It now rewrites the request into `awaydesk stopped before this answer.` with an edit, so
+  stopped. It now rewrites the request into `allaboard stopped before this answer.` with an edit, so
   no notification and no control is left; a turn that had a reply behaves as before. A rewrite
   Slack refuses falls back to the deletion. Only a question or an approval gets the line, and
   only one line per thread at each start (a second can appear at a later start, when a deletion
@@ -1117,7 +1106,7 @@ All notable changes to this project are documented here. The format follows
   P27 and P28 check it, and the `completed` record, on each release.
 - A second `Start` on a session's setup while the first is applied, and a model picked just
   before `Start` but handled after it, no longer add `This question is no longer open: it was
-  already answered, or awaydesk restarted.` under the summary: the summary says
+  already answered, or allaboard restarted.` under the summary: the summary says
   what happened. The handlers run concurrently, so either click can find the setup decided. A
   click on a setup no longer held (a restart, or a click after the start was applied) keeps the
   notice, since the daemon cannot tell those two apart. The log line names the path as before;
@@ -1598,7 +1587,7 @@ All notable changes to this project are documented here. The format follows
   the rest of the run. It never notifies and stores nothing. Known limit: the iOS
   app can show no status for a thread that Slack on desktop already has open; `docs/setup.md`
   says so.
-- Cleanup of `state.json` (new module `awaydesk.cleanup`): on start and then every 6
+- Cleanup of `state.json` (new module `allaboard.cleanup`): on start and then every 6
   hours, a bound channel Slack answers `channel_not_found` about is forgotten with its threads
   (`StateStore.remove_channel`), and the pruning of threads whose session is gone, which ran on
   start alone, runs on the same schedule. A failure that is not that answer removes nothing, a
@@ -1606,7 +1595,7 @@ All notable changes to this project are documented here. The format follows
   the bound channels nothing is forgotten. A private channel the bot was removed from is
   forgotten like a deleted one: `!bind` there again once the bot is back.
 - Session index: the app's Home tab lists the sessions the threads hold, grouped by channel, the
-  channel and the session used last first (new module `awaydesk.home`). A channel shows
+  channel and the session used last first (new module `allaboard.home`). A channel shows
   its five newest sessions and a Show all button; each session is two lines, the root's status
   reaction and the title, then the status in a word, the thread's number of replies, the time of
   its last reply and an Open link to the thread. The replies and the last reply are read from
@@ -1635,7 +1624,7 @@ All notable changes to this project are documented here. The format follows
   started it, so more than one can be open at once), the ts of every approval, question and D8
   hold request still carrying buttons, and the root's reaction while it is ⏳ or ✋, ids only,
   never message content (`state.json` stays version 2, additive). On start, before the Socket
-  Mode connection opens, `awaydesk.repair.repair_crash` reads each open reply back by its
+  Mode connection opens, `allaboard.repair.repair_crash` reads each open reply back by its
   own ts and rewrites it to say the daemon stopped before an answer, dropping the daemon's own
   status line (found by its own fixed block_id, since Slack assigns one to a block that was
   posted without one) rather than the whole message; deletes each stale request; and sets ❌ on a
@@ -1657,7 +1646,7 @@ All notable changes to this project are documented here. The format follows
 - Probe claim P14: a hook's `cwd` follows a `cd`, which the footer's branch depends on.
 - One Claude Code session per Slack thread, instead of one per channel: a top-level message opens
   a new thread with its own session id, bypass switch and effort level, kept in `state.json`
-  (now version 2); a reply inside a thread continues that session, even after awaydesk
+  (now version 2); a reply inside a thread continues that session, even after allaboard
   restarts or the thread's Claude Code process closes from an hour with nothing to do (the next
   message resumes it). A channel bound under version 1 keeps its directory and gets one top-level
   notice explaining the new model, with its old session still reachable through `!resume`.
@@ -1682,8 +1671,8 @@ All notable changes to this project are documented here. The format follows
   Continue and Cancel. `!stop` inside the held thread, a top-level `!stop` of its channel, and a
   restart cancel the wait the same way Cancel does, with a `Not sent.` notice; the idle-close
   timer and the ✋ root reaction treat a held message the same way they treat an open approval.
-- The agent and the chat are modules chosen by name. `AWAYDESK_AGENT` and `AWAYDESK_CHAT` in
-  `~/.config/awaydesk/.env` select them. Both are optional and absent they mean `claude` and
+- The agent and the chat are modules chosen by name. `ALLABOARD_AGENT` and `ALLABOARD_CHAT` in
+  `~/.config/allaboard/.env` select them. Both are optional and absent they mean `claude` and
   `slack`, so an existing `.env` and `state.json` work with no edit and nothing in Slack changes.
   `src/registry.ts` holds the entries and `src/main.ts` builds the selected ones without importing
   either module; a name the registry does not hold stops the start, and the message lists the valid
@@ -1758,7 +1747,7 @@ All notable changes to this project are documented here. The format follows
   (`read.uploadFile`) and reaches the rest through `core/port.ts`. Three signatures take what the
   provider used to supply: `readOpenable` and `readOnce` take the size cap as an argument, and
   `startCommit` and `changedIn` take the thread's start in epoch seconds, which the provider reads
-  from the thread's `thread_ts` (`open.startedAt`). The listing logs under `awaydesk.core.files`,
+  from the thread's `thread_ts` (`open.startedAt`). The listing logs under `allaboard.core.files`,
   and a listing that fails names the error by its code or type, as the core's other log lines do
 .
 - `state.json` keeps a thread's `status` and `ended` as the words `working`, `waiting`, `done` and
@@ -1814,7 +1803,7 @@ All notable changes to this project are documented here. The format follows
   `ChatProvider.escape` for a command that holds a backtick. What the owner reads in Slack is
   unchanged.
 - The Claude back end names no chat: a call nobody could be asked about is denied with
-  `awaydesk could not show this request to the owner, so nobody approved it.`, a text only Claude
+  `allaboard could not show this request to the owner, so nobody approved it.`, a text only Claude
   reads. `test/chat/slack/resume.test.ts` fails when the rows the Slack picker shows and the rows
   the back end dates sessions for (`RESUME_ROWS` in each module) differ.
 - The agent seam and the Slack provider lose what nothing read. In the seam: `requestId` on
@@ -1925,11 +1914,11 @@ All notable changes to this project are documented here. The format follows
   `src/values.ts` sit above the layers, for what more than one of them needs: the clock, the log,
   Python's whitespace and string order, and the reading of a parsed value or a caught error.
   What an owner sees is unchanged: the same words, the same
-  texts in Slack, the same Slack app manifest, and the same `~/.config/awaydesk/.env` and
+  texts in Slack, the same Slack app manifest, and the same `~/.config/allaboard/.env` and
   `state.json` (version 2). The command is installed with npm, from a tarball `npm pack` builds (`docs/setup.md`, Part 0), in place of `uv tool install`. The checks are Biome, `tsc --noEmit` and `node --test`,
   which runs the tests from their sources (`npm run check`); the release probe is
   `node probe/main.ts` and `node probe/live-agent.ts` runs 23 live checks of the Claude back end.
-  The Python daemon, its tests and its probe are removed (`src/awaydesk/`, `tests/`, `probe/*.py`,
+  The Python daemon, its tests and its probe are removed (`src/allaboard/`, `tests/`, `probe/*.py`,
   `pyproject.toml`, `uv.lock`), and the recordings moved to `test/fixtures/`. `test/golden/` holds
   what the renderer and the reply sink do for each recording of `test/fixtures/sdk/`: the files
   the Python code wrote, less the fake Slack's answer to each call, kept as snapshots that
@@ -1960,10 +1949,10 @@ All notable changes to this project are documented here. The format follows
     two and tried again, and Slack always sends the header.
   - An effort chosen in a session's setup is applied to the running session in place, where the
     Python daemon started a new Claude Code client for it. The footer shows the same level.
-  - The log names the module of each line where the Python daemon wrote `awaydesk`, so the line
-    a start prints reads `INFO awaydesk.chat.slack.thread: connected to Slack workspace
+  - The log names the module of each line where the Python daemon wrote `allaboard`, so the line
+    a start prints reads `INFO allaboard.chat.slack.thread: connected to Slack workspace
     <workspace id>`. A start that fails on a token Slack refuses logs `ERROR
-    awaydesk.main: stopped by an unexpected error: <Slack's error>` and exits with status 1, in
+    allaboard.main: stopped by an unexpected error: <Slack's error>` and exits with status 1, in
     place of a traceback.
   - Where a text or a log line names the error that stopped something (a failed download, a
     turn that failed), the name is the code of a system error (`EACCES`, `ENOENT`), else the
@@ -2003,11 +1992,6 @@ All notable changes to this project are documented here. The format follows
     daemon gives its clients a logger that drops them, and logs a failed call by its error
     code as before. From Bolt and the Socket Mode client the log holds one line per warning
     or error, with no text of theirs, and the connection's states by name.
-- The project is named `awaydesk` (was `code-with-slack`). The package, the command, the
-  repository, the Slack app and its bot take the new name. On a machine that ran the old name,
-  four places move: the configuration folder is `~/.config/awaydesk/`, the LaunchAgent is
-  `local.awaydesk`, the log is `~/Library/Logs/awaydesk/awaydesk.log`, and the command is
-  `awaydesk`. Nothing is read from the old places.
 - `claude-agent-sdk` 0.2.165, which bundles Claude Code 2.1.294 (was 0.2.164 with 2.1.292). The
   probe certified it on 2026-10-10: all 23 claims hold, every row of `docs/sdk-surface.md` is
   still in the package and every `reference` row is still named by the reference. The two
@@ -2041,7 +2025,7 @@ All notable changes to this project are documented here. The format follows
 - The README is a landing page: what the daemon is for, what it needs before an install, the
   steps of the setup, what a session shows and one row per command. The detail of each command
   lives in `docs/setup.md` alone. `tests/test_docs.py` fails when the README's command table
-  differs from the `Word` union of `awaydesk.commands`, when the version or the Python it
+  differs from the `Word` union of `allaboard.commands`, when the version or the Python it
   states differ from `pyproject.toml`, and when it passes `README_WORD_LIMIT` words.
 
 - A reply ends with ❌ whenever an edit Slack refused left one of its messages short of what
@@ -2221,7 +2205,7 @@ All notable changes to this project are documented here. The format follows
   2026-10-03) does not say whether a delete notifies; a bot deleting its own message in a
   thread was silent when measured on 2026-09-29, and the top-level case is a check by hand.
 - A message refused while the daemon stops names what the stop waits for. Under
-  `awaydesk is restarting; send this again in a moment.` the refusal lists each thread
+  `allaboard is restarting; send this again in a moment.` the refusal lists each thread
   that still holds the restart, of any channel: its channel, a link to the thread labelled with
   the session's title as the Home tab names it (`Session` when it has none, or when the
   folder's sessions cannot be listed), and what holds it there
@@ -2335,10 +2319,10 @@ All notable changes to this project are documented here. The format follows
 - `!stop`, a restart and an error end a reply through the same path as a normal end: the stream
   stops with the footer (a push), and the root shows ✅ or ❌ as before. A message queued in a
   thread when a restart drops it gets no reply of its own: the end of the running reply, or one
-  message when nothing runs, says `N messages were not sent because awaydesk restarted:
+  message when nothing runs, says `N messages were not sent because allaboard restarted:
   send them again.` with the start of each (`sessions.not_sent`).
 - Crash repair stops each open reply's stream first (`message_not_in_streaming_state` is fine),
-  then edits the message: a card left running becomes an error, and `awaydesk stopped
+  then edits the message: a card left running becomes an error, and `allaboard stopped
   before this answer.` is appended. Nothing is posted. `open_replies` in `state.json` now holds
   the ts of the reply's stream or message.
 - `docs/features.md` and `docs/setup.md` describe the notification behaviour above: one push when
@@ -2373,7 +2357,7 @@ All notable changes to this project are documented here. The format follows
 - An Edit or Write diff shows whole, as the terminal shows it, in a collapsible full-width
   container closed by default: the call's line is its title and `Added … lines, removed … lines`
   its subtitle. It no longer stops at 20 lines.
-- awaydesk's own notices (the answer to `!bind`, `!bypass` and `!stop`, a restart, a
+- allaboard's own notices (the answer to `!bind`, `!bypass` and `!stop`, a restart, a
   refused attachment, the ephemeral errors, and the lines of the `!bind` and `!resume` lists)
   are a context block, small and grey as the footer, so they read apart from Claude's replies.
   `!help`, `!guide`, `!status` and the answer to a resume stay full size.
@@ -2405,11 +2389,11 @@ All notable changes to this project are documented here. The format follows
 
 - A stop that does not drain and lands between a turn's end and the close of its reply no longer
   says two things that were not true of that turn. The reply held the whole answer and
-  then `This reply ended before an answer: awaydesk stopped.`, and the root got the status of an
+  then `This reply ended before an answer: allaboard stopped.`, and the root got the status of an
   error: it now ends with no such line, and the root gets the status of a turn that ended, unless
   a prompt was dropped, an error already stood on the root or a task of any reply still ran. The
   footer is missing when the stop came while it was read. A prompt the agent had
-  taken into that turn was listed under `1 message was not sent because awaydesk stopped: send
+  taken into that turn was listed under `1 message was not sent because allaboard stopped: send
   it again.`: the reply now ends with the note of a normal end, that the agent took the message
   into this reply. `ThreadSession.abandon` returns whether the turn it ended had ended well, and
   `ActiveTurn.released` holds the prompts a cut turn's result released.
@@ -2506,7 +2490,7 @@ All notable changes to this project are documented here. The format follows
   entry ended its file with `if (import.meta.main) void main();`, and below 22.18 that value is
   undefined: `main` never ran and the command ended with status 0 and no output (measured
   2026-10-11, Node 22.17.0), a restart loop with an empty log under the LaunchAgent. `main.ts` now
-  imports `require-node.ts` first, which ends the process with one `ERROR awaydesk.main:` line and
+  imports `require-node.ts` first, which ends the process with one `ERROR allaboard.main:` line and
   status 1 when `node-version.nodeRefusal` finds `process.versions.node` below
   `node-version.MINIMUM_NODE`, and `test/node-version.test.ts` holds that constant to
   `engines.node`. `config.loadConfig` read a relative `ALLOWED_ROOT` from the working directory
@@ -2650,7 +2634,7 @@ All notable changes to this project are documented here. The format follows
   turn that opens with no replay is the report. The correction at the turn's end stays, for the
   turns no recording covers: one that opens with a compaction, a command, a prompt with an
   image, a turn that fails before its first word.
-- The setup guide and the docstring of `awaydesk.trust` say what a trusted parent folder
+- The setup guide and the docstring of `allaboard.trust` say what a trusted parent folder
   leaves out. Outside a repository a parent's trust lets a session start, and Claude Code
   still holds the `permissions.allow` rules and `additionalDirectories` of the folder's own
   `.claude/settings.json` until the dialog is accepted in that folder, which is why the terminal
@@ -3091,10 +3075,10 @@ First release.
 - Package scaffold: `pyproject.toml` with pinned dependencies, MIT license, docs test.
 - CI (sensitive-data scan; tests, types, lint), the published text scan, Dependabot for uv and
   GitHub Actions.
-- Configuration loading from `~/.config/awaydesk/.env` with the mode 600 check.
+- Configuration loading from `~/.config/allaboard/.env` with the mode 600 check.
 - `state.json` with atomic writes, and a single-instance lock on the configuration directory.
 - Identity and channel guards on every inbound path: messages, buttons and form submissions.
-- The `awaydesk` entry point, started by a user LaunchAgent.
+- The `allaboard` entry point, started by a user LaunchAgent.
 - One Claude Code session per channel with a turn queue, resume after a restart, stale-session
   recovery, bypass held in memory, and stop. Shutting down or rebinding a channel ends every
   waiting reply with the reason.
