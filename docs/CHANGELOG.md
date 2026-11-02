@@ -204,6 +204,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- While the daemon drains, its messages say it is stopping or restarting: a `SIGTERM` does not say
+  which, and after `allaboard service stop` a message sent again got no answer (#176).
 - `allaboard service stop` and `allaboard service uninstall` refuse while an update holds the
   machine's lock and the instance's daemon runs, since launchd would kill it and can cut its
   install (#177).

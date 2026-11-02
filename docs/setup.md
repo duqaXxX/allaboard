@@ -1566,7 +1566,7 @@ with desktop open" of [Measured platform behaviour](slack-provider.md#measured-p
 its footer do not depend on it.
 
 What allaboard says on its own (the answer to `!bind`, `!bypass` or `!stop`, a notice that
-it is restarting, a refused attachment, an error) shows small and grey, as the footer does, so it
+it is stopping or restarting, a refused attachment, an error) shows small and grey, as the footer does, so it
 reads apart from Claude's replies. `!help`, `!guide`, `!status` and the answer to a resume show at
 full size.
 
@@ -1722,8 +1722,8 @@ version the offer shows, even if a newer one came out since, and then:
 
 1. The offer (or, from the Home tab, the line) reads `Installing allaboard <latest>…`. Sessions
    already running go on. A message that needs a new Claude Code process (a new thread, a session
-   to reconnect, `!status`, the usage probe) is answered `allaboard is restarting; send this
-   again in a moment.` for the install's few seconds, and nothing changes. Every other daemon on
+   to reconnect, `!status`, the usage probe) is answered `allaboard is updating, stopping or restarting; unless it is stopping, send this again in a moment.`
+   for the install's few seconds, and nothing changes. Every other daemon on
    the machine answers the same while the install runs (it asks the update lock, below), and
    refuses `!allaboard restart` with `An update of allaboard is already under way.`; so does a
    daemon while `allaboard update` runs in a terminal.
@@ -1950,7 +1950,7 @@ the folder's sessions, which stay on disk.
 On `SIGTERM` allaboard stops starting turns and lets everything already running finish: the
 turns, the background commands and agents, which end with the Claude Code process, and the turn in
 which Claude reports each one. Then it exits, and `KeepAlive` starts it again. Meanwhile a new
-message gets `allaboard is restarting; send this again in a moment.`, a queued one ends with
+message gets `allaboard is updating, stopping or restarting; unless it is stopping, send this again in a moment.`, a queued one ends with
 the same request. Under that sentence the refusal lists each thread the restart still waits for,
 with a link to it and what holds it there (a turn, an approval or a question waiting for you,
 background tasks), so you know where to answer or send `!stop`; `!status` typed in a channel
@@ -1958,7 +1958,7 @@ lists that channel's threads the same way and counts those of other channels wit
 them, since its answer is a post every member of the channel reads. An approval or a question Claude asks meanwhile stays open and can be answered, so
 a session that restarts the daemon can still finish its turn. The daemon's `!words` keep working:
 `!stop` ends a long turn so the restart goes on. A thread left with only background tasks says so
-in the line under its last message (`Restart waits for 1 shell · !stop ends it now`), since
+in the line under its last message (`Stop or restart waits for 1 shell · !stop ends it now`), since
 allaboard cannot tell whether a task such as a dev server ever ends; `!stop` there stops
 them and the restart goes on. That line is no message: it does not ring, and it goes with the
 restart. A restart posts nothing in a thread that has nothing running, bypass on or not, since
