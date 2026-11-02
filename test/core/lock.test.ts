@@ -583,28 +583,22 @@ test("asking does not hold the lock: the installer's take works right after", as
 
 test("the directory probe tells held from free and from missing", MACOS_ONLY, async () => {
   const directory = scratch();
-  assert.equal(await directoryHeld(join(directory, "nowhere")), false);
-  assert.equal(await directoryHeld(directory), false);
+  assert.equal(directoryHeld(join(directory, "nowhere")), false);
+  assert.equal(directoryHeld(directory), false);
   const lock = await singleInstance(directory);
   try {
-    assert.equal(await directoryHeld(directory), true);
+    assert.equal(directoryHeld(directory), true);
   } finally {
     await lock.release();
   }
-  assert.equal(await directoryHeld(directory), false);
+  assert.equal(directoryHeld(directory), false);
 });
 
 test("the directory probe takes its shared lock for an instant only", MACOS_ONLY, async () => {
   const directory = scratch();
-  assert.equal(await directoryHeld(directory), false);
+  assert.equal(directoryHeld(directory), false);
   // Nothing of the probe is left: an exclusive take succeeds at once, with no retry.
   await (await singleInstance(directory)).release();
-});
-
-test("two probes at once do not see each other", MACOS_ONLY, async () => {
-  const directory = scratch();
-  const answers = await Promise.all(Array.from({ length: 20 }, () => directoryHeld(directory)));
-  assert.deepEqual(new Set(answers), new Set([false]));
 });
 
 test(

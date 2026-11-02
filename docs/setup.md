@@ -575,6 +575,7 @@ allaboard service uninstall
 
 `restart` sends `SIGTERM` to the running daemon (`launchctl kill TERM gui/$(id -u)/local.allaboard`):
 running turns finish first, then launchd starts it again. `status` reads `launchctl list`.
+`stop` and `uninstall` refuse with status 1 during an update, see [A stop during an update](#a-stop-during-an-update).
 `stop` keeps the service installed and unloads it (`launchctl disable`, then `launchctl bootout`):
 run it with no turn running, since launchd ends a turn still running within 60 seconds, its reply
 with it, and a session that runs `stop` itself is such a turn. The command returns at once, while the
@@ -1809,10 +1810,13 @@ the step it is in and puts the old folder back (npm 11.17.0, 2026-10-17: exit st
 before), and the shutdown goes on once npm has ended, for at most 2 minutes (a failure's stop,
 which otherwise ends the process 30 seconds after the failure, waits that long too). The log then holds
 the failure of the install. A `SIGKILL` of npm would leave a half-written copy, which is why the
-daemon does not send one. `launchctl bootout` (which `allaboard service stop`, `allaboard service uninstall` and a logout
-run) is the exception: launchd kills the daemon `ExitTimeOut` (60 seconds) after it, and an
-install that takes longer than that is cut off the same way and can leave a half-written copy;
-the next `npm install -g allaboard@<version>` repairs it.
+daemon does not send one. `allaboard service stop` and `allaboard service uninstall` refuse with
+status 1 while the instance's daemon runs and an update holds the machine's lock, whichever instance
+or terminal runs the update. For a hung install this daemon runs, `allaboard service restart` ends it
+when the drain reaches its limit. A logout cannot be refused, and an update that starts just after the
+command read the lock is not seen: `launchctl bootout` makes launchd kill the daemon `ExitTimeOut`
+(60 seconds) later, and an install that takes longer than that is cut off the same way and can leave
+a half-written copy; the next `npm install -g allaboard@<version>` repairs it.
 
 ### From a terminal
 
@@ -1833,49 +1837,6 @@ failed or could not tell.
 
 To update by hand, `npm install -g allaboard@latest` then `allaboard service restart` for each
 instance on the copy works as before.
-
-### Moving from awaydesk
-
-allaboard was published as `awaydesk` up to 0.3.1. The two are separate npm packages, so
-`awaydesk update` and `!awaydesk update` never find allaboard. Every name moved with the package:
-the command, `~/.config/awaydesk[-<name>]/`, the LaunchAgent `local.awaydesk[.<name>]`, the logs
-in `~/Library/Logs/awaydesk/` and the variables `AWAYDESK_AGENT`, `AWAYDESK_CHAT` and
-`AWAYDESK_INSTANCE`. The format of `.env` and `state.json` is the same, so a copy keeps the
-tokens, the bound channels and the sessions of every thread.
-
-1. Stop and remove each service while no turn runs:
-
-   ```bash
-   awaydesk service uninstall                    # the default instance
-   awaydesk service uninstall --instance <name>  # each named one
-   ```
-
-2. Copy each instance's folder, keeping the mode of `.env`, and rename the variables in it:
-
-   ```bash
-   cp -Rp ~/.config/awaydesk ~/.config/allaboard
-   cp -Rp ~/.config/awaydesk-<name> ~/.config/allaboard-<name>   # each named one
-   sed -i '' 's/^AWAYDESK_/ALLABOARD_/' ~/.config/allaboard/.env ~/.config/allaboard-*/.env
-   ```
-
-3. Replace the package and install the services again:
-
-   ```bash
-   npm uninstall -g awaydesk
-   npm install -g allaboard
-   allaboard service install
-   allaboard service install --instance <name>  # each named one
-   ```
-
-4. Once each instance answers in Slack, delete what awaydesk left:
-
-   ```bash
-   rm -rf ~/.config/awaydesk ~/.config/awaydesk-* ~/.config/awaydesk_identities
-   rm -rf ~/.config/awaydesk_update ~/Library/Logs/awaydesk
-   ```
-
-The Slack apps and their tokens stay as they are. A bot keeps the name it was created with; to
-change it, edit **Display Name** under **App Home** in the app's settings.
 
 ## Uninstalling
 

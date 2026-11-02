@@ -14,7 +14,7 @@ import {
   type Instance,
   parseInstanceName,
 } from "./core/instance.ts";
-import { UpdateUnderWay, updateLock } from "./core/lock.ts";
+import { directoryHeld, UpdateUnderWay, updateDirectory, updateLock } from "./core/lock.ts";
 import { answerWizard, type SetupModules } from "./core/wizard.ts";
 import {
   type InstallResult,
@@ -178,6 +178,8 @@ export interface Host {
    * those this command's `PATH` finds.
    */
   program(agentExecutables: readonly string[]): Program;
+  /** Whether an install of allaboard runs on this machine now, as far as can be told. */
+  updateUnderWay(): boolean;
 }
 
 /** The commands the agents in `agents` declare. */
@@ -198,6 +200,14 @@ export const machineHost: Host = {
       : null,
   program: (agentExecutables) =>
     programOf(process.argv[1] ?? "", process.env.PATH ?? "", process.execPath, agentExecutables),
+  // A service exists on macOS alone, so its mechanism is read directly, and synchronously.
+  updateUnderWay: () => {
+    try {
+      return directoryHeld(updateDirectory(homedir()));
+    } catch {
+      return false; // A lock that cannot be read must not keep the owner from stopping a service.
+    }
+  },
 };
 
 /**
@@ -225,6 +235,18 @@ export function answer(
       const manager = host.service(invocation.instance);
       if (manager === null) {
         output.err("allaboard service: allaboard runs as a service on macOS only, for now.\n");
+        return 1;
+      }
+      // `bootout` kills a running daemon within `ExitTimeOut`, and npm with it if it is installing.
+      // The lock does not say who holds it, so another instance's or a terminal's update counts too.
+      if (
+        (invocation.action === "stop" || invocation.action === "uninstall") &&
+        manager.runningPid() !== null &&
+        host.updateUnderWay()
+      ) {
+        output.err(
+          `allaboard service ${invocation.action}: an update of allaboard is under way on this machine; run this again once it has ended.\n`,
+        );
         return 1;
       }
       const report =

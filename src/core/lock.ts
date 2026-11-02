@@ -394,7 +394,7 @@ export async function chatIdentityLocks(
 }
 
 /** The macOS probe: whether an exclusive lock is held on `directory`, by a shared lock taken and let go. */
-export async function directoryHeld(directory: string): Promise<boolean> {
+export function directoryHeld(directory: string): boolean {
   let fd: number;
   try {
     fd = openSync(directory, constants.O_RDONLY | O_SHLOCK | constants.O_NONBLOCK);
@@ -432,7 +432,7 @@ export async function socketHeld(
  * false for a machine where no update ever ran. Rejects for what it cannot tell, an error of
  * the system; the caller decides what that means.
  */
-export function updateHeld(home: string): Promise<boolean> {
+export async function updateHeld(home: string): Promise<boolean> {
   const directory = updateDirectory(home);
   return process.platform === "darwin" ? directoryHeld(directory) : socketHeld(directory);
 }
