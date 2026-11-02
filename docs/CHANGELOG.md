@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A message can carry `.xls`, `.xlsx`, `.docx`, `.pptx` and `.zip` files: each reaches the session
+  as the path of a saved copy, a zip unopened (#174, #136). A message takes up to 10 images, not 5,
+  within the same 15 MB (#136).
 - `!tag` and `!untag` no longer pin: they handle the `[name]` prefix and the session's tag, and need
   `chat:write` alone. A tagged thread that is not pinned can be deleted, and on the Home tab only
   pinned threads come first. A thread pinned by an earlier `!tag` keeps its pin until `!unpin`

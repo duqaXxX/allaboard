@@ -43,13 +43,16 @@ export const IMAGE_TYPES: ReadonlySet<string> = new Set([
 ]);
 export const IMAGE_LIMIT = 7_500_000; // bytes, whose base64 form is 10,000,000 characters
 export const IMAGE_SIDE = 8000;
-// Per message (the maintainer, 2026-09-25): images stay in the conversation and are sent again
+// Per message (the maintainer, 2026-09-25; ten since 2026-11-02, as many files as Slack's composer
+// takes, Slack help "Add files to Slack", read that day): images stay in the conversation and are sent again
 // at every turn, and a request is capped at 32 MB (Vision, read 2026-09-25).
-export const IMAGES_PER_MESSAGE = 5;
+export const IMAGES_PER_MESSAGE = 10;
 export const IMAGES_LIMIT = 15 * 1024 * 1024;
 export const FILE_LIMIT = 100 * 1024 * 1024;
 // The files that are not images Claude receives (the maintainer, 2026-09-25: the most common
-// ones, those its Read tool opens): any text/* type, which covers source code, plus these.
+// ones): any text/* type, which covers source code and Slack's .csv and .tsv, plus these. Read
+// refuses the Office formats (tools reference, read 2026-11-02), so the session opens them with a
+// command; their values are what Slack sent for an upload from the desktop client (2026-11-02).
 export const FILE_TYPES: ReadonlySet<string> = new Set([
   "application/pdf",
   "application/json",
@@ -61,6 +64,12 @@ export const FILE_TYPES: ReadonlySet<string> = new Set([
   "application/sql",
   "application/toml",
   "application/x-ipynb+json",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Passed unopened (the maintainer, 2026-11-02): the session unpacks it as a terminal session does.
+  "application/zip",
 ]);
 // Saved files outlive a restart, since the resumed conversation names them (the maintainer,
 // 2026-09-25).

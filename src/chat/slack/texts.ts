@@ -97,7 +97,7 @@ export const UPLOAD_IMAGE_SIDE = naming(
 );
 export const UPLOAD_FILE_TYPE =
   "is a `{mimetype}` file, and allaboard passes on only text, source code, PDF, JSON, " +
-  "XML, YAML and notebook files";
+  "XML, YAML, notebook, Excel (.xls, .xlsx), Word (.docx), PowerPoint (.pptx) and zip files";
 export const UPLOAD_FILE_SIZE = "is {size}, over the {limit} limit for a file";
 export const UPLOAD_TOO_MANY = naming(
   "Nothing was sent to {author}: the message has {count} images, over the {limit} one message " +

@@ -878,8 +878,8 @@ export const GUIDE_FIRST_MESSAGE = naming(
   "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its " +
     "own, growing as {author} works, with a line for each tool it uses. Reply inside that thread to " +
     "continue the same session. Attach images or files to a message: {author} sees a JPEG, PNG, GIF or " +
-    "WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML " +
-    "or notebook file from a copy saved on this Mac; other files are refused.",
+    "WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML, " +
+    "notebook, Excel, Word, PowerPoint or zip file from a copy saved on this Mac; other files are refused.",
 );
 // Step 3 holds what the setup asks for; `{choices}` is the items on offer, joined as a list.
 export const GUIDE_SETUP =
