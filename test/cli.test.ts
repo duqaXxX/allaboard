@@ -9,8 +9,17 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { answer, answerSetup, type Host, type Output, parseArguments, USAGE } from "../src/cli.ts";
+import {
+  answer,
+  answerSetup,
+  type Host,
+  machineHost,
+  type Output,
+  parseArguments,
+  USAGE,
+} from "../src/cli.ts";
 import { DEFAULT_INSTANCE } from "../src/core/instance.ts";
+import { updateLock } from "../src/core/lock.ts";
 import type { ChatEntry } from "../src/core/port.ts";
 import type { Report, ServiceManager } from "../src/host/service/seam.ts";
 
@@ -192,7 +201,11 @@ test("an invalid invocation prints its reason and the usage on stderr and answer
 const PROGRAM = { node: "/n/node", main: "/m/main.js", npmBin: null, agentExecutables: [] };
 
 /** A host whose service manager records the calls and answers `report`. */
-function fakeHost(report: Report): Host & { calls: string[] } {
+function fakeHost(
+  report: Report,
+  updateUnderWay = false,
+  runningPid: number | null = 1,
+): Host & { calls: string[] } {
   const calls: string[] = [];
   const answering = (name: string) => (): Report => {
     calls.push(name);
@@ -210,7 +223,7 @@ function fakeHost(report: Report): Host & { calls: string[] } {
     start: answering("start"),
     list: answering("list"),
     instances: () => ({ rows: [], refused: [] }),
-    runningPid: () => null,
+    runningPid: () => runningPid,
   };
   return {
     calls,
@@ -222,6 +235,7 @@ function fakeHost(report: Report): Host & { calls: string[] } {
       calls.push(`program ${agentExecutables.join(" ")}`);
       return PROGRAM;
     },
+    updateUnderWay: () => updateUnderWay,
   };
 }
 
@@ -242,6 +256,51 @@ test("a service action is made on the manager of the instance it names", () => {
   assert.deepEqual(host.calls, ["service dev", "restart", "service default", "list"]);
 });
 
+for (const action of ["stop", "uninstall"] as const) {
+  test(`service ${action} refuses while an update is under way, and touches nothing`, () => {
+    const host = fakeHost({ code: 0, out: [], err: [] }, true);
+    const output = captured();
+    const invocation = { kind: "service", action, instance: DEFAULT_INSTANCE } as const;
+    assert.equal(answer(invocation, output, {}, host), 1);
+    assert.equal(
+      output.stderr,
+      `allaboard service ${action}: an update of allaboard is under way on this machine; run this again once it has ended.\n`,
+    );
+    assert.deepEqual(host.calls, ["service default"]);
+  });
+}
+
+test("service stop goes on during an update when its daemon is not running", () => {
+  const host = fakeHost({ code: 0, out: [], err: [] }, true, null);
+  const invocation = { kind: "service", action: "stop", instance: DEFAULT_INSTANCE } as const;
+  assert.equal(answer(invocation, captured(), {}, host), 0);
+  assert.deepEqual(host.calls, ["service default", "stop"]);
+});
+
+test("the machine's host reads the real update lock", {
+  skip: process.platform === "darwin" ? false : "the lock of a service: macOS only",
+}, async (t) => {
+  const home = mkdtempSync(join(tmpdir(), "cli-update-lock-"));
+  const before = process.env.HOME;
+  t.after(() => {
+    process.env.HOME = before;
+    rmSync(home, { recursive: true, force: true });
+  });
+  process.env.HOME = home;
+  assert.equal(machineHost.updateUnderWay(), false, "no update ever ran");
+  const lock = await updateLock(home);
+  assert.equal(machineHost.updateUnderWay(), true, "held");
+  await lock.release();
+  assert.equal(machineHost.updateUnderWay(), false, "released");
+});
+
+test("the other service actions go on during an update", () => {
+  const host = fakeHost({ code: 0, out: [], err: [] }, true);
+  const invocation = { kind: "service", action: "status", instance: DEFAULT_INSTANCE } as const;
+  assert.equal(answer(invocation, captured(), {}, host), 0);
+  assert.deepEqual(host.calls, ["service default", "status"]);
+});
+
 test("install hands the manager the program of this command, with the agents' commands", () => {
   const host = fakeHost({ code: 0, out: [], err: [] });
   const invocation = { kind: "service", action: "install", instance: DEFAULT_INSTANCE } as const;
@@ -252,7 +311,7 @@ test("install hands the manager the program of this command, with the agents' co
 
 test("a system with no service manager refuses service with status 1", () => {
   const output = captured();
-  const host: Host = { service: () => null, program: () => PROGRAM };
+  const host: Host = { service: () => null, program: () => PROGRAM, updateUnderWay: () => false };
   const invocation = { kind: "service", action: "install", instance: DEFAULT_INSTANCE } as const;
   assert.equal(answer(invocation, output, {}, host), 1);
   assert.match(output.stderr, /macOS only/);

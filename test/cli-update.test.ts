@@ -188,6 +188,7 @@ function world(t: { after(fn: () => void): void }, setup: Setup = {}): World {
     };
   };
   const host: UpdateHost = {
+    updateUnderWay: () => false,
     service: (instance) => (setup.noService === true ? null : service(instance.name)),
     program: () => ({
       node: "/n/node",

@@ -204,6 +204,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `allaboard service stop` and `allaboard service uninstall` refuse while an update holds the
+  machine's lock and the instance's daemon runs, since launchd would kill it and can cut its
+  install (#177).
 - A thread's delete reads the thread again after its root went: what Slack still shows is told to
   the owner, where the delete used to report it gone, and a reply still shown keeps the root and the
   thread (#148). A reply still there after the root went leaves a tombstone, which is forgotten.
