@@ -62,7 +62,7 @@ test("a start returns a session once Claude Code answered", LIMIT, async () => {
   const session = await new ClaudeBackend({ query: sdk.query, home }).start(START, NO_REQUESTS);
   assert.equal(sdk.queries.length, 1);
   assert.equal(sdk.only.options.cwd, START.folder);
-  assert.equal((await session.info()).permissionMode, "bypassPermissions");
+  assert.equal((await session.info()).permissionMode, "default");
   await session.close();
   assert.equal(sdk.only.closed, true);
 });

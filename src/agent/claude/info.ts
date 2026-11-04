@@ -4,8 +4,8 @@
  * and a listed session.
  *
  * The first two are read as `unknown`: the initialize answer carries `current_permission_mode`,
- * which `SDKControlInitializeResponse` does not declare (measured on Claude Code 2.1.286,
- * `test/fixtures/sdk/server-info.json`).
+ * which `SDKControlInitializeResponse` does not declare (measured on Claude Code 2.1.286 and
+ * 2.1.318, `test/fixtures/sdk/server-info.json`).
  */
 import type { SDKSessionInfo } from "@anthropic-ai/claude-agent-sdk";
 import { isRecord, records } from "../../values.ts";

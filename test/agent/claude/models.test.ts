@@ -5,7 +5,7 @@ import type { ModelInfo } from "../../../src/agent/seam.ts";
 import { modelName, settingName } from "../../../src/core/models.ts";
 import { sdkJson } from "../../support/fixtures.ts";
 
-// The recorded list (`server-info.json`, Claude Code 2.1.286): the Claude data the core tests (`test/core/models.test.ts`) leave out.
+// The recorded list (`server-info.json`, Claude Code 2.1.318): the Claude data the core tests (`test/core/models.test.ts`) leave out.
 const MODELS = agentInfo(sdkJson("server-info")).models;
 
 test("a model is named by its display name in the agent's list, found by its full id", () => {
@@ -29,8 +29,7 @@ test("a setting is named by the entry it is the value of, else by the model whos
 });
 
 test("a setting the list does not hold shows as it is set", () => {
-  // `fable` is an alias the advisor takes; the recorded list holds Fable by its id alone.
-  assert.equal(settingName(MODELS, "fable"), "fable");
+  assert.equal(settingName(MODELS, "unlisted"), "unlisted");
   assert.equal(settingName([], "opus"), "opus");
 });
 

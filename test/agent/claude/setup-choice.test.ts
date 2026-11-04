@@ -11,8 +11,9 @@ import {
 } from "../../../src/core/setup.ts";
 import { sdkJson } from "../../support/fixtures.ts";
 
-// The CLI's own list (test/fixtures/sdk/server-info.json, Claude Code 2.1.286): the first entry
-// is `default`, and Haiku carries no effort fields at all.
+// The CLI's own list (test/fixtures/sdk/server-info.json, Claude Code 2.1.318): the first entry
+// is `default`, and Haiku 4.5 carries no effort fields at all.
+const HAIKU_45 = "claude-haiku-4-5-20251001";
 const MODELS: readonly ModelInfo[] = agentInfo(sdkJson("server-info")).models;
 
 const untouched = { model: DEFAULT, effort: DEFAULT, bypass: false };
@@ -20,7 +21,7 @@ const untouched = { model: DEFAULT, effort: DEFAULT, bypass: false };
 test("the models of the recording keep the cli s order and fields", () => {
   assert.equal(MODELS[0]?.value, DEFAULT);
   assert.equal(MODELS[0]?.displayName, "Default (recommended)");
-  const haiku = MODELS.find((m) => m.value === "haiku");
+  const haiku = MODELS.find((m) => m.value === HAIKU_45);
   assert.deepEqual([haiku?.supportsEffort, haiku?.supportedEffortLevels], [false, []]);
 });
 
@@ -29,7 +30,7 @@ test("a model offers its levels in the cli s order", () => {
 });
 
 test("a model without effort, or one not listed, offers no level", () => {
-  assert.deepEqual(effortLevels(MODELS, "haiku"), []);
+  assert.deepEqual(effortLevels(MODELS, HAIKU_45), []);
   assert.deepEqual(effortLevels(MODELS, "gpt-x"), []);
 });
 
@@ -44,8 +45,8 @@ test("each part of a selection is kept when the models list it", () => {
 });
 
 test("an effort the model does not support reads as default", () => {
-  const choice = choiceOf(MODELS, { model: "haiku", effort: "high", bypass: false });
-  assert.deepEqual(choice, { model: "haiku", effort: DEFAULT, bypass: false });
+  const choice = choiceOf(MODELS, { model: HAIKU_45, effort: "high", bypass: false });
+  assert.deepEqual(choice, { model: HAIKU_45, effort: DEFAULT, bypass: false });
 });
 
 test("a model the agent did not list reads as default, with its effort", () => {

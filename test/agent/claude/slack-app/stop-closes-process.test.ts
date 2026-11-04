@@ -388,7 +388,7 @@ test("a stop whose read never answers draws the context an earlier footer read",
   const footers = contexts(world).filter((block) => block.includes("ctx"));
   assert.equal(footers.length, 1, contexts(world).join("\n"));
   assert.match(footers[0] ?? "", /5%/);
-  assert.match(footers[0] ?? "", /claude-haiku-5-5/);
+  assert.match(footers[0] ?? "", /Haiku 5\.5/);
 });
 
 test("a stop whose read answers draws that read, not the earlier one", async (t) => {
@@ -463,7 +463,7 @@ test("the read made when a turn ends under background work feeds the footer of a
   const footers = contexts(world).filter((block) => block.includes("ctx"));
   assert.equal(footers.length, 1, contexts(world).join("\n"));
   assert.match(footers[0] ?? "", /5%/);
-  assert.match(footers[0] ?? "", /claude-haiku-5-5/);
+  assert.match(footers[0] ?? "", /Haiku 5\.5/);
 });
 
 test("a model switch while the turn-end read is on its way voids it", async (t) => {
