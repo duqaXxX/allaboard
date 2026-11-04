@@ -5,6 +5,18 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.318, which bundles Claude Code 2.1.318. The
+  release probe certified it on 2026-11-04: the SDK surface table holds and so do the claims. Its
+  stream carries paths the fixtures do not hold, none of which the source reads, all accepted on
+  2.1.318: the fields of each `input_transformations` entry (`type`, `path`, `reason`) on an
+  assistant message and its `message_start`,
+  `credential_expires_at` on a result, and `ultrathink_typed_raises` in the init record. The new
+  `SDKSessionWritesLostMessage` is left unread. A session is now offered `/send-to-project`, which
+  answers that Remote Control is not on: the first probe run found claim P23's limit gone for it,
+  so `docs/limits.md` names it beside the feature, not as a command not offered (#189).
+
 ## [0.13.0] - 2026-11-02
 
 ### Changed
