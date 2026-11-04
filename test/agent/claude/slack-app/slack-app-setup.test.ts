@@ -266,17 +266,20 @@ test("start applies model effort and bypass with a live effort change", async (t
   assert.equal(summaryOf(manual), "Model: Opus 5.5 · Effort: high · Bypass: on");
 });
 
+// Haiku 4.5 is the model of the recording (Claude Code 2.1.318) that carries no effort fields.
+const HAIKU_45 = "claude-haiku-4-5-20251001";
+
 test("changing the model rewrites the efforts", async (t) => {
   const manual = manualWorld(t);
   await manual.dispatch(message("hello", { ts: THREAD }));
-  await manual.dispatch(setupClick(manual, SETUP_MODEL, { model: "haiku", effort: "high" }));
+  await manual.dispatch(setupClick(manual, SETUP_MODEL, { model: HAIKU_45, effort: "high" }));
   const update = manual.slack.callsTo("chat.update").at(-1) as Body;
   const found = setupControls(update.blocks);
   assert.deepEqual(
     (control(found, SETUP_EFFORT).options as Body[]).map((option) => option.value),
     ["default"],
   );
-  assert.equal(control(found, SETUP_MODEL).initial_option.value, "haiku");
+  assert.equal(control(found, SETUP_MODEL).initial_option.value, HAIKU_45);
   assert.ok(!("initial_options" in control(found, SETUP_BYPASS))); // the tick state is kept
   assert.deepEqual(manual.queries(), []); // still waiting
 });

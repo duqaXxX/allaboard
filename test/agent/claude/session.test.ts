@@ -1249,7 +1249,7 @@ test(
   async (t) => {
     const { session } = await started(t);
     const info = await session.info();
-    assert.equal(info.permissionMode, "bypassPermissions");
+    assert.equal(info.permissionMode, "default");
     assert.ok(info.models.length > 0);
     assert.ok(info.models.every((model) => model.value !== ""));
     assert.ok(info.commands.length > 0);

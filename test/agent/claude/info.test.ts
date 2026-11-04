@@ -1,6 +1,6 @@
 /**
  * What Claude Code says of itself, into the seam's types: the answer to the initialize request
- * (`server-info.json`, Claude Code 2.1.286), the context usage (`context-usage.json`) and a
+ * (`server-info.json`, Claude Code 2.1.318), the context usage (`context-usage.json`) and a
  * listed session (`SDKSessionInfo`, TypeScript SDK 0.3.296).
  */
 import assert from "node:assert/strict";
@@ -20,14 +20,14 @@ const LEVELS = ["low", "medium", "high", "xhigh", "max"];
 
 test("the server info gives each model with what the setup shows of it", () => {
   const { models } = agentInfo(SERVER_INFO);
-  assert.equal(models.length, 12);
+  assert.equal(models.length, 13);
   assert.deepEqual(models.slice(0, 2), [
     {
       value: "default",
       isDefault: true,
-      resolvedModel: "claude-sonnet-5-5",
+      resolvedModel: "claude-opus-5-5",
       displayName: "Default (recommended)",
-      description: "Sonnet 5.5 · Efficient for routine tasks",
+      description: "Opus 5.5 · Best for everyday, complex tasks",
       supportsEffort: true,
       supportedEffortLevels: LEVELS,
     },
@@ -44,9 +44,12 @@ test("the server info gives each model with what the setup shows of it", () => {
 });
 
 test("a model without effort has no level", () => {
-  const haiku = agentInfo(SERVER_INFO).models.find((model) => model.value === "haiku");
+  // Claude Code 2.1.318 lists Haiku 4.5 with no `supportsEffort` at all.
+  const haiku = agentInfo(SERVER_INFO).models.find(
+    (model) => model.value === "claude-haiku-4-5-20251001",
+  );
   assert.deepEqual(haiku, {
-    value: "haiku",
+    value: "claude-haiku-4-5-20251001",
     isDefault: false,
     resolvedModel: "claude-haiku-4-5-20251001",
     displayName: "Haiku 4.5",
@@ -86,7 +89,7 @@ test("a model with no name of its own is shown by its value", () => {
 
 test("the server info gives every command with its hint and its aliases", () => {
   const { commands } = agentInfo(SERVER_INFO);
-  assert.equal(commands.length, 54);
+  assert.equal(commands.length, 56);
   assert.deepEqual(
     commands.find((command) => command.name === "compact"),
     {
@@ -131,7 +134,7 @@ test("a command with no name is left out", () => {
 // The permission mode.
 
 test("the server info names the permission mode the session starts in", () => {
-  assert.equal(agentInfo(SERVER_INFO).permissionMode, "bypassPermissions");
+  assert.equal(agentInfo(SERVER_INFO).permissionMode, "default");
 });
 
 test("a server info that names no mode gives none", () => {
@@ -151,6 +154,10 @@ const ACCOUNT = {
 };
 
 test("the server info names the account by its email, with its plan", () => {
+  assert.deepEqual(agentInfo(SERVER_INFO).account, {
+    name: "alice@example.com",
+    plan: "Claude Ultra",
+  });
   assert.deepEqual(agentInfo({ ...SERVER_INFO, account: ACCOUNT }).account, {
     name: "alice@example.com",
     plan: "Claude Max",
@@ -169,7 +176,6 @@ test("an account with no email, as behind a cloud provider, gives none", () => {
   assert.equal(agentInfo({ account: { apiProvider: "bedrock" } }).account, null);
   assert.equal(agentInfo({ account: { ...ACCOUNT, email: "" } }).account, null);
   assert.equal(agentInfo({ account: "alice@example.com" }).account, null);
-  assert.equal(agentInfo(SERVER_INFO).account, null);
 });
 
 test("what is no server info gives no model, no command and no mode", () => {
