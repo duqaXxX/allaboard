@@ -373,6 +373,51 @@ test("!stop in a session's thread answers with a post of the thread", async (t) 
   assert.equal(world.shown(ref).at(-1), texts.STOPPED_THREAD);
 });
 
+test("ChatInbound.stop stops a running turn and posts what !stop does", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened();
+  (world.agent as PlainAgent).next(hold());
+  await world.says("a long job", ref.thread);
+  await world.settle();
+  assert.equal(await world.chat.as(OWNER).stops(ref), true);
+  assert.equal(world.shown(ref).at(-1), texts.STOPPED_THREAD);
+});
+
+test("ChatInbound.stop with nothing running says there is nothing to stop", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened();
+  assert.equal(await world.inbound.stop(ref), false);
+  assert.equal(world.shown(ref).at(-1), texts.NOTHING_TO_STOP_THREAD);
+});
+
+test("ChatInbound.stop on a thread being deleted posts nothing", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened();
+  const before = world.shown(ref).length;
+  assert.equal(world.sessions.hold(ref.channel, ref.thread), true);
+  assert.equal(await world.inbound.stop(ref), false);
+  assert.equal(world.shown(ref).length, before);
+});
+
+test("a failure of ChatInbound.stop reaches the owner in the thread, as one of !stop does", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened();
+  (world.agent as PlainAgent).next(hold());
+  await world.says("a long job", ref.thread);
+  await world.settle();
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  session.stop = async () => {
+    throw new Error("boom");
+  };
+  // Work may have been cut before the failure: it counts as stopped.
+  assert.equal(await world.inbound.stop(ref), true);
+  assert.equal(
+    world.shown(ref).at(-1),
+    fill(named(texts.ERROR_REPLY, PLAIN_NAMES), { error: "Error" }),
+  );
+});
+
 test("!stop on a goal says the goal is still set, and not once it is achieved", async (t) => {
   // The stop ends the turn, not the goal: the next message resumes it (measured 2026-10-20).
   const condition = "the files a1.txt to a20.txt exist";

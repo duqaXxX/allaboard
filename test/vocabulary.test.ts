@@ -637,12 +637,21 @@ test("the core and the entry files hold no literal a module declares", () => {
     assert.ok(literals.includes(audited), audited);
   }
   assert.ok(literals.includes("reaction_added") && literals.includes("Block Kit"));
+  // The agent session's event and manifest feature (issue #57).
+  assert.ok(literals.includes("agent_session_stopped") && literals.includes("agent_view"));
   assert.deepEqual(moduleLiteralLeaks(SRC, literals), []);
 });
 
 test("no source outside the modules names a method of a chat's Web API", () => {
   const patterns = declaredWords().flatMap((words) => words.patterns);
   assert.ok(patterns.length > 0);
+  // The `agents.` family (`agents.sessions.setStatus`) is a method of the chat's Web API too.
+  const probe = mkdtempSync(join(tmpdir(), "allaboard-agents-"));
+  for (const directory of ["agent", "chat", "core"]) {
+    mkdirSync(join(probe, directory), { recursive: true });
+  }
+  writeFileSync(join(probe, "core", "a.ts"), 'const m = "agents.sessions.setStatus";\n');
+  assert.deepEqual(patternLeaks(probe, patterns), ["core/a.ts:1: agents.sessions.setStatus"]);
   assert.deepEqual(patternLeaks(SRC, patterns), []);
 });
 

@@ -64,6 +64,11 @@ export const REACTIONS: Readonly<Record<RootStatus, Status>> = {
   restarting: Status.RESTARTING,
 };
 
+/** The root status a reaction shows. */
+export function rootStatusOf(reaction: Status): RootStatus {
+  return (Object.keys(REACTIONS) as RootStatus[]).find((s) => REACTIONS[s] === reaction) ?? "done";
+}
+
 // Process-wide, once true: no instance calls Slack for reactions again this run.
 let missingScope = false;
 // Process-wide, once true: no instance calls Slack for a thread status again this run.
@@ -115,6 +120,11 @@ export class StatusReaction {
     this.#channel = options.channel;
     this.#rootTs = options.rootTs;
     this.#log = options.logger ?? logger;
+  }
+
+  /** The reaction asked for last, shown or not; `null` after a clear. */
+  get requested(): Status | null {
+    return this.#wanted;
   }
 
   /**
@@ -288,6 +298,8 @@ export interface ThreadStatusOptions {
   readonly clock: Clock;
   readonly refresh?: number;
   readonly afterWrite?: number;
+  /** Called with whether a call that went through was a clear (the bridge to `agent-session.ts`). */
+  readonly onBridged?: (cleared: boolean) => void;
   readonly logger?: Logger;
 }
 
@@ -345,6 +357,7 @@ export class ThreadStatus {
   readonly #refresh: number;
   readonly #afterWrite: number;
   readonly #log: Logger;
+  readonly #onBridged: ((cleared: boolean) => void) | undefined;
   #text = ""; // what it says; empty: nothing is shown
   #fallback: string = slackTexts.THREAD_WORKING_STATUS;
   #shown = false; // whether Slack was last asked to show it
@@ -362,6 +375,7 @@ export class ThreadStatus {
     this.#refresh = options.refresh ?? THREAD_STATUS_REFRESH_SECONDS;
     this.#afterWrite = options.afterWrite ?? THREAD_STATUS_AFTER_WRITE_SECONDS;
     this.#log = options.logger ?? logger;
+    this.#onBridged = options.onBridged;
   }
 
   /**
@@ -515,6 +529,7 @@ export class ThreadStatus {
       return refusedStatus;
     }
     this.#failed = null;
+    this.#onBridged?.(!on);
     return true;
   }
 }

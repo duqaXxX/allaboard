@@ -710,7 +710,12 @@ for (const [listener, payload] of ACKNOWLEDGE_ONLY) {
 }
 
 // The two events: tested by hand below.
-const EVENTS = ["event message", "event message deleted", "event file_change"];
+const EVENTS = [
+  "event message",
+  "event message deleted",
+  "event agent_session_stopped",
+  "event file_change",
+];
 
 test("every listener the app registers has a row in the table, and every row a listener", (t) => {
   const world = worldOf(t);

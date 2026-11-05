@@ -4016,11 +4016,14 @@ test("an idle session closes itself after the delay and posts nothing", async (t
   // `done` is set before the thread status's last write (the end now runs in its own task):
   // let it land, so only the close itself is counted.
   await h.sleep(0.02);
-  const callsBefore = h.slack.apiCalls.length; // every kind: postMessage, update, delete
+  // Every kind but the thread's agent session: the turn's `active` dropped its entry, and the
+  // close's settling of the root rebuilds it and sends `active` again.
+  const written = () => h.slack.apiCalls.filter((c) => c.method !== "agents.sessions.setStatus");
+  const callsBefore = written().length; // postMessage, update, delete
   await idleDelayPasses(h, session);
   await h.until(() => h.clients[0]?.connected === false, 1);
   assert.ok(session.closed);
-  assert.equal(h.slack.apiCalls.length, callsBefore); // a silent close
+  assert.equal(written().length, callsBefore); // a silent close
 });
 
 test("release closes an idle session silently and refuses one in use", async (t) => {
@@ -4038,11 +4041,12 @@ test("release closes an idle session silently and refuses one in use", async (t)
   await turn.done.wait();
   await h.until(() => session.idle);
   await h.sleep(0.02); // the thread status's last write lands
-  const callsBefore = h.slack.apiCalls.length;
+  const written = () => h.slack.apiCalls.filter((c) => c.method !== "agents.sessions.setStatus");
+  const callsBefore = written().length;
   assert.ok(await h.manager.release(CHANNEL, THREAD));
   assert.ok(session.closed && session.doneClosing.isSet);
   assert.ok(!h.clients[0]?.connected);
-  assert.equal(h.slack.apiCalls.length, callsBefore); // as silent as the idle close
+  assert.equal(written().length, callsBefore); // as silent as the idle close
   // Released, the thread is held: no session is rebuilt from the entry `state.json` still
   // has, so a message sent while its messages are deleted starts nothing.
   assert.ok(h.manager.held(CHANNEL, THREAD));

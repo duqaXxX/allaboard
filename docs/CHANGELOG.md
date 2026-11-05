@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Each thread is listed under **Agents & tools** on Slack's desktop app (`agent_view`): the spinner
+  and **Stop** while it works or background work runs, `Needs your input` while it waits for you,
+  the app's icon once it ended. **Stop** does what `!stop` does. The manifest gains
+  `features.agent_view`, the bot scopes `assistant:write` and `im:history`, and the bot events
+  `agent_session_stopped`, `message.im` and `app_home_opened`: an existing app updates its
+  manifest and reinstalls (`docs/setup.md`). iOS shows no such list (#57).
+
 ### Changed
 
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.318, which bundles Claude Code 2.1.318. The

@@ -140,11 +140,15 @@ test("a process resumed with no prompt waiting tells of the lost task and nothin
   await world.clock.advance(INJECTED_TURN_WAIT + 1);
   await world.idle();
   assert.equal(world.slack.streamTs.length, 1, "no reply for the empty turn");
-  // Only the thread's activity line may move (the agent's own state words).
+  // Only the thread's activity line may move (the agent's own state words), and with it the
+  // thread's agent session.
   const written = world.slack.apiCalls
     .slice(before)
     .map((call) => call.method)
-    .filter((method) => method !== "assistant.threads.setStatus");
+    .filter(
+      (method) =>
+        method !== "assistant.threads.setStatus" && method !== "agents.sessions.setStatus",
+    );
   assert.deepEqual(written, []);
   assert.equal(session.restartReady, true);
   assert.equal(session.reporting, false);

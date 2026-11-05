@@ -164,6 +164,7 @@ the conversation at a prompt (measured on the TypeScript SDK 0.3.303 on 2026-10-
 
 | What differs | In the terminal | From Slack | Looked into |
 |---|---|---|---|
+| Seeing your threads at a glance | `claude` lists its sessions in the terminal | **Agents & tools** on Slack's desktop app lists each thread with a spinner, `Needs your input` or the app's icon, and a **Stop** control. Slack's iOS app shows no such list (measured 2026-11-03), so the root's reaction, the line under the thread and the Home tab are what you see there. A session you close in **Agents & tools** is listed again while its thread runs and hides again after: allaboard never sets a session to `closed`, because the thread keeps answering | [#57](https://github.com/duqaXxX/allaboard/issues/57) |
 | Files in one message | No limit of its own on files dropped in | Slack's composer takes up to 10 files per message on desktop (help page "Add files to Slack", read 2026-11-02) | none |
 | The list of changed files | The panel scrolls through every file | A list shows the first 45 files and says how many more there are: Block Kit allows 50 blocks in a message | none |
 | Speaking a message | Dictation writes your words as you speak | You send an audio clip and choose **Generate transcript** on it: Slack writes no transcript by itself | none |

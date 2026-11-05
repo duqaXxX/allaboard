@@ -670,6 +670,24 @@ export function deletedRoot(channel: string, deletedTs: string, author: string =
   return body;
 }
 
+/**
+ * The Stop control of a thread's session in Agents & tools: the event as the reference gives it
+ * (docs.slack.dev/reference/events/agent_session_stopped, read 2026-11-04; the ids are synthetic),
+ * in a recorded envelope, whose `team_id` is the event's only team.
+ */
+export function agentSessionStopped(channel: string, thread: string, user: string = OWNER): Body {
+  const body = recorded("event_callback-message");
+  body.event = {
+    type: "agent_session_stopped",
+    channel,
+    event_ts: "1790192400.000300",
+    streaming_message_ts: [],
+    thread_ts: thread,
+    user,
+  };
+  return body;
+}
+
 let replySeq = 0;
 
 /** A reply inside `threadTs`'s thread: its own `ts` always differs from it. */

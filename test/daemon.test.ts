@@ -1129,11 +1129,15 @@ test("no name carries claude code", () => {
 test("the manifest asks for the minimum", () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, "slack-app-manifest.json"), "utf8"));
   assert.deepEqual([...manifest.oauth_config.scopes.bot].sort(), [
+    // The manifest editor demands it beside `agent_view` (seen 2026-11-04); the sessions API's
+    // references name `chat:write` alone.
+    "assistant:write",
     "chat:write",
     "files:read", // downloading the files attached to a message (the maintainer, 2026-09-25)
     "files:write", // `!open` shares a file of the session's folder into its thread
     "groups:history",
     "groups:read",
+    "im:history", // `message.im`, which the manifest editor demands beside `agent_view`
     "reactions:write", // the status reaction on a session's root message
   ]);
   // The owner's own token, for the Home tab's Delete and Clean up (`chat.delete` on messages the
@@ -1146,6 +1150,12 @@ test("the manifest asks for the minimum", () => {
     // Slack sends it while it writes a clip's transcript, the only sign that one is ready
     // (measured 2026-10-09); read under `files:read`, with no scope of its own.
     "file_change",
+    // The Stop control of a thread's session in Agents & tools (events reference, 2026-11-04).
+    "agent_session_stopped",
+    // `agent_view` demands both subscriptions beside it; the daemon drops the first and has no
+    // listener for the second (the Home tab is published as before).
+    "message.im",
+    "app_home_opened",
   ]);
   assert.equal(manifest.settings.is_mcp_enabled, false);
   // The session index is the app's Home tab: published with no scope and no event
@@ -1155,8 +1165,14 @@ test("the manifest asks for the minimum", () => {
     messages_tab_enabled: true,
     messages_tab_read_only_enabled: true,
   });
-  // Replies are plain messages in the main window: no agent view, no task cards.
-  assert.ok(!("agent_view" in manifest.features));
+  // Threads are listed in Agents & tools (`agent_view`, issue #57); `agent_session_title_changed`
+  // is not asked for: nothing reads it.
+  assert.deepEqual(manifest.features.agent_view, {
+    agent_description: manifest.display_information.description,
+  });
+  assert.ok(
+    !manifest.settings.event_subscriptions.bot_events.includes("agent_session_title_changed"),
+  );
   // Commands are typed as `!word` messages: the app registers no slash command.
   assert.ok(!("slash_commands" in manifest.features));
 });

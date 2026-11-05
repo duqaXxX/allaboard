@@ -23,6 +23,7 @@ export interface Flows {
   readonly picked?: (pick: ListPick) => Promise<void>;
   readonly unbound?: (channel: string) => Promise<void>;
   readonly rootGone?: (ref: ThreadRef) => Promise<void>;
+  readonly stop?: (ref: ThreadRef) => Promise<boolean>;
 }
 
 export class Inbound implements ChatInbound {
@@ -55,6 +56,10 @@ export class Inbound implements ChatInbound {
 
   rootGone(ref: ThreadRef): Promise<void> {
     return this.#flow("rootGone")(ref);
+  }
+
+  stop(ref: ThreadRef): Promise<boolean> {
+    return this.#flow("stop")(ref);
   }
 
   #flow<Name extends keyof Flows>(name: Name): NonNullable<Flows[Name]> {

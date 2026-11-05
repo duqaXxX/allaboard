@@ -13,6 +13,9 @@
     "bot_user": {
       "display_name": "allaboard",
       "always_online": true
+    },
+    "agent_view": {
+      "agent_description": "Drive the coding-agent sessions on your own computer from private Slack channels."
     }
   },
   "oauth_config": {
@@ -23,7 +26,9 @@
         "chat:write",
         "files:read",
         "files:write",
-        "reactions:write"
+        "reactions:write",
+        "assistant:write",
+        "im:history"
       ],
       "user": [
         "chat:write",
@@ -36,7 +41,10 @@
     "event_subscriptions": {
       "bot_events": [
         "message.groups",
-        "file_change"
+        "file_change",
+        "agent_session_stopped",
+        "message.im",
+        "app_home_opened"
       ]
     },
     "interactivity": {

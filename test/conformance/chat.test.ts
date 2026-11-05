@@ -52,6 +52,7 @@ import {
 } from "../support/fake-slack.ts";
 import { ELSEWHERE, memoryChat, OWNER, SOMEONE } from "../support/memory-chat.ts";
 import {
+  agentSessionStopped,
   type Body,
   clickIn,
   deletedRoot,
@@ -121,6 +122,9 @@ function memoryPerson(
     },
     deletes: async (said) => {
       await person.deletes(said);
+    },
+    stops: async (ref) => {
+      await person.stops(ref);
     },
     types: async (shown, _ref, text) => {
       if (shown.id === null) throw new Error("a suggestion is a message of the chat");
@@ -389,6 +393,9 @@ function slackPerson(
       await dispatch(
         deletedRoot(said.ref.channel, said.id, said.author ?? world.identity.ownerUserId),
       );
+    },
+    stops: async (ref): Promise<void> => {
+      await dispatch(agentSessionStopped(ref.channel, ref.thread, user));
     },
     // The field's block id carries the typed message; the thread is the one the suggestion sits in.
     types: async (shown, ref, text): Promise<void> => {
