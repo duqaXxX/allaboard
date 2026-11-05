@@ -1515,7 +1515,20 @@ call in flight per thread, the last wanted status winning. `ThreadStatus` is a s
 a non-empty `assistant.threads.setStatus` sets `processing` and an empty one `active`: after a
 bridged clear the entry sends a wanted `processing` or `suspended` again. While `processing` is
 wanted the call is repeated every 30 minutes against the one-hour timeout of a session left in it.
-A thread nothing was given for (no root status, no activity line) is not written to.
+A thread nothing was given for (no root status, no activity line) is not written to by the
+status drain; only a stream call that may have changed its session (below) makes it an entry.
+
+A stream is a third writer. `chat.stopStream` takes `session_status`, which defaults to `active`,
+and `chat.startStream` sets `processing` (docs.slack.dev/ai/agent-sessions, read 2026-11-05;
+`@slack/web-api` 8.2.0 types the field). The sink therefore passes the thread's wanted status
+(`AgentSessions.wanted`) on every stop, so a turn that ends while a background task runs leaves the
+session `processing`. The field is sent only once one `agents.sessions.setStatus` has succeeded on
+the app, and never after a refusal. After a start (an unknown-outcome start that is not adopted counts, since it may have landed), a
+stop, a stop of unknown outcome or a stream Slack ended itself, the sink calls `AgentSessions.afterWrite` with what the call left (`null` when
+unknown). A match sends nothing and keeps a resend already demanded; a mismatch, or an unknown
+outcome, sends the wanted status again. A stop whose request timed out could still be processed
+after that resend; while `processing` is wanted the 30-minute refresh corrects it, otherwise it
+stays until the thread's next status change or Slack's one-hour timeout.
 
 Failures are logged with the channel, the ts and the code, once per code in a row. `missing_scope`,
 `not_allowed_token_type` and `feature_disabled` stop the calls for the rest of the run. On shutdown

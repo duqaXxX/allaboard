@@ -360,3 +360,153 @@ test("a failed add of the settling reaction does not turn a finished session bac
   // The settling rebuilds the dropped entry and sends `active` again, never `processing`.
   assert.deepEqual(sent(slack).slice(1), ["active", "active"]);
 });
+
+// ---- #199: a stream stop is a second writer of the session status
+
+test("wanted follows the root and activity, and is undefined until a call succeeded", async () => {
+  const { slack, clock, sessions } = setup();
+  assert.equal(sessions.wanted(REF), undefined, "nothing proven yet");
+  sessions.root(REF, "waiting");
+  assert.equal(sessions.wanted(REF), undefined, "the first call is still out");
+  await clock.advance(0);
+  assert.equal(sessions.wanted(REF), "suspended");
+  sessions.root(REF, "working");
+  assert.equal(sessions.wanted(REF), "processing");
+  sessions.root(REF, "done");
+  sessions.activity(REF, true);
+  assert.equal(sessions.wanted(REF), "processing");
+  sessions.activity(REF, false);
+  await clock.advance(0);
+  assert.equal(sessions.wanted(REF), "active", "no entry: active");
+  assert.deepEqual(sent(slack), ["suspended", "active"]); // the turn collapses its inputs
+  await sessions.close();
+});
+
+test("wanted stays undefined when the first call fails, and after a refusal", async () => {
+  const failing = setup();
+  failing.slack.responses["agents.sessions.setStatus"] = () => rejected("internal_error");
+  failing.sessions.root(REF, "working");
+  await failing.clock.advance(0);
+  assert.equal(failing.sessions.wanted(REF), undefined);
+  await failing.sessions.close();
+
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  assert.equal(sessions.wanted(REF), "processing");
+  slack.responses["agents.sessions.setStatus"] = () => rejected("missing_scope");
+  sessions.root(REF, "done");
+  await clock.advance(0);
+  assert.equal(sessions.wanted(REF), undefined, "refused for good");
+  await sessions.close();
+});
+
+test("afterWrite with what is wanted sends nothing, a stop without the field being active", async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  sessions.afterWrite(REF, "processing");
+  sessions.afterWrite(REF, "processing");
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing"]);
+  sessions.root(REF, "done");
+  await clock.advance(0);
+  sessions.afterWrite(REF, undefined); // no field: Slack's default, which is what is wanted
+  sessions.afterWrite(REF, "active");
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing", "active"]);
+  await sessions.close();
+});
+
+test("afterWrite with another status sends the wanted one again", async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  sessions.afterWrite(REF, undefined); // a stop with no field set the session active
+  await clock.advance(0);
+  sessions.afterWrite(REF, "suspended");
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing", "processing", "processing"]);
+  await sessions.close();
+});
+
+test("afterWrite of an unknown outcome sends the wanted status, even a matching one", async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  sessions.afterWrite(REF, null);
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing", "processing"]);
+  await sessions.close();
+});
+
+test("a stop that returns after the entry was dropped is corrected", async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  const carried = sessions.wanted(REF); // the stop reads processing
+  sessions.root(REF, "done"); // the work ends: active sent, the entry dropped
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing", "active"]);
+  sessions.afterWrite(REF, carried); // the stop lands last and sets processing
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing", "active", "active"]);
+  await sessions.close();
+});
+
+test("a matching stop does not erase a resend a bridged clear demanded", async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  slack.gate = new AsyncEvent();
+  slack.gateMethod = "agents.sessions.setStatus";
+  const stopped = sessions.stopped(REF, true); // a resend is out, held
+  await slack.gated.wait();
+  const carried = sessions.wanted(REF); // a stream stop reads processing
+  sessions.bridged(REF, true); // the bridge cleared: another resend is demanded
+  sessions.afterWrite(REF, carried); // the stop returns, a match: nothing of its own
+  slack.gate.set();
+  await stopped;
+  await sessions.close();
+  assert.deepEqual(sent(slack), ["processing", "processing", "processing"]);
+});
+
+test("a stream that starts while suspended is wanted gets the wanted status again", async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "waiting");
+  await clock.advance(0);
+  sessions.afterWrite(REF, "processing"); // a start sets processing
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["suspended", "suspended"]);
+  await sessions.close();
+});
+
+test("a stop answered before the first status call succeeded is still reconciled", async () => {
+  const { slack, clock, sessions } = setup();
+  slack.gate = new AsyncEvent();
+  slack.gateMethod = "agents.sessions.setStatus";
+  sessions.root(REF, "working");
+  await slack.gated.wait(); // the first call is held: nothing is proven yet
+  assert.equal(sessions.wanted(REF), undefined);
+  sessions.afterWrite(REF, sessions.wanted(REF)); // a stop with no field set `active`
+  slack.gate.set();
+  await clock.advance(0);
+  await sessions.close();
+  assert.deepEqual(sent(slack), ["processing", "processing"]);
+});
+
+test("afterWrite does nothing once a refusal stopped the calls", async () => {
+  const { slack, clock, sessions } = setup();
+  slack.responses["agents.sessions.setStatus"] = () => rejected("feature_disabled");
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  sessions.afterWrite(REF, null);
+  sessions.afterWrite(REF, "suspended");
+  await clock.advance(0);
+  assert.equal(sent(slack).length, 1);
+  // No entry was made: a refresh timer or a later input would find one to send for.
+  sessions.root(REF, "done");
+  await clock.advance(0);
+  assert.equal(sent(slack).length, 1);
+  await sessions.close();
+});

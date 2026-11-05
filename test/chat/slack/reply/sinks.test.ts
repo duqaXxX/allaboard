@@ -20,6 +20,7 @@ import type {
   TaskUpdate,
 } from "../../../../src/chat/seam.ts";
 import { formatFooter } from "../../../../src/chat/slack/footer.ts";
+import type { SessionState } from "../../../../src/chat/slack/reply/agent-session.ts";
 import {
   BANNER_LIMIT,
   BLOCKS_LIMIT,
@@ -159,6 +160,8 @@ interface ReplyOptions {
   steady?: FakeClock;
   onOpenReply?: (old: string | null, fresh: string | null) => void;
   onWrite?: () => void;
+  sessionStatus?: () => SessionState | undefined;
+  onSessionWrite?: (carried: SessionState | undefined | null) => void;
   logger?: Logger;
   /** Zero unless a test is about the debounce itself. */
   debounceSeconds?: number;
@@ -184,6 +187,8 @@ function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
     ...(options.steady !== undefined && { steady: options.steady }),
     onOpenReply: options.onOpenReply,
     onWrite: options.onWrite,
+    sessionStatus: options.sessionStatus,
+    onSessionWrite: options.onSessionWrite,
     logger: options.logger ?? new Recorded(),
     debounceSeconds: options.debounceSeconds ?? 0,
     finalRetrySeconds: options.finalRetrySeconds,
@@ -6268,4 +6273,119 @@ test("a line about the work is a grey line in the stream and stays one once the 
     { type: "markdown", text: "It found <nothing>." },
   ]);
   assert.equal(slack.pushes(), 1); // the stop pushed; the update that greys the line never does
+});
+
+// ---- #199: the session status a stream stop carries, and what the sink reports after a write
+
+type Written = SessionState | undefined | null;
+
+function sessionReply(slack: FakeSlack, status: () => SessionState | undefined, options = {}) {
+  const writes: Written[] = [];
+  const sink = reply(slack, {
+    sessionStatus: status,
+    onSessionWrite: (carried) => void writes.push(carried),
+    ...options,
+  });
+  return { sink, writes };
+}
+
+test("a stop carries the session status read at the call, and reports it", async () => {
+  const slack = new FakeSlack();
+  let status: SessionState = "processing";
+  const { sink, writes } = sessionReply(slack, () => status);
+  await sink.text("Done.");
+  await settled();
+  status = "suspended"; // changed after the start, before the stop
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(only(slack.callsTo("chat.stopStream")).session_status, "suspended");
+  assert.deepEqual(writes, ["processing", "suspended"]); // the start, then the stop
+});
+
+test("a stop carries no field when no status is wanted, and reports undefined", async () => {
+  const slack = new FakeSlack();
+  const { sink, writes } = sessionReply(slack, () => undefined);
+  await sink.text("Done.");
+  await settled();
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.ok(!("session_status" in only(slack.callsTo("chat.stopStream"))));
+  assert.deepEqual(writes, ["processing", undefined]);
+});
+
+test("a start adopted after an unknown outcome reports processing once", async () => {
+  const slack = new ResetAfterApply();
+  slack.resetNext = "chat.startStream";
+  const { sink, writes } = sessionReply(slack, () => "active");
+  await sink.text("one");
+  await settled();
+  assert.equal(slack.callsTo("chat.startStream").length, 1);
+  assert.deepEqual(writes, ["processing"]);
+});
+
+test("a start whose adoption finds nothing reports unknown, then the start that lands", async () => {
+  const slack = new FakeSlack();
+  slack.responses["chat.startStream"] = [
+    networkDown(),
+    slack.responses["chat.startStream"] as JsonObject,
+  ];
+  const { sink, writes } = sessionReply(slack, () => "active");
+  await sink.text("one");
+  await settled();
+  assert.deepEqual(writes, [null]); // adopted nothing, but the start may have landed
+  await sink.text(" two");
+  await settled();
+  assert.equal(slack.callsTo("chat.startStream").length, 2);
+  assert.deepEqual(writes, [null, "processing"]);
+});
+
+test("a stop of unknown outcome reports unknown, and so does its resolution", async () => {
+  const slack = new ResetAfterApply();
+  const clock = new FakeClock();
+  const { sink, writes } = sessionReply(slack, () => "processing", {
+    clock,
+    finalRetrySeconds: 60.0,
+  });
+  await sink.text("Answer.");
+  await settled();
+  slack.resetNext = "chat.stopStream";
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), false);
+  assert.deepEqual(writes, ["processing", null]); // the failure
+  assert.equal(await sink.settle(), true); // the retry finds the stream over
+  assert.deepEqual(writes, ["processing", null, null]); // and its resolution
+});
+
+test("a stop that finds the stream ended by Slack reports unknown", async () => {
+  const slack = new FakeSlack();
+  const { sink, writes } = sessionReply(slack, () => "processing");
+  await sink.text("Started it.");
+  await settled();
+  slack.expire(slack.streamTs[0] ?? "");
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.deepEqual(writes, ["processing", null]);
+});
+
+test("an append that finds the stream ended by Slack reports unknown", async () => {
+  const slack = new FakeSlack();
+  const { sink, writes } = sessionReply(slack, () => "processing");
+  await sink.text("Started it.");
+  await settled();
+  slack.expire(slack.streamTs[0] ?? "");
+  await sink.text(" More.");
+  await settled();
+  assert.deepEqual(writes, ["processing", null]);
+});
+
+test("a stop refused with a known error reports nothing", async () => {
+  const slack = new FakeSlack();
+  slack.responses["chat.stopStream"] = [rejected("internal_error")];
+  const { sink, writes } = sessionReply(slack, () => "processing");
+  await sink.text("Done.");
+  await settled();
+  await sink.finish([]);
+  await sink.closeOut();
+  assert.equal(slack.callsTo("chat.stopStream").length >= 1, true);
+  assert.deepEqual(writes, ["processing"]); // the start only
 });

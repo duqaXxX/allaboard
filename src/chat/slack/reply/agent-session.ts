@@ -61,6 +61,8 @@ export class AgentSessions {
   // Every drain in flight, entries dropped meanwhile included, for `close`.
   readonly #draining = new Set<Promise<void>>();
   #refused = false;
+  // One `agents.sessions.setStatus` succeeded since start: agent sessions work on this app.
+  #proven = false;
   #closed = false;
   #failed: string | null = null;
 
@@ -115,6 +117,35 @@ export class AgentSessions {
     }
     this.#again(entry);
     await entry.draining;
+  }
+
+  /**
+   * The status a `chat.stopStream` should carry (it sets `active` when it carries none): the
+   * thread's wanted one. Undefined until one status call succeeded on this app, and for good
+   * once one was refused, so a stop never carries a field an app without agent sessions may
+   * reject. Read-only.
+   */
+  wanted(ref: ThreadRef): SessionState | undefined {
+    if (this.#refused || !this.#proven) return undefined;
+    return this.#wantedOf(ref);
+  }
+
+  /**
+   * A stream call that may have written the session returned: a stop carried `carried`
+   * (`undefined`: no field, so Slack's `active`), a start set `processing`, `null`: unknown. A
+   * stream call is a second writer outside the queue: when what it left differs from the wanted
+   * status, or is unknown, the wanted status is sent again. A match sends nothing and never
+   * clears a resend already demanded.
+   */
+  afterWrite(ref: ThreadRef, carried: SessionState | undefined | null): void {
+    if (this.#refused) return;
+    if (carried !== null && (carried ?? "active") === this.#wantedOf(ref)) return;
+    this.#again(this.#entry(ref));
+  }
+
+  #wantedOf(ref: ThreadRef): SessionState {
+    const entry = this.#entries.get(key(ref));
+    return entry === undefined ? "active" : wantedStatus(entry.root, entry.activity);
   }
 
   /** Cancels the timers, then waits for the calls in flight and queued. */
@@ -195,6 +226,7 @@ export class AgentSessions {
         status,
       });
       this.#failed = null;
+      this.#proven = true;
       return "sent";
     } catch (error) {
       const code = describe(error);

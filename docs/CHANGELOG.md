@@ -14,6 +14,13 @@ All notable changes to this project are documented here. The format follows
   `agent_session_stopped`, `message.im` and `app_home_opened`: an existing app updates its
   manifest and reinstalls (`docs/setup.md`). iOS shows no such list (#57).
 
+### Fixed
+
+- A turn that ends while a background task runs no longer turns the thread's entry in **Agents &
+  tools** back to idle: a stream stop set the session `active`, so the spinner and **Stop** went
+  while the work went on. Stops now carry the wanted `session_status`, and the session is set again
+  after a stream call that may have changed it (#199).
+
 ### Changed
 
 - The cleanup forgets a bound channel only when Slack gives a certain answer. The bot's

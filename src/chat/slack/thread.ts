@@ -658,6 +658,8 @@ export class SlackThread implements ThreadChat {
       ...(this.options.steady !== undefined && { steady: this.options.steady }),
       onOpenReply: onOpenMessage,
       onWrite: () => this.line.wrote(),
+      sessionStatus: () => this.agent.wanted(this.ref),
+      onSessionWrite: (carried) => this.agent.afterWrite(this.ref, carried),
       places,
       ...(this.options.debounceSeconds !== undefined && {
         debounceSeconds: this.options.debounceSeconds,
