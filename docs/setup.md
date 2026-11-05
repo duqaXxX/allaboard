@@ -189,22 +189,25 @@ still starts and the Home tab still lists the sessions, with no **Edit** button;
 `!delete-thread`, `!tag`, `!untag`, `!pin` and `!unpin` then answer that they do nothing, and
 `!help` and `!guide` leave them out.
 
-The token needs the user scopes `chat:write` and `pins:write`, which the manifest asks for. It
-can post, edit, pin and delete messages as you, anywhere you can. allaboard uses it for these
+The token needs the user scopes `chat:write`, `pins:write` and `groups:read`, which the manifest asks
+for. It can post, edit, pin and delete messages as you, anywhere you can, and read the details of a private channel (not its messages). allaboard uses it for these
 calls: `auth.test` at startup, to check the token is yours; `chat.delete`, on the messages that
 are not the bot's in a thread you chose to delete or a channel you chose to clean up;
 `chat.update`, on the first message of a thread you tagged or whose session has a title; and
-`pins.add` or `pins.remove` on the first message of a thread you pinned or unpinned. It is the one credential in `.env` that acts under your name: if you do not want
+`pins.add` or `pins.remove` on the first message of a thread you pinned or unpinned; and
+`conversations.info`, on a bound channel the bot no longer sees, to tell a deleted channel from one
+the bot was removed from. It is the one credential in `.env` that acts under your name: if you do not want
 those features, leave it out of `.env`.
 
 An app created before the manifest asked for these user scopes has no such token, or a token
-without `pins:write`. Open **OAuth & Permissions**, and under **Scopes**, **User Token Scopes**,
-add `chat:write` and `pins:write`; reinstall the app to your workspace when Slack asks, and copy
+without `pins:write` or `groups:read`. Open **OAuth & Permissions**, and under **Scopes**, **User Token Scopes**,
+add `chat:write`, `pins:write` and `groups:read`; reinstall the app to your workspace when Slack asks, and copy
 the **User OAuth Token**. An install that already has the token must do this once to use `!pin`
 and `!unpin`: allaboard asks Slack at startup which scopes the token holds, and without
 `pins:write` it offers neither word, logs one line saying so, and keeps the Home tab's Delete and
 Clean up, `!tag`, `!untag` and titles working with `chat:write` alone. A token for which Slack reports no scopes gets the
-same treatment.
+same treatment. Without `groups:read` the cleanup keeps a channel the bot cannot see (below, under
+"Cleaning `state.json`").
 
 ### Find your member ID
 
@@ -859,6 +862,8 @@ new channel:
 4. If the instance's `.env` was rewritten, press **Refresh** on the Home tab or restart the
    instance. That runs the cleanup, which forgets the old channels and threads
    (`forgot channel ...: Slack no longer has it`) once a channel of the new workspace is bound.
+   It forgets the old channels only when `SLACK_USER_TOKEN` holds the user scope `groups:read`:
+   without the token or the scope they stay in `state.json`, logged, until it does.
 5. Send `!resume` there, or `!resume <id or name>`, once for each session you want to continue.
    Each one continues in a thread of its own, with bypass never chosen and no `/effort` level, and
    a session you do not resume stays on disk, for later.
@@ -1259,19 +1264,26 @@ then stays on the page:
 | Line | What happened |
 |---|---|
 | `Not deleted: that thread is working or waiting for you.` | A turn runs in the thread, or an approval or a question waits for you: let it end, or send `!stop` in the thread |
+| `Not deleted: allaboard did not start that thread, so it does not delete it.` | The thread is not in `state.json` and its first message is neither yours nor the bot's, or no reply is left under it |
+| `Not deleted: that thread's channel is no longer bound to a folder.` | The channel was unbound after the page was drawn |
 | `` Could not delete every message of that thread (`<Slack's error>`). Delete it again to continue. `` | Slack or the network failed half way: Delete continues with the messages that are left |
 | ``Slack still shows 2 of that thread's messages after the delete. Delete it again to continue.`` | A read after the delete still finds those messages |
 | `` Slack refused to delete 2 of that thread's messages (`cant_delete_message`): they are not yours or the bot's, or your workspace does not let you delete them. Every other message is gone and the thread is still listed. `` | The first message stays so the thread can still be opened: delete what is left by hand in Slack |
 
 `!delete-thread`, sent inside the thread, deletes it the same way without the Home tab: it asks
 first, in a message only you see, with the same warning and the same two buttons, and the same
-rule holds for a thread that is working or waiting for you. Nothing says the delete is under
+rule holds for a thread that is working or waiting for you. It also deletes a thread
+`state.json` no longer holds, when its first message is yours or the bot's, it still has a reply
+and its channel is bound to a folder (what `!clean-channel` deletes too); the thread of someone
+else, or one with no reply left, is refused. Nothing says the delete is under
 way: the thread's messages go one after the other, and the thread leaves the Home tab when it is
 gone. A delete that does not end tells you why under your word, in a message only you see:
 
 | Line | What happened |
 |---|---|
 | ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` | The thread started working, or began to wait for you, after the question was shown |
+| `allaboard did not start this thread, so it does not delete it.` | The thread is not in `state.json` and its first message is neither yours nor the bot's: no question is shown; the same line can come after you click, if the thread changed meanwhile |
+| ``This channel is bound to no folder, so `!delete-thread` deletes nothing here.`` | The channel was unbound after the question was shown |
 | `` Could not delete every message of this thread (`<Slack's error>`). Send `!delete-thread` again to continue. `` | Slack or the network failed half way: the word continues with the messages that are left |
 | ``Slack still shows 2 of this thread's messages after the delete. Send `!delete-thread` again to continue.`` | A read after the delete still finds those messages |
 | `` Slack refused to delete 2 of this thread's messages (`cant_delete_message`): they are not yours or the bot's, or your workspace does not let you delete them. Every other message is gone. `` | The first message stays so the thread can still be opened |
@@ -1423,7 +1435,8 @@ command the agent does not list is not offered.
   - In a thread: Unpins the first message, whoever pinned it, by hand included, and leaves the tag; the same answer and limits as `!pin`. A pinned reply stays pinned
 - `!delete-thread`
   - At the top level: Refused, in a post in the channel: ``Deleting a thread belongs to one session: send `!delete-thread` inside its thread.``
-  - In a thread: Asks first, in a message only you see under your word, titled `Delete this thread?`, with the Home tab's warning and the buttons `Delete thread` and `Cancel`. Either button takes the question away; `Delete thread` then deletes the thread as the Home tab's Delete does ("Deleting a thread"). A thread that is working or waiting for you is refused before the question: ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` So is a thread with a pinned message: ``This thread is pinned, so it is not deleted. `!untag` removes its tag and its pin.`` when the first message carries a tag, ``This thread is pinned, so it is not deleted. Unpin its first message in Slack, then delete it.`` when it is pinned by hand, and ``A message of this thread is pinned, so it is not deleted. Unpin it in Slack, then delete it.`` when a reply is. A pin added after the question, or while the delete runs, is caught when you confirm, with the same line. Anything after the word shows the list of words. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot delete a thread here, so `!delete-thread` does nothing.`` and `!help` and `!guide` leave it out
+  - In a thread of a channel bound to no folder: Refused, in a post in the thread: ``This channel is bound to no folder, so `!delete-thread` deletes nothing here.`` In a thread being deleted already: the busy line below
+  - In a thread: Asks first, in a message only you see under your word, titled `Delete this thread?`, with the Home tab's warning and the buttons `Delete thread` and `Cancel`. Either button takes the question away; `Delete thread` then deletes the thread as the Home tab's Delete does ("Deleting a thread"). A thread that is working or waiting for you is refused before the question: ``Not deleted: this thread is working or waiting for you. Send `!stop` first, then `!delete-thread` again.`` So is a thread with a pinned message: ``This thread is pinned, so it is not deleted. `!untag` removes its tag and its pin.`` when the first message carries a tag, ``This thread is pinned, so it is not deleted. Unpin its first message in Slack, then delete it.`` when it is pinned by hand, and ``A message of this thread is pinned, so it is not deleted. Unpin it in Slack, then delete it.`` when a reply is. A pin added after the question, or while the delete runs, is caught when you confirm, with the same line. A thread `state.json` no longer holds is asked about only when it passes the rule above; otherwise ``allaboard did not start this thread, so it does not delete it.`` replaces the question. Anything after the word shows the list of words. Without `SLACK_USER_TOKEN`, the word answers ``Slack cannot delete a thread here, so `!delete-thread` does nothing.`` and `!help` and `!guide` leave it out
 - `!clean-channel`
   - At the top level: Asks first, in a message only you see, titled `Clean up this channel?`, which counts the threads that go and those that stay (working, waiting for you, pinned; a thread someone else started stays too), with the buttons *Clean up* and *Cancel*. Clean up deletes each thread as the Home tab's Delete does, threads `state.json` no longer holds included, then what the Home tab's Clean up deletes. The sessions stay, and `!resume` lists them again. The question then turns into `Cleaning up this channel. A line says how it went at the end.`, and at the end into `Threads deleted: 3, kept: 1, not finished: 0. Messages deleted: 2, refused: 0.` In a channel bound to no folder: ``This channel is bound to no folder, so `!clean-channel` deletes nothing here.`` Without `SLACK_USER_TOKEN` the word is left out of `!help` and `!guide`, and answers ``Slack cannot clean a channel here, so `!clean-channel` does nothing.``
   - In a thread: Refused, in an ephemeral message: `` `!clean-channel` works in the channel, not inside a thread.``
@@ -1906,7 +1919,9 @@ of the Node executable in System Settings, if you gave it one.
 | The daemon starts and connects, and answers none of your messages | `SLACK_OWNER_USER_ID` is not your member ID in the bot's workspace, and with no `SLACK_USER_TOKEN` nothing checks it at start: every message is ignored as someone else's. [Moving to another workspace](#moving-to-another-workspace) |
 | The daemon is down and you need a session's id, which `!status` shows | The id is the name of the session's file, in the folder under `~/.claude/projects/` (or under the instance's `CLAUDE_CONFIG_DIR`) named after the project's path. Continue it in the terminal as in [Continuing a session in the terminal](#continuing-a-session-in-the-terminal) |
 | The app has no **Home** tab, or it stays empty | **Home Tab** is off in the app's settings, and the log says `the Home tab is not enabled in the Slack app`: turn it on under **App Home**, **Show Tabs**, then restart allaboard |
-| `forgot channel ...: Slack no longer has it` in the log | The channel was deleted, or the bot was removed from it: its binding and its threads are gone from `state.json`. If the bot is back in it, send `!bind` there again |
+| `forgot channel ...: Slack no longer has it` in the log | The channel was deleted, or your own token cannot see it either: its binding and its threads are gone from `state.json`. If the channel exists again, send `!bind` there |
+| `the bot is not in channel ... which still exists: invite it again to use the channel` in the log | The bot was removed from a channel your token still sees: the binding and its threads are kept. Invite the bot back |
+| `Slack does not show channel ... to the bot: kept, since without the owner's token (scope groups:read) ...` in the log | Without `SLACK_USER_TOKEN` or its `groups:read` scope a deleted channel and one the bot was removed from look the same: the channel is kept. Add the scope (Part 1, step 3) |
 | `Slack finds none of the ... bound channels: nothing is forgotten` in the log | Every bound channel is out of the bot's reach: check that `SLACK_BOT_TOKEN` is the one of this workspace and that the bot is still in its channels |
 | A session is missing from the Home tab | The page starts on `Last 48 hours`: choose `Any time`. A thread whose root message was deleted, and a channel the bot is no longer in, are left out |
 
@@ -1942,9 +1957,12 @@ a thread or a channel with a session open at that moment. When Slack finds none 
 channels it forgets none and says so in the log, since that is what a bot token of another
 workspace looks like. The rules are in [Cleaning `state.json`](architecture.md#cleaning-statejson).
 
-A private channel the bot was removed from answers `channel_not_found` too, so it is forgotten
-like a deleted one. After inviting the bot back, send `!bind` there again; `!resume` brings back
-the folder's sessions, which stay on disk.
+A private channel the bot was removed from, or never joined, answers `channel_not_found` to the bot
+like a deleted one. The cleanup asks again with your user token (scope `groups:read`): a channel you
+still see is kept, with a log line asking you to invite the bot again, and only a channel your token
+cannot see either is forgotten. Without the token or the scope such a channel is kept and logged, so
+a deleted channel stays in `state.json` until the token has the scope. Each thread the cleanup
+prunes gets a log line with its ids and the reason.
 
 ### Restarts and shutdown
 

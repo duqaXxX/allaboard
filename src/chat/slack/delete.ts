@@ -87,12 +87,14 @@ export interface PinnedRefusal {
 
 /**
  * Why a delete left the thread where it was: its session works or waits for the owner, a message
- * of it is pinned, Slack refused `count` of its messages, `count` of them were still there once the
+ * of it is pinned, it is not a thread of the daemon's, its channel is no longer bound, Slack refused `count` of its messages, `count` of them were still there once the
  * delete had done all it could, or a call failed with `error` half way.
  * Each place that offers a delete words it for itself.
  */
 export type DeleteRefusal =
   | { readonly reason: "busy" }
+  | { readonly reason: "not-allaboard" }
+  | { readonly reason: "unbound" }
   | PinnedRefusal
   | { readonly reason: "refused"; readonly count: number }
   | { readonly reason: "left"; readonly count: number }
@@ -127,6 +129,11 @@ export type PinnedThreadCall = (
 export interface ThreadDeletion {
   readonly delete: DeleteThreadCall;
   readonly pinned: PinnedThreadCall;
+  /** Why `delete` would not take the thread, as `ThreadDeleter.deletable` reads it. */
+  readonly deletable: (
+    channelId: string,
+    threadTs: string,
+  ) => Promise<DeleteRefusal | "gone" | null>;
   /** What `purge` would take and keep, as `ThreadDeleter.survey` reads it. */
   readonly survey: (channelId: string) => Promise<ChannelSurvey>;
   /** Empties a channel, as `ThreadDeleter.purge` does: the line that says how it went. */
@@ -192,6 +199,28 @@ interface Seen {
   readonly tombstone: boolean;
 }
 
+/**
+ * Whether `message` is the root of a thread the daemon started or took over: written by the bot or
+ * the owner with no subtype (a file the owner sent is `file_share`), or a tombstone, which nobody's
+ * root is left for.
+ */
+export function isOrphanRoot(
+  message: Record<string, unknown>,
+  botUserId: string,
+  ownerUserId: string,
+): boolean {
+  if (isTombstone(message)) return true;
+  const author = String(message.user || "");
+  const known = author === botUserId || author === ownerUserId;
+  const root = String(message.thread_ts ?? "") === String(message.ts);
+  return known && root && (!message.subtype || message.subtype === FILE_SHARE);
+}
+
+/** Whether a `conversations.replies` answer of `limit=1` shows a reply under `root`. */
+function showsReplies(root: Record<string, unknown>, messages: readonly unknown[]): boolean {
+  return Boolean(root.reply_count) || messages.length > 1;
+}
+
 /** The refusal for a pinned message among a thread's, the root's first; null for none. */
 function pinnedOf(messages: ReadonlyMap<string, Seen>, threadTs: string): PinnedRefusal | null {
   const root = messages.get(threadTs);
@@ -229,20 +258,59 @@ export class ThreadDeleter {
   }
 
   /**
-   * Delete every message of a thread that holds a session and forget the thread. Returns null
-   * once the thread is gone (or was not one of the daemon's), else why it is still there. Never
-   * throws.
+   * Delete every message of a thread that holds a session, or that `deletable` takes for an
+   * orphan, and forget the thread. Returns null once the thread is gone, else why it is still
+   * there. Never throws.
    */
   async delete(channelId: string, threadTs: string): Promise<DeleteRefusal | null> {
-    if (this.#state.thread(channelId, threadTs) === null) {
-      return null; // not a thread of the daemon's: nothing a click may delete
+    const held = this.#state.thread(channelId, threadTs) !== null;
+    if (!held) {
+      // The value of a click is untrusted, and one may come long after the question.
+      try {
+        const found = await this.deletable(channelId, threadTs);
+        if (found === "gone") return null; // deleted meanwhile: nothing is left to say
+        if (found !== null) return found;
+      } catch (error) {
+        logger.warning(`could not read ${channelId}/${threadTs}: ${describe(error)}`);
+        return { reason: "failed", error: describe(error) };
+      }
     }
     return this.#oneAtATime.run(() => {
-      if (this.#state.thread(channelId, threadTs) === null) {
+      if (held && this.#state.thread(channelId, threadTs) === null) {
         return Promise.resolve(null); // deleted while this call waited its turn
       }
       return this.#delete(channelId, threadTs);
     });
+  }
+
+  /**
+   * Why `delete` would not take the thread, null when it would: `state.json` holds it, or it is an
+   * orphan of a bound channel (`isOrphanRoot`, and a reply still under it). `gone` for a thread
+   * Slack no longer has. Throws on a failed read.
+   */
+  async deletable(channelId: string, threadTs: string): Promise<DeleteRefusal | "gone" | null> {
+    if (this.#state.thread(channelId, threadTs) !== null) return null;
+    if (!this.#state.channels().includes(channelId)) return { reason: "unbound" };
+    let answer: unknown;
+    try {
+      answer = await this.#bot.conversations.replies({
+        channel: channelId,
+        ts: threadTs,
+        limit: 1,
+      });
+    } catch (error) {
+      // The one answer that says the thread is gone; an answer with no root of that ts (a reply's
+      // ts, an empty one) proves nothing and is no thread of the daemon's.
+      if (describe(error) === THREAD_NOT_FOUND) return "gone";
+      throw error;
+    }
+    const messages = messagesOf(answer);
+    const root = messages.find((message) => String(message.ts) === threadTs);
+    return root !== undefined &&
+      isOrphanRoot(root, this.#botUserId, this.#ownerUserId) &&
+      showsReplies(root, messages)
+      ? null
+      : { reason: "not-allaboard" };
   }
 
   async #delete(channelId: string, threadTs: string): Promise<DeleteRefusal | null> {
@@ -477,11 +545,10 @@ export class ThreadDeleter {
         found.push(ts);
         continue;
       }
-      const author = String(message.user || "");
-      const known = author === this.#botUserId || author === this.#ownerUserId;
-      const root = String(message.thread_ts ?? "") === ts;
-      const started = known && root && (!message.subtype || message.subtype === FILE_SHARE);
-      if ((isTombstone(message) || started) && (await this.#holdsReplies(channelId, ts))) {
+      if (
+        isOrphanRoot(message, this.#botUserId, this.#ownerUserId) &&
+        (await this.#holdsReplies(channelId, ts))
+      ) {
         found.push(ts);
       }
     }
@@ -502,7 +569,7 @@ export class ThreadDeleter {
     }
     const messages = messagesOf(answer);
     const root = messages.find((message) => String(message.ts) === ts);
-    return root !== undefined && (Boolean(root.reply_count) || messages.length > 1);
+    return root !== undefined && showsReplies(root, messages);
   }
 
   /** The channel's messages, page by page. */

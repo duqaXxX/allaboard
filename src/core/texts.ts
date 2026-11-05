@@ -177,6 +177,9 @@ export const DELETE_THREAD_UNAVAILABLE = naming(
 export const DELETE_THREAD_BUSY =
   "Not deleted: this thread is working or waiting for you. Send `!stop` first, then " +
   "`!delete-thread` again.";
+// A thread in a channel bound to no folder: the chat's delete only touches a bound channel.
+export const DELETE_THREAD_UNBOUND =
+  "This channel is bound to no folder, so `!delete-thread` deletes nothing here.";
 // Shown only by a chat that cannot clean a channel.
 export const CLEAN_UNAVAILABLE = naming(
   "{chat} cannot clean a channel here, so `!clean-channel` does nothing.",

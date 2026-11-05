@@ -658,6 +658,10 @@ function deleteLine(refusal: DeleteRefusal, names: Names): string {
   switch (refusal.reason) {
     case "busy":
       return slackTexts.HOME_DELETE_BUSY;
+    case "not-allaboard":
+      return slackTexts.HOME_DELETE_NOT_ALLABOARD;
+    case "unbound":
+      return slackTexts.HOME_DELETE_UNBOUND;
     case "pinned":
       return pinnedLine(refusal, names);
     case "refused":

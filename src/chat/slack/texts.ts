@@ -273,6 +273,14 @@ export const THREAD_DELETE_REFUSED = naming(
     "not yours or the bot's, or your workspace does not let you delete them. Every other " +
     "message is gone.",
 );
+// `!delete-thread` on a thread that is neither in `state.json` nor one the daemon could have
+// started: the line replaces the question, or follows the click.
+export const THREAD_DELETE_NOT_ALLABOARD =
+  "allaboard did not start this thread, so it does not delete it.";
+export const HOME_DELETE_UNBOUND =
+  "Not deleted: that thread's channel is no longer bound to a folder.";
+export const HOME_DELETE_NOT_ALLABOARD =
+  "Not deleted: allaboard did not start that thread, so it does not delete it.";
 export const THREAD_DELETE_LEFT = naming(
   "{chat} still shows {count} of this thread's messages after the delete. Send `!delete-thread` " +
     "again to continue.",

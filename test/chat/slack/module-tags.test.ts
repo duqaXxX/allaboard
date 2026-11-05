@@ -19,7 +19,7 @@ const USER_TOKEN = `${"xox"}p-000-fake`;
 
 // What `auth.test` answers for a user token: the client adds the scopes from the response's
 // X-OAuth-Scopes header to `response_metadata.scopes` (@slack/web-api 8.2.0, WebClient.js).
-const SCOPES = ["identify", "chat:write", "pins:write"];
+const SCOPES = ["identify", "chat:write", "pins:write", "groups:read"];
 
 async function built(
   userToken: string | null,
@@ -110,7 +110,7 @@ test("with the owner's token the provider tags a root through the owner's client
 });
 
 test("a title is written by the owner's client alone, with no pin", async () => {
-  const { chat, slack, owner } = await built(USER_TOKEN, ["identify", "chat:write"]);
+  const { chat, slack, owner } = await built(USER_TOKEN, ["identify", "chat:write", "groups:read"]);
   const ts = "1780000000.000002";
   slack.responses["conversations.replies"] = {
     ok: true,
@@ -137,7 +137,7 @@ function warnings(t: TestContext): () => string {
 
 test("a user token without pins:write offers no pins, says so once, and still tags, deletes and titles", async (t) => {
   const said = warnings(t);
-  const { chat, owner } = await built(USER_TOKEN, ["identify", "chat:write"]);
+  const { chat, owner } = await built(USER_TOKEN, ["identify", "chat:write", "groups:read"]);
   assert.equal(chat.capabilities.threadPins, false);
   assert.equal(chat.pinThread, undefined);
   assert.equal(chat.capabilities.threadTags, true);

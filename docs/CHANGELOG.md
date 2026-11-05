@@ -16,6 +16,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The cleanup forgets a bound channel only when Slack gives a certain answer. The bot's
+  `channel_not_found` is the same for a deleted channel and for one the bot was removed from, so
+  the cleanup asks again with your user token: a channel you still see is kept and logged, and
+  without the token or the new user scope `groups:read` a channel the bot cannot see is kept and
+  logged. The manifest asks for `groups:read`; an existing app adds it under **User Token Scopes**
+  and reinstalls (`docs/setup.md`) (#197).
+- The cleanup logs one line for each thread it prunes from `state.json`, with its channel and thread
+  ids and why (its session is gone, or none started within a day), in place of a count (#148).
+- `!delete-thread` also deletes a thread `state.json` no longer holds (one the cleanup forgot, or
+  that a crash left), after the usual question, when its channel is bound, its first message is
+  yours or the bot's and a reply is still under it. A thread someone else started gets `allaboard
+  did not start this thread, so it does not delete it.`, and a thread in a channel bound to no
+  folder ``This channel is bound to no folder, so `!delete-thread` deletes nothing here.`` (#148).
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.318, which bundles Claude Code 2.1.318. The
   release probe certified it on 2026-11-04: the SDK surface table holds and so do the claims. Its
   stream carries paths the fixtures do not hold, none of which the source reads, all accepted on

@@ -87,6 +87,7 @@ import { installedVersion } from "../src/version.ts";
 import { FakeSdk } from "./support/fake-query.ts";
 import {
   AGENT,
+  type Args,
   AsyncEvent,
   BOT,
   CHANNEL,
@@ -908,15 +909,12 @@ test("a failure's deadline is moved only by the wait for npm, and a step after i
 });
 
 test("run forgets a gone channel at start and again on its schedule", async (t) => {
-  const d = new Daemon(t);
+  const d = new Daemon(t, { userToken: true });
   const state = v1State(d.dir, GONE); // a channel still owing its upgrade notice
   state.bind(CHANNEL, d.dir);
   state.bind("C000LATE", d.dir);
   const gone = new Set([GONE]);
-  d.slack.responses["conversations.info"] = (args) =>
-    gone.has(String(args.channel))
-      ? rejected("channel_not_found")
-      : slackPayload("api-conversations-info");
+  channelsThatMayGo(d, gone);
   let notices: ReturnType<typeof t.mock.method> | null = null;
   const bound = (): string[] =>
     Object.keys((JSON.parse(readFileSync(d.path, "utf8")) as { channels: object }).channels);
@@ -948,16 +946,27 @@ test("run forgets a gone channel at start and again on its schedule", async (t) 
   assert.equal(d.slack.callsTo("conversations.info").length, asked);
 });
 
-/** A channel Slack answers about as the test says: there, or `channel_not_found` once added to `gone`. */
+/**
+ * A channel Slack answers about as the test says: there, or `channel_not_found` once added to
+ * `gone`, to the bot and to the owner's token (which holds `groups:read`), as for a deleted one.
+ */
 function channelsThatMayGo(d: Daemon, gone: Set<string>): void {
-  d.slack.responses["conversations.info"] = (args) =>
+  const answer = (args: Args) =>
     gone.has(String(args.channel))
       ? rejected("channel_not_found")
       : slackPayload("api-conversations-info");
+  d.slack.responses["conversations.info"] = answer;
+  d.owner.responses["conversations.info"] = answer;
+  d.owner.responses["auth.test"] = {
+    ok: true,
+    team_id: TEAM,
+    user_id: OWNER,
+    response_metadata: { scopes: ["chat:write", "groups:read"] },
+  };
 }
 
 test("the Home tab's Refresh runs the cleanup at once, and the page is written without the channel", async (t) => {
-  const d = new Daemon(t);
+  const d = new Daemon(t, { userToken: true });
   const state = new StateStore(d.path);
   state.bind(CHANNEL, d.dir);
   state.bind("C000LATE", d.dir);
@@ -1144,7 +1153,7 @@ test("the manifest asks for the minimum", () => {
   // bot did not post) and for `!tag` and `!untag` (`chat.update` and `pins.add` or `pins.remove`
   // on the owner's first message); an install yields it beside the bot token. Nothing else acts
   // as the owner.
-  assert.deepEqual(manifest.oauth_config.scopes.user, ["chat:write", "pins:write"]);
+  assert.deepEqual(manifest.oauth_config.scopes.user, ["chat:write", "groups:read", "pins:write"]);
   assert.deepEqual(manifest.settings.event_subscriptions.bot_events, [
     "message.groups",
     // Slack sends it while it writes a clip's transcript, the only sign that one is ready

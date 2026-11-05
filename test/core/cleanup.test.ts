@@ -203,7 +203,7 @@ test("clean forgets gone channels then prunes what is left", async () => {
   assert.equal(state.thread(CHANNEL, THREAD), null); // pruned: its session no longer exists
   // the forgotten channel's folder is not read
   assert.deepEqual(asked, [state.channel(CHANNEL)?.directory]);
-  assert.ok(log.lines.join("\n").includes("pruned 1 stale thread"));
+  assert.ok(log.lines.includes(`INFO pruned thread ${CHANNEL}/${THREAD}: its session is gone`));
 });
 
 test("clean keeps a thread with a live session", async () => {
@@ -321,7 +321,12 @@ test("a thread with no session is dropped for its age only when the chat dates i
   assert.equal(state.thread(CHANNEL, GONE_THREAD), null); // dated and older than a day
   assert.notEqual(state.thread(CHANNEL, undated), null);
   assert.notEqual(state.thread(CHANNEL, THREAD), null); // its session is alive
-  assert.ok(log.lines.join("\n").includes("pruned 1 stale thread"));
+  assert.ok(
+    log.lines.includes(
+      `INFO pruned thread ${CHANNEL}/${GONE_THREAD}: no session started within a day`,
+    ),
+  );
+  assert.ok(!log.lines.join("\n").includes(`${CHANNEL}/${undated}`));
 });
 
 test("a pass over sessions the agent cannot list prunes nothing", async () => {

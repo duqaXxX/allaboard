@@ -416,15 +416,22 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
         return;
       }
       case "delete-thread":
-        if (session === null) {
+        if (session === null && !outside) {
           await talk.inChannel(channel, texts.DELETE_THREAD_TOP_LEVEL);
         } else if (!chat.capabilities.threadDelete || chat.deleteThread === undefined) {
           await talk.tell(ref, named(texts.DELETE_THREAD_UNAVAILABLE, names));
-        } else if (session.inUse) {
+        } else if (outside && sessions.held(channel, thread)) {
+          // A delete of the thread already runs.
+          await talk.tell(ref, texts.DELETE_THREAD_BUSY);
+        } else if (outside && !state.channels().includes(channel)) {
+          await talk.tell(ref, texts.DELETE_THREAD_UNBOUND);
+        } else if (session?.inUse) {
           // Refused before the owner is asked; the delete checks again on their yes, since the
           // thread may have started working meanwhile.
           await talk.tell(ref, texts.DELETE_THREAD_BUSY);
         } else {
+          // A thread with no session is the chat's to judge: it deletes one `state.json` no
+          // longer holds only when it can tell the thread is the daemon's.
           await chat.deleteThread(ref);
         }
         return;

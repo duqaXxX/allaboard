@@ -155,15 +155,102 @@ test("a thread in use is not deleted", async () => {
   assert.deepEqual(world.freed, []);
 });
 
-test("a thread the daemon does not hold is not touched", async () => {
-  // The value of a click is untrusted: only a thread `state.json` holds is ever deleted.
+test("a thread the daemon does not hold and that is no orphan is not touched", async () => {
+  // The value of a click is untrusted: only a thread `state.json` holds, or an orphan of a bound
+  // channel (`deletable`), is ever deleted.
   const world = new World();
-  assert.equal(await world.deleter.delete(CHANNEL, "1790000009.000009"), null);
-  assert.equal(await world.deleter.delete("C000NOPE", ROOT), null);
+  const other = "1790000009.000009";
+  world.bot.responses["conversations.replies"] = orphanReplies(world, other, "U000BOB");
+  assert.deepEqual(await world.deleter.delete(CHANNEL, other), { reason: "not-allaboard" });
+  // A channel no longer bound has its own refusal.
+  assert.deepEqual(await world.deleter.delete("C000NOPE", ROOT), { reason: "unbound" });
+  // A thread already gone (a second confirm, a stale click) is gone, not refused.
+  world.bot.responses["conversations.replies"] = rejected("thread_not_found");
+  assert.equal(await world.deleter.delete(CHANNEL, other), null);
+  // An answer with no root of that ts proves nothing: no silent success.
+  world.bot.responses["conversations.replies"] = { ok: true, messages: [], has_more: false };
+  assert.deepEqual(await world.deleter.delete(CHANNEL, other), { reason: "not-allaboard" });
+  world.bot.responses["conversations.replies"] = {
+    ok: true,
+    messages: [orphanRoot("1790000009.000010", OWNER)],
+    has_more: false,
+  };
+  assert.deepEqual(await world.deleter.delete(CHANNEL, other), { reason: "not-allaboard" });
   assert.deepEqual(world.released, []);
-  assert.deepEqual(world.bot.apiCalls, []);
+  assert.deepEqual(world.bot.callsTo("chat.delete"), []);
   assert.deepEqual(world.owner.apiCalls, []);
   assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
+});
+
+/** A thread root with replies, as `conversations.replies` with `limit=1` returns it. */
+function orphanRoot(ts: string, user: string, fields: JsonObject = {}): JsonObject {
+  return { type: "message", ts, user, thread_ts: ts, text: "x", reply_count: 2, ...fields };
+}
+
+/** `conversations.replies` of a thread the daemon no longer holds, until its root is deleted. */
+function orphanReplies(world: World, ts: string, user = OWNER, fields: JsonObject = {}) {
+  return (args: Args): Answer =>
+    world.deleted(world.owner).includes(String(args.ts))
+      ? rejected("thread_not_found")
+      : { ok: true, messages: [orphanRoot(ts, user, fields)], has_more: false };
+}
+
+test("a thread state.json holds is deletable, an orphan of a bound channel too", async () => {
+  const world = new World();
+  const orphan = "1790000060.000001";
+  assert.equal(await world.deleter.deletable(CHANNEL, ROOT), null);
+  assert.deepEqual(world.bot.apiCalls, []); // state.json says so: nothing is asked of Slack
+  for (const [user, fields] of [
+    [OWNER, {}],
+    [BOT, {}],
+    [OWNER, { subtype: "file_share" }],
+    ["USLACKBOT", { subtype: "tombstone" }],
+  ] as const) {
+    world.bot.responses["conversations.replies"] = orphanReplies(world, orphan, user, fields);
+    assert.equal(await world.deleter.deletable(CHANNEL, orphan), null, JSON.stringify(fields));
+  }
+});
+
+const NOT_ALLABOARD = { reason: "not-allaboard" };
+
+test("a thread someone else started, one with no reply, one gone, and an unbound channel say why", async () => {
+  const world = new World();
+  const orphan = "1790000061.000001";
+  world.bot.responses["conversations.replies"] = orphanReplies(world, orphan, "U000BOB");
+  assert.deepEqual(await world.deleter.deletable(CHANNEL, orphan), NOT_ALLABOARD);
+  world.bot.responses["conversations.replies"] = orphanReplies(world, orphan, OWNER, {
+    subtype: "bot_message",
+  });
+  assert.deepEqual(await world.deleter.deletable(CHANNEL, orphan), NOT_ALLABOARD);
+  world.bot.responses["conversations.replies"] = {
+    ok: true,
+    messages: [orphanRoot(orphan, OWNER, { reply_count: 0 })],
+    has_more: false,
+  };
+  assert.deepEqual(await world.deleter.deletable(CHANNEL, orphan), NOT_ALLABOARD);
+  world.bot.responses["conversations.replies"] = rejected("thread_not_found");
+  assert.equal(await world.deleter.deletable(CHANNEL, orphan), "gone");
+  const calls = world.bot.apiCalls.length;
+  assert.deepEqual(await world.deleter.deletable("C000NOPE", orphan), { reason: "unbound" });
+  assert.equal(world.bot.apiCalls.length, calls, "an unbound channel is not asked about");
+  world.bot.responses["conversations.replies"] = rejected("ratelimited");
+  await assert.rejects(world.deleter.deletable(CHANNEL, orphan));
+});
+
+test("an orphan is deleted with the hold taken and freed, and a failed check is a failure", async () => {
+  const world = new World();
+  const orphan = "1790000062.000001";
+  world.bot.responses["conversations.replies"] = orphanReplies(world, orphan);
+  assert.equal(await world.deleter.delete(CHANNEL, orphan), null);
+  assert.deepEqual(world.deleted(world.owner), [orphan]);
+  assert.deepEqual(world.released, [[CHANNEL, orphan]]);
+  assert.deepEqual(world.freed, [[CHANNEL, orphan]]);
+  // `delete` never throws: a check Slack failed is a failure the owner reads.
+  world.bot.responses["conversations.replies"] = rejected("ratelimited");
+  assert.deepEqual(await world.deleter.delete(CHANNEL, "1790000063.000001"), {
+    reason: "failed",
+    error: "ratelimited",
+  });
 });
 
 test("a message already gone does not stop the delete", async () => {

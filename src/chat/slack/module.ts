@@ -23,6 +23,7 @@ import { socketReceiver } from "./app/app.ts";
 import { ChannelGuard, type Identity } from "./app/guards.ts";
 import { prepareUploads } from "./attachments.ts";
 import { ChannelLine, lineThread } from "./channel-line.ts";
+import { READ_CHANNELS_SCOPE } from "./channels.ts";
 import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
 import { MENTION_VARIABLE, mentionsOn, type ProbeClient, slackSetup } from "./onboarding.ts";
@@ -148,6 +149,27 @@ export function canPin(owner: OwnerClient | null): boolean {
   if (!owner.scopes.includes(PINS_SCOPE)) {
     logger.warning(
       `SLACK_USER_TOKEN lacks the scope ${PINS_SCOPE}, so !pin and !unpin are not offered until the app is reinstalled with that scope (see ${setupGuide(SETUP_SLACK_APP)})`,
+    );
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Whether the owner's token can read a bound channel the bot is no longer in, which the cleanup
+ * needs to tell a deleted channel from a removed bot. Without it such a channel is kept and logged.
+ */
+export function canReadChannels(owner: OwnerClient | null): owner is OwnerClient {
+  if (owner === null) return false;
+  if (owner.scopes === null) {
+    logger.warning(
+      `Slack lists no scopes for SLACK_USER_TOKEN, so a channel the bot cannot see is kept, not forgotten: reinstall the app with the user scope ${READ_CHANNELS_SCOPE} (see ${setupGuide(SETUP_SLACK_APP)})`,
+    );
+    return false;
+  }
+  if (!owner.scopes.includes(READ_CHANNELS_SCOPE)) {
+    logger.warning(
+      `SLACK_USER_TOKEN lacks the scope ${READ_CHANNELS_SCOPE}, so a channel the bot cannot see is kept, not forgotten: reinstall the app with that user scope (see ${setupGuide(SETUP_SLACK_APP)})`,
     );
     return false;
   }
@@ -310,6 +332,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     steady: context.steady,
     agent: () => context.core().agent,
     ...(roots !== null && { roots, canPin: canPin(owner) }),
+    ...(canReadChannels(owner) && { channelReader: owner.client }),
     line: new ChannelLine(slack, {
       botUserId: identity.botUserId,
       // Read when the line changes, after the core exists.
@@ -333,6 +356,8 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
             threadDeleter.delete(channelId, threadId),
           pinned: (channelId: string, threadId: string) =>
             threadDeleter.pinned(channelId, threadId),
+          deletable: (channelId: string, threadId: string) =>
+            threadDeleter.deletable(channelId, threadId),
           survey: (channelId: string) => threadDeleter.survey(channelId),
           purge: (channelId: string) => threadDeleter.purge(channelId),
         },

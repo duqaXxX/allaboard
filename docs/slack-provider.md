@@ -802,7 +802,14 @@ tried again after `home.RETRY_SECONDS`.
 capability `threadDelete`, only when `module.deleter` built a `delete.ThreadDeleter` from the
 owner's token: the same deleter the Home tab's Delete calls, so both ways share one path and one
 rule (`SessionManager.release` refuses a thread in use). The core refuses a thread whose session
-works or waits (`ThreadSession.inUse`) before anything is shown.
+works or waits (`ThreadSession.inUse`), or is held by a delete already under way, before anything is
+shown. A thread `state.json` holds no entry for reaches the provider as well:
+`ThreadDeleter.deletable` takes it when its channel is bound and its root, read with
+`conversations.replies` and `limit=1`, passes `delete.isOrphanRoot` (the bot's or the owner's first
+message, a file the owner sent, or a tombstone) with a reply under it, the rule `!clean-channel`'s
+purge applies. `DeleteThread.ask` shows `THREAD_DELETE_NOT_ALLABOARD` instead of the question for
+any other, and `delete` checks again on the click, answering `not-allaboard` (a failed read is
+`failed`: `delete` never throws). `#delete` takes the hold with no session in the thread.
 
 The question is an ephemeral message under the owner's word (`DeleteThread.ask`), built by
 `delete-thread.deleteThreadBlocks` from the Home tab's own texts, with two buttons and no value. A
@@ -1540,9 +1547,13 @@ comment of `endReply`.
 
 The core's cleanup of `state.json` ("Cleaning `state.json`" in [architecture.md](architecture.md#cleaning-statejson)) asks the provider whether a channel and a thread are still there (`ChatProvider.channelState`, `ChatProvider.threadState`).
 
-- The lookup for channels is `channels.channelLookup`: `gone` is `channel_not_found` from
-`conversations.info`, and any other failure is no answer and removes nothing. A private channel the bot was removed from gives the
-same answer as a deleted one, so it is forgotten too. 
+- The lookup for channels is `channels.channelLookup`: the bot's `conversations.info` answering
+ok is `there`. The bot's `channel_not_found` is the same for a deleted channel and for one the bot
+was removed from or never joined (measured 2026-11-05), so the lookup asks again with the owner's
+client (`SlackChatOptions.channelReader`, set when the token holds `groups:read`,
+`module.canReadChannels`): `channel_not_found` there too is `gone`; ok is no answer, with a log line
+saying the bot is not in a channel that exists. With no owner client the bot's `channel_not_found`
+is no answer, logged. Any other failure is no answer and removes nothing.
 
 - The lookup for threads is `channels.threadLookup`: `gone` is `thread_not_found`
 from `conversations.replies` on the root with `limit=1`, or a root returned as a tombstone

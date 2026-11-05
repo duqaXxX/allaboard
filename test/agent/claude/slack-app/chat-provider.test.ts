@@ -139,11 +139,14 @@ test("a thread was opened at its ts, in seconds; a name that is no number says n
   assert.equal(chat.openedAt({ channel: CHANNEL, thread: "not-a-ts" }), null);
 });
 
-test("a channel is gone only for channel_not_found", async () => {
-  const { slack, chat } = madeChat();
+test("a channel is gone only when the bot and the owner's token both say channel_not_found", async () => {
+  const owner = new FakeSlack();
+  const { slack, chat } = madeChat({ channelReader: owner });
   assert.equal(await chat.channelState(CHANNEL), "there");
   assert.deepEqual(slack.callsTo("conversations.info"), [{ channel: CHANNEL }]);
   slack.responses["conversations.info"] = rejected("channel_not_found");
+  assert.equal(await chat.channelState(CHANNEL), "no answer", "the owner still sees it");
+  owner.responses["conversations.info"] = rejected("channel_not_found");
   assert.equal(await chat.channelState(CHANNEL), "gone");
   slack.responses["conversations.info"] = rejected("ratelimited");
   await assert.rejects(
@@ -342,6 +345,7 @@ test("with a deleter the provider declares threadDelete, and deleteThread asks t
     deletion: {
       delete: async () => null,
       pinned: async () => null,
+      deletable: async () => null,
       survey: async () => ({ threads: 0, busy: 0, pinned: 0 }),
       purge: async () => null,
     },

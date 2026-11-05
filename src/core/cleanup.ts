@@ -3,9 +3,9 @@
  * whose first message the chat no longer has, and a thread whose session is gone. Run once on
  * start and then every `CLEAN_EVERY_SECONDS`, so a daemon that stays up for weeks cleans too.
  *
- * Only a certain answer removes anything. A channel is certainly gone when the chat says it does
- * not exist, which a chat may also answer for a channel the bot was removed from: the two cannot
- * be told apart, and a channel forgotten by mistake is bound again with `!bind`. A rate limit, a
+ * Only a certain answer removes anything. A channel is certainly gone only when the chat provider
+ * has made it certain (a chat may answer the same for a channel the bot was removed from, which
+ * is the provider's to tell apart, or else to keep). A rate limit, a
  * server error or the network is no answer and removes nothing. A thread is asked about only in
  * a channel that answered `there` in the same pass (the credentials of another account of the
  * chat must never wipe threads), and its certain answer is the chat saying its first message does
@@ -241,7 +241,13 @@ export async function clean(
       now(),
       live(),
     );
-    if (removed > 0) log.info(`pruned ${removed} stale thread(s) from state.json`);
+    for (const { ref, reason } of removed) {
+      log.info(
+        `pruned thread ${ref.channel}/${ref.thread}: ${
+          reason === "session gone" ? "its session is gone" : "no session started within a day"
+        }`,
+      );
+    }
   } catch (error) {
     log.warning(`could not prune stale threads: ${errorName(error)}`);
   }
