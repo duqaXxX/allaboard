@@ -51,6 +51,7 @@ import { cancellable, formatDuration, Mutex, type Previews } from "../../../core
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, RunningList, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
+import type { SessionState } from "./agent-session.ts";
 import {
   asideBlock,
   BANNER_LIMIT,
@@ -504,6 +505,17 @@ export interface ReplySinkOptions {
    */
   readonly onWrite?: () => void;
   /**
+   * The session status a stream stop carries (`session_status`, which Slack sets `active` when
+   * absent), read right before the call; undefined: no field.
+   */
+  readonly sessionStatus?: () => SessionState | undefined;
+  /**
+   * Called after a stream call that may have changed the thread's agent session: what a stop
+   * carried (`undefined`: no field), `processing` after a start, `null`: unknown outcome.
+   * Synchronous, never awaited here.
+   */
+  readonly onSessionWrite?: (carried: SessionState | undefined | null) => void;
+  /**
    * Where the thread's messages sit, shared by every reply of the thread; a reply with a
    * message of another reply below it ends where it is. Absent, the reply knows of no other.
    */
@@ -542,6 +554,8 @@ export class ReplySink implements Sink {
   private readonly steady: Clock;
   private readonly onOpenReply: ((old: string | null, fresh: string | null) => void) | null;
   private readonly onWrite: (() => void) | null;
+  private readonly sessionStatus: () => SessionState | undefined;
+  private readonly onSessionWrite: (carried: SessionState | undefined | null) => void;
   private readonly places: ThreadPlaces;
   private readonly logger: Logger;
   private readonly debounceSeconds: number;
@@ -643,6 +657,8 @@ export class ReplySink implements Sink {
     this.places = options.places ?? new ThreadPlaces();
     this.places.join(this);
     this.onWrite = options.onWrite ?? null;
+    this.sessionStatus = options.sessionStatus ?? (() => undefined);
+    this.onSessionWrite = options.onSessionWrite ?? (() => {});
     this.logger = options.logger ?? defaultLogger;
     this.debounceSeconds = options.debounceSeconds ?? DEBOUNCE_SECONDS;
     this.finalRetrySeconds = options.finalRetrySeconds ?? FINAL_RETRY_SECONDS;
@@ -2096,10 +2112,15 @@ export class ReplySink implements Sink {
               : ""),
         );
         const ts = unknown ? await this.adopt(attempted, true, ReplySink.firstWords(plan)) : null;
-        if (ts === null) return [false, null];
+        if (ts === null) {
+          // The read-back may have failed, not found nothing: the start may have landed.
+          if (unknown) this.onSessionWrite(null);
+          return [false, null];
+        }
         streamTs = ts; // it landed: this is that stream
       }
       message.ts = streamTs;
+      this.onSessionWrite("processing"); // a start sets it, as the documentation says
       this.places.moved();
       message.streaming = true;
       message.started = attempted;
@@ -2145,6 +2166,7 @@ export class ReplySink implements Sink {
       if (code === NOT_STREAMING) {
         // Slack ended the stream first: the message goes on by update.
         this.gone(message);
+        this.onSessionWrite(null); // its own stop set the session
         // A rest stop that landed with its answer lost: the reply is at rest from here on.
         if (this.restRequested) this.places.place();
         return this.updateStep(message, null, true);
@@ -2185,13 +2207,19 @@ export class ReplySink implements Sink {
     if (ts === null) throw new Error("a stop of a stream that never started");
     let footer = blocks !== null && blocks.length > 0 ? blocks : null;
     let result: "stopped" | "gone" = "stopped";
+    let carried: SessionState | undefined;
+    let accepted = false;
     try {
       this.wrote = true;
+      // Read at the call: a stop without the field sets the session `active`.
+      carried = this.sessionStatus();
       await this.slack.chat.stopStream({
         channel: this.channel,
         ts,
         ...(footer === null ? {} : { blocks: footer }),
+        ...(carried === undefined ? {} : { session_status: carried }),
       });
+      accepted = true;
     } catch (error) {
       if (describe(error) !== NOT_STREAMING) {
         this.logger.warning(`could not stop a reply's stream: ${describe(error)}`);
@@ -2200,6 +2228,7 @@ export class ReplySink implements Sink {
         if (unknownOutcome(error) && ours && message.stopUnknown === null) {
           message.stopUnknown = [...(footer ?? [])];
         }
+        if (unknownOutcome(error)) this.onSessionWrite(null); // it may have landed
         return "failed";
       }
       if (message.stopUnknown !== null && !this.pastLife(message)) {
@@ -2212,7 +2241,11 @@ export class ReplySink implements Sink {
         result = "gone";
       }
       message.stopUnknown = null;
+      // Which stop set the session, if any, is not known.
+      this.onSessionWrite(null);
     }
+    // Outside the try: a throw of the callback cannot turn a landed stop into a failed one.
+    if (accepted) this.onSessionWrite(carried);
     this.gone(message);
     message.stopUnknown = null;
     message.exact = this.streamShows(message, end);

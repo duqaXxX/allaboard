@@ -187,6 +187,78 @@ test("a write of a reply sets the thread status again", async () => {
   assert.equal(slack.callsTo("assistant.threads.setStatus").at(-1)?.status, "");
 });
 
+test("a turn ending with background work leaves the session processing (#199)", async () => {
+  const replies = new FakeSlack();
+  const { slack, clock, thread } = made({ replies });
+  thread.showActivity({ kind: "working" });
+  await settle(clock);
+  assert.deepEqual(
+    slack.callsTo("agents.sessions.setStatus").map((call) => call.status),
+    ["processing"],
+  );
+  const reply = thread.openReply(() => {});
+  await reply.text("The turn is over, a subagent runs.");
+  await reply.finish([]);
+  assert.equal(await reply.closeOut(), true);
+  await settle(clock);
+  // Slack's stop would have set `active`: it carries what the thread wants, and nothing is resent.
+  assert.equal(only(replies.callsTo("chat.stopStream")).session_status, "processing");
+  assert.deepEqual(
+    slack.callsTo("agents.sessions.setStatus").map((call) => call.status),
+    ["processing"],
+  );
+  await thread.close();
+});
+
+test("a stop answered not_streaming makes the thread send its wanted status again (#199)", async () => {
+  const replies = new FakeSlack();
+  const { slack, clock, thread } = made({ replies });
+  thread.showActivity({ kind: "working" });
+  await settle(clock);
+  const reply = thread.openReply(() => {});
+  await reply.text("Started.");
+  await reply.finish([]); // the flush starts the stream
+  replies.expire(replies.streamTs[0] ?? ""); // Slack ended the stream: its own stop set the session
+  await reply.closeOut();
+  await settle(clock);
+  assert.deepEqual(
+    slack.callsTo("agents.sessions.setStatus").map((call) => call.status),
+    ["processing", "processing"],
+  );
+  await thread.close();
+});
+
+test("a root working with the activity line cleared after the stop stays processing (#199)", async () => {
+  const replies = new FakeSlack();
+  const { slack, clock, thread } = made({ replies });
+  await thread.showStatus("working");
+  thread.showActivity({ kind: "working" });
+  await settle(clock);
+  const reply = thread.openReply(() => {});
+  await reply.text("A subagent runs.");
+  await reply.finish([]);
+  await reply.closeOut();
+  thread.showActivity(null); // a task that outlives its turn leaves the line empty
+  await settle(clock);
+  assert.equal(only(replies.callsTo("chat.stopStream")).session_status, "processing");
+  assert.equal(slack.callsTo("agents.sessions.setStatus").at(-1)?.status, "processing");
+  await thread.close();
+});
+
+test("a stop on an app that refuses agent sessions carries no status field (#199)", async () => {
+  const replies = new FakeSlack();
+  const { slack, clock, thread } = made({ replies });
+  slack.responses["agents.sessions.setStatus"] = rejected("feature_disabled");
+  thread.showActivity({ kind: "working" });
+  await settle(clock);
+  const reply = thread.openReply(() => {});
+  await reply.text("hello");
+  await reply.finish([]);
+  await reply.closeOut();
+  assert.ok(!("session_status" in only(replies.callsTo("chat.stopStream"))));
+  await thread.close();
+});
+
 /** A line that records which threads it was asked to name, and by which root texts. */
 function recordingLine(): {
   line: ChannelLine;
@@ -750,3 +822,8 @@ test("a thread keeps no reply the places let go of", async () => {
   thread.openReply(() => {});
   assert.equal(opened(), 1, "only the reply still held");
 });
+
+function only<T>(items: readonly T[]): T {
+  assert.equal(items.length, 1);
+  return items[0] as T;
+}
