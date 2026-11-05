@@ -1489,7 +1489,12 @@ test("a notice shows under the header", () => {
 test("edit and delete publish the page and keep it in edit mode", async (t) => {
   const w = world(t);
   const asked: [string, string][] = [];
-  const answers: (DeleteRefusal | null)[] = [{ reason: "busy" }, null];
+  const answers: (DeleteRefusal | null)[] = [
+    { reason: "not-allaboard" },
+    { reason: "unbound" },
+    { reason: "busy" },
+    null,
+  ];
   const home = makeHome(w, listing(w), {
     delete: async (channelId, threadTs) => {
       asked.push([channelId, threadTs]);
@@ -1508,6 +1513,15 @@ test("edit and delete publish the page and keep it in edit mode", async (t) => {
   assert.equal(buttons(published(w.slack).at(-1) as Json, DELETE_ACTION).length, 1);
   await home.delete(CHANNEL, OLD_THREAD);
   let page = published(w.slack).at(-1) as Json;
+  assert.ok(
+    notes(page).includes(`“Fix the footer”: ${slackTexts.HOME_DELETE_NOT_ALLABOARD}`),
+    "a thread the deleter does not take is told, and stays listed",
+  );
+  await home.delete(CHANNEL, OLD_THREAD);
+  page = published(w.slack).at(-1) as Json;
+  assert.ok(notes(page).includes(`“Fix the footer”: ${slackTexts.HOME_DELETE_UNBOUND}`));
+  await home.delete(CHANNEL, OLD_THREAD);
+  page = published(w.slack).at(-1) as Json;
   // It names the thread.
   assert.ok(notes(page).includes(`“Fix the footer”: ${slackTexts.HOME_DELETE_BUSY}`));
   assert.equal(buttons(page, DELETE_ACTION).length, 1); // still listed, still in edit mode
@@ -1515,6 +1529,8 @@ test("edit and delete publish the page and keep it in edit mode", async (t) => {
   await home.delete(CHANNEL, OLD_THREAD);
   page = published(w.slack).at(-1) as Json;
   assert.deepEqual(asked, [
+    [CHANNEL, OLD_THREAD],
+    [CHANNEL, OLD_THREAD],
     [CHANNEL, OLD_THREAD],
     [CHANNEL, OLD_THREAD],
   ]);

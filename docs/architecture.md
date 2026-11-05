@@ -743,7 +743,8 @@ chat stops. It removes only what an answer makes certain:
   (`AgentBackend.aliveSessions`, which for Claude is `listing.aliveSessions`: the sessions the SDK
   lists, with every transcript file in the folder's transcript directory) and a no-session thread
   that the chat (`ChatProvider.openedAt`) says was opened more than a day ago; one it cannot
-  date is kept. A folder the back end cannot tell about keeps its
+  date is kept. It returns each thread removed with its reason, and the pass logs one line per
+  thread (`pruned thread <channel>/<thread>: ...`, ids only). A folder the back end cannot tell about keeps its
   threads: one whose transcript directory is there and cannot be read, one whose directory cannot be
   checked for (a `stat` that fails with anything but `ENOENT` or `ENOTDIR`, such as `EACCES` on the
   projects directory above it), and one whose name passes

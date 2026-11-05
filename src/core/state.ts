@@ -22,6 +22,12 @@ export const ONE_DAY = 24 * 60 * 60;
 /** When a thread was opened, in epoch seconds; null when the chat cannot tell. */
 export type OpenedAt = (ref: ThreadRef) => number | null;
 
+/** A thread `StateStore.prune` removed, and why: its session left the folder, or none ever started. */
+export interface Pruned {
+  readonly ref: ThreadRef;
+  readonly reason: "session gone" | "never started";
+}
+
 /**
  * The names of the agent and the chat a `state.json` was written for: a session id and a thread's
  * name mean nothing to another agent or another chat.
@@ -793,18 +799,18 @@ export class StateStore {
    * null means it cannot tell, and that folder's threads are kept. `keep` names the
    * (channelId, threadId) to leave alone whatever they look like: the threads with a live
    * session, whose id may not be on disk yet. If `alive` throws, nothing is removed or written;
-   * the caller decides what to do next. Returns how many entries were removed.
+   * the caller decides what to do next. Returns the entries removed, each with why.
    */
   prune(
     alive: (directory: string) => Iterable<string> | null,
     openedAt: OpenedAt,
     now: number,
     keep: Iterable<ThreadRef> = [],
-  ): number {
+  ): Pruned[] {
     const kept = new Set([...keep].map((ref) => threadKey(ref.channel, ref.thread)));
     const aliveCache = new Map<string, ReadonlySet<string> | null>();
     const updated = new Map<string, ChannelRecord>();
-    let removed = 0;
+    const removed: Pruned[] = [];
     for (const [channelId, channel] of this.channelsById) {
       const survivors = new Map<string, ThreadState>();
       for (const [threadId, thread] of channel.threads) {
@@ -819,13 +825,16 @@ export class StateStore {
           }
           const sessions = aliveCache.get(thread.directory);
           if (sessions && !sessions.has(thread.sessionId)) {
-            removed += 1;
+            removed.push({ ref: { channel: channelId, thread: threadId }, reason: "session gone" });
             continue;
           }
         } else {
           const opened = openedAt({ channel: channelId, thread: threadId });
           if (opened !== null && now - opened > ONE_DAY) {
-            removed += 1;
+            removed.push({
+              ref: { channel: channelId, thread: threadId },
+              reason: "never started",
+            });
             continue;
           }
         }
@@ -836,7 +845,7 @@ export class StateStore {
         survivors.size === channel.threads.size ? channel : { ...channel, threads: survivors },
       );
     }
-    if (removed > 0) {
+    if (removed.length > 0) {
       const gone: ThreadRef[] = [];
       for (const [channelId, channel] of this.channelsById) {
         const after = updated.get(channelId)?.threads;

@@ -257,6 +257,8 @@ export class World {
   threadDeleteRefusal: DeleteRefusal | null = null;
   /** What the deleter answers before `!delete-thread` asks its question: null for no pin. */
   pinnedRefusal: PinnedRefusal | null = null;
+  /** What the deleter answers before the question: whether it may take the thread, or throws. */
+  deletable: DeleteRefusal | "gone" | Error | null = null;
   /** How many passes of the daemon's cleanup the Home tab's Refresh asked for. */
   cleanups = 0;
   /** The Slack provider the handlers answer through. */
@@ -386,6 +388,10 @@ export class World {
             return this.threadDeleteRefusal;
           },
           pinned: async () => this.pinnedRefusal,
+          deletable: async () => {
+            if (this.deletable instanceof Error) throw this.deletable;
+            return this.deletable;
+          },
           survey: async () => ({ threads: 3, busy: 1, pinned: 0 }),
           purge: async (channelId: string) => {
             this.channelCleans.push(channelId);

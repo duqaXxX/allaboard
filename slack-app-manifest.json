@@ -32,6 +32,7 @@
       ],
       "user": [
         "chat:write",
+        "groups:read",
         "pins:write"
       ]
     },

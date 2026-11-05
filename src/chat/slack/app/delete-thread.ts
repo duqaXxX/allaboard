@@ -24,6 +24,10 @@ function deleteLine(refusal: DeleteRefusal, names: Names): string {
   switch (refusal.reason) {
     case "busy":
       return texts.DELETE_THREAD_BUSY;
+    case "not-allaboard":
+      return slackTexts.THREAD_DELETE_NOT_ALLABOARD;
+    case "unbound":
+      return texts.DELETE_THREAD_UNBOUND;
     case "pinned":
       return pinnedLine(refusal, names);
     case "refused":
@@ -49,6 +53,12 @@ export class DeleteThread {
    * thread gets the refusal's line instead: the question is not asked of what is not deleted.
    */
   async ask(channel: string, threadTs: string): Promise<void> {
+    const refusal = await this.deletable(channel, threadTs);
+    if (refusal === "gone") return; // nothing to ask about, and no line: it is not there
+    if (refusal !== null) {
+      await this.answers.tellOwner(channel, threadTs, deleteLine(refusal, this.parts.names));
+      return;
+    }
     const pinned = await this.pinned(channel, threadTs);
     if (pinned !== null) {
       await this.answers.tellOwner(channel, threadTs, pinnedLine(pinned, this.parts.names));
@@ -61,6 +71,24 @@ export class DeleteThread {
       deleteThreadBlocks(this.parts.names),
       { ephemeral: true },
     );
+  }
+
+  /**
+   * Why the deleter would not take the thread, null when it would. One that cannot be read is no
+   * refusal: the question is shown, and `ThreadDeleter.delete` asks again on the owner's yes.
+   */
+  private async deletable(
+    channel: string,
+    threadTs: string,
+  ): Promise<DeleteRefusal | "gone" | null> {
+    try {
+      return (await this.parts.deletion?.deletable(channel, threadTs)) ?? null;
+    } catch (error) {
+      logger.warning(
+        `could not read whether ${channel}/${threadTs} is deletable: ${describe(error)}`,
+      );
+      return null;
+    }
   }
 
   /**

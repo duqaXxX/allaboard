@@ -65,6 +65,40 @@ test("a pinned thread gets the refusal in place of the question", async (t) => {
   );
 });
 
+test("a thread allaboard did not start gets a line in place of the question", async (t) => {
+  const world = worldOf(t);
+  world.deletable = { reason: "not-allaboard" };
+  await world.built.askDelete(CHANNEL, THREAD);
+  const posts = world.slack.callsTo("chat.postEphemeral") as Body[];
+  assert.equal(posts.length, 1);
+  const [post] = posts as [Body];
+  assert.equal(post.text, slackTexts.THREAD_DELETE_NOT_ALLABOARD);
+  assert.equal(post.thread_ts, THREAD);
+  assert.ok(!(post.blocks as Body[]).some((block) => block.type === "actions"), "no question");
+});
+
+test("an unbound channel's thread gets the core's line, and a gone thread nothing", async (t) => {
+  const world = worldOf(t);
+  world.deletable = { reason: "unbound" };
+  await world.built.askDelete(CHANNEL, THREAD);
+  assert.equal(
+    (world.slack.callsTo("chat.postEphemeral").at(-1) as Body).text,
+    texts.DELETE_THREAD_UNBOUND,
+  );
+  const before = world.slack.callsTo("chat.postEphemeral").length;
+  world.deletable = "gone";
+  await world.built.askDelete(CHANNEL, THREAD);
+  assert.equal(world.slack.callsTo("chat.postEphemeral").length, before);
+});
+
+test("a thread that cannot be read is asked about anyway: the click checks it again", async (t) => {
+  const world = worldOf(t);
+  world.deletable = new Error("ratelimited");
+  await world.built.askDelete(CHANNEL, THREAD);
+  const [post] = world.slack.callsTo("chat.postEphemeral") as [Body];
+  assert.equal(post.text, slackTexts.HOME_DELETE_TITLE);
+});
+
 test("Delete thread takes the question away, then deletes the thread the click sits in", async (t) => {
   const responses = respondedTo(t);
   const world = worldOf(t);
@@ -79,6 +113,8 @@ test("Delete thread takes the question away, then deletes the thread the click s
 // the Home tab's, which speak of a page and a button the thread does not have.
 const REFUSALS: readonly [DeleteRefusal, string][] = [
   [{ reason: "busy" }, texts.DELETE_THREAD_BUSY],
+  [{ reason: "not-allaboard" }, slackTexts.THREAD_DELETE_NOT_ALLABOARD],
+  [{ reason: "unbound" }, texts.DELETE_THREAD_UNBOUND],
   [{ reason: "pinned", where: "root" }, named(slackTexts.DELETE_PINNED_ROOT, NAMES)],
   [{ reason: "pinned", where: "reply" }, named(slackTexts.DELETE_PINNED_REPLY, NAMES)],
   [

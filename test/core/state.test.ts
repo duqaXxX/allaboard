@@ -457,7 +457,7 @@ test("a store given no sync flushes with the system's own", POSIX_ONLY, (t) => {
   assert.equal(flush.mock.callCount(), 2);
 });
 
-// TestPrune: `prune` calls `alive` once per distinct folder and reports how many entries it removed.
+// TestPrune: `prune` calls `alive` once per distinct folder and reports the entries it removed, each with its reason.
 
 test("removes a thread whose session is gone", () => {
   const dir = scratch();
@@ -467,7 +467,9 @@ test("removes a thread whose session is gone", () => {
   store.setSession(CHANNEL, THREAD, SESSION);
 
   const removed = store.prune(() => [], opened, ROOT_TIME);
-  assert.equal(removed, 1);
+  assert.deepEqual(removed, [
+    { ref: { channel: CHANNEL, thread: THREAD }, reason: "session gone" },
+  ]);
   assert.equal(store.thread(CHANNEL, THREAD), null);
 });
 
@@ -479,7 +481,7 @@ test("keeps a thread whose session is alive", () => {
   store.setSession(CHANNEL, THREAD, SESSION);
 
   const removed = store.prune(() => [SESSION], opened, ROOT_TIME);
-  assert.equal(removed, 0);
+  assert.deepEqual(removed, []);
   assert.notEqual(store.thread(CHANNEL, THREAD), null);
 });
 
@@ -491,7 +493,9 @@ test("removes a no session thread older than a day", () => {
 
   const rootTime = ROOT_TIME;
   const removed = store.prune(() => [], opened, rootTime + 86_401);
-  assert.equal(removed, 1);
+  assert.deepEqual(removed, [
+    { ref: { channel: CHANNEL, thread: THREAD }, reason: "never started" },
+  ]);
   assert.equal(store.thread(CHANNEL, THREAD), null);
 });
 
@@ -503,7 +507,7 @@ test("keeps a young no session thread", () => {
 
   const rootTime = ROOT_TIME;
   const removed = store.prune(() => [], opened, rootTime + 3_600);
-  assert.equal(removed, 0);
+  assert.deepEqual(removed, []);
   assert.notEqual(store.thread(CHANNEL, THREAD), null);
 });
 
@@ -523,7 +527,7 @@ test("calls alive once per distinct folder", () => {
   store.setSession(CHANNEL, OTHER_THREAD, SESSION);
 
   const removed = store.prune(alive, opened, ROOT_TIME);
-  assert.equal(removed, 0);
+  assert.deepEqual(removed, []);
   assert.deepEqual(calls, [join(dir, "project")]);
 });
 
@@ -778,7 +782,7 @@ test("prune keeps every thread of a folder it cannot decide", () => {
   const alive = (directory: string): Set<string> | null =>
     directory.endsWith("undecided") ? null : new Set();
 
-  assert.equal(store.prune(alive, opened, 1_700_000_000), 1);
+  assert.equal(store.prune(alive, opened, 1_700_000_000).length, 1);
   assert.notEqual(store.thread("chan-1", "thread-a"), null);
   assert.equal(store.thread("chan-1", "thread-b"), null);
 });
@@ -1009,15 +1013,9 @@ test("the observer hears a prune that removed something", () => {
   const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
-  assert.equal(
-    store.prune(() => new Set([SESSION]), opened, ROOT_TIME),
-    0,
-  );
+  assert.equal(store.prune(() => new Set([SESSION]), opened, ROOT_TIME).length, 0);
   assert.deepEqual(heard, []);
-  assert.equal(
-    store.prune(() => new Set(), opened, ROOT_TIME),
-    1,
-  );
+  assert.equal(store.prune(() => new Set(), opened, ROOT_TIME).length, 1);
   assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD }]]);
 });
 
@@ -1076,12 +1074,9 @@ test("prune leaves alone the threads it is told to keep", () => {
     { channel: CHANNEL, thread: THREAD },
     { channel: CHANNEL, thread: OTHER_THREAD },
   ];
+  assert.equal(store.prune(() => new Set(), opened, later, keep).length, 0);
   assert.equal(
-    store.prune(() => new Set(), opened, later, keep),
-    0,
-  );
-  assert.equal(
-    store.prune(() => new Set(), opened, later, [{ channel: CHANNEL, thread: THREAD }]),
+    store.prune(() => new Set(), opened, later, [{ channel: CHANNEL, thread: THREAD }]).length,
     1,
   );
   assert.notEqual(store.thread(CHANNEL, THREAD), null);

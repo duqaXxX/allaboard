@@ -979,7 +979,9 @@ export interface ChatProvider {
     keep?: (text: string) => void | Promise<void>,
   ): Promise<void>;
   /**
-   * `!delete-thread` typed in an idle session's thread: asks the owner alone to confirm, and on
+   * `!delete-thread` typed in an idle session's thread, or in a thread with no session (the core
+   * checks the channel is bound and no delete runs; the provider decides whether such a thread is
+   * the daemon's, and refuses otherwise): asks the owner alone to confirm, and on
    * their yes deletes the thread's messages and forgets the thread, as the chat's index deletes
    * one; a no leaves everything as it was. Resolves once the question is shown. Present with
    * `threadDelete`.

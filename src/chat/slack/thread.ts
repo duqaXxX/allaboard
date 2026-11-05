@@ -172,6 +172,11 @@ export interface SlackChatOptions {
    * all, so the edits of a root queue behind one another.
    */
   readonly roots?: RootEditor;
+  /**
+   * The owner's client, present when its token holds `groups:read` (`module.canReadChannels`): it
+   * tells a deleted channel from one the bot was removed from.
+   */
+  readonly channelReader?: WebClient;
   /** Whether the token can pin, which tags and titles do not need (`module.canPin`). */
   readonly canPin?: boolean;
   /**
@@ -479,7 +484,7 @@ export class SlackChat implements ChatProvider {
   }
 
   channelState(channel: string): Promise<Presence> {
-    return channelLookup(this.options.slack)(channel);
+    return channelLookup(this.options.slack, this.options.channelReader ?? null)(channel);
   }
 
   threadState(ref: ThreadRef): Promise<Presence> {

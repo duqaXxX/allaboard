@@ -471,6 +471,8 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     agent: () => AGENT,
     limiter: world.limiter,
     clock: world.slackClock,
+    // The same fake answers for the owner's token: a channel that went is gone to both.
+    channelReader: world.slack,
     app: {
       core: () => core,
       config: world.config,

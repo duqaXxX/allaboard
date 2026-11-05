@@ -735,15 +735,45 @@ test("!clean-channel in a chat that cannot clean says so", async (t) => {
 
 // --- !delete-thread
 
-test("!delete-thread belongs to a session, in the channel and in a thread that holds none", async (t) => {
+test("!delete-thread belongs to a session: at the top level of the channel it is refused", async (t) => {
   const world = await MessagesWorld.make(t, { deletes: true });
   await world.says("!delete-thread");
-  const answers = () => world.inChannel().filter((line) => line === texts.DELETE_THREAD_TOP_LEVEL);
-  assert.equal(answers().length, 1);
+  assert.equal(world.inChannel().filter((l) => l === texts.DELETE_THREAD_TOP_LEVEL).length, 1);
+  assert.deepEqual(world.deleteCalls, []);
+});
+
+test("!delete-thread in a thread state.json holds no session for goes to the chat's delete", async (t) => {
+  const world = await MessagesWorld.make(t, { deletes: true });
   const outside = world.chat.openThread(world.channel);
   await world.says("!delete-thread", outside.thread);
-  assert.equal(answers().length, 2, "a thread that holds no session is answered in the channel");
+  assert.deepEqual(world.deleteCalls, [outside]);
+});
+
+test("!delete-thread in a thread held by a delete under way says it is busy", async (t) => {
+  const world = await MessagesWorld.make(t, { deletes: true });
+  const outside = world.chat.openThread(world.channel);
+  assert.equal(world.sessions.hold(world.channel, outside.thread), true);
+  await world.says("!delete-thread", outside.thread);
+  assert.equal(world.shown(outside).at(-1), texts.DELETE_THREAD_BUSY);
   assert.deepEqual(world.deleteCalls, []);
+});
+
+test("!delete-thread in an unbound channel's thread does nothing but say so", async (t) => {
+  const world = await MessagesWorld.make(t, { deletes: true });
+  const outside = world.chat.openThread(world.channel);
+  world.state.removeChannel(world.channel);
+  await world.says("!delete-thread", outside.thread);
+  assert.equal(world.shown(outside).at(-1), texts.DELETE_THREAD_UNBOUND);
+  assert.deepEqual(world.deleteCalls, []);
+});
+
+test("!delete-thread in a thread of a chat that cannot delete says so, held or unbound too", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const outside = world.chat.openThread(world.channel);
+  world.sessions.hold(world.channel, outside.thread);
+  world.state.removeChannel(world.channel);
+  await world.says("!delete-thread", outside.thread);
+  assert.equal(world.shown(outside).at(-1), named(texts.DELETE_THREAD_UNAVAILABLE, PLAIN_NAMES));
 });
 
 test("!delete-thread in an idle session's thread hands the confirmation to the chat", async (t) => {
