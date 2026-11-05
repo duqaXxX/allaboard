@@ -66,13 +66,21 @@ import { listBlocks } from "./lists.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
 import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
+import { AgentSessions } from "./reply/agent-session.ts";
 import { contextBlock, footerBlock, noticeText, split } from "./reply/blocks.ts";
 import { crossedError, deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { positionOf, ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
-import { activityWords, REACTIONS, Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
+import {
+  activityWords,
+  REACTIONS,
+  rootStatusOf,
+  Status,
+  StatusReaction,
+  ThreadStatus,
+} from "./reply/status.ts";
 import {
   answeredBlocks,
   approvalBlocks,
@@ -524,7 +532,12 @@ export class SlackChat implements ChatProvider {
     }
   }
 
+  get agentSessions(): AgentSessions {
+    return agentSessionsOf(this.options);
+  }
+
   async close(): Promise<void> {
+    await agentSessionsOf(this.options).close();
     await this.options.app?.home.close();
   }
 }
@@ -540,6 +553,20 @@ const withdrawn = new WeakMap<SlackChatOptions, Set<string>>();
 // keeps the model list alone.
 const SETUPS_KEPT = 64;
 const drawnSetups = new WeakMap<SlackChatOptions, Map<string, SetupDraw>>();
+
+// One registry of agent sessions per provider: it outlives every `SlackThread` (`reply/agent-session.ts`).
+const agentSessions = new WeakMap<SlackChatOptions, AgentSessions>();
+
+function agentSessionsOf(options: SlackChatOptions): AgentSessions {
+  let sessions = agentSessions.get(options);
+  if (sessions === undefined) {
+    sessions = new AgentSessions(options.slack, {
+      clock: options.steady ?? options.clock ?? monotonicClock,
+    });
+    agentSessions.set(options, sessions);
+  }
+  return sessions;
+}
 
 /** How a thread object holds its thread's places: taken at its first reply, given back at its close. */
 interface ThreadLease {
@@ -561,6 +588,9 @@ export class SlackThread implements ThreadChat {
   private readonly reaction: StatusReaction;
   /** Slack's status line at the bottom of the thread. */
   private readonly line: ThreadStatus;
+  /** The thread's Slack agent session: fed with the root status and the activity line. */
+  private readonly agent: AgentSessions;
+  private readonly ref: ThreadRef;
   private readonly stopped: AbortSignal;
   private readonly lease: ThreadLease;
   /** The places of this thread, once a reply was opened in it and until the close. */
@@ -595,11 +625,14 @@ export class SlackThread implements ThreadChat {
     this.lease = lease;
     this.slack = options.slack;
     this.clock = options.clock ?? systemClock;
+    this.agent = agentSessionsOf(options);
+    this.ref = { channel: channelId, thread: threadTs };
     this.reaction = new StatusReaction(this.slack, { channel: channelId, rootTs: threadTs });
     this.line = new ThreadStatus(this.slack, {
       channel: channelId,
       threadTs,
       clock: options.steady ?? options.clock ?? monotonicClock,
+      onBridged: (cleared) => this.agent.bridged(this.ref, cleared),
     });
     this.onWritten = written ?? (() => this.line.wrote());
   }
@@ -651,6 +684,7 @@ export class SlackThread implements ThreadChat {
       const mention = this.mention();
       if (mention !== undefined) void this.tellEnd(kind, mention);
     }
+    this.agent.root(this.ref, status);
     return this.reaction.show(REACTIONS[status], options.signal);
   }
 
@@ -699,14 +733,19 @@ export class SlackThread implements ThreadChat {
   }
 
   clearStatus(): Promise<void> {
+    this.agent.root(this.ref, null);
     return this.reaction.clear();
   }
 
-  settleStatus(): Promise<void> {
-    return this.reaction.settle();
+  async settleStatus(): Promise<void> {
+    await this.reaction.settle();
+    // The state asked for last, which may be another object's, not the one a failed call left.
+    const shown = this.reaction.requested;
+    if (shown !== null) this.agent.root(this.ref, rootStatusOf(shown));
   }
 
   showActivity(activity: Activity | null): void {
+    this.agent.activity(this.ref, activity !== null);
     if (activity === null) this.line.show("", "");
     else this.line.show(...activityWords(activity));
   }
@@ -1118,6 +1157,8 @@ export class SlackThread implements ThreadChat {
       this.lease.give();
     }
     await this.line.close();
+    // The close clears the line; the session's end status still reaches the entry afterwards.
+    this.agent.activity(this.ref, false);
   }
 
   private get place(): { readonly channel: string; readonly threadTs: string } {

@@ -106,9 +106,56 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
   return unserved;
 }
 
+/**
+ * `!stop` inside a session's thread: either answer is a post that stays (a line for the owner
+ * alone is gone on reload). False when nothing was stopped; when only a hold was cancelled (null
+ * from the session, which said `Not sent.` itself) nothing is posted and the work counts as cut.
+ */
+export function threadStop(
+  deps: FlowDeps,
+  talk: Talk,
+): (ref: ThreadRef, session: ThreadSession) => Promise<boolean> {
+  return async (ref, session) => {
+    const stopped = await session.stop();
+    // The answer goes under the ending and footer of the reply the stop cut short.
+    if (stopped) await session.stopLanded();
+    if (stopped !== null) {
+      const said = stopped ? stoppedText(session.goal, deps) : texts.NOTHING_TO_STOP_THREAD;
+      await talk.tell(ref, said, { stays: true });
+    }
+    return stopped !== false;
+  };
+}
+
+/**
+ * `ChatInbound.stop`: the word's stop. A thread being deleted gets no post, which would outlive
+ * it. A failure is told in the thread, as the word's is, and counts as stopped: work may be cut.
+ */
+export function inboundStop(deps: FlowDeps, talk: Talk): (ref: ThreadRef) => Promise<boolean> {
+  const stopThread = threadStop(deps, talk);
+  return async (ref) => {
+    if (deps.sessions.held(ref.channel, ref.thread)) return false;
+    const session = deps.sessions.get(ref.channel, ref.thread);
+    if (session === null) {
+      await talk.tell(ref, texts.NOTHING_TO_STOP_THREAD, { stays: true });
+      return false;
+    }
+    let stopped = true;
+    await talk.replyOnFailure(
+      ref,
+      async () => {
+        stopped = await stopThread(ref, session);
+      },
+      (told) => talk.tell(ref, told),
+    );
+    return stopped;
+  };
+}
+
 export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: ForkFlow): WordFlow {
   const { chat, agent, sessions, state, names } = deps;
   const status = channelStatus(deps, talk);
+  const stopThread = threadStop(deps, talk);
   const unserved = unservedWords(deps, others);
   const allaboard = others.allaboard;
 
@@ -268,24 +315,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
             await talk.inChannel(channel, stopped ? texts.STOPPED_CHANNEL : texts.NOTHING_TO_STOP);
           }
         } else {
-          // Either answer is a post that stays in the thread: a line for the owner alone is
-          // gone on reload, and the root's mark alone does not say a stop was received. null:
-          // only a hold was cancelled, which already said `Not sent.` from its own waiter.
-          const stopped = await session.stop();
-          if (stopped) {
-            // The answer goes under the ending and the footer of the reply the stop cut
-            // short, which may be a message of its own.
-            await session.stopLanded();
-          }
-          if (stopped !== null) {
-            await talk.tell(
-              ref,
-              stopped ? stoppedText(session.goal, deps) : texts.NOTHING_TO_STOP_THREAD,
-              {
-                stays: true,
-              },
-            );
-          }
+          await stopThread(ref, session);
         }
         return;
       case "memory":

@@ -306,6 +306,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   app.event("message", async ({ event, body }) => {
     const message = event as unknown as Payload;
     const envelope = body as unknown as Payload;
+    // The Messages tab: `message.im` is subscribed only because `agent_view` demands it.
+    if (message.channel_type === "im") return;
     if (!isWrittenMessage(message)) return;
     const [user, team] = messageActor(message, envelope);
     const channel = text(message.channel);
@@ -357,6 +359,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   // check proves whose message went, not who removed it. This may be revisited.
   app.event("message", async ({ event, body }) => {
     const message = event as unknown as Payload;
+    if (message.channel_type === "im") return;
     const deleted = deletedTs(message);
     if (deleted === null) return;
     const channel = text(message.channel);
@@ -387,10 +390,28 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     if (parts.state.thread(channel, deleted) !== null) parts.chat.index?.refresh([ref]);
   });
 
+  // The Stop control of a session in Agents & tools (docs.slack.dev/reference/events/
+  // agent_session_stopped, read 2026-11-04). The workspace is the envelope's `team_id`, taken only
+  // when it says the channel is not shared (as `messageActor` does for a `thread_broadcast`).
+  app.event("agent_session_stopped", async ({ event, body }) => {
+    const stop = event as unknown as Payload;
+    const envelope = body as unknown as Payload;
+    const channel = text(stop.channel);
+    const team = envelope.is_ext_shared_channel === false ? text(envelope.team_id) : null;
+    if (!answers.fromOwner(text(stop.user), team, channel) || channel === null) return;
+    const thread = text(stop.thread_ts);
+    if (thread === null || parts.state.thread(channel, thread) === null) return;
+    if (!(await answers.channelAllowed(channel, thread))) return;
+    const ref = { channel, thread };
+    // The core tells the owner of a failure itself (`ChatInbound`): no member rejects for one.
+    await chat.agentSessions.stopped(ref, await parts.inbound.stop(ref));
+  });
+
   app.event("file_change", ({ event }) => clips.onFileChange(event as unknown as Payload));
   registered.push(
     { kind: "event", id: "message", acknowledgeOnly: false },
     { kind: "event", id: "message deleted", acknowledgeOnly: false },
+    { kind: "event", id: "agent_session_stopped", acknowledgeOnly: false },
     { kind: "event", id: "file_change", acknowledgeOnly: false },
   );
 

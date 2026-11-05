@@ -10,6 +10,7 @@ import { messages } from "./messages.ts";
 import { rewindFlow } from "./rewind.ts";
 import { type FlowDeps, Talk } from "./talk.ts";
 import { updating } from "./update.ts";
+import { inboundStop } from "./words.ts";
 
 export interface Built {
   /** What the chat provider calls when the owner did something. */
@@ -64,6 +65,7 @@ export function buildFlows(deps: FlowDeps): Built {
       },
       unbound: (channel) => talk.unbound(channel),
       rootGone: rootGone(deps),
+      stop: inboundStop(deps, talk),
     }),
   };
 }

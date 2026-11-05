@@ -1487,6 +1487,42 @@ the method (`status.THREAD_STATUS_REFUSED`) stops every `ThreadStatus` from call
 rest of the run. Nothing about it is stored, and a crash leaves at most a status Slack removes by
 itself.
 
+## The agent session
+
+Each thread is also a Slack agent session, listed under **Agents & tools** on desktop
+(`src/chat/slack/reply/agent-session.ts`; `agents.sessions.setStatus` and the event
+`agent_session_stopped`, docs.slack.dev, read 2026-11-04). The session status is derived, never
+stored: the root status and the activity line the core gives a `SlackThread` map to a Slack status.
+
+| Root status | Activity line | Session status |
+|---|---|---|
+| `waiting` | any | `suspended` |
+| `working`, `restarting` | any | `processing` |
+| `done`, `error`, none | showing | `processing` |
+| `done`, `error`, none | none | `active` |
+
+`closed` is never sent: the thread always answers. `AgentSessions` keeps one entry per thread at
+the provider (not in `SlackThread`: the core builds a new `SlackThread` for every call and draws a
+session's end status after its `close`). Every change of the wanted status is sent explicitly, one
+call in flight per thread, the last wanted status winning. `ThreadStatus` is a second writer, since
+a non-empty `assistant.threads.setStatus` sets `processing` and an empty one `active`: after a
+bridged clear the entry sends a wanted `processing` or `suspended` again. While `processing` is
+wanted the call is repeated every 30 minutes against the one-hour timeout of a session left in it.
+A thread nothing was given for (no root status, no activity line) is not written to.
+
+Failures are logged with the channel, the ts and the code, once per code in a row. `missing_scope`,
+`not_allowed_token_type` and `feature_disabled` stop the calls for the rest of the run. On shutdown
+the queue ignores the provider's `stopped` signal (the sessions' end statuses are drawn after the
+daemon aborts it), and `SlackChat.close` cancels the timers, then waits for the queues.
+
+The Stop control arrives as `agent_session_stopped`. Its listener checks the user, the workspace
+(the envelope's `team_id`, taken only when `is_ext_shared_channel` is `false`), that the core keeps
+the thread, and the channel, then calls `ChatInbound.stop`, which does what `!stop` does in the
+thread. When the core stopped something the wanted status is sent again, since the click changes no
+status; when it found nothing to stop, `active` is sent. The manifest's `message.im` events (the
+app's Messages tab) are dropped by the message listeners before anything else, and
+`app_home_opened` has no listener: Bolt acknowledges an event nobody listens for.
+
 ## Repairing a reply
 
 The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's stream, reads the

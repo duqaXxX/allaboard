@@ -132,6 +132,11 @@ export interface Person {
    * the way its Enter does in the chat.
    */
   types(shown: Shown, ref: ThreadRef, text: string): Promise<void>;
+  /**
+   * Uses the chat's control that stops the session of `ref`. Present only on a person of a chat
+   * that has such a control (`ChatInbound.stop`).
+   */
+  stops?(ref: ThreadRef): Promise<void>;
 }
 
 /** A provider under test, not started, with the chat around it. */
@@ -441,6 +446,7 @@ class Recorder implements ChatInbound {
   readonly picks: ListPick[] = [];
   readonly unboundChannels: string[] = [];
   readonly goneRoots: ThreadRef[] = [];
+  readonly stopped: ThreadRef[] = [];
 
   async message(message: InboundMessage): Promise<void> {
     this.messages.push(message);
@@ -468,9 +474,15 @@ class Recorder implements ChatInbound {
     this.goneRoots.push(ref);
   }
 
+  async stop(ref: ThreadRef): Promise<boolean> {
+    this.stopped.push(ref);
+    return true;
+  }
+
   get empty(): boolean {
     return (
       this.messages.length +
+        this.stopped.length +
         this.answers.length +
         this.picks.length +
         this.unboundChannels.length +
@@ -1701,6 +1713,20 @@ export function chatConformance(
     });
 
     describe("the owner check: nobody else reaches the daemon, in or out of the owner's workspace", () => {
+      inbound(
+        "the stop control of the owner reaches the daemon once, and nobody else's",
+        async (s) => {
+          if (s.rig.owner.stops === undefined) return; // this chat has no such control
+          s.rig.keep(s.ref);
+          for (const person of strangers(s.rig)) {
+            await person.stops?.(s.ref);
+            assert.ok(s.inbound.empty);
+          }
+          await s.rig.owner.stops(s.ref);
+          assert.deepEqual(s.inbound.stopped, [s.ref]);
+        },
+      );
+
       inbound(
         "the deletion of a kept thread's first message that somebody else wrote never arrives",
         async (s) => {

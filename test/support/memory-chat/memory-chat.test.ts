@@ -17,6 +17,7 @@ const NOBODY: ChatInbound = {
   picked: async () => {},
   unbound: async () => {},
   rootGone: async () => {},
+  stop: async () => false,
 };
 
 async function built(chat = memoryChat()) {

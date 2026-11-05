@@ -18,6 +18,8 @@ export const MODULE_WORDS: ModuleWords = {
     "reaction_added",
     "app_mention",
     "app_home_opened",
+    "agent_session_stopped",
+    "agent_view",
     "message_changed",
     "message_deleted",
     "block_actions",
@@ -25,6 +27,6 @@ export const MODULE_WORDS: ModuleWords = {
     "Block Kit",
   ],
   patterns: [
-    /^(chat|conversations|views|reactions|pins|files|users|apps|auth|assistant)\.[a-zA-Z]/,
+    /^(chat|conversations|views|reactions|pins|files|users|apps|auth|assistant|agents)\.[a-zA-Z]/,
   ],
 };

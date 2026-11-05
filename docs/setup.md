@@ -158,7 +158,8 @@ they are read only when `slack` is the selected chat.
 What each scope and event of the manifest is for is under
 [Slack scopes and what fails without one](#slack-scopes-and-what-fails-without-one).
 
-allaboard needs none of the app's agent features: leave **Agent experience** and the
+The manifest switches on the app's **Agent experience** (`agent_view`), which lists each
+thread under **Agents & tools** on Slack's desktop app. Leave the
 **Slack Model Context Protocol (MCP) Server** off in the app settings. The MCP server lets an app
 act on behalf of Slack users, which allaboard never needs.
 
@@ -1990,8 +1991,10 @@ kills the daemon and that turn with it after `ExitTimeOut`.
 
 The manifest asks for private channels only (`groups:history`, `groups:read`,
 `message.groups`), `chat:write`, `files:read` to download the files you attach to a message,
-`files:write` for `!open`, which shares a file of the session's folder into its thread, and
-`reactions:write` for the status reaction on a session's root message. It also asks for the user
+`files:write` for `!open`, which shares a file of the session's folder into its thread,
+`reactions:write` for the status reaction on a session's root message, and `assistant:write` and
+`im:history`, which Slack's manifest editor demands beside `agent_view` (the **Agent experience**
+below); no call of the app needs either. It also asks for the user
 scopes `chat:write` and `pins:write`, which give the app your `xoxp-` token for the Home tab's
 Delete and Clean up, for `!delete-thread`, for `!tag` and `!untag`, and for `!pin` and `!unpin` (Part 1, step 3). It subscribes to one more
 event, `file_change`, which is how the app learns that Slack has written the transcript of an
@@ -2013,6 +2016,23 @@ An audio clip needs the `file_change` event among the app's bot events. An app c
 earlier manifest lacks it: add `file_change` under **Event Subscriptions**, **Subscribe to bot
 events**, and save. Without it a clip waits 5 minutes and is dropped, since nothing tells the
 app that its transcript is ready.
+
+The **Agent experience** (`features.agent_view` in the manifest, read in the migration guide
+docs.slack.dev/ai/migrating-to-agent-messaging on 2026-11-04) lists a session's threads under
+**Agents & tools** on desktop: a running thread shows a spinner and a **Stop** control, a thread
+waiting for you shows `Needs your input`, and a finished one shows the app's icon. allaboard sets
+each thread's status with `agents.sessions.setStatus`, which needs `chat:write`, and **Stop** does
+what `!stop` typed in the thread does; it arrives as the bot event `agent_session_stopped`. The
+manifest editor asks for three more things beside `agent_view`: the bot scope `assistant:write`,
+and the bot events `message.im` (with its scope `im:history`) and `app_home_opened`. allaboard
+drops what arrives on `message.im`, since the app's Messages tab is read-only, and does nothing
+with `app_home_opened`. An app created from an earlier
+manifest needs the update: on the app's page choose **App Manifest**, paste the current
+[`slack-app-manifest.json`](../slack-app-manifest.json), save, and reinstall the app to the
+workspace so the new scopes apply. Without it the rest works as before: the
+status calls fail and the failures are logged, and the threads get no spinner, Stop or
+`Needs your input`. Which error Slack returns then has not been measured. iOS shows no **Agents & tools** list
+(`docs/limits.md`).
 
 The line under a thread (`Working…`) is Slack's thread status
 (`assistant.threads.setStatus`), which Slack's reference lists under `chat:write`. When Slack

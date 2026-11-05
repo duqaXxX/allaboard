@@ -878,6 +878,12 @@ export interface ChatInbound {
    * delete of the daemon's holds is left to that delete.
    */
   rootGone(ref: ThreadRef): Promise<void>;
+  /**
+   * The owner used a control of the chat to stop the session of `ref`, as `!stop` typed there
+   * does. True when something was stopped (a hold cancelled alone counts). The provider checks
+   * the owner, the core does not.
+   */
+  stop(ref: ThreadRef): Promise<boolean>;
 }
 
 /**

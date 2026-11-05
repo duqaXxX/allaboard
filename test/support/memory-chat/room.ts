@@ -196,6 +196,11 @@ export interface Person {
    * Resolves with whether it reached the daemon.
    */
   deletes(said: { readonly id: MessageId; readonly ref: ThreadRef }): Promise<boolean>;
+  /**
+   * Uses the chat's control that stops the session of `ref` (Slack's Stop button in Agents &
+   * tools). Resolves with whether it reached the daemon.
+   */
+  stops(ref: ThreadRef): Promise<boolean>;
 }
 
 function key(channel: string, thread: string): string {
@@ -313,6 +318,7 @@ export class Room {
       types: (suggestion, text) => this.#types(owns, suggestion, text),
       picksOnPage: (version) => this.#picksOnPage(owns, version),
       deletes: (said) => this.#deletes(said, tenant === HOME),
+      stops: (ref) => this.#stops(owns, ref),
     };
   }
 
@@ -737,6 +743,12 @@ export class Room {
     if (!root || !home || author !== this.owner || this.#inbound === null) return false;
     if (!this.#kept.has(key(said.ref.channel, said.ref.thread))) return false;
     await this.#inbound.rootGone(said.ref);
+    return true;
+  }
+
+  async #stops(owns: boolean, ref: ThreadRef): Promise<boolean> {
+    if (!owns || this.#inbound === null) return false;
+    await this.#inbound.stop(ref);
     return true;
   }
 
