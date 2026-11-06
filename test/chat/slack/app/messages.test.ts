@@ -1,7 +1,7 @@
 /** How a message's composer blocks are read into the text a word is read in (`unformatted`). */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { unformatted } from "../../../../src/chat/slack/app/messages.ts";
+import { bareText, inboundMessage, unformatted } from "../../../../src/chat/slack/app/messages.ts";
 
 // A composer message's blocks, as Slack stores them. Read back on 2026-10-07: a section with a
 // `text` element in inline code, and a `rich_text_preformatted` part. The `bold` style and the
@@ -70,4 +70,76 @@ unformattedCases.forEach(([text, blocks, expected], index) => {
   test(`unformatted [${index + 1}: ${JSON.stringify(text)}]`, () => {
     assert.equal(unformatted(text, blocks), expected);
   });
+});
+
+// The composer's blocks for a word and its argument: the style sits in the blocks, the marks in
+// the text (read back on 2026-10-07).
+const bareCases: [string, unknown, string][] = [
+  [
+    "inline code",
+    richText(part([leaf("!tag "), leaf("CVE-0000-00000", { code: true })])),
+    "!tag CVE-0000-00000",
+  ],
+  [
+    "inline code, a path",
+    richText(part([leaf("!bind "), leaf("a/b", { code: true })])),
+    "!bind a/b",
+  ],
+  // Bold, italic and strikethrough marks may be characters of a name: the typed text is read.
+  ["bold", richText(part([leaf("!tag "), leaf("x", { bold: true })])), ""],
+  ["italic", richText(part([leaf("!open "), leaf("__init__.py", { italic: true })])), ""],
+  ["strike", richText(part([leaf("!open "), leaf("a", { strike: true })])), ""],
+  [
+    "code and bold together",
+    richText(part([leaf("!tag "), leaf("x", { code: true, bold: true })])),
+    "",
+  ],
+  // A code block after the word is not its argument.
+  [
+    "a code block",
+    richText(part([leaf("!tag")]), part([leaf("name")], "rich_text_preformatted")),
+    "",
+  ],
+  ["only a code block", richText(part([leaf("!tag name")], "rich_text_preformatted")), ""],
+  // Anything but text is not read: the text as sent is the better reading.
+  ["a link", richText(part([leaf("!open "), { type: "link", url: "https://example.com" }])), ""],
+  ["a quote", richText(part([leaf("!tag x")], "rich_text_quote")), ""],
+  ["no composer block", [{ type: "section" }], ""],
+  ["no blocks", null, ""],
+];
+
+bareCases.forEach(([name, blocks, expected]) => {
+  test(`bareText: ${name}`, () => {
+    assert.equal(bareText(blocks), expected);
+  });
+});
+
+function inbound(text: string, blocks: unknown) {
+  // Only `text` and `blocks` are read before the content is asked for.
+  return inboundMessage({} as never, {} as never, "C1", "1.1", "1.2", { text, blocks });
+}
+
+test("a message with a name in inline code reaches the core as typed and bare", () => {
+  const message = inbound(
+    "!tag `CVE-0000-00000`",
+    richText(part([leaf("!tag "), leaf("CVE-0000-00000", { code: true })])),
+  );
+  assert.equal(message.text, "!tag `CVE-0000-00000`");
+  assert.equal(message.bare, "!tag CVE-0000-00000");
+});
+
+test("a !fork prompt keeps its code span in the typed text", () => {
+  const message = inbound(
+    "!fork run `make test`",
+    richText(part([leaf("!fork run "), leaf("make test", { code: true })])),
+  );
+  assert.equal(message.text, "!fork run `make test`");
+});
+
+test("a name in italic blocks is read from the typed text", () => {
+  const message = inbound(
+    "!open __init__.py",
+    richText(part([leaf("!open "), leaf("__init__.py", { italic: true })])),
+  );
+  assert.equal(message.bare, message.text);
 });

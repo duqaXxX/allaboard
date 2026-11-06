@@ -547,10 +547,27 @@ test("!tag with no name, or a name the rule refuses, shows the help and changes 
     const before = world.shown(ref).length;
     await world.says(typed, ref.thread);
     assert.equal(world.shown(ref).length, before + 2, typed); // the word, then the help
-    assert.ok(world.shown(ref).at(-1)?.includes("`!tag <name>`"), typed);
+    // Its own help line and the rule, not the list of every word.
+    const answer = world.shown(ref).at(-1) ?? "";
+    assert.ok(answer.startsWith("`!tag <name>`"), typed);
+    assert.ok(answer.endsWith(`\n${texts.RULE_TAG}`), typed);
+    assert.equal(answer.includes("`!guide`"), false, typed);
   }
   assert.deepEqual(world.tagCalls, []);
   assert.deepEqual(agent.tagCalls, []);
+});
+
+test("!tag reads the name from the message without its formatting", async (t) => {
+  const agent = new WithSessionTags();
+  const world = await MessagesWorld.make(t, { agent, tags: true });
+  const ref = await world.opened();
+  await world.send({
+    ref,
+    id: "tag-1",
+    text: "!tag `CVE-0000-00000`",
+    bare: "!tag CVE-0000-00000",
+  });
+  assert.deepEqual(world.tagCalls, [[ref, "CVE-0000-00000"]]);
 });
 
 test("!tag in a chat that cannot tag a thread says so, and the help leaves both words out", async (t) => {

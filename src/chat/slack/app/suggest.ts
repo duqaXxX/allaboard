@@ -167,6 +167,7 @@ function typedIn(channel: string, threadTs: string, id: string, sent: string): I
     topLevel: false,
     text: sent,
     plain: sent,
+    bare: sent,
     literal: false,
     content: async () => sent,
   };

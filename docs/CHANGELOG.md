@@ -16,6 +16,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `!tag` with the name in inline code (`` !tag `CVE-0000-00000` ``) tags the thread: a name, an id,
+  a path or a keyword after a word is read without inline code marks (bold, italic and strike stay,
+  as a name may hold them), and the prompt of `!fork` keeps its formatting. A word typed with arguments it refuses answers with its own line of `!help` and the
+  rule it broke, not the whole list. `InboundMessage` gains `bare`, the message with its inline
+  code marks removed (#186).
 - A turn that ends while a background task runs no longer turns the thread's entry in **Agents &
   tools** back to idle: a stream stop set the session `active`, so the spinner and **Stop** went
   while the work went on. Stops now carry the wanted `session_status`, and the session is set again

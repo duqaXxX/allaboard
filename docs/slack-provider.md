@@ -1100,7 +1100,15 @@ it returns the text without those marks: the arguments stay as the owner sent th
 formatting and links. Anything else returns nothing and the message stays a prompt: a quote, a list,
 a message that opens with another element, and a message with no composer block, where nothing tells
 a mark from a character the owner typed. The word ends at any whitespace, so a line break after it
-separates the arguments as a space does. The words: `help`, `guide`, `bind`, `bypass`, `status`,
+separates the arguments as a space does. The listener also hands over `InboundMessage.bare`, the text of the composer's one
+`rich_text_section` without the marks of inline code (`messages.bareText`). It gives up, and `bare` is
+then the typed text, when the blocks hold anything else: a code block, a second part, a quote, a
+list, a link, a mention, an emoji, no composer block, or a `text` element with a style besides `code`
+(bold, italic and strikethrough marks may be characters of a name, as in `__init__.py`).
+`commands.parseBang` reads the argument of the words whose argument is a name, an id, a path or a
+keyword (`bind`, `bypass`, `plan`, `help`, `resume`, `open`, `tag`, `allaboard`) from `bare`, when
+`bare` is a message of the same word, so a name in inline code tags the thread. An argument that is
+text for the agent (the prompt of `fork`, any other command) stays as the owner sent it. The words: `help`, `guide`, `bind`, `bypass`, `status`,
 `stop` and `resume` and `open` are the daemon's own words (`commands.Word`), dispatched in
 `words.wordFlow` by whether the lookup above found a session: `!resume` works only at the top
 level, refused inside any thread (`texts.WORD_IN_THREAD`), and `!bind` is refused the same way in a

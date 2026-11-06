@@ -451,9 +451,9 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     // The text that read as a word: what a suggestion shows back to the owner.
     let written = message.text;
     if (!message.literal) {
-      command = parseBang(message.text);
+      command = parseBang(message.text, message.bare);
       if (command === null) {
-        command = parseBang(message.plain);
+        command = parseBang(message.plain, message.bare);
         written = message.plain;
       }
       // `!` alone is a prompt unless the chat suggests and a session's thread is where it was

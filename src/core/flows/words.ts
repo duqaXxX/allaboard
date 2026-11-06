@@ -7,7 +7,7 @@
  */
 import { ChatError, type MessageId, type ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
-import { helpText, type Shell, WORD, type Word } from "../commands.ts";
+import { helpText, type Shell, WORD, type Word, wordHelpLine } from "../commands.ts";
 import { guideText } from "../guide.ts";
 import { memoryText, skillsText } from "../loaded.ts";
 import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
@@ -204,10 +204,22 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
       case "help":
         await showHelp(command.query);
         return;
-      case "invalid":
-        // A mistyped word gets the full list, which shows how each word is written.
-        await showHelp("");
+      case "invalid": {
+        // A mistyped word gets its own help line and the rule it broke; the full list only when
+        // no word was typed.
+        const line =
+          command.word === null || unserved.has(command.word)
+            ? null
+            : wordHelpLine(command.word, names, agent.capabilities.folderTrust);
+        if (line === null) {
+          await showHelp("");
+        } else {
+          await talk.say(channel, where, [line, command.rule].filter(Boolean).join("\n"), {
+            ownerOnly: quiet,
+          });
+        }
         return;
+      }
       case "guide": {
         const have = agent.capabilities;
         const offered = {

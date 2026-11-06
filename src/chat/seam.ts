@@ -835,6 +835,12 @@ export interface InboundMessage {
   readonly text: string;
   /** The same with the chat's formatting marks removed: where a word of the daemon is read. */
   readonly plain: string;
+  /**
+   * The same with the marks of inline code removed wherever they stand: where a word's name, id
+   * or path is read. The typed `text` when the chat cannot tell such a mark from a character, and
+   * for a message whose formatting it does not read through; never empty for a message.
+   */
+  readonly bare: string;
   /** It carries files, or was spoken: never read as a word or a command. */
   readonly literal: boolean;
   /**
