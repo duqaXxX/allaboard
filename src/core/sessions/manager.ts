@@ -95,7 +95,7 @@ export class SessionManager {
 
   /**
    * The live session of a thread, or one rebuilt from its stored entry (after a restart, the
-   * idle close, or a resume whose session turned out gone); null when the thread is not a
+   * idle close, or a refused resume, whose entry stays); null when the thread is not a
    * session. A closed session (`close()` has started: shutdown, an idle close, or the
    * SessionGone branch of `ensureConnected`) is never handed back here: it is discarded and
    * replaced, so a message never reaches a client that is going, or gone. The session handed

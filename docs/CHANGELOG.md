@@ -16,6 +16,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A thread stays in `state.json` while its messages remain in Slack (#148). The cleanup no longer
+  drops a thread because the agent stopped listing its session, and a refused resume no longer
+  removes the entry: the Home tab keeps the row as `Session <id>` and, with `SLACK_USER_TOKEN`, Delete works (without
+  it, `!delete-thread` in the thread deletes it), and the next
+  message in the thread tries the resume again, so a transcript that comes back is used. A
+  thread with no session opened more than a day ago is still pruned. `StateStore.prune` loses its
+  `alive` input.
 - `!tag` with the name in inline code (`` !tag `CVE-0000-00000` ``) tags the thread: a name, an id,
   a path or a keyword after a word is read without inline code marks (bold, italic and strike stay,
   as a name may hold them), and the prompt of `!fork` keeps its formatting. A word typed with arguments it refuses answers with its own line of `!help` and the
@@ -35,7 +42,7 @@ All notable changes to this project are documented here. The format follows
   logged. The manifest asks for `groups:read`; an existing app adds it under **User Token Scopes**
   and reinstalls (`docs/setup.md`) (#197).
 - The cleanup logs one line for each thread it prunes from `state.json`, with its channel and thread
-  ids and why (its session is gone, or none started within a day), in place of a count (#148).
+  ids and why (no session started within a day), in place of a count (#148).
 - `!delete-thread` also deletes a thread `state.json` no longer holds (one the cleanup forgot, or
   that a crash left), after the usual question, when its channel is bound, its first message is
   yours or the bot's and a reply is still under it. A thread someone else started gets `allaboard

@@ -491,7 +491,7 @@ changed thread's root is read again. The line is then edited, never posted, to t
 or to its own thread's word (`channel-line.rootKind`: `⏳ Working:` once the owner answered and
 the work goes on, `✅ Done:` after his own `!stop`), linked by the root but while it waits on the
 request it opens; a change that leaves it as it was writes nothing. When its own thread leaves
-`state.json` (deleted, or pruned) and nothing waits, the line is deleted. Each line carries the
+`state.json` (deleted, or forgotten) and nothing waits, the line is deleted. Each line carries the
 thread it names, its word and its mention in its metadata's payload (ids, no content), so after a
 start the first refresh takes over the line an earlier run left and brings it to the threads'
 status; a line with no such payload stays as it is until the next post. The mention stays, and an
