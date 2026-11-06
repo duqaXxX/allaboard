@@ -60,7 +60,9 @@ export function makeClients(
   botToken: string,
   options: ClientOptions = {},
 ): readonly [shared: SlackClient, replies: SlackClient] {
-  return [sharedClient(botToken, options), repliesClient(botToken, options)];
+  // Temporary, #116: the daemon's own clients log their calls.
+  const traced = { ...options, traceCalls: true };
+  return [sharedClient(botToken, traced), repliesClient(botToken, traced)];
 }
 
 export const CLIENTS: Clients = {

@@ -54,6 +54,8 @@ import { getLogger } from "../../../log.ts";
 import { silentLogger } from "../quiet-logger.ts";
 
 export const logger = getLogger("allaboard.chat.slack.reply.clients");
+// Temporary, #116: a logger of its own, so the policy's lines stay what the tests read.
+const callLogger = getLogger("allaboard.chat.slack.reply.calls");
 
 /**
  * The four calls that create or grow a message: the replies client never sends one again after a
@@ -106,6 +108,8 @@ export interface ClientOptions extends Omit<WebClientOptions, keyof typeof SENT_
    * the call it answered `ratelimited`.
    */
   readonly stopped?: AbortSignal;
+  /** Temporary, #116: log every call with the ids it addresses. Set by `makeClients` only. */
+  readonly traceCalls?: boolean;
 }
 
 /** A request that failed before an answer, and not by the client's own timeout. */
@@ -128,14 +132,16 @@ class PolicyClient extends WebClient {
   readonly #clock: Clock;
   readonly #random: () => number;
   readonly #stopped: AbortSignal | undefined;
+  readonly #traceCalls: boolean;
 
   constructor(token: string | undefined, notRetried: readonly string[], options: ClientOptions) {
-    const { clock, random, stopped, ...rest } = options;
+    const { clock, random, stopped, traceCalls, ...rest } = options;
     super(token, { timeout: REQUEST_TIMEOUT_MS, ...rest, ...SENT_ONCE, logger: silentLogger() });
     this.#notRetried = new Set(notRetried);
     this.#clock = clock ?? systemClock;
     this.#random = random ?? Math.random;
     this.#stopped = stopped;
+    this.#traceCalls = traceCalls ?? false;
   }
 
   /**
@@ -163,6 +169,13 @@ class PolicyClient extends WebClient {
     options: Record<string, unknown> = {},
   ): Promise<WebAPICallResult> {
     if (method === "files.uploadV2") return super.apiCall(method, options);
+    // Temporary, #116: every call with the ids it addresses, never its content. Closing the issue
+    // removes it.
+    const ids = ["channel", "channel_id", "ts", "thread_ts"]
+      .filter((key) => typeof options[key] === "string")
+      .map((key) => `${key}=${String(options[key])}`)
+      .join(" ");
+    if (this.#traceCalls) callLogger.info(`call ${method} ${ids} (temporary, #116)`);
     let waited = 0;
     for (let retries = 0; ; retries += 1) {
       try {
