@@ -1764,6 +1764,14 @@ agent's own line (`AgentWords.trust`).
   bytes collected are bounded by `ChatProvider.fileLimit`, which the chat declares with
   `fileUpload` (Slack: its 1 MB snippet limit); a larger diff is told, not shared. Both
   `diff-index` calls take `--ignore-submodules=dirty`, so no submodule's config or filters run.
+- **What a click does.** `diffFlow` runs the picks of one list (the channel and the list's message)
+  one after another, so the last click is the last applied, and a failed pick does not stop the
+  next. A diff goes into the list's own message (`ThreadList.shown`) when `ThreadChat.fitsList`
+  says the chat can draw it there; otherwise it is shared, and the id `ThreadChat.share` answers
+  with is kept in memory for the list's next pick to delete with `ThreadChat.unshare`. The list's entry also
+  says whether its message shows a diff, so a pick that ends in a refusal, or a file share,
+  redraws the list only when it does. A pick refused as stale deletes the file and drops the entry;
+  an idle close keeps it, a restart forgets it.
 - **The turns.** `ThreadSession` records the `fileChange` of every `call_ended` under the prompt of
   the running turn (`sessions/changes.TurnChanges`), a subagent's calls included, and a turn the
   agent starts itself under the prompt before it. `files/diff.groupEdits`, `statOfEdits` and

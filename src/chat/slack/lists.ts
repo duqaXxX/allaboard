@@ -7,8 +7,8 @@
 
 import { fill } from "../../core/port.ts";
 import type { DiffRow, RewindAction, ThreadList } from "../seam.ts";
-import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
-import { take } from "./reply/chars.ts";
+import { type ContextBlock, contextBlock, inFence, MESSAGE_LIMIT } from "./reply/blocks.ts";
+import { len, take } from "./reply/chars.ts";
 import { shownAsWritten } from "./reply/escape.ts";
 import * as slackTexts from "./texts.ts";
 
@@ -90,7 +90,22 @@ interface ViewSelect {
   ];
 }
 
-export type DiffBlock = ContextBlock | DiffSection | ViewSelect;
+/**
+ * The diff shown under the rows: one markdown block, which Slack stores as rich text. It is a
+ * fenced block so that the diff is code; the path is its first line, inside the fence, since a
+ * backtick in a file name would end an inline code span.
+ */
+interface ShownDiff {
+  type: "markdown";
+  text: string;
+}
+
+export type DiffBlock = ContextBlock | DiffSection | ViewSelect | ShownDiff;
+
+// A list with a diff in it is drawn only when the text of its blocks fits what a message holds,
+// with the margin `MESSAGE_LIMIT` keeps. Whether a section's text counts toward Slack's 12,000
+// is not measured, so every text counts.
+const LIST_TEXT_LIMIT = MESSAGE_LIMIT;
 
 function row(list: DiffList, file: DiffRow, index: number): DiffSection {
   const counts = file.binary ? slackTexts.DIFF_BINARY : `+${file.added} −${file.removed}`;
@@ -147,7 +162,29 @@ export function diffBlocks(list: DiffList, title: string): DiffBlock[] {
       contextBlock(fill(slackTexts.DIFF_MORE, { rows: DIFF_ROWS, count: list.files.length })),
     );
   }
+  if (list.shown !== undefined) {
+    blocks.push({
+      type: "markdown",
+      text: `\`\`\`\n${inFence(`${list.shown.path}\n${list.shown.text}`)}\n\`\`\``,
+    });
+  }
   return blocks;
+}
+
+/** The characters of the text a list's blocks hold, in code points. */
+function textOf(blocks: readonly DiffBlock[]): number {
+  let total = 0;
+  for (const block of blocks) {
+    if (block.type === "markdown") total += len(block.text);
+    else if (block.type === "section") total += len(block.text.text);
+    else if (block.type === "context") for (const part of block.elements) total += len(part.text);
+  }
+  return total;
+}
+
+/** Whether `list`, its `shown` diff included, fits one message. */
+export function diffFits(list: DiffList, title: string): boolean {
+  return textOf(diffBlocks(list, title)) <= LIST_TEXT_LIMIT;
 }
 
 /** What a prompt option carries: the session the list was made for, and the prompt. */

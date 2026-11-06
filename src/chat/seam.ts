@@ -243,6 +243,9 @@ export type ChatFailure = "refused" | "failed" | "bug";
 /** A message of the chat, by the id its provider gives it. The core stores it and hands it back. */
 export type MessageId = string;
 
+/** What a chat names a file it holds by (`ThreadChat.share`): opaque to the core. */
+export type FileId = string;
+
 /** What the root of a thread shows of its session. */
 export type SessionStatus = "working" | "waiting" | "done" | "error";
 
@@ -417,6 +420,12 @@ export interface ThreadChat {
    */
   offer?(list: ThreadList, title: string, replacing?: MessageId): Promise<MessageId>;
   /**
+   * Whether `list` (a diff list with its `shown` diff included) can be drawn in one message under
+   * `title`, as `offer` is called with them. The chat measures what it would send. A chat without it is never given `shown`. Present with
+   * `threadLists`.
+   */
+  fitsList?(list: ThreadList, title: string): boolean;
+  /**
    * Rewrites a message of the daemon's in this thread into one collapsed element titled `title`
    * that holds what the message showed, as text: the controls of the message, if any, are gone.
    * Nothing is deleted. Resolves with false, and changes nothing, when the message cannot be read
@@ -426,15 +435,20 @@ export interface ThreadChat {
   fold?(message: MessageId, title: string): Promise<boolean>;
   /**
    * Shares a file into the thread: `name` is its file name, `title` what the chat shows for it.
-   * Nothing is posted by the daemon on success. Rejects with a `ChatError` whose name is the
-   * reason when the chat refused (a file over its own size limit, a missing permission). Present
-   * with `fileUpload`.
+   * Nothing is posted by the daemon on success. Resolves with the file's id, or null when the
+   * chat gives none. Rejects with a `ChatError` whose name is the reason when the chat refused (a
+   * file over its own size limit, a missing permission). Present with `fileUpload`.
    */
   share?(file: {
     readonly name: string;
     readonly title: string;
     readonly content: Uint8Array;
-  }): Promise<void>;
+  }): Promise<FileId | null>;
+  /**
+   * Deletes a file `share` made. Rejects with `ChatError` when the chat refused. Present with
+   * `fileUpload`.
+   */
+  unshare?(file: FileId): Promise<void>;
   /**
    * Rewrites an answered question into the record of its answers, with nothing left to press.
    * Rejects with `ChatError` when the chat refuses the rewrite.
@@ -671,7 +685,8 @@ export type ThreadList =
    * shown, one of `views` (a list of one or more, the first being the files as they are now).
    * Each row has a control that shares that file's diff. `session` is the session the list was
    * made for, which a pick hands back. The provider decides how many rows it draws and how it
-   * says that more exist.
+   * says that more exist. `shown` is one file's diff drawn under the rows, in the same message
+   * (`ThreadChat.fitsList` says whether it fits); `path` is as the row carried it.
    */
   | {
       readonly type: "diff";
@@ -679,6 +694,7 @@ export type ThreadList =
       readonly views: readonly { readonly id: string; readonly label: string }[];
       readonly files: readonly DiffRow[];
       readonly session: string;
+      readonly shown?: { readonly path: string; readonly text: string };
     }
   /**
    * The prompts of a session (`!rewind`), newest first, one to pick. The provider decides how many

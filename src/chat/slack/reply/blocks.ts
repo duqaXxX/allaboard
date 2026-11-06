@@ -221,6 +221,11 @@ export function plainLines(body: string, title: string | null = null): string {
 // literal character in source, always by its code.
 export const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b);
 
+/** `body` made safe to sit inside a fence: mentions quieted, every run of 3+ backticks broken. */
+export function inFence(body: string): string {
+  return quietMentions(body, true).replace(/`{3,}/g, (run) => run.split("").join(ZERO_WIDTH_SPACE));
+}
+
 /**
  * A new file's first lines as code blocks, split where a block would pass its limit. A fence
  * inside the file must not close the block early: every run of three or more backticks is
@@ -228,10 +233,7 @@ export const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b);
  * reply's are (`quietMentions`).
  */
 export function previewBlocks(body: string): MarkdownBlock[] {
-  const broken = quietMentions(body, true).replace(/`{3,}/g, (run) =>
-    run.split("").join(ZERO_WIDTH_SPACE),
-  );
-  return split(broken)
+  return split(inFence(body))
     .filter((chunk) => chunk !== "")
     .map((chunk) => ({ type: "markdown", text: `\`\`\`\n${chunk}\n\`\`\`` }));
 }

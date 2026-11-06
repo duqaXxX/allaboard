@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!diff` shows a file's diff under the list, in the same message, when it fits; another click or a
+  change of view replaces it. A larger diff is shared as a `.diff` file as before, and the next
+  click on that list or a change of view deletes it (a restart forgets the file, which then
+  stays). Clicks on one list are applied in order. `ThreadChat.share` answers with a `FileId` or
+  null, and `ThreadChat.fitsList` and `ThreadChat.unshare` are new optional members (#142).
 - The footer says `git: not trusted` in place of the branch and the changed lines when the
   session's folder is inside a git repository the agent's record of trust does not cover (for one, a
   folder under a trusted parent folder that became a repository mid-session; a folder trusted at its

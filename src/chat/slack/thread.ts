@@ -62,7 +62,7 @@ import { foldMessage } from "./fold.ts";
 import { formatFooter, slackTime } from "./footer.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
-import { listBlocks } from "./lists.ts";
+import { diffFits, listBlocks } from "./lists.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
 import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
@@ -991,13 +991,17 @@ export class SlackThread implements ThreadChat {
     }
   }
 
+  fitsList(list: ThreadList, title: string): boolean {
+    return list.type !== "diff" || diffFits(list, title);
+  }
+
   async share(file: {
     readonly name: string;
     readonly title: string;
     readonly content: Uint8Array;
-  }): Promise<void> {
+  }): Promise<string | null> {
     try {
-      await shareFile(
+      return await shareFile(
         this.slack,
         this.channel,
         this.threadTs,
@@ -1007,6 +1011,14 @@ export class SlackThread implements ThreadChat {
       );
     } catch (error) {
       // Slack's own code, never the file or its path.
+      throw crossedError(error);
+    }
+  }
+
+  async unshare(file: string): Promise<void> {
+    try {
+      await this.slack.files.delete({ file });
+    } catch (error) {
       throw crossedError(error);
     }
   }

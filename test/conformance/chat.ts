@@ -668,6 +668,10 @@ export function chatConformance(
           const thread = s.provider.thread(s.rig.thread);
           assert.equal(typeof thread.offer === "function", s.provider.capabilities.threadLists);
           assert.equal(typeof thread.share === "function", s.provider.capabilities.fileUpload);
+          // Optional members the core uses only with their base: a diff drawn in a list needs
+          // lists, deleting a shared file needs sharing.
+          if (thread.fitsList !== undefined) assert.ok(thread.offer, "fitsList without offer");
+          if (thread.unshare !== undefined) assert.ok(thread.share, "unshare without share");
           const limit = s.provider.fileLimit;
           assert.equal(limit !== undefined, s.provider.capabilities.fileUpload, "fileLimit");
           if (limit !== undefined) assert.ok(Number.isInteger(limit) && limit > 0, String(limit));

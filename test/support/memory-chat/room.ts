@@ -109,6 +109,7 @@ export interface OpenThreadList {
 
 /** A file shared into a thread. */
 export interface SharedFile {
+  readonly id: string;
   readonly ref: ThreadRef;
   readonly name: string;
   readonly title: string;
@@ -247,11 +248,19 @@ export class Room {
   readonly #lists = new Map<MessageId, OpenList>();
   readonly #threadLists = new Map<MessageId, OpenThreadList>();
   readonly #shared: SharedFile[] = [];
+  #fileCount = 0;
   readonly #suggestions = new Map<MessageId, OpenSuggestion>();
   readonly #strays: string[] = [];
   readonly #placed = new Set<Placed>();
   readonly #running = new Map<string, RunningList>();
   #lookupFails = false;
+
+  /** The thread chat has no `unshare`: set before the chat is built. */
+  noUnshare = false;
+  /** `ThreadChat.offer` rejects with a `ChatError` for a diff list that holds a `shown` diff. */
+  shownRefused = false;
+  /** `ThreadChat.unshare` rejects with a `ChatError` while this is set. */
+  unshareRefused = false;
 
   readonly #threadIds: "own" | "opening";
 
@@ -551,8 +560,19 @@ export class Room {
     this.#threadLists.set(list.message, list);
   }
 
-  addShared(file: SharedFile): void {
-    this.#shared.push(file);
+  /** Keeps a file shared into a thread and answers with its id. */
+  addShared(file: Omit<SharedFile, "id">): string {
+    const id = `file-${++this.#fileCount}`;
+    this.#shared.push({ id, ...file });
+    return id;
+  }
+
+  /** Deletes a shared file; false when there is none by that id. */
+  removeShared(id: string): boolean {
+    const at = this.#shared.findIndex((file) => file.id === id);
+    if (at < 0) return false;
+    this.#shared.splice(at, 1);
+    return true;
   }
 
   addSuggestion(suggestion: OpenSuggestion): void {

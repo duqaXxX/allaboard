@@ -5,10 +5,11 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { ThreadRef } from "../../../src/chat/seam.ts";
+import { Cancelled } from "../../../src/core/sessions/tasks.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { shellQuote } from "../../../src/text.ts";
 import { commitAll } from "../../support/files.ts";
@@ -17,9 +18,13 @@ import { call, say } from "../../support/plain-agent.ts";
 import { MessagesWorld, WithFolderTrust } from "./messages-world.ts";
 
 /** A world whose channel is bound to a committed repository the agent trusts; the thread is open. */
-async function repositoryWorld(t: Parameters<typeof MessagesWorld.make>[0], trust = true) {
+async function repositoryWorld(
+  t: Parameters<typeof MessagesWorld.make>[0],
+  trust = true,
+  options: { fits?: number; noUnshare?: boolean } = {},
+) {
   const agent = new WithFolderTrust();
-  const world = await MessagesWorld.make(t, { agent, diff: true });
+  const world = await MessagesWorld.make(t, { agent, diff: true, ...options });
   const repo = committed(join(world.folder, "repo"));
   writeFileSync(join(repo, "src.txt"), "one\ntwo\n");
   commitAll(repo);
@@ -66,14 +71,16 @@ test("a file's control shares its unified diff as <name>.diff", async (t) => {
 
   assert.equal(await world.chat.as("alice").picksFile(message, "src.txt"), true);
   await world.settle();
-  assert.equal(await world.chat.as("alice").picksFile(message, "dir/new.txt"), true);
-  await world.settle();
-
-  const [edit, created] = world.chat.shared();
+  const [edit] = world.chat.shared();
   assert.equal(edit?.name, "src.txt.diff");
   assert.equal(edit?.title, "src.txt.diff");
   assert.match(edit?.content ?? "", /^diff --git a\/src.txt b\/src.txt\n/);
   assert.match(edit?.content ?? "", /\n-two\n\+three\n/);
+  // The list shows one thing at a time: the next pick deletes this file.
+  assert.equal(await world.chat.as("alice").picksFile(message, "dir/new.txt"), true);
+  await world.settle();
+  const [created, ...others] = world.chat.shared();
+  assert.deepEqual(others, []);
   assert.equal(created?.name, "new.txt.diff");
   assert.equal(created?.title, "dir/new.txt.diff");
   assert.match(created?.content ?? "", /\nnew file mode 100644\n/);
@@ -363,4 +370,268 @@ test("a diff over what the chat takes as one file is told and not shared", async
     world.shown(ref).at(-1),
     "The diff of `src.txt` is over 300 bytes, the most Memory chat takes as one file.",
   );
+});
+
+// --- a diff shown in the list's own message
+
+/** A world whose chat draws a diff of up to 400 characters in the list, with a small and a large file changed. */
+async function shownWorld(
+  t: Parameters<typeof MessagesWorld.make>[0],
+  options: { noUnshare?: boolean } = {},
+) {
+  const built = await repositoryWorld(t, true, { fits: 400, ...options });
+  writeFileSync(join(built.repo, "src.txt"), "one\nthree\n");
+  writeFileSync(join(built.repo, "small.txt"), "a\n");
+  writeFileSync(join(built.repo, "big.txt"), "a long line of text\n".repeat(100));
+  writeFileSync(join(built.repo, "huge.txt"), "another long line\n".repeat(100));
+  await built.world.says("!diff", built.ref.thread);
+  await built.world.settle();
+  return { ...built, message: listOf(built.world, built.ref).message };
+}
+
+const alice = (world: MessagesWorld) => world.chat.as("alice");
+
+/** Makes the nth read of the repository (0 for the first) wait for `gate` and, when asked, fail. */
+function holdRepository(world: MessagesWorld, holds: Map<number, Promise<void>>, failing = -1) {
+  const original = world.sessions.repository.bind(world.sessions);
+  let calls = 0;
+  world.sessions.repository = async (directory) => {
+    const call = calls++;
+    await holds.get(call);
+    if (call === failing) throw new Cancelled();
+    return original(directory);
+  };
+}
+
+/** Long enough for an unqueued second pick's git reads to end while the first is held. */
+function later(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 400));
+}
+
+test("a small diff is drawn in the list's own message and shares no file", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  await alice(world).picksFile(message, "src.txt");
+  await world.settle();
+  const open = listOf(world, ref);
+  assert.equal(open.message, message, "the same message");
+  assert.equal(open.list.shown?.path, "src.txt");
+  assert.match(open.list.shown?.text ?? "", /\n-two\n\+three\n/);
+  assert.deepEqual(world.chat.shared(), []);
+});
+
+test("a second click replaces the diff the list shows", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  await alice(world).picksFile(message, "src.txt");
+  await world.settle();
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown?.path, "small.txt");
+  assert.deepEqual(world.chat.shared(), []);
+});
+
+test("a large diff is shared as a file and the list is drawn with no diff", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  await alice(world).picksFile(message, "src.txt");
+  await world.settle();
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown, undefined);
+  assert.deepEqual(
+    world.chat.shared().map((file) => file.name),
+    ["big.txt.diff"],
+  );
+});
+
+test("the next click, or a view change, deletes the file the list shared", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  assert.equal(world.chat.shared().length, 1);
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.deepEqual(world.chat.shared(), []);
+  assert.equal(listOf(world, ref).list.shown?.path, "small.txt");
+
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  assert.equal(world.chat.shared().length, 1);
+  await alice(world).picksView(message, "current");
+  await world.settle();
+  assert.deepEqual(world.chat.shared(), []);
+  assert.equal(listOf(world, ref).list.shown, undefined);
+});
+
+test("two clicks whose reads end in reverse order leave the last click's diff shown", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  let release = () => {};
+  holdRepository(world, new Map([[0, new Promise<void>((resolve) => (release = resolve))]]));
+  const first = alice(world).picksFile(message, "src.txt");
+  const second = alice(world).picksFile(message, "small.txt");
+  await later();
+  release();
+  await Promise.all([first, second]);
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown?.path, "small.txt");
+});
+
+test("two large clicks whose reads end in reverse order leave one file, the last click's", async (t) => {
+  const { world, message } = await shownWorld(t);
+  let release = () => {};
+  holdRepository(world, new Map([[0, new Promise<void>((resolve) => (release = resolve))]]));
+  const first = alice(world).picksFile(message, "big.txt");
+  const second = alice(world).picksFile(message, "huge.txt");
+  await later();
+  release();
+  await Promise.all([first, second]);
+  await world.settle();
+  assert.deepEqual(
+    world.chat.shared().map((file) => file.name),
+    ["huge.txt.diff"],
+  );
+});
+
+test("a pick that rejects does not stop the one queued behind it", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  holdRepository(world, new Map(), 0);
+  const first = alice(world).picksFile(message, "src.txt");
+  const second = alice(world).picksFile(message, "small.txt");
+  const [failed, done] = await Promise.allSettled([first, second]);
+  assert.equal(failed.status, "rejected");
+  assert.equal(done.status, "fulfilled");
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown?.path, "small.txt");
+});
+
+test("a pick arriving while the second runs, after the first settled, runs after the second", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  let release = () => {};
+  holdRepository(world, new Map([[1, new Promise<void>((resolve) => (release = resolve))]]));
+  const first = alice(world).picksFile(message, "src.txt");
+  const second = alice(world).picksFile(message, "small.txt");
+  await first;
+  // The first has settled and the second runs, held at its read: the chain's entry is the
+  // second's own, and the third must queue behind it.
+  const third = alice(world).picksView(message, "current");
+  await later();
+  release();
+  await Promise.all([second, third]);
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown, undefined, "the view change, the last, ran last");
+});
+
+test("an idle close keeps the file the list shared, and the next pick deletes it", async (t) => {
+  const { world, message } = await shownWorld(t);
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  await world.sessions.closeAll();
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.deepEqual(world.chat.shared(), []);
+});
+
+test("a list made for another session is told stale and its file is deleted", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  const session = world.state.thread(ref.channel, ref.thread)?.sessionId ?? "";
+  world.state.setSession(ref.channel, ref.thread, "another-session");
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.equal(world.shown(ref).at(-1), texts.DIFF_STALE);
+  assert.deepEqual(world.chat.shared(), [], "the file does not stay in the thread");
+  world.state.setSession(ref.channel, ref.thread, session);
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  assert.equal(world.chat.shared().length, 1, "and the list forgot it, so one file is there");
+});
+
+test("a chat that cannot delete a file is not asked to, and one that fails to is ignored", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  world.chat.unshareRefused = true;
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown?.path, "small.txt");
+  assert.equal(world.chat.shared().length, 1, "the refused delete left the file");
+  assert.doesNotMatch(world.shown(ref).join("\n"), /refused|could not/i);
+});
+
+test("a chat that refuses the diff in the list gets it as a file, and the list shows none", async (t) => {
+  const { world, ref, message } = await shownWorld(t);
+  world.chat.shownRefused = true;
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.deepEqual(
+    world.chat.shared().map((file) => file.name),
+    ["small.txt.diff"],
+  );
+  assert.equal(listOf(world, ref).list.shown, undefined);
+});
+
+test("a refusal takes the diff of another file off the list, and only then redraws it", async (t) => {
+  const { world, repo, ref, message } = await shownWorld(t);
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown?.path, "small.txt");
+  rmSync(join(repo, "big.txt"));
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  assert.equal(world.shown(ref).at(-1), "`big.txt` no longer differs from HEAD.");
+  assert.equal(listOf(world, ref).list.shown, undefined, "no stale diff under the rows");
+});
+
+test("a chat with no way to delete a file shares and shows on, and is not asked", async (t) => {
+  const { world, ref, message } = await shownWorld(t, { noUnshare: true });
+  await alice(world).picksFile(message, "big.txt");
+  await world.settle();
+  await alice(world).picksFile(message, "small.txt");
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown?.path, "small.txt");
+  assert.equal(world.chat.shared().length, 1, "the file stays: nothing can delete it");
+  assert.doesNotMatch(world.shown(ref).join("\n"), /refused|could not/i);
+});
+
+test("a list this process has not seen is redrawn on its first pick, whatever it showed before", async (t) => {
+  const first = await shownWorld(t);
+  await alice(first.world).picksFile(first.message, "small.txt");
+  await first.world.settle();
+  assert.equal(listOf(first.world, first.ref).list.shown?.path, "small.txt");
+
+  // A restart: the chat and the folder stay, the flow's memory of the list does not.
+  const again = await MessagesWorld.make(t, {
+    agent: first.agent,
+    diff: true,
+    fits: 400,
+    restartOf: first.world,
+  });
+  await alice(again).picksFile(first.message, "big.txt");
+  await again.settle();
+  assert.equal(listOf(again, first.ref).list.shown, undefined, "the old diff is off the rows");
+  assert.deepEqual(
+    again.chat.shared().map((file) => file.name),
+    ["big.txt.diff"],
+  );
+});
+
+test("a pick in a view that no longer exists tells so once", async (t) => {
+  const { world, agent, repo, ref } = await repositoryWorld(t, true, { fits: 400 });
+  agent.next(editing(join(repo, "src.txt"), ["-two", "+TWO"]), say("Done."));
+  await world.says("edit", ref.thread);
+  await world.settle();
+  writeFileSync(join(repo, "src.txt"), "one\nTWO\n");
+  await world.says("!diff", ref.thread);
+  await world.settle();
+  const open = listOf(world, ref);
+  const turn = open.list.views[1];
+  assert.ok(turn);
+  await world.chat.as("alice").picksView(open.message, turn.id);
+  await world.settle();
+  await alice(world).picksFile(open.message, "src.txt");
+  await world.settle();
+  assert.equal(listOf(world, ref).list.shown?.path, "src.txt", "the list shows a diff");
+  await world.sessions.closeAll();
+  await alice(world).picksFile(open.message, "src.txt");
+  await world.settle();
+  assert.equal(world.shown(ref).filter((line) => line === texts.DIFF_VIEW_GONE).length, 1);
 });
