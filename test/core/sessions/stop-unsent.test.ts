@@ -100,35 +100,42 @@ test("a !!command taken while the process starts never runs", async (t) => {
   assert.deepEqual(sentTo(agent), []);
 });
 
-test("a !!command that ran and waits to be sent is shown with the stop, never sent", async (t) => {
-  const agent = new GatedAgent({ shell: {} });
-  const world = await AskingWorld.make(t, { agent });
-  const { ref, session } = world.thread();
-  const release = join(world.folder, "release");
-  await session.submit("", `while [ ! -f ${release} ]; do sleep 0.02; done; echo $((6*7))`);
-  await untilSoon(
-    "the command runs",
-    () => (session as unknown as { shellStop: unknown }).shellStop !== null,
-  );
-  // The worker waits for the connect lock once the command is over.
-  const lock = (session as unknown as { connectLock: Mutex }).connectLock;
-  const free = await lock.acquire();
-  writeFileSync(release, "");
-  await untilSoon(
-    "the command ended",
-    () => (session as unknown as { shellStop: unknown }).shellStop === null,
-  );
+// The command runs in a real Bash (`src/core/shell.ts`), as in `test/core/shell.test.ts`.
+const POSIX_ONLY = { skip: process.platform === "win32" && "a real Bash", timeout: 20_000 };
 
-  assert.equal(await session.stop(), null);
-  free();
-  await until("the stop line", () =>
-    world.shown(ref).some((line) => line.includes(texts.SHELL_NOT_TOLD_STOPPED)),
-  );
-  const shown = world.shown(ref).join("\n");
-  assert.match(shown, /^42$/m);
-  assert.doesNotMatch(shown, /send it again/);
-  assert.deepEqual(sentTo(agent), []);
-});
+test(
+  "a !!command that ran and waits to be sent is shown with the stop, never sent",
+  POSIX_ONLY,
+  async (t) => {
+    const agent = new GatedAgent({ shell: {} });
+    const world = await AskingWorld.make(t, { agent });
+    const { ref, session } = world.thread();
+    const release = join(world.folder, "release");
+    await session.submit("", `while [ ! -f ${release} ]; do sleep 0.02; done; echo $((6*7))`);
+    await untilSoon(
+      "the command runs",
+      () => (session as unknown as { shellStop: unknown }).shellStop !== null,
+    );
+    // The worker waits for the connect lock once the command is over.
+    const lock = (session as unknown as { connectLock: Mutex }).connectLock;
+    const free = await lock.acquire();
+    writeFileSync(release, "");
+    await untilSoon(
+      "the command ended",
+      () => (session as unknown as { shellStop: unknown }).shellStop === null,
+    );
+
+    assert.equal(await session.stop(), null);
+    free();
+    await until("the stop line", () =>
+      world.shown(ref).some((line) => line.includes(texts.SHELL_NOT_TOLD_STOPPED)),
+    );
+    const shown = world.shown(ref).join("\n");
+    assert.match(shown, /^42$/m);
+    assert.doesNotMatch(shown, /send it again/);
+    assert.deepEqual(sentTo(agent), []);
+  },
+);
 
 test("a turn taken and another queued behind it: after the stop the root ends done", async (t) => {
   const agent = new GatedAgent();
