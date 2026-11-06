@@ -219,14 +219,14 @@ function newestFirst(sessions: readonly ListedSession[]): ListedSession[] {
 }
 
 /**
- * The session ids alive in `directory`, for the state's pruning: those the listing shows,
- * unioned with every transcript file actually there. The listing skips sidechain and
- * metadata-only sessions (the SDK's own rules): a session real enough to be stored in a thread
- * must never be pruned just because it has not built up a title yet. Null is "cannot tell", and
- * the pruning then keeps the folder's threads: past `LONG_PROJECT_KEY` characters the CLI names
- * the folder with a hash we may not reproduce, so a missing folder there proves nothing; and a
- * folder that is there and cannot be read, or whose presence cannot be checked, cannot tell either
- * (a listing reads an unreadable folder as an empty one, and every session would look gone).
+ * The session ids alive in `directory`, which the live probe reads to check the folder name it
+ * derives against the CLI's: those the listing shows, unioned with every transcript file actually
+ * there. The listing skips sidechain and metadata-only sessions (the SDK's own rules), so a
+ * session that has not built up a title yet is still counted. Null is "cannot tell": past
+ * `LONG_PROJECT_KEY` characters the CLI names the folder with a hash we may not reproduce, so a
+ * missing folder there proves nothing; and a folder that is there and cannot be read, or whose
+ * presence cannot be checked, cannot tell either (a listing reads an unreadable folder as an
+ * empty one, and every session would look gone).
  */
 export async function aliveSessions(
   directory: string,

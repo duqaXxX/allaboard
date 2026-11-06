@@ -61,7 +61,7 @@ What crosses the agent seam:
 
 | Crossing | Direction | What |
 |---|---|---|
-| commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions` and `aliveSessions` (with `sessionListing`), `folderTrusted`, `trustedRepository` and `untrustedRepository` (with `folderTrust`), `usageLimits`, `tagSession`, `forkSession` (with `sessionForks`), `prompts` (with `fileRestore` or `conversationRewind`), `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask` (with `subagents` or `backgroundTasks`), `setPermissionMode`, `setModel`, `setEffort` (with `liveEffort`), `contextUsage`, `restoreFiles` (with `fileRestore`), `loaded` (with `loadedContext`), `info`, `close` |
+| commands | core to back end | on `AgentBackend`: `start`, `listSessions` and `datedSessions` (with `sessionListing`), `folderTrusted`, `trustedRepository` and `untrustedRepository` (with `folderTrust`), `usageLimits`, `tagSession`, `forkSession` (with `sessionForks`), `prompts` (with `fileRestore` or `conversationRewind`), `sessionTitle` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask` (with `subagents` or `backgroundTasks`), `setPermissionMode`, `setModel`, `setEffort` (with `liveEffort`), `contextUsage`, `restoreFiles` (with `fileRestore`), `loaded` (with `loadedContext`), `info`, `close` |
 | events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), word that the running turn took a task's notification (`notification_folded`), a message from another of the owner's sessions (`peer_message`), a message a background subagent sent while it ran (`subagent_message`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
 | declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, and `AgentBackend.tools`, the `ToolVocabulary` of the tools the terminal shows in words or a preview of its own (also on the `AgentEntry`, readable without a back end; `NO_TOOL_WORDS` for an agent with none), which `Previews` of `src/core/reply/previews.ts` draws and every other tool shows generically, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
@@ -364,8 +364,8 @@ module that breaks it fails only in use.
 | A start that fails | `ResumeRefused`, the one error class of the seam, when the session a start names cannot be resumed: the turn fails and the thread keeps its entry, so the next start tries again. Any other rejection is shown to the owner by its name and the next message tries again. Neither leaves a process running | `a resume the agent refuses rejects with ResumeRefused and leaves no process` |
 
 Members that serve a capability are optional on the type and present exactly when the module
-declares it (a conformance check asserts that): `listSessions`, `datedSessions` and
-`aliveSessions` with `sessionListing`; `folderTrusted`, `trustedRepository` and
+declares it (a conformance check asserts that): `listSessions` and `datedSessions` with
+`sessionListing`; `folderTrusted`, `trustedRepository` and
 `untrustedRepository` with `folderTrust`; `AgentSession.setEffort` with `liveEffort`;
 `AgentSession.stopTask` with `subagents` or `backgroundTasks`; `AgentBackend.usageLimits`,
 `AgentBackend.tagSession`, `AgentBackend.sessionTitle` and `AgentSession.loaded` with theirs. The
@@ -743,9 +743,8 @@ chat stops. It removes only what an answer makes certain:
   was opened more than a day ago; one it cannot date is kept. A thread with a session id is never
   dropped here, whether or not the agent still lists the session (#148): its messages remain in the
   chat, and the session index lists it from `state.json` as `Session <id>`, with Delete. The pass
-  does not read the agent's session lists (`AgentBackend.aliveSessions` stays for the probe). It
-  returns each thread removed with its reason, and the pass logs one line per thread
-  (`pruned thread <channel>/<thread>: ...`, ids only).
+  does not read the agent's session lists. It returns each thread removed with its reason, and
+  the pass logs one line per thread (`pruned thread <channel>/<thread>: ...`, ids only).
 
 A pass leaves alone every thread and channel with a live session object
 (`SessionManager.liveThreads`), which a stop would otherwise close under the pass; the next pass takes them

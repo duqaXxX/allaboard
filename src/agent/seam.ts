@@ -115,7 +115,7 @@ export interface Capabilities {
   readonly commands: boolean;
   /** A prompt sent while a turn runs is taken into that turn (`prompt_taken`). */
   readonly promptDuringTurn: boolean;
-  /** `listSessions`, `datedSessions` and `aliveSessions`. */
+  /** `listSessions` and `datedSessions`. */
   readonly sessionListing: boolean;
   /**
    * `folderTrusted`, `trustedRepository` and `untrustedRepository` read a record of trust the
@@ -1088,11 +1088,6 @@ export interface AgentBackend {
    * alone. Present with `sessionListing`.
    */
   datedSessions?(folder: string, sessions: readonly ListedSession[]): Promise<ListedSession[]>;
-  /**
-   * The ids of the sessions the agent still holds for `folder`; null when it cannot tell.
-   * Present with `sessionListing`.
-   */
-  aliveSessions?(folder: string): Promise<ReadonlySet<string> | null>;
   /**
    * Whether the owner trusted `folder` in the agent, as the agent itself would decide. Present
    * with `folderTrust`.

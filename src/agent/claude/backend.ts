@@ -33,7 +33,7 @@ import { CAPABILITIES } from "./capabilities.ts";
 import { chromeEnabled } from "./chrome.ts";
 import { GOAL_CLEAR } from "./goals.ts";
 import { type RunOutput, sessionHolders } from "./holders.ts";
-import { aliveSessions, byLastActivity, directorySessions, projectsDir } from "./listing.ts";
+import { byLastActivity, directorySessions, projectsDir } from "./listing.ts";
 import { type RewindStart, rewindPoints, rewindStart } from "./rewind.ts";
 import { ClaudeSession, type QueryFunction, THREAD_SETTINGS_SOURCES } from "./session.ts";
 import { shellMode } from "./shell.ts";
@@ -308,11 +308,6 @@ export class ClaudeBackend implements AgentBackend {
    */
   datedSessions(folder: string, sessions: readonly ListedSession[]): Promise<ListedSession[]> {
     return byLastActivity(folder, sessions, { projects: this.#projects });
-  }
-
-  /** The session ids alive in `folder`, or null when it cannot tell (the pruning keeps them). */
-  aliveSessions(folder: string): Promise<ReadonlySet<string> | null> {
-    return aliveSessions(folder, this.#projects);
   }
 
   folderTrusted(folder: string): Promise<boolean> {

@@ -209,7 +209,7 @@ test(
   },
 );
 
-// The ids alive, for the state's pruning.
+// The ids alive, which the live probe reads.
 
 test("the ids alive are the listed sessions and every transcript file there", LIMIT, async (t) => {
   const { config, project } = await workspace(t);

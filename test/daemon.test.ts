@@ -5,10 +5,9 @@
  * Nothing waits on the wall clock: the Home tab's debounce and the cleanup's schedule are crossed
  * by advancing `FakeClock`.
  *
- * Which sessions are alive is the Claude back end's (`ClaudeBackend.aliveSessions`, tested in
- * `test/agent/claude/listing.test.ts` and `backend.test.ts`); the cleanup no longer reads it
- * (#148: a thread stays while its messages remain), which is the test `a start keeps a thread
- * whose session the back end no longer lists`.
+ * The cleanup does not ask the agent which sessions are alive (#148: a thread stays while its
+ * messages remain), which is the test `a start keeps a thread whose session the back end no
+ * longer lists`.
  *
  * From the critical review of 2026-10-10: the daemon is built over one fake for each Slack client
  * it makes (`slack`, `replies`, `owner`), so a part wired to the wrong client or token fails a
