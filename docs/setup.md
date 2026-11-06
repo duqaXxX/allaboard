@@ -1336,6 +1336,15 @@ is sent as you wrote it. To send Claude a text that starts with `!`, put any cha
 command: `!stop` or `!bypass on` alone in inline code acts as the word. Inside a quote or a list
 a `!` is never a command.
 
+An argument that is a name, an id, a path or a keyword (`!tag`, `!resume`, `!open`, `!bind`,
+`!help`, `!bypass`, `!plan`, `!allaboard`) is read without inline code marks, so
+`` !tag `CVE-0000-00000` `` tags the thread as `!tag CVE-0000-00000` does. Bold, italic and
+strikethrough are not removed there, since their marks may be characters of a name. An argument that is
+text for Claude (the prompt of `!fork`, and any other `!name args` command) is sent as you wrote
+it, code spans included. A word typed with arguments it refuses (a tag that breaks the rule, `!diff
+now`, `!bypass maybe`) answers with its own line of the list and the rule it broke, instead of the
+whole list; a word that this instance does not offer still gets the whole list.
+
 | Word | At the top level (answered by a post in the channel) | Inside a session's thread (answered for you alone) |
 |---|---|---|
 | `!guide` | Explains in a few lines how allaboard works | Same, as an ephemeral message you alone see |

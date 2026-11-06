@@ -369,7 +369,9 @@ export function updating(deps: FlowDeps, updates: Updates, talk: Talk): Allaboar
         return;
       }
       // Asking about allaboard is being told; the line would repeat the answer.
-      const typed = message.literal ? null : (parseBang(message.text) ?? parseBang(message.plain));
+      const typed = message.literal
+        ? null
+        : (parseBang(message.text, message.bare) ?? parseBang(message.plain, message.bare));
       if (typed?.kind === "allaboard") return;
       const text = fill(texts.UPDATE_NOTICE, { latest: version, installed: updates.installed });
       // A message of the channel opens a thread that has no reply yet, and a chat may show a

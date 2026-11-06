@@ -795,16 +795,16 @@ test("bang stop inside an idle thread says nothing is running", async (t) => {
   assert.deepEqual(world.ephemerals(), []);
 });
 
-test("a malformed daemon word at top level shows only the daemon words", async (t) => {
+test("a malformed daemon word at top level shows its own help line and the rule", async (t) => {
   const world = worldOf(t);
   await world.dispatch(message("!bypass maybe"));
   const text = said(world).at(-1) as string;
-  assert.ok(text.includes("`!bypass") && !text.includes("`!compact"));
-  assert.ok(text.includes(namedText(texts.HELP_UNBOUND, NAMES)));
+  assert.ok(text.includes("`!bypass") && text.includes(texts.RULE_BYPASS));
+  assert.ok(!text.includes("`!compact") && !text.includes("`!guide`"));
   assert.deepEqual(world.queries(), []);
 });
 
-test("a malformed daemon word inside a thread shows the session s help too", async (t) => {
+test("a malformed daemon word inside a thread shows its own help line and the rule", async (t) => {
   const world = worldOf(t);
   await world.dispatch(message("hi", { ts: THREAD }));
   await world.dispatch(reply("!bypass maybe", THREAD));
@@ -812,8 +812,8 @@ test("a malformed daemon word inside a thread shows the session s help too", asy
   assert.equal(shown.length, 1);
   // The whole list is the message's markdown block; its `text` is the fallback, cut.
   const text = JSON.stringify((world.slack.callsTo("chat.postEphemeral") as Body[])[0]?.blocks);
-  assert.ok(text.includes("`!bypass") && text.includes("`!compact"));
-  assert.ok(!text.includes(namedText(texts.HELP_UNBOUND, NAMES)));
+  assert.ok(text.includes("`!bypass") && text.includes(texts.RULE_BYPASS));
+  assert.ok(!text.includes("`!compact") && !text.includes("`!guide`"));
 });
 
 test("bang from anyone else does nothing", async (t) => {

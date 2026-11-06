@@ -135,6 +135,10 @@ export interface Passthrough {
 
 export interface Invalid {
   readonly kind: "invalid";
+  /** The word that was mistyped, whose own help line answers; null when no word was typed. */
+  readonly word: string | null;
+  /** One sentence on the rule the arguments broke; null where there is none to state. */
+  readonly rule: string | null;
 }
 
 // The daemon's own words, answered without Claude Code; a Passthrough goes to the session.
@@ -205,6 +209,11 @@ export const DESCRIPTION_LIMIT = 100;
  */
 export const TAG_NAME = /^[\p{L}\p{N}._-]{1,40}$/u;
 
+/** A mistyped `word` (typed in any case, as `parseBang` reads it), with the rule it broke. */
+function invalid(word: string, rule: string | null = texts.RULE_NO_ARGUMENT): Invalid {
+  return { kind: "invalid", word: word.toLowerCase(), rule };
+}
+
 // Python's whitespace, which `strip` and `split` follow, is not JavaScript's `\s` (`text.ts`).
 const TRAILING = new RegExp(`[${PY_SPACE}]+$`);
 const STARTS_WITH_SPACE = new RegExp(`^[${PY_SPACE}]`);
@@ -215,39 +224,43 @@ const RUNS_OF_SPACE = new RegExp(`[${PY_SPACE}]+`);
  * Map a `!word` message to the daemon's own command or a Claude Code passthrough; null when the
  * message is not a command at all.
  */
-export function parseBang(text: string): Command | null {
+export function parseBang(text: string, bare: string = text): Command | null {
   const stripped = strip(text);
   if (!stripped.startsWith("!")) return null;
   const body = stripped.slice(1);
   if (body === "" || STARTS_WITH_SPACE.test(body)) return null;
   if (body.startsWith("!")) {
     const command = strip(body.slice(1));
-    return command === "" ? { kind: "invalid" } : { kind: "shell", command };
+    if (command === "") return { kind: "invalid", word: null, rule: null };
+    return { kind: "shell", command };
   }
   // The word ends at any whitespace: a line break after it (a code block that follows the
   // word, a second line) separates it from its arguments as a space does.
   const split = WORD_AND_REST.exec(body);
   const word = split?.[1] ?? "";
   const rest = strip(split?.[2] ?? "");
+  // A name, an id or a path is read from `bare`, the message with its inline code marks removed;
+  // content (a prompt, text for the agent) stays as typed in `rest`.
+  const named = bareArgument(bare, word) ?? rest;
   switch (word.toLowerCase()) {
     case "help":
-      return { kind: "help", query: rest.toLowerCase() };
+      return { kind: "help", query: named.toLowerCase() };
     case "guide":
       if (rest === "") return { kind: "guide" };
       break;
     case "bind":
-      return { kind: "bind", path: rest }; // alone, it lists the folders a session can start in
+      return { kind: "bind", path: named }; // alone, it lists the folders a session can start in
     case "bypass":
-      switch (rest.toLowerCase()) {
+      switch (named.toLowerCase()) {
         case "on":
           return { kind: "bypass", on: true };
         case "off":
           return { kind: "bypass", on: false };
         default:
-          return { kind: "invalid" };
+          return invalid(word, texts.RULE_BYPASS);
       }
     case "plan":
-      switch (rest.toLowerCase()) {
+      switch (named.toLowerCase()) {
         case "":
         case "on":
           return { kind: "plan", on: true };
@@ -276,32 +289,32 @@ export function parseBang(text: string): Command | null {
       return { kind: "fork", prompt: rest };
     case "diff":
       // The terminal's `/diff` takes no argument; anything after the word is a mistake.
-      return rest === "" ? { kind: "diff" } : { kind: "invalid" };
+      return rest === "" ? { kind: "diff" } : invalid(word);
     case "rewind":
       // The terminal's `/rewind` takes no argument either.
-      return rest === "" ? { kind: "rewind" } : { kind: "invalid" };
+      return rest === "" ? { kind: "rewind" } : invalid(word);
     case "resume":
-      return { kind: "resume", target: rest };
+      return { kind: "resume", target: named };
     case "open":
-      return { kind: "open", target: rest };
+      return { kind: "open", target: named };
     case "tag":
       // Alone, or with a name the rule refuses, it is mistyped: the help shows how it is written.
-      return TAG_NAME.test(rest) ? { kind: "tag", name: rest } : { kind: "invalid" };
+      return TAG_NAME.test(named) ? { kind: "tag", name: named } : invalid(word, texts.RULE_TAG);
     case "untag":
       // A thread has one tag, so `!untag devops` means `!untag`: what follows the word says
       // nothing more, and a word the owner typed must not reach the agent as a prompt.
       return { kind: "untag" };
     case "pin":
-      return rest === "" ? { kind: "pin" } : { kind: "invalid" };
+      return rest === "" ? { kind: "pin" } : invalid(word);
     case "unpin":
-      return rest === "" ? { kind: "unpin" } : { kind: "invalid" };
+      return rest === "" ? { kind: "unpin" } : invalid(word);
     case "delete-thread":
       // Anything after it is a mistake: the help shows how it is written, and nothing is deleted.
-      return rest === "" ? { kind: "delete-thread" } : { kind: "invalid" };
+      return rest === "" ? { kind: "delete-thread" } : invalid(word);
     case "clean-channel":
-      return rest === "" ? { kind: "clean-channel" } : { kind: "invalid" };
+      return rest === "" ? { kind: "clean-channel" } : invalid(word);
     case "allaboard":
-      switch (rest.toLowerCase()) {
+      switch (named.toLowerCase()) {
         case "":
           return { kind: "allaboard", action: "show" };
         case "update":
@@ -309,10 +322,35 @@ export function parseBang(text: string): Command | null {
         case "restart":
           return { kind: "allaboard", action: "restart" };
         default:
-          return { kind: "invalid" };
+          return invalid(word, texts.RULE_ALLABOARD);
       }
   }
   return { kind: "passthrough", text: strip(`${word} ${rest}`) };
+}
+
+/**
+ * What follows `word` in `bare`, when `bare` is a `!` message of the same word; null otherwise,
+ * so the caller keeps the argument as typed.
+ */
+function bareArgument(bare: string, word: string): string | null {
+  const stripped = strip(bare);
+  if (!stripped.startsWith("!")) return null;
+  const split = WORD_AND_REST.exec(stripped.slice(1));
+  if (split?.[1]?.toLowerCase() !== word.toLowerCase()) return null;
+  return strip(split[2] ?? "");
+}
+
+/**
+ * The own help line of `word` (`!tag <name> ...`), the one `!help` lists for it; null for a word
+ * with none. `folderTrust` picks the `!bind` line as `helpText` does.
+ */
+export function wordHelpLine(word: string, names: texts.Names, folderTrust = true): string | null {
+  const lines = (folderTrust ? texts.HELP_WORDS : texts.HELP_WORDS_ANY).map((line) =>
+    texts.named(line, names),
+  );
+  return (
+    lines.find((line) => line.startsWith(`\`!${word} `) || line.startsWith(`\`!${word}\``)) ?? null
+  );
 }
 
 /** Whether `text` is a `!` and nothing else: the owner asking for every command. */

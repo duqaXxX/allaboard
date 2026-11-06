@@ -373,6 +373,7 @@ export interface Own {
   readonly topLevel?: boolean;
   readonly text: string;
   readonly plain?: string;
+  readonly bare?: string;
   readonly literal?: boolean;
   readonly content?: () => Promise<PromptContent | null>;
 }
@@ -549,6 +550,7 @@ export class MessagesWorld {
       topLevel: own.topLevel ?? false,
       text: own.text,
       plain: own.plain ?? own.text,
+      bare: own.bare ?? own.text,
       literal: own.literal ?? false,
       content: own.content ?? (async () => own.text),
     } satisfies InboundMessage);

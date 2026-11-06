@@ -604,6 +604,7 @@ export class Room {
         topLevel: sent.topLevel,
         text,
         plain: text,
+        bare: text,
         literal,
         content: async () => text,
       });
@@ -723,6 +724,7 @@ export class Room {
       topLevel: false,
       text,
       plain: text,
+      bare: text,
       literal: false,
       content: async () => text,
     });

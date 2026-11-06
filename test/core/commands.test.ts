@@ -12,6 +12,7 @@ import {
   rankCandidates,
   refusedInThread,
   WORD,
+  wordHelpLine,
 } from "../../src/core/commands.ts";
 import { guideText } from "../../src/core/guide.ts";
 import * as texts from "../../src/core/texts.ts";
@@ -53,6 +54,16 @@ function recordedCommands(): CommandInfo[] {
   );
 }
 
+/** What a mistyped `word` reads as: the word, with the rule of its own that its arguments broke. */
+function invalidOf(word: string): Command {
+  const rules: Record<string, string> = {
+    tag: texts.RULE_TAG,
+    bypass: texts.RULE_BYPASS,
+    allaboard: texts.RULE_ALLABOARD,
+  };
+  return { kind: "invalid", word, rule: rules[word] ?? texts.RULE_NO_ARGUMENT };
+}
+
 const parseCases: [string, Command | null][] = [
   ["!help", { kind: "help", query: "" }],
   ["!help Comp", { kind: "help", query: "comp" }],
@@ -71,15 +82,15 @@ const parseCases: [string, Command | null][] = [
   ["!ALLABOARD  update ", { kind: "allaboard", action: "update" }],
   ["!allaboard restart", { kind: "allaboard", action: "restart" }],
   ["!allaboard\nrestart", { kind: "allaboard", action: "restart" }],
-  ["!allaboard upgrade", { kind: "invalid" }], // anything else after the word is a mistake
-  ["!allaboard update now", { kind: "invalid" }],
+  ["!allaboard upgrade", invalidOf("allaboard")], // anything else after the word is a mistake
+  ["!allaboard update now", invalidOf("allaboard")],
   ["!tag devops", { kind: "tag", name: "devops" }],
   ["!TAG  Release-2.1_b ", { kind: "tag", name: "Release-2.1_b" }], // the name is kept as typed
   ["!tag\nràpido", { kind: "tag", name: "ràpido" }],
-  ["!tag", { kind: "invalid" }],
-  ["!tag two words", { kind: "invalid" }],
-  ["!tag [x]", { kind: "invalid" }],
-  ["!tag ".concat("a".repeat(41)), { kind: "invalid" }],
+  ["!tag", invalidOf("tag")],
+  ["!tag two words", invalidOf("tag")],
+  ["!tag [x]", invalidOf("tag")],
+  ["!tag ".concat("a".repeat(41)), invalidOf("tag")],
   ["!tag ".concat("a".repeat(40)), { kind: "tag", name: "a".repeat(40) }],
   ["!untag", { kind: "untag" }],
   ["!UNTAG ", { kind: "untag" }],
@@ -87,19 +98,19 @@ const parseCases: [string, Command | null][] = [
   ["!untag devops", { kind: "untag" }],
   ["!pin", { kind: "pin" }],
   ["!PIN ", { kind: "pin" }],
-  ["!pin now", { kind: "invalid" }],
+  ["!pin now", invalidOf("pin")],
   ["!unpin", { kind: "unpin" }],
-  ["!unpin devops", { kind: "invalid" }],
+  ["!unpin devops", invalidOf("unpin")],
   ["!delete-thread", { kind: "delete-thread" }],
   ["!DELETE-THREAD ", { kind: "delete-thread" }],
   // Anything after the word is a mistake: the help shows how it is written, nothing is deleted.
-  ["!delete-thread now", { kind: "invalid" }],
+  ["!delete-thread now", invalidOf("delete-thread")],
   ["!clean-channel", { kind: "clean-channel" }],
   ["!CLEAN-CHANNEL ", { kind: "clean-channel" }],
-  ["!clean-channel now", { kind: "invalid" }],
+  ["!clean-channel now", invalidOf("clean-channel")],
   ["!delete", { kind: "passthrough", text: "delete" }],
-  ["!bypass", { kind: "invalid" }],
-  ["!bypass maybe", { kind: "invalid" }],
+  ["!bypass", invalidOf("bypass")],
+  ["!bypass maybe", invalidOf("bypass")],
   ["!plan maybe", { kind: "plan", on: null }], // a request after the word is not taken
   ["!plan\nPrepare a plan", { kind: "plan", on: null }],
   ["!status", { kind: "status" }],
@@ -117,8 +128,8 @@ const parseCases: [string, Command | null][] = [
   ["!! git status ", { kind: "shell", command: "git status" }],
   // The command is the shell's: kept as typed, case and line breaks included.
   ["!!LS\n| wc -l", { kind: "shell", command: "LS\n| wc -l" }],
-  ["!!", { kind: "invalid" }],
-  ["!! ", { kind: "invalid" }],
+  ["!!", { kind: "invalid", word: null, rule: null }],
+  ["!! ", { kind: "invalid", word: null, rule: null }],
 ];
 
 for (const [text, expected] of parseCases) {
@@ -255,13 +266,13 @@ test("the guide and the help explain every word of the daemon", () => {
 test("diff parses alone and refuses a request after it", () => {
   assert.deepEqual(parseBang("!diff"), { kind: "diff" });
   assert.deepEqual(parseBang("!DIFF"), { kind: "diff" });
-  assert.deepEqual(parseBang("!diff src/a.ts"), { kind: "invalid" });
+  assert.deepEqual(parseBang("!diff src/a.ts"), invalidOf("diff"));
 });
 
 test("rewind parses alone and refuses a request after it", () => {
   assert.deepEqual(parseBang("!rewind"), { kind: "rewind" });
   assert.deepEqual(parseBang("!REWIND"), { kind: "rewind" });
-  assert.deepEqual(parseBang("!rewind 3"), { kind: "invalid" });
+  assert.deepEqual(parseBang("!rewind 3"), invalidOf("rewind"));
 });
 
 test("guide parses", () => {
@@ -543,4 +554,51 @@ test("a name far in length from the word is never measured", () => {
   const started = Date.now();
   assert.deepEqual(ranked(long), []);
   assert.ok(Date.now() - started < 100, "a very long word is not measured against short names");
+});
+
+// A name, an id or a path is read from the message without any formatting; content is not.
+test("a name, an id or a path is read from the bare text", () => {
+  assert.deepEqual(parseBang("!tag `CVE-0000-00000`", "!tag CVE-0000-00000"), {
+    kind: "tag",
+    name: "CVE-0000-00000",
+  });
+  assert.deepEqual(parseBang("!resume *abc*", "!resume abc"), { kind: "resume", target: "abc" });
+  assert.deepEqual(parseBang("!open `src/a.ts`", "!open src/a.ts"), {
+    kind: "open",
+    target: "src/a.ts",
+  });
+  assert.deepEqual(parseBang("!bind `sub`", "!bind sub"), { kind: "bind", path: "sub" });
+  assert.deepEqual(parseBang("!bypass `on`", "!bypass on"), { kind: "bypass", on: true });
+  assert.deepEqual(parseBang("!help `tag`", "!help tag"), { kind: "help", query: "tag" });
+});
+
+test("a prompt keeps the formatting it was typed with", () => {
+  assert.deepEqual(parseBang("!fork run `make test`", "!fork run make test"), {
+    kind: "fork",
+    prompt: "run `make test`",
+  });
+  assert.deepEqual(parseBang("!model `opus`", "!model opus"), {
+    kind: "passthrough",
+    text: "model `opus`",
+  });
+});
+
+test("a bare text of another word leaves the argument as typed", () => {
+  assert.deepEqual(parseBang("!tag `x`", "hello"), invalidOf("tag"));
+  assert.deepEqual(parseBang("!tag `x`", "!pin x"), invalidOf("tag"));
+});
+
+test("a word's own help line is the line !help lists for it", () => {
+  const line = wordHelpLine("tag", PLAIN_NAMES) ?? "";
+  assert.ok(line.startsWith("`!tag <name>` "), line);
+  assert.equal(line.includes("\n"), false);
+  assert.ok(wordHelpLine("pin", PLAIN_NAMES)?.startsWith("`!pin` "));
+  assert.equal(wordHelpLine("nope", PLAIN_NAMES), null);
+});
+
+test("a bare text that falls back to the typed one leaves the argument as typed", () => {
+  assert.deepEqual(parseBang("!open __init__.py"), { kind: "open", target: "__init__.py" });
+  assert.deepEqual(parseBang("!bind work/_old_/x"), { kind: "bind", path: "work/_old_/x" });
+  assert.deepEqual(parseBang("!tag *x*"), invalidOf("tag"));
+  assert.deepEqual(parseBang("!tag", "!tag"), invalidOf("tag"));
 });

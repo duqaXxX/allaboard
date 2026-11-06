@@ -814,6 +814,11 @@ const HELP_BIND_ANY = naming(
 export const HELP_WORDS_ANY: readonly Named[] = HELP_WORDS.map((word) =>
   word.template.startsWith("`!bind ") ? HELP_BIND_ANY : word,
 );
+// The sentence that follows a mistyped word's own help line, on the rule its arguments broke.
+export const RULE_NO_ARGUMENT = "This word takes nothing after it.";
+export const RULE_TAG = "A tag is 1 to 40 letters, digits, `.`, `_` or `-`.";
+export const RULE_BYPASS = "Say `on` or `off` after it.";
+export const RULE_ALLABOARD = "Say `update` or `restart` after it, or nothing.";
 export const HELP_NO_MATCH = "No command matches `{query}`.";
 export const HELP_AGENT = naming(
   "\n**{agent}** (this session, now). Any other `!name args` runs that command; " +

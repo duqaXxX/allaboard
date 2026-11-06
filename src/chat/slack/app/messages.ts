@@ -100,6 +100,32 @@ export function unformatted(text: string, blocks: unknown): string {
   return "";
 }
 
+/**
+ * The text of a composer message with its inline code taken out of its marks: the `text` elements
+ * of its one `rich_text_section`, joined. Empty when the message has no composer block, holds
+ * anything but that one section (a code block, a second part, a quote, a list), or has an element
+ * that is not text or carries a style besides `code`: bold, italic and strikethrough marks are
+ * characters a name may hold (`__init__.py`), so such a message is read from its typed text.
+ */
+export function bareText(blocks: unknown): string {
+  const block = firstOf(blocks);
+  if (block.type !== "rich_text" || !Array.isArray(block.elements)) return "";
+  if (block.elements.length !== 1) return "";
+  const section = firstOf(block.elements);
+  if (section.type !== "rich_text_section" || !Array.isArray(section.elements)) return "";
+  let line = "";
+  for (const leaf of section.elements as unknown[]) {
+    const element = firstOf([leaf]);
+    if (element.type !== "text" || typeof element.text !== "string") return "";
+    const style = element.style;
+    if (typeof style === "object" && style !== null) {
+      if (Object.entries(style).some(([key, on]) => on === true && key !== "code")) return "";
+    }
+    line += element.text;
+  }
+  return line;
+}
+
 /** A Slack file object of a message: wire data, read field by field. */
 type SlackFile = Readonly<Record<string, unknown>>;
 
@@ -220,6 +246,8 @@ export function inboundMessage(
     text: sent,
     // The composer's blocks tell a mark around a `!` from the text alone.
     plain: unformatted(sent, event.blocks) || sent,
+    // A name, an id or a path is read without the inline code the composer gave it.
+    bare: bareText(event.blocks) || sent,
     literal: files.length > 0 || (options.spoken ?? false),
     content: async () =>
       files.length > 0 ? withAttachments(parts, answers, channel, threadTs, ts, sent, files) : sent,

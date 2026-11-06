@@ -1524,6 +1524,7 @@ export function chatConformance(
         assert.equal(message?.topLevel, true, "written in the channel, not inside a thread");
         assert.equal(message?.text, OWN_WORDS);
         assert.equal(message?.plain, OWN_WORDS);
+        assert.equal(message?.bare, OWN_WORDS, "a plain message is its own bare text");
         assert.equal(message?.literal, false);
         assert.equal(promptText((await message?.content()) ?? null), OWN_WORDS);
       });
