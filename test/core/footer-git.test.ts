@@ -19,7 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
-import { gitState } from "../../src/core/footer.ts";
+import { gitReading, gitState } from "../../src/core/footer.ts";
 import { committed, git, gitEnv } from "../support/git-layouts.ts";
 import { repositoryAt } from "../support/repositories.ts";
 
@@ -131,4 +131,18 @@ test("every git call shares one time limit", {
   } finally {
     process.env.PATH = path;
   }
+});
+
+test("a verdict of an untrusted repository gives the repository and no git fields", async () => {
+  const repository = await repositoryAt(app);
+  const reading = await gitReading(app, async () => ({ untrusted: repository as never }));
+  assert.deepEqual(reading.state, [null, null]);
+  assert.equal(reading.untrusted, repository);
+});
+
+test("a verdict that never answers gives no mark and no git fields within the limit", async () => {
+  const never = new Promise<never>(() => {});
+  const reading = await gitReading(app, () => never, 50);
+  assert.deepEqual(reading.state, [null, null]);
+  assert.equal(reading.untrusted, null);
 });

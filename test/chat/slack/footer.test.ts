@@ -21,6 +21,7 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     effortObserved: null,
     folder: null,
     branch: null,
+    gitUntrusted: false,
     changes: null,
     sessionTokens: null,
     contextPercent: null,
@@ -48,6 +49,12 @@ test("full footer", () => {
     formatFooter(data, NOW),
     "⚡ bypass · claude-opus-5-5 · main · 12.3k *tok* · *ctx* 6% · *5h* 3% ↻ 2h · *7d* 25%",
   );
+});
+
+test("a repository the agent does not cover reads `git: not trusted` after the folder", () => {
+  const data = fields({ model: "claude-opus-5-5", folder: "/work/demo", gitUntrusted: true });
+  assert.equal(formatFooter(data, NOW), "claude-opus-5-5 · demo · git: not trusted");
+  assert.equal(formatFooter(fields({ folder: "/work/demo" }), NOW), "demo");
 });
 
 test("the account ends the footer, without its plan", () => {

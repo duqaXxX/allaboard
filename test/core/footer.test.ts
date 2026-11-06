@@ -46,6 +46,7 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     effortObserved: null,
     folder: null,
     branch: null,
+    gitUntrusted: false,
     changes: null,
     sessionTokens: null,
     contextPercent: null,

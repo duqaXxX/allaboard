@@ -1110,6 +1110,16 @@ The core caches them for five minutes (`footer.UsageCache`, `footer.USAGE_TTL`);
 the back end makes of the SDK's rate-limit record, invalidates the cache. A probe with no answer
 within `usage.USAGE_TIMEOUT` gives up and closes its session. The limit fields exist only with a
 claude.ai subscription. A field that cannot be read is left out.
+The git fields and the trust verdict come from one lookup, `directory.verdictBy` (the agent's
+`trustedRepository`, then, with `folderTrust` declared and no trusted repository, its `untrustedRepository`;
+neither runs git; an error from either is logged and gives no verdict), made by `footer.gitReading` under `footer.GIT_TIMEOUT` with the git calls: a lookup that
+stalls gives no mark and no git fields. Where the agent says the repository holding the folder lacks only
+the owner's trust, `ThreadSession.footerData` passes `FooterFields.gitUntrusted` and the provider draws a
+mark in place of the git fields (Slack: `git: not trusted`); `!status` shows `Git: not trusted` and names that
+repository, read from the folder the session works in and so possibly outside the bound folder, with the line that asks for the trust. A repository
+with no work tree git can list, a lookup that fails (logged) and an agent without `folderTrust` give no mark.
+The lookup runs at every footer, so trusting the repository in the agent's terminal gives a normal footer on
+the next turn with no restart.
 
 `!status`, sent inside a session's thread, lists the same values one per line (`Model: ...`,
 `Context: ...`), read by the same `ThreadSession.footerData` and written from the same list,

@@ -321,6 +321,7 @@ const FOOTER: FooterFields = {
   effortObserved: null,
   folder: FOLDER,
   branch: null,
+  gitUntrusted: false,
   changes: null,
   sessionTokens: null,
   contextPercent: null,
@@ -982,6 +983,20 @@ export function chatConformance(
         const shown = s.rig.read(s.ref).find((m) => m.text.includes("An answer with an effort"));
         assert.match(shown?.text ?? "", /auto/, "the effort is drawn");
         assert.match(shown?.text ?? "", /medium/, "and the level it ran at beside it");
+      });
+
+      check("draws the mark for a repository the agent does not cover", async (s) => {
+        const reply = s.provider.thread(s.ref).openReply(() => {});
+        await reply.text("An answer in an untrusted repository");
+        await reply.finish([]);
+        assert.equal(await reply.closeOut(), true);
+        assert.equal(await reply.waitLanded(), true);
+        assert.equal(await reply.showFooter({ ...FOOTER, gitUntrusted: true }), true);
+        await reply.settle();
+        const shown = s.rig
+          .read(s.ref)
+          .find((m) => m.text.includes("An answer in an untrusted repository"));
+        assert.match(shown?.text ?? "", /not trusted/, "the mark is drawn");
       });
 
       check("closes out with no footer", async (s) => {

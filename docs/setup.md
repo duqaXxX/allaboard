@@ -2106,7 +2106,12 @@ branch and the uncommitted lines, `!open` lists the changed files and `!diff` th
 a repository you trusted in Claude Code. A trusted folder does not stand for a repository inside
 it. A bound folder that is not a repository itself and holds one a level or two below it shows
 them for that repository once you open `claude` in it and accept the trust dialog. Without that
-trust the footer leaves the branch and the lines out, `!open` lists no changed files there, `!diff` is refused, and
+trust the footer says `git: not trusted` in place of the branch and the lines, and `!status` shows
+`Git: not trusted` and names the repository with the line that asks for the trust. Nothing is posted
+in the thread for it. This also covers a folder that becomes a repository mid-session (after `git init`) when
+Claude Code trusted it only through a parent folder: a folder trusted at its own path becomes a trusted
+repository and shows its branch at once. Once you open `claude` in the folder and accept the trust dialog,
+the next footer shows the branch again with no restart. `!open` lists no changed files there, `!diff` is refused, and
 its search reads that repository from disk, the files its `.gitignore` names included.
 
 The answer to `!bind`, and `!status` inside a thread, name the repositories one or two levels

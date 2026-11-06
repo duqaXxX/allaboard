@@ -116,6 +116,12 @@ export interface FooterFields {
   /** The folder the thread was opened in. */
   readonly folder: string | null;
   readonly branch: string | null;
+  /**
+   * The folder is inside a repository the agent's record of trust does not cover, so no branch
+   * and no changes were read: a provider says so in their place. False for an agent that keeps
+   * no such record and for a folder that is no repository.
+   */
+  readonly gitUntrusted: boolean;
   /** Lines inserted and deleted since the last commit. */
   readonly changes: readonly [inserted: number, deleted: number] | null;
   readonly sessionTokens: number | null;

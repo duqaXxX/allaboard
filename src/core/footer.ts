@@ -38,6 +38,7 @@ export type FooterKey =
   | "effort"
   | "branch"
   | "changes"
+  | "git_untrusted"
   | "tokens"
   | "context"
   | "session_limit"
@@ -251,6 +252,22 @@ function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
+ * What the agent's record of trust says of the repository holding a folder: `trusted` where git
+ * may run, `untrusted` where only the owner's trust is missing, null for no repository or one
+ * no trust would cover.
+ */
+export type RepositoryVerdict =
+  | { readonly trusted: Repository }
+  | { readonly untrusted: Repository }
+  | null;
+
+/** The footer's git reading: the state, and the repository whose missing trust left it empty. */
+export interface GitReading {
+  readonly state: GitState;
+  readonly untrusted: Repository | null;
+}
+
+/**
  * The branch and the changes of the repository holding `here`, each null when unknown.
  *
  * `repository` answers only for a repository the owner trusted in Claude Code
@@ -262,15 +279,39 @@ export async function gitState(
   repository: (folder: string) => Promise<Repository | null>,
   timeout: number = GIT_TIMEOUT,
 ): Promise<GitState> {
+  const reading = await gitReading(
+    here,
+    async (folder) => {
+      const found = await repository(folder);
+      return found === null ? null : { trusted: found };
+    },
+    timeout,
+  );
+  return reading.state;
+}
+
+/**
+ * `gitState` from one verdict lookup, under the same limit: the trust verdict and the git calls
+ * share `timeout`, so a lookup that never answers gives no state and no untrusted repository.
+ */
+export async function gitReading(
+  here: string,
+  verdict: (folder: string) => Promise<RepositoryVerdict>,
+  timeout: number = GIT_TIMEOUT,
+): Promise<GitReading> {
   let branch: string | null = null;
   let changes: [number, number] | null = null;
   const limit = new AbortController();
   const timer = setTimeout(() => limit.abort(new Error("git timeout")), timeout);
   const { signal } = limit;
   try {
-    const found = await until(repository(here), signal);
+    const decided = await until(verdict(here), signal);
+    if (decided !== null && "untrusted" in decided) {
+      return { state: [null, null], untrusted: decided.untrusted };
+    }
+    const found = decided === null ? null : decided.trusted;
     if (found === null || found.gitDir === null) {
-      return [null, null];
+      return { state: [null, null], untrusted: null };
     }
     const out = await runGit(found, ["branch", "--show-current"], signal);
     branch = out ? strip(out) || null : null;
@@ -285,7 +326,7 @@ export async function gitState(
   } finally {
     clearTimeout(timer);
   }
-  return [branch, changes];
+  return { state: [branch, changes], untrusted: null };
 }
 
 /** The tokens of a turn summed over its models; null when it used none. */
@@ -409,6 +450,9 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
       label: "Uncommitted",
       value: `(+${data.changes[0]},-${data.changes[1]})`,
     });
+  }
+  if (data.gitUntrusted) {
+    fields.push({ key: "git_untrusted", label: "Git", value: "not trusted" });
   }
   if (data.sessionTokens !== null) {
     fields.push({

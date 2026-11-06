@@ -66,8 +66,9 @@ export class SessionManager {
   }
 
   /**
-   * The repository holding `directory` when the daemon's git may run in it: the footer's own
-   * lookup (`repositoryBy`), so what runs git for `!open` is what runs it for the footer.
+   * The repository holding `directory` when the daemon's git may run in it: the trusted
+   * half of the footer's own lookup (`verdictBy`, built on `repositoryBy`), so what runs git for
+   * `!open` is what runs it for the footer.
    */
   repository(directory: string): Promise<Repository | null> {
     return repositoryBy(this.deps.agent)(directory);

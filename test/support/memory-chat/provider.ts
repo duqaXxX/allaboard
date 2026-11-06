@@ -66,6 +66,7 @@ function footerLine(footer: FooterFields): string {
       : `${footer.effort} (${footer.effortObserved})`,
     footer.folder,
     footer.branch,
+    footer.gitUntrusted ? "git not trusted" : null,
     changes === null ? null : `+${changes[0]} -${changes[1]}`,
     sessionTokens === null ? null : `${sessionTokens} tokens`,
     contextPercent === null ? null : `${contextPercent}% context`,
