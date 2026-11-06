@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The footer says `git: not trusted` in place of the branch and the changed lines when the
+  session's folder is inside a git repository the agent's record of trust does not cover (for one, a
+  folder under a trusted parent folder that became a repository mid-session; a folder trusted at its
+  own path shows its branch at once). `!status` shows `Git: not trusted` and names the
+  repository with the line that asks for the trust. Nothing is posted in the thread for it, and
+  the next footer is normal once you trust the repository.
 - Each thread is listed under **Agents & tools** on Slack's desktop app (`agent_view`): the spinner
   and **Stop** while it works or background work runs, `Needs your input` while it waits for you,
   the app's icon once it ended. **Stop** does what `!stop` does. The manifest gains

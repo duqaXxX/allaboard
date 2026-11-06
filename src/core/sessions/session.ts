@@ -58,6 +58,7 @@ import type {
   Question,
   QuestionAnswer,
   QuestionRequest,
+  Repository,
   SavedMessage,
   ScheduledJob,
   SessionEvent,
@@ -83,7 +84,7 @@ import { errorName } from "../../values.ts";
 import {
   footerFields,
   formatStatusFields,
-  gitState,
+  gitReading,
   sessionTokens,
   type UsageCache,
 } from "../footer.ts";
@@ -125,10 +126,10 @@ import {
 import type { SessionDeps } from "./deps.ts";
 import {
   checkDirectory,
-  repositoryBy,
   terminalLine,
   trustedBy,
   untrustedNotice,
+  verdictBy,
 } from "./directory.ts";
 import {
   BypassUnavailable,
@@ -1960,13 +1961,14 @@ export class ThreadSession {
    */
   async status(): Promise<string> {
     let data: FooterFields | null = null;
+    let markedRepository: Repository | null = null;
     let unavailable: string[] = [];
     let gone = false;
     let usable = true;
     try {
       await this.ensureConnected();
       this.refreshUsage();
-      data = await this.footerData(this.sessionTokens);
+      ({ fields: data, untrusted: markedRepository } = await this.footerData(this.sessionTokens));
     } catch (error) {
       // Not an answer to give: the word is refused as a message is, and nothing changed.
       if (error instanceof StartsBlocked) throw error;
@@ -1989,7 +1991,7 @@ export class ThreadSession {
       }
     }
     // Not with a folder no session can start in: that is what the owner acts on first.
-    const untrusted = usable ? await this.untrustedLines() : [];
+    const untrusted = usable ? await this.untrustedLines(markedRepository) : [];
     // The agent's title is read with the footer's values, before the check below: it is the last
     // await of this call, so a close that came while it ran is seen.
     const stored = this.deps.state.thread(this.channelId, this.threadId);
@@ -2061,10 +2063,14 @@ export class ThreadSession {
    * What tells the owner which repositories below the thread's folder still need the agent's
    * trust; nothing for an agent that keeps no record of trust.
    */
-  private async untrustedLines(): Promise<string[]> {
+  private async untrustedLines(also: Repository | null): Promise<string[]> {
     try {
-      return await untrustedNotice(this.deps.agent, this.directory, this.names, (text) =>
-        this.deps.chat.escape(text, "reference"),
+      return await untrustedNotice(
+        this.deps.agent,
+        this.directory,
+        this.names,
+        (text) => this.deps.chat.escape(text, "reference"),
+        also,
       );
     } catch (error) {
       if (error instanceof Cancelled) throw error;
@@ -4512,7 +4518,7 @@ export class ThreadSession {
     live = true,
     work: FooterFields["work"] = null,
   ): Promise<FooterFields | null> {
-    const data = { ...(await this.footerData(tokens, live)), work };
+    const data = { ...(await this.footerData(tokens, live)).fields, work };
     const says =
       work !== null ||
       data.bypass ||
@@ -4561,9 +4567,13 @@ export class ThreadSession {
 
   /**
    * The footer's values from what the session knows now and `tokens`: the one source for both
-   * the footer and `!status`, so the two never disagree.
+   * the footer and `!status`, so the two never disagree; with them, the repository the
+   * `git: not trusted` mark is for, which `!status` names.
    */
-  private async footerData(tokens: number | null, live = true): Promise<FooterFields> {
+  private async footerData(
+    tokens: number | null,
+    live = true,
+  ): Promise<{ fields: FooterFields; untrusted: Repository | null }> {
     let context: ContextUsage = { model: null, percentage: null };
     if (live && this.client === null) {
       context = this.closingContext ?? this.lastContext ?? context;
@@ -4579,14 +4589,16 @@ export class ThreadSession {
       }
     }
     const here = this.workingDirectory || this.directory;
-    const [branch, changes] = await gitState(here, repositoryBy(this.deps.agent));
+    const reading = await gitReading(here, verdictBy(this.deps.agent));
+    const [branch, changes] = reading.state;
+    const gitUntrusted = reading.untrusted !== null;
     const usage = this.usage?.current ?? null;
     // A switch the usage does not name yet is the newer word; once a request has gone to the
     // new model the usage names it, and from then on the usage alone speaks.
     if (context.model === this.modelSwitched) this.modelSwitched = null;
     const model = this.modelSwitched ?? context.model;
     const advisor = await this.advisorSetting(live);
-    return {
+    const fields: FooterFields = {
       bypass: this.bypass,
       planning: this.planning,
       model: model === null ? null : modelName(this.models, model),
@@ -4594,6 +4606,7 @@ export class ThreadSession {
       ...this.effortFields(),
       folder: this.directory,
       branch,
+      gitUntrusted,
       changes,
       sessionTokens: tokens,
       contextPercent: context.percentage,
@@ -4603,6 +4616,7 @@ export class ThreadSession {
       accountPlan: this.account?.plan ?? null,
       work: null,
     };
+    return { fields, untrusted: reading.untrusted };
   }
 
   /**
