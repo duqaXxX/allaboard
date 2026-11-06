@@ -355,6 +355,10 @@ export interface WorldOptions {
   readonly noFold?: boolean;
   /** With `diff`: the most bytes the chat takes as one shared file. */
   readonly fileLimit?: number;
+  /** With `diff`: the chat can not delete a shared file (`ThreadChat.unshare` absent). */
+  readonly noUnshare?: boolean;
+  /** With `diff`: the chat draws a diff of up to this many characters in the list's own message. */
+  readonly fits?: number;
   /** The chat has reactions: a word that took effect is marked on the owner's message. */
   readonly reactions?: boolean;
   /** The daemon can update itself, through this host (`World.updates`); absent, it cannot. */
@@ -485,6 +489,8 @@ export class MessagesWorld {
         files: options.diff ?? false,
         folds: (options.rewind ?? false) && options.noFold !== true,
         ...(options.fileLimit !== undefined && { fileLimit: options.fileLimit }),
+        ...(options.fits !== undefined && { fits: options.fits }),
+        ...(options.noUnshare === true && { unshare: false }),
       });
     const provider = await chat.build({
       variables: {},

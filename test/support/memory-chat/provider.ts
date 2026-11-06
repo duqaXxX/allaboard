@@ -318,7 +318,8 @@ function listText(list: ThreadList, title: string): string {
     file.binary ? `${file.path} binary` : `${file.path} +${file.added} -${file.removed}`,
   );
   const views = list.views.map((view) => (view.id === list.view ? `[${view.label}]` : view.label));
-  return [title, views.join(" "), ...rows].join("\n");
+  const shown = list.shown === undefined ? [] : [`shown ${list.shown.path}`, list.shown.text];
+  return [title, views.join(" "), ...rows, ...shown].join("\n");
 }
 
 class MemoryThread implements ThreadChat {
@@ -331,12 +332,23 @@ class MemoryThread implements ThreadChat {
     readonly name: string;
     readonly title: string;
     readonly content: Uint8Array;
-  }) => Promise<void>;
+  }) => Promise<string | null>;
+  /** Present with `fileUpload`. */
+  readonly unshare?: (file: string) => Promise<void>;
+  /** Present with `threadLists` and a limit on what a list holds. */
+  readonly fitsList?: (list: ThreadList, title: string) => boolean;
   /** Present with `messageFold`. */
   readonly fold?: (message: MessageId, title: string) => Promise<boolean>;
   readonly #folds: boolean;
 
-  constructor(room: Room, ref: ThreadRef, lists: boolean, files: boolean, folds: boolean) {
+  constructor(
+    room: Room,
+    ref: ThreadRef,
+    lists: boolean,
+    files: boolean,
+    folds: boolean,
+    fits?: number,
+  ) {
     this.#room = room;
     this.#ref = ref;
     this.#folds = folds;
@@ -360,6 +372,9 @@ class MemoryThread implements ThreadChat {
     }
     if (lists) {
       this.offer = async (list, title, replacing) => {
+        if (room.shownRefused && list.type === "diff" && list.shown !== undefined) {
+          throw new ChatError("refused");
+        }
         const text = listText(list, title);
         const held = replacing === undefined ? null : room.message(replacing);
         let message: StoredMessage;
@@ -373,15 +388,23 @@ class MemoryThread implements ThreadChat {
         return message.id;
       };
     }
+    if (lists && fits !== undefined) {
+      this.fitsList = (list) => list.type !== "diff" || (list.shown?.text.length ?? 0) <= fits;
+    }
     if (files) {
-      this.share = async (file) => {
+      this.share = async (file) =>
         room.addShared({
           ref,
           name: file.name,
           title: file.title,
           content: Buffer.from(file.content).toString("utf8"),
         });
-      };
+      if (!room.noUnshare) {
+        this.unshare = async (file) => {
+          if (room.unshareRefused) throw new ChatError("refused");
+          room.removeShared(file);
+        };
+      }
     }
   }
 
@@ -552,6 +575,7 @@ export class MemoryProvider implements ChatProvider {
   readonly #lists: boolean;
   readonly #files: boolean;
   readonly #folds: boolean;
+  readonly #fits: number | undefined;
   #inbound: ChatInbound | null = null;
 
   constructor(
@@ -562,8 +586,10 @@ export class MemoryProvider implements ChatProvider {
     files = false,
     fileLimit = 1 << 20,
     folds = false,
+    fits?: number,
   ) {
     this.#room = room;
+    this.#fits = fits;
     this.identities = identities;
     this.#lists = lists;
     this.#files = files;
@@ -594,7 +620,7 @@ export class MemoryProvider implements ChatProvider {
   thread(ref: ThreadRef): ThreadChat {
     // A thread is a name the chat gave out: the core builds none from something else (a message id).
     if (this.#room.openedAt(ref) === null) this.#room.stray(`thread ${ref.channel}/${ref.thread}`);
-    return new MemoryThread(this.#room, ref, this.#lists, this.#files, this.#folds);
+    return new MemoryThread(this.#room, ref, this.#lists, this.#files, this.#folds, this.#fits);
   }
 
   channel(channel: string): ChannelChat {

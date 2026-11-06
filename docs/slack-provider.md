@@ -562,8 +562,8 @@ the doc comments of the symbols named here.
 
 ## Lists in a thread
 
-`!diff` and `!rewind` post a list in the session's thread, and `!diff` shares a file when one of
-its controls is used. The core decides what is listed and what a control does
+`!diff` and `!rewind` post a list in the session's thread, and `!diff` shows a diff under its rows or
+shares a file when one of its controls is used. The core decides what is listed and what a control does
 ([Changed files of `!diff`](architecture.md#changed-files-of-diff),
 [Going back with `!rewind`](architecture.md#going-back-with-rewind));
 the provider declares `threadLists` and draws.
@@ -576,6 +576,16 @@ the provider declares `threadLists` and draws.
   file has no button. A button's value is `[session, view, path]` as JSON and a view option's
   `[session, view]`; one over the element's limit (2,000 and 150 characters) is left out: a row
   with no button, a list with no selector.
+- **A diff in the list.** With `ThreadList.shown`, `diffBlocks` ends with one `markdown` block: a
+  fenced block whose first line is the file's path (inside the fence, so a backtick in a name
+  cannot end an inline span) and then the diff, escaped as `reply/blocks.inFence` does for a
+  preview: mention sequences quieted, every run of three or more backticks broken by zero-width
+  spaces, entities left literal (they stay literal in code). Slack stores it as `rich_text`.
+  `SlackThread.fitsList` builds the blocks and counts the text of every block in code points
+  against `MESSAGE_LIMIT` (11,000), whether or not Slack counts a section's text, which is not
+  measured. A list with a diff holds at most 49 blocks. `SlackThread.unshare` deletes a file
+  `share` made with `files.delete` on the bot token (`files:write`); `share` answers with the id
+  nested in the result of `files.uploadV2`, or null when it holds none.
 - **Hearing.** `ThreadLists.onDiffFile` and `onDiffView` acknowledge, check the owner and the
   workspace and the thread (`Answers.admitted`), read the value, which is untrusted, and call
   `ChatInbound.picked` with a `diff-file` or `diff-view` pick. A value of another shape reaches

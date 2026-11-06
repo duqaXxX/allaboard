@@ -21,6 +21,8 @@ import {
   rewindActionId,
   viewValue,
 } from "../../../src/chat/slack/lists.ts";
+import { MESSAGE_LIMIT } from "../../../src/chat/slack/reply/blocks.ts";
+import { len } from "../../../src/chat/slack/reply/chars.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
 import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import { fill } from "../../../src/core/texts.ts";
@@ -188,6 +190,97 @@ test("share rejects with Slack's code, and no path in it", async () => {
     thread.share({ name: "a.diff", title: "a.diff", content: Buffer.from("x") }),
     (error: unknown) => error instanceof ChatError && error.name === "snippet_too_large",
   );
+});
+
+test("share answers with the id nested in the upload's result, or null when there is none", async () => {
+  const { slack, thread } = madeChat();
+  const file = { name: "a.diff", title: "a.diff", content: Buffer.from("x") };
+  assert.equal(await thread.share(file), "F000FILE");
+  slack.responses["files.completeUploadExternal"] = { ok: true };
+  assert.equal(await thread.share(file), null);
+});
+
+test("unshare deletes the file with files.delete, and rejects with Slack's code", async () => {
+  const { slack, thread } = madeChat();
+  await thread.unshare("F000FILE");
+  assert.deepEqual(slack.callsTo("files.delete"), [{ file: "F000FILE" }]);
+  slack.responses["files.delete"] = rejected("file_not_found");
+  await assert.rejects(
+    thread.unshare("F000FILE"),
+    (error: unknown) => error instanceof ChatError && error.name === "file_not_found",
+  );
+});
+
+// A diff shown under the rows: one markdown block, the path first, inside the fence.
+
+const ZWSP = String.fromCodePoint(0x200b);
+
+test("a shown diff is one markdown block after the rows, its path the first line inside the fence", () => {
+  const blocks = diffBlocks(
+    { ...LIST, shown: { path: "src/a`b.ts", text: "@@\n+x\n" } },
+    "t",
+  ) as Json[];
+  const last = blocks.at(-1);
+  assert.equal(last?.type, "markdown");
+  assert.equal(last?.text, "```\nsrc/a`b.ts\n@@\n+x\n\n```");
+  assert.equal(blocks.filter((block) => block.type === "markdown").length, 1);
+});
+
+test("a shown diff holding markup, a mention, a fence and backticks reads back as typed but for zero-width spaces", () => {
+  const text = "+a < b && c\n+<!here> <!channel>\n+```\n+````x`\n+`one` ``two``\n";
+  const [block] = (diffBlocks({ ...LIST, shown: { path: "p<!here>", text } }, "t") as Json[]).slice(
+    -1,
+  );
+  const body = String(block?.text).slice("```\n".length, -"\n```".length);
+  assert.equal(body.replaceAll(ZWSP, ""), `p<!here>\n${text}`);
+  assert.doesNotMatch(body, /<!here/, "no raw broadcast reaches the block");
+  assert.doesNotMatch(body, /`{3}/, "no run of three backticks closes the fence");
+  assert.ok(body.includes("&"), "entities stay literal in code");
+});
+
+const textLength = (blocks: Json[]): number =>
+  blocks.reduce(
+    (sum, block) =>
+      sum +
+      (block.type === "markdown" ? len(block.text) : 0) +
+      (block.type === "section" ? len(block.text.text) : 0) +
+      (block.type === "context" ? len(block.elements[0].text) : 0),
+    0,
+  );
+
+test("fitsList follows the text of the blocks it would send, to the character", () => {
+  const { thread } = madeChat();
+  const files = Array.from({ length: DIFF_ROWS + 5 }, (_, i) => ({
+    path: `src/dir/file-${i}.ts`,
+    added: 1,
+    removed: 0,
+    binary: false,
+  }));
+  for (const path of ["src/a.ts", "d/".repeat(1500)]) {
+    // Backtick runs grow by the spaces that break them: the count is of what is sent.
+    const listed = (k: number): Extract<ThreadList, { type: "diff" }> => ({
+      ...LIST,
+      files,
+      shown: { path, text: "```\n".repeat(k) },
+    });
+    let k = 0;
+    while (textLength(diffBlocks(listed(k + 1), "Changed files") as Json[]) <= MESSAGE_LIMIT)
+      k += 1;
+    assert.ok(k > 100, "the search found the edge");
+    assert.equal(thread.fitsList(listed(k), "Changed files"), true, `${k} fences fit`);
+    assert.equal(thread.fitsList(listed(k + 1), "Changed files"), false, `${k + 1} fences do not`);
+    assert.ok((diffBlocks(listed(k), "Changed files") as Json[]).length <= 50);
+  }
+});
+
+test("fitsList counts code points, not UTF-16 units, and has no say about a list with no diff", () => {
+  const { thread } = madeChat();
+  const emoji = "\u{1F7E5}";
+  const shown = (n: number) => ({ ...LIST, shown: { path: "a.ts", text: emoji.repeat(n) } });
+  const room = MESSAGE_LIMIT - textLength(diffBlocks(shown(0), "Changed files") as Json[]);
+  assert.equal(thread.fitsList(shown(room - 1 - 10), "Changed files"), true);
+  assert.equal(thread.fitsList(shown(room + 5), "Changed files"), false);
+  assert.equal(thread.fitsList(LIST, "Changed files"), true);
 });
 
 // The rewind lists: a selector of prompts, then a button for each action at one prompt.

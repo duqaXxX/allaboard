@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!diff` shows a file's diff under the list, in the same message, when it fits; another click or a
+  change of view replaces it. A larger diff is shared as a `.diff` file as before, and the next
+  click on that list or a change of view deletes it (a restart forgets the file, which then
+  stays). Clicks on one list are applied in order. `ThreadChat.share` answers with a `FileId` or
+  null, and `ThreadChat.fitsList` and `ThreadChat.unshare` are new optional members (#142).
 - Each thread is listed under **Agents & tools** on Slack's desktop app (`agent_view`): the spinner
   and **Stop** while it works or background work runs, `Needs your input` while it waits for you,
   the app's icon once it ended. **Stop** does what `!stop` does. The manifest gains

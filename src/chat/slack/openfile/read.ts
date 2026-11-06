@@ -34,7 +34,7 @@ export async function uploadFile(
 /**
  * Shares `content` into the thread as the file `filename`, shown under `title`: the form of
  * `uploadFile` for a file that is no path of the folder (`!diff` shares a patch). Rejects with
- * Slack's error.
+ * Slack's error. Resolves with the file's id, null when Slack's answer holds none.
  */
 export async function shareFile(
   client: WebClient,
@@ -43,11 +43,11 @@ export async function shareFile(
   content: Buffer,
   filename: string,
   title: string,
-): Promise<void> {
+): Promise<string | null> {
   // Slack types a `.ts` by its own guess: a file of 256 KB came out `Binary` (seen 2026-10-31).
   // Video shares these extensions, which is what the bytes rule out.
   const typescript = /\.[cm]?ts$|\.tsx$/i.test(filename) && !looksBinary(content);
-  await client.files.uploadV2({
+  const done = await client.files.uploadV2({
     channel_id: channel,
     thread_ts: threadTs,
     file: content,
@@ -55,4 +55,8 @@ export async function shareFile(
     title,
     ...(typescript && { snippet_type: "typescript" }),
   });
+  // The id sits one level down: the upload's result lists the answer of each file's completion.
+  // `files.uploadV2` is typed as a bare result; `filesUploadV2`, which it is bound to, adds `files`.
+  const { files } = done as Awaited<ReturnType<WebClient["filesUploadV2"]>>;
+  return files?.[0]?.files?.[0]?.id ?? null;
 }

@@ -55,6 +55,13 @@ export interface MemoryChatOptions {
    * keeps its text behind it (`ShownMessage.inside`).
    */
   readonly folds?: boolean;
+  /**
+   * With `lists`: the provider can draw a diff in a list's own message (`ThreadChat.fitsList`) up
+   * to this many characters of it; absent, it has no `fitsList` and a diff is shared as a file.
+   */
+  readonly fits?: number;
+  /** With `files`: the thread chat has no `unshare` (`false`). */
+  readonly unshare?: boolean;
   /** With `files`: the most bytes the provider takes as one shared file (1 MiB when absent). */
   readonly fileLimit?: number;
   /**
@@ -84,6 +91,7 @@ export class MemoryChat extends Room implements ChatEntry {
   readonly #files: boolean;
   readonly #fileLimit: number | undefined;
   readonly #folds: boolean;
+  readonly #fits: number | undefined;
   #built: MemoryProvider | null = null;
 
   constructor(
@@ -96,8 +104,10 @@ export class MemoryChat extends Room implements ChatEntry {
     files = false,
     fileLimit?: number,
     folds = false,
+    fits?: number,
   ) {
     super(owner, threadIds, edits);
+    this.#fits = fits;
     this.#folds = folds;
     this.#identities = identities;
     this.#suggests = suggests;
@@ -122,6 +132,7 @@ export class MemoryChat extends Room implements ChatEntry {
       this.#files,
       this.#fileLimit,
       this.#folds,
+      this.#fits,
     );
     return this.#built;
   }
@@ -129,7 +140,7 @@ export class MemoryChat extends Room implements ChatEntry {
 
 /** A memory chat with no channel yet. */
 export function memoryChat(options: MemoryChatOptions = {}): MemoryChat {
-  return new MemoryChat(
+  const chat = new MemoryChat(
     options.owner ?? OWNER,
     options.identities ?? [MEMORY_IDENTITY],
     options.suggestions ?? false,
@@ -139,5 +150,8 @@ export function memoryChat(options: MemoryChatOptions = {}): MemoryChat {
     options.files ?? false,
     options.fileLimit,
     options.folds ?? false,
+    options.fits,
   );
+  chat.noUnshare = options.unshare === false;
+  return chat;
 }
