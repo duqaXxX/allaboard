@@ -4,8 +4,9 @@
  * what follows a pick; the chat draws the list.
  */
 import type { ListedSession } from "../../agent/seam.ts";
-import type { ListPick, MessageId, ThreadRef } from "../../chat/seam.ts";
+import type { ListPick, MessageId, Presence, ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
+import { CLEAN_EVERY_SECONDS } from "../cleanup.ts";
 import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
@@ -71,6 +72,36 @@ export function resuming(deps: FlowDeps, talk: Talk): Resuming {
   };
 
   /**
+   * Why a session held by the thread `holder` is not resumed: a link to that thread, or, when the
+   * chat gives none and says the thread's channel is gone, how the owner frees the session (the
+   * cleanup forgets that channel with its threads). A channel the chat could not answer about
+   * keeps the plain refusal, with the thread's name for a link; so does a gone channel with a
+   * live session, which the cleanup leaves for a later pass.
+   */
+  const heldElsewhere = async (holder: ThreadRef): Promise<string> => {
+    const link = await chat.thread(holder).link(HOLDER_LABEL, "notice");
+    if (link !== null) return fill(texts.RESUME_ELSEWHERE, { link });
+    let presence: Presence = "no answer";
+    try {
+      presence = await chat.channelState(holder.channel);
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      logger.warning(`could not ask about channel ${holder.channel}: ${errorName(error)}`);
+    }
+    if (presence !== "gone" || sessions.sessionsOf(holder.channel).length > 0) {
+      const name = fill(texts.STATUS_CHANNEL_LINK_FALLBACK, { thread_ts: holder.thread });
+      return fill(texts.RESUME_ELSEWHERE, { link: name });
+    }
+    const hours = String(CLEAN_EVERY_SECONDS / 3600);
+    const control = chat.cleanupControl;
+    const free =
+      control === undefined
+        ? fill(texts.RESUME_FREE_LATER, { hours })
+        : fill(texts.RESUME_FREE_NOW, { control, hours });
+    return fill(texts.RESUME_HELD_UNREACHABLE, { thread: holder.thread, free });
+  };
+
+  /**
    * Point the thread `ref` at `chosen`, a session read from `directory`; false, after telling
    * the owner why in the channel, when nothing changed: that thread already holds a session (a
    * resume is never a swap), `chosen` is already held by some other thread (one session lives
@@ -97,8 +128,7 @@ export function resuming(deps: FlowDeps, talk: Talk): Resuming {
     }
     const holder = state.holder(chosen.id);
     if (holder !== null) {
-      const link = await talk.noticeLink(holder, HOLDER_LABEL);
-      await talk.inChannel(channel, fill(texts.RESUME_ELSEWHERE, { link }));
+      await talk.inChannel(channel, await heldElsewhere(holder));
       return false;
     }
     const record = state.channel(channel);

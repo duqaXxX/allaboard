@@ -46,6 +46,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A `!resume` or a Resume click of a session held by a thread in a channel the chat says is gone
+  answers ``This session is held by thread `<id>`, in a channel the chat no longer reaches.`` and
+  how to free it: the chat's own control (`ChatProvider.cleanupControl`, new and optional; Slack:
+  `Refresh on the Home tab`) at once, or the cleanup within 6 hours. A channel the chat could not
+  answer about keeps the answer with a link (#191).
 - The cleanup forgets a bound channel only when Slack gives a certain answer. The bot's
   `channel_not_found` is the same for a deleted channel and for one the bot was removed from, so
   the cleanup asks again with your user token: a channel you still see is kept and logged, and

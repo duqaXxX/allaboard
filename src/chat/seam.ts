@@ -965,6 +965,11 @@ export interface ChatProvider {
    */
   threadState(ref: ThreadRef): Promise<Presence>;
   /**
+   * The chat's own control that runs the cleanup at once, named for the owner as the subject of
+   * a sentence in a notice (Slack: `Refresh on the Home tab`); absent when the chat offers none.
+   */
+  readonly cleanupControl?: string;
+  /**
    * The mark a root carries for `status`, written for a reference, so that a line about a session
    * shows what its thread shows. Present with `rootStatus`.
    */

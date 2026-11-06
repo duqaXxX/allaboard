@@ -234,6 +234,7 @@ const CAPABILITIES = {
 /** The Slack provider: one `SlackThread` per thread, one `SlackChannel` per channel. */
 export class SlackChat implements ChatProvider {
   readonly name = "Slack";
+  readonly cleanupControl = "Refresh on the Home tab";
   readonly capabilities: ChatCapabilities;
   /** Slack's limit for a snippet, the most a shared file may hold. */
   readonly fileLimit = SNIPPET_LIMIT;

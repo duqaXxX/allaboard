@@ -875,8 +875,11 @@ read 2026-10-30), and these channels are private.
 
 Until the cleanup of step 4 has run, the old threads still hold their sessions. `!resume` lists no
 row for such a session, only a count of those open elsewhere, and `!resume <id or name>` answers
-`This session is already open in another thread: <link>.`, where the link can show as the thread's
-id, since the new bot cannot reach it. While none of the bound channels answers, the log says
+``This session is held by thread `<id>`, in a channel the chat no longer reaches. Refresh on the Home tab frees it now; otherwise the cleanup does within 6 hours.``
+when Slack says the old channel is gone, which takes `SLACK_USER_TOKEN` with the scope
+`groups:read`; without them the answer is
+`This session is already open in another thread: <link>.`, where the link can show as the
+thread's id, since the new bot cannot reach it. While none of the bound channels answers, the log says
 `Slack finds none of the ... bound channels: nothing is forgotten`.
 
 An instance added for the new workspace has a `state.json` of its own, so nothing refuses a resume
@@ -1521,7 +1524,9 @@ channel, which opens a new thread, and delete the old thread from the Home tab o
 click or
 `!resume <id or name>` that names a session already open in another thread of any channel gets
 `This session is already open in another thread: <link>.` instead, with a permalink to that thread: one
-session never runs in two threads at once.
+session never runs in two threads at once. When that thread is in a channel Slack says is gone, the
+answer names the thread's id and says that **Refresh** on the Home tab, or the cleanup within 6
+hours, frees the session.
 
 ### Files in a message
 
@@ -1921,6 +1926,7 @@ of the Node executable in System Settings, if you gave it one.
 | ``This thread holds no session. In the channel, send a new message to start one, or `!resume` to continue an earlier one.`` | The thread holds no session (a word's own thread, or one with no entry in `state.json`); send a new message in the channel to start one, send `!resume` there to continue a session Claude Code still has, or type a word, which works as if typed there |
 | ``This thread already holds a session: send `!resume` again in the channel to pick another.`` | A Resume click or `!resume <id or name>` was sent to a thread that already has a session; a new `!resume` in the channel gives a thread of its own |
 | `This session is already open in another thread: <link>.` | A Resume click or `!resume <id or name>` named a session already open in some other thread; follow the link and send the message there instead |
+| ``This session is held by thread `<id>`, in a channel the chat no longer reaches. ...`` | The session is held by a thread of a channel Slack says is gone (deleted, or in a workspace the instance left); press **Refresh** on the Home tab, which forgets that channel with its threads, and send `!resume` again. While any thread of that channel still has a live session the cleanup keeps the channel, and the answer is the one above |
 | `Claude Code has not been trusted in ...`, after a message or a `!bind` | Open `claude` in that folder (the repository root) in the terminal, accept the trust dialog, and send the message again. For a worktree whose folder was moved by hand, run `git worktree repair` in it |
 | The terminal shows the trust dialog in a folder you already use from Slack, or Slack asks for approvals the folder's allow rules cover | The folder is outside a repository and only a parent folder is trusted, which Claude Code does not count for the `permissions.allow` rules and `additionalDirectories` of the folder's `.claude/settings.json`. Accept the dialog in that folder: it lists them |
 | `The directory ... no longer exists` | The thread's directory was moved or deleted: restore it to keep using this thread, or, in the channel, bind another folder with `!bind <path>` and send a new message to start a session there |

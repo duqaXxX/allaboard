@@ -195,6 +195,8 @@ export interface WorldOptions {
   readonly bound?: boolean;
   /** The app is built with no thread deleter, as without the owner's user token. */
   readonly noThreadDelete?: true;
+  /** What the provider asks with the owner's token about a channel the bot does not find. */
+  readonly channelReader?: FakeSlack;
   /** The `chat.update` budget, when a test paces it. */
   readonly limiter?: Limiter;
   /** `!open`'s listings, when a test stands in for them. */
@@ -302,6 +304,7 @@ export class World {
       agent: () => CLAUDE_AGENT,
       limiter: this.limiter,
       clock: this.slackClock,
+      ...(options.channelReader !== undefined && { channelReader: options.channelReader }),
     });
     this.sessions = new SessionManager({
       chat: this.chat,
