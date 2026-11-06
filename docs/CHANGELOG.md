@@ -46,6 +46,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `!stop` and the Stop control drop every message of the session not yet sent to the agent: the
+  ones queued behind the running turn, and the one taken while the process starts. A note names
+  them (`1 message was not sent because you stopped it: send it again.`). A `!!command` that
+  already ran is shown with `Not told to the agent: you stopped the session.`, and one not yet
+  started does not run. `ThreadSession.stop` answers null when a hold or dropped messages were its
+  only effect (refs #200).
 - A `!resume` or a Resume click of a session held by a thread in a channel the chat says is gone
   answers ``This session is held by thread `<id>`, in a channel the chat no longer reaches.`` and
   how to free it: the chat's own control (`ChatProvider.cleanupControl`, new and optional; Slack:

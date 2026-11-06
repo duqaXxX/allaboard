@@ -227,6 +227,8 @@ export const TAKEN_INTO_REPLY_MANY = naming(
 export const BECAUSE_RESTARTED = "allaboard restarted";
 export const BECAUSE_SHUTDOWN = "allaboard stopped";
 export const BECAUSE_STOPPED = naming("{agent} stopped");
+// The owner's `!stop` dropped the turns not yet sent. (`BECAUSE_STOPPED` is the agent's own stop.)
+export const BECAUSE_OWNER_STOPPED = "you stopped it";
 export const BECAUSE_MOVED = "the session moved to the terminal";
 // The line a reply ends with when `!terminal` took its turn to the terminal.
 export const MOVED_TO_TERMINAL = "Moved to the terminal, which continues this turn.";
@@ -483,6 +485,8 @@ export const HOLD_UNPOSTED = naming(
 export const HOLD_GONE =
   "This question is no longer open: it was already answered, or allaboard restarted.";
 export const NOT_SENT = "Not sent.";
+// Under a `!!command` that ran when the owner stopped the session before it was sent.
+export const SHELL_NOT_TOLD_STOPPED = "Not told to the agent: you stopped the session.";
 export const SHELL_EXITED = "✓ exit 0 · {seconds}";
 export const SHELL_FAILED = "✗ exit {code} · {seconds}";
 export const SHELL_TIMED_OUT = "✗ timed out after {seconds}";

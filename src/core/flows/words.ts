@@ -108,8 +108,9 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
 
 /**
  * `!stop` inside a session's thread: either answer is a post that stays (a line for the owner
- * alone is gone on reload). False when nothing was stopped; when only a hold was cancelled (null
- * from the session, which said `Not sent.` itself) nothing is posted and the work counts as cut.
+ * alone is gone on reload). False when nothing was stopped; when only a hold was cancelled or
+ * messages not sent were dropped (null from the session, which said `Not sent.` or the note
+ * itself) nothing is posted and the work counts as cut.
  */
 export function threadStop(
   deps: FlowDeps,
@@ -321,8 +322,9 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           await talk.tell(ref, texts.STOP_OUTSIDE_SESSION);
         } else if (session === null) {
           const stopped = await sessions.stopChannel(channel);
-          // null: only a hold was cancelled somewhere in the channel (`Not sent.`, from its
-          // own waiter); no second notice, since nothing the agent was doing stopped.
+          // null: only a hold was cancelled or unsent messages were dropped somewhere in the
+          // channel (`Not sent.` or the note, from the session); no second notice, since nothing
+          // the agent was doing stopped.
           if (stopped !== null) {
             await talk.inChannel(channel, stopped ? texts.STOPPED_CHANNEL : texts.NOTHING_TO_STOP);
           }

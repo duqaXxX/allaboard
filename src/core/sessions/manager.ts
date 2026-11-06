@@ -327,8 +327,9 @@ export class SessionManager {
 
   /**
    * `stop()` on every live session of the channel; true if any stopped something. Null when
-   * nothing did except cancel a hold: the caller adds no further notice of its own then, the
-   * same as `ThreadSession.stop`'s own null, since the held thread already got `Not sent.`.
+   * nothing did except cancel a hold or drop messages not sent yet: the caller adds no further
+   * notice of its own then, the same as `ThreadSession.stop`'s own null, since the thread already
+   * got `Not sent.` or the note.
    */
   async stopChannel(channelId: string): Promise<boolean | null> {
     // Together: a stop that closes a process takes seconds, and the sessions share nothing.

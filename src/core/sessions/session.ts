@@ -88,6 +88,7 @@ import {
   sessionTokens,
   type UsageCache,
 } from "../footer.ts";
+import type { Pending } from "../hold.ts";
 import { modelName, settingName } from "../models.ts";
 import { resolvePath } from "../paths.ts";
 import { LoopReply } from "../reply/loop-card.ts";
@@ -270,6 +271,21 @@ export class ThreadSession {
   private readonly queue = new Queue<Turn>();
   /** Out of the queue, not sent yet. */
   private taken: Turn | null = null;
+  /**
+   * The turn `taken` held when `stop()` ran: the worker drops it instead of sending it. One
+   * reference, so a turn taken after the stop is not affected.
+   */
+  private stopTaken: Turn | null = null;
+  /**
+   * Turns a stop took out of the queue while the worker held a taken one: the worker names them
+   * in the same note as the taken turn (`endStopped`), in the order sent.
+   */
+  private stopQueued: Turn[] = [];
+  /**
+   * True from the moment a turn's end notes were read until the next turn starts: a note pushed
+   * to `endNotes` after that has no reply left to end, so `drop` posts it.
+   */
+  private endNotesRead = false;
   /** The files each turn of this process edited, for `!diff`. */
   private readonly turnChanges = new TurnChanges();
   /**
@@ -937,9 +953,10 @@ export class ThreadSession {
    * thread whose session is gone could not start.
    */
   async failQueued(line: string): Promise<void> {
-    while (!this.queue.empty) {
+    const stopQueued = this.stopQueued.splice(0);
+    while (stopQueued.length > 0 || !this.queue.empty) {
       try {
-        await this.fail(this.queue.getNowait(), line);
+        await this.fail(stopQueued.shift() ?? this.queue.getNowait(), line);
       } catch {
         // one reply that cannot be ended must not keep the others waiting
       }
@@ -954,9 +971,27 @@ export class ThreadSession {
    * reacts once for the whole close.
    */
   async dropQueued(options: { readonly error?: boolean } = {}): Promise<void> {
-    const queued: Turn[] = [];
-    while (!this.queue.empty) queued.push(this.queue.getNowait());
-    await this.drop(queued, texts.BECAUSE_RESTARTED, options);
+    await this.drop(this.takeQueued(), texts.BECAUSE_RESTARTED, options);
+  }
+
+  /** Every turn waiting to be taken, a stop's included, in the order sent; the queue is left empty. */
+  private takeQueued(): Turn[] {
+    const turns = this.stopQueued;
+    this.stopQueued = [];
+    while (!this.queue.empty) turns.push(this.queue.getNowait());
+    return turns;
+  }
+
+  /**
+   * `drop` for a stop: a note that cannot be posted is logged (no content) and never turns the
+   * stop, or the worker's turn, into a failure.
+   */
+  private async dropStopped(turns: readonly Turn[]): Promise<void> {
+    try {
+      await this.drop(turns, texts.BECAUSE_OWNER_STOPPED);
+    } catch (error) {
+      logger.warning(`could not post the note of a stop in ${this.where}: ${errorName(error)}`);
+    }
   }
 
   /** Release `turns` that will never be sent, and say so once: see `dropQueued`. */
@@ -969,7 +1004,7 @@ export class ThreadSession {
     try {
       if (options.error) this.reactError();
       const note = notSent(turns, because);
-      if (this.busy) this.endNotes.push(note);
+      if (this.busy && !this.endNotesRead) this.endNotes.push(note);
       else await this.post(note);
     } finally {
       for (const turn of turns) turn.done.set();
@@ -979,9 +1014,14 @@ export class ThreadSession {
 
   /** Say, at the end of the reply that just ran, what a restart dropped meanwhile. */
   private async feedEndNotes(renderer: TurnRenderer): Promise<void> {
-    const notes = this.endNotes;
-    this.endNotes = [];
-    for (const note of notes) await renderer.feedError(note);
+    // A note pushed while one is fed (a stop landing meanwhile) is fed in the same pass.
+    while (this.endNotes.length > 0) {
+      const notes = this.endNotes;
+      this.endNotes = [];
+      for (const note of notes) await renderer.feedError(note);
+    }
+    // (sync) Right after the last check: from here `drop` posts its note itself.
+    this.endNotesRead = true;
   }
 
   /**
@@ -1118,6 +1158,7 @@ export class ThreadSession {
         await worker.settled();
         const taken = this.taken;
         this.taken = null;
+        this.stopTaken = null;
         if (taken !== null) {
           try {
             await this.fail(taken, texts.named(texts.SESSION_GONE, this.names), { error: true });
@@ -1643,15 +1684,37 @@ export class ThreadSession {
 
   /**
    * Interrupt the running turn, deny its pending approvals and stop this thread's background
-   * tasks; queued turns stay queued. A hold open in this thread is always cancelled too,
-   * silently (whoever waits on it tells the owner `Not sent.` once it wakes). Null when that
-   * hold was the only thing here: the caller adds no further notice of its own then, since a
-   * hold with nothing else running stops nothing the agent itself was doing, and `Not sent.`
-   * alone already answers `!stop`.
+   * tasks. Every turn of this session not yet sent to the agent is dropped with a note: the
+   * queued ones, and the one the worker has taken while the process starts. A hold open in this
+   * thread is always cancelled too, silently (whoever waits on it tells the owner `Not sent.`
+   * once it wakes). Null when the only effects were a hold cancelled or turns dropped: the
+   * owner already reads `Not sent.` or the note, and a further notice would only repeat it.
    */
   async stop(): Promise<boolean | null> {
-    // (sync) With no hold open, nothing waits between the call and the checks below.
+    // (sync) With no hold open, nothing waits between the call and the lines below.
     const hold = this.deps.holds.cancel(this.channelId, this.threadId);
+    const queued = this.takeQueued();
+    const caught = this.taken;
+    let dropping: Promise<void> = Promise.resolve();
+    if (caught !== null) {
+      // One note, naming the taken turn first: the worker posts it when it ends that turn.
+      this.stopTaken = caught;
+      this.stopQueued = queued;
+    } else dropping = this.dropStopped(queued);
+    let stopped: boolean | null;
+    try {
+      stopped = await this.stopWork(hold);
+    } finally {
+      await dropping;
+    }
+    if (stopped !== false || (queued.length === 0 && caught === null)) return stopped;
+    // Only submitted turns were dropped. A taken one is dropped by the worker, which then ends
+    // the root; the queued ones end it here, as a stopped shell does.
+    await this.reactDoneIfIdle(undefined, { byOwner: true });
+    return null;
+  }
+
+  private async stopWork(hold: Pending | null): Promise<boolean | null> {
     const held = hold !== null;
     if (hold !== null) await this.deleteRequest(hold.messageId);
     // A shell command of the owner's that runs is stopped like a turn, and the rest still stops.
@@ -1800,8 +1863,9 @@ export class ThreadSession {
       await this.settleRequests(requests);
       const taken = this.taken;
       this.taken = null;
+      this.stopTaken = null;
       const unsent = taken === null ? [] : [taken];
-      while (!this.queue.empty) unsent.push(this.queue.getNowait());
+      unsent.push(...this.takeQueued());
       await this.abandon(cut ? texts.MOVED_TO_TERMINAL : texts.MOVED_BEFORE_SENT, {
         more: unsent,
         because: texts.BECAUSE_MOVED,
@@ -2164,8 +2228,9 @@ export class ThreadSession {
       // A turn the worker took but had not sent yet is in no queue.
       const taken = this.taken;
       this.taken = null;
+      this.stopTaken = null;
       const unsent = taken === null ? [] : [taken];
-      while (!this.queue.empty) unsent.push(this.queue.getNowait());
+      unsent.push(...this.takeQueued());
       endedWell = await this.abandon(texts.fill(texts.ENDED, { reason }), {
         more: unsent,
         because: texts.BECAUSE_SHUTDOWN,
@@ -2401,6 +2466,8 @@ export class ThreadSession {
     // of looping back to an empty queue nothing will ever fill again.
     while (!this.closedFlag) {
       const turn = await this.queue.get(signal);
+      // No `await` may come between the two lines: `stop()` relies on a turn out of the queue
+      // being in `taken`.
       this.taken = turn;
       try {
         let client = await this.ensureConnected(signal);
@@ -2411,8 +2478,18 @@ export class ThreadSession {
             await this.dropForDrain(turn);
             continue;
           }
+          // The command has not started (`shellStarted`): a stop before it keeps it from running.
+          if (turn === this.stopTaken) {
+            await this.endStopped(turn, signal);
+            continue;
+          }
           if (!(await this.runShell(turn, turn.shell, signal))) {
             this.taken = null;
+            this.stopTaken = null;
+            // The stop that cut the command also dropped the messages queued behind it.
+            const queued = this.stopQueued;
+            this.stopQueued = [];
+            await this.dropStopped(queued);
             this.idleTimerCheck();
             continue;
           }
@@ -2426,8 +2503,13 @@ export class ThreadSession {
           await this.dropForDrain(turn);
           continue;
         }
+        if (turn === this.stopTaken) {
+          await this.endStopped(turn, signal);
+          continue;
+        }
         this.sent.push(turn);
         this.taken = null;
+        this.stopTaken = null;
         await cancellable(client.send({ id: turn.uuid, content: turn.prompt }), signal);
         // A prompt written after a cut is what makes the agent keep it.
         this.dropCut();
@@ -2435,7 +2517,10 @@ export class ThreadSession {
       } catch (error) {
         if (error instanceof Cancelled) throw error;
         this.taken = null;
-        if (
+        if (turn === this.stopTaken) {
+          // A connect that failed under a turn the owner stopped is not an error to tell.
+          await this.endStopped(turn, signal);
+        } else if (
           error instanceof DirectoryUnavailable ||
           error instanceof SessionGone ||
           error instanceof SessionClosed ||
@@ -3861,6 +3946,7 @@ export class ThreadSession {
       startedAt: this.now(),
     };
     this.active = active;
+    this.endNotesRead = false;
     if (turn !== null) this.turnChanges.begin(turn.uuid);
     const reply = this.reply(renderer);
     if (!(reply instanceof LoopReply)) {
@@ -4754,9 +4840,31 @@ export class ThreadSession {
     }
   }
 
+  /**
+   * Ends the turn a stop caught in the worker's hands. One whose command already ran shows its
+   * run and says it was not told to the agent; any other is dropped with the note.
+   */
+  private async endStopped(turn: Turn, signal: AbortSignal): Promise<void> {
+    this.taken = null;
+    this.stopTaken = null;
+    const queued = this.stopQueued;
+    this.stopQueued = [];
+    if (turn.shellStarted) {
+      try {
+        await this.fail(turn, texts.SHELL_NOT_TOLD_STOPPED);
+      } catch (error) {
+        logger.warning(`could not end a stopped command in ${this.where}: ${errorName(error)}`);
+      }
+      await this.dropStopped(queued);
+    } else await this.dropStopped([turn, ...queued]);
+    this.idleTimerCheck();
+    await this.reactDoneIfIdle(signal, { byOwner: true });
+  }
+
   /** Drops `turn`, which a drain will never send, with a note. */
   private async dropForDrain(turn: Turn): Promise<void> {
     this.taken = null;
+    this.stopTaken = null;
     // A prompt genuinely dropped by the drain, reacting ❌; like the queued ones, it gets no
     // reply of its own, only a note.
     await this.drop([turn], texts.BECAUSE_RESTARTED, { error: true });
@@ -4786,6 +4894,7 @@ export class ThreadSession {
     // The word is refused for an agent that declares no `shellCommands`, so one that queued a
     // command has its mode.
     const mode = this.deps.agent.shell as ShellMode;
+    turn.shellStarted = true;
     const stop = new AbortController();
     this.shellStop = stop;
     let run: ShellRun;
