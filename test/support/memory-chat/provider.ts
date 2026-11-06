@@ -643,6 +643,10 @@ export class MemoryProvider implements ChatProvider {
     return this.#room.openedAt(ref);
   }
 
+  get cleanupControl(): string | undefined {
+    return this.#room.cleanupControl ?? undefined;
+  }
+
   async channelState(channel: string): Promise<Presence> {
     if (this.#room.lookupFails()) return "no answer";
     return this.#room.knows(channel) ? "there" : "gone";

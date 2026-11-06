@@ -861,6 +861,14 @@ export const RESUME_LISTED = "Resumed {title} in {link}.";
 // A session held by any thread of any channel is never resumed a second time; `{link}` is the
 // holding thread's permalink (a plain fallback when Slack would not give one).
 export const RESUME_ELSEWHERE = "This session is already open in another thread: {link}.";
+// The same refusal when the chat says the holding thread's channel is gone: no link to follow,
+// and the cleanup is what forgets that channel and frees the session. `{free}` is one of the two
+// below, by whether the chat has a control that runs the cleanup at once (`{control}`).
+export const RESUME_HELD_UNREACHABLE =
+  "This session is held by thread `{thread}`, in a channel the chat no longer reaches. {free}";
+export const RESUME_FREE_NOW =
+  "{control} frees it now; otherwise the cleanup does within {hours} hours.";
+export const RESUME_FREE_LATER = "The cleanup frees it within {hours} hours.";
 // `!guide`: how to use the bot, in the owner's words, as parts that `src/core/guide.ts` chooses
 // among and joins: a part appears only when the agent and the chat serve what it describes.
 // `test/core/commands.test.ts` fails when a word of the daemon is missing from the whole; keep

@@ -46,6 +46,7 @@ import {
   AsyncEvent,
   BOT,
   CHANNEL,
+  FakeSlack,
   OTHER_CHANNEL,
   OTHER_TEAM,
   OTHER_THREAD,
@@ -1355,6 +1356,30 @@ test("a held session s link falls back when the permalink fails", async (t) => {
   assert.equal(world.state.thread(CHANNEL, THREAD), null);
   const fallback = fill(texts.STATUS_CHANNEL_LINK_FALLBACK, { thread_ts: OTHER_THREAD });
   assert.ok(said(world).includes(fill(texts.RESUME_ELSEWHERE, { link: fallback })));
+});
+
+test("a session held in a channel Slack no longer has names Refresh on the Home tab", async (t) => {
+  const owner = new FakeSlack();
+  const world = worldFor(t)({ channelReader: owner });
+  twoSessions(world);
+  world.state.bind(OTHER_CHANNEL, join(world.root, "app"));
+  world.state.openThread(OTHER_CHANNEL, OTHER_THREAD, SESSION_B);
+  // Only OTHER_CHANNEL is gone: every other call keeps the answer it had.
+  const goneIn = (slack: FakeSlack, method: string): void => {
+    const before = slack.responses[method] ?? { ok: true };
+    slack.responses[method] = (args) => {
+      if (args.channel === OTHER_CHANNEL) return rejected("channel_not_found");
+      return typeof before === "function" ? before(args) : before;
+    };
+  };
+  goneIn(world.slack, "chat.getPermalink");
+  goneIn(world.slack, "conversations.info");
+  goneIn(owner, "conversations.info");
+  await world.dispatch(message(`!resume ${SESSION_B}`, { ts: THREAD }));
+  assert.equal(world.state.thread(CHANNEL, THREAD), null);
+  const free = fill(texts.RESUME_FREE_NOW, { control: "Refresh on the Home tab", hours: "6" });
+  const text = fill(texts.RESUME_HELD_UNREACHABLE, { thread: OTHER_THREAD, free });
+  assert.ok(said(world).includes(text), said(world).join("\n"));
 });
 
 test("the list counts a session held elsewhere and gives it no row", async (t) => {
