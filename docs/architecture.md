@@ -472,7 +472,9 @@ Slack provider does it is in [The Socket Mode connection](slack-provider.md#the-
 - A queued turn is dropped without a reply of its own (`ThreadSession.dropQueued`). One note
   (`turn.notSent`, `N messages were not sent because allaboard restarted: send them again.`, with the
   start of each) is added to the end of the thread's running reply, or posted as a message of its
-  own when nothing runs.
+  own when nothing runs. A `!stop` drops the turns not sent yet the same way, with the note
+  `N messages were not sent because you stopped it: send them again.`, the one a worker has taken
+  while the process starts included.
 - Approvals and questions stay open: the chat's connection closes only after the drain. A
   same-folder hold or a setup still open is cancelled, as `!stop` would.
 - A thread left with only background tasks says that a restart waits in its activity line

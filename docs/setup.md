@@ -1384,6 +1384,14 @@ whole list; a word that this instance does not offer still gets the whole list.
 | a message, or one with files | Opens a session, asks its setup, and after **Start** sends the message; the reply grows in the thread | Continues that session |
 | a question from Claude | One line with **Answer** and **Skip** | Same |
 
+A stop also drops the messages of that session that have not reached the agent: those queued
+behind the running turn, and the one taken while the agent's process starts. One note names
+them in the order you sent them, `N messages were not sent because you stopped it: send them
+again.`: at the end of the reply that was running, or a message of its own when nothing runs. A
+stop that only drops messages answers with that note and adds no `Stopped.`. A `!!command` that
+already ran is shown with `Not told to the agent: you stopped the session.` The **Stop** control
+in Agents & tools does the same.
+
 A word that depends on what the agent can do exists when the agent declares that capability, and
 the word's meaning is the agent's mapping. In this release the agent is the Claude Code module:
 `!bypass on` sets its `bypassPermissions` mode, `!plan` sets its plan mode, and the words `/effort`

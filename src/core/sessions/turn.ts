@@ -23,6 +23,8 @@ export class Turn {
   readonly shell: string | null;
   /** What the thread shows of the command's run, from its run until a reply shows it. */
   head: string | null = null;
+  /** Set when the worker enters the shell command's run: past it, a stop no longer drops the turn. */
+  shellStarted = false;
 
   constructor(prompt: PromptContent, sink: Reply, shell: string | null = null) {
     this.prompt = prompt;
