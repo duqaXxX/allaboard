@@ -457,32 +457,19 @@ test("a store given no sync flushes with the system's own", POSIX_ONLY, (t) => {
   assert.equal(flush.mock.callCount(), 2);
 });
 
-// TestPrune: `prune` calls `alive` once per distinct folder and reports the entries it removed, each with its reason.
+// TestPrune: `prune` reports the entries it removed, each with its reason.
 
-test("removes a thread whose session is gone", () => {
+// #148: a thread's messages remain in the chat whether or not the agent lists its session.
+test("keeps a thread with a session however old", () => {
   const dir = scratch();
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD);
   store.setSession(CHANNEL, THREAD, SESSION);
 
-  const removed = store.prune(() => [], opened, ROOT_TIME);
-  assert.deepEqual(removed, [
-    { ref: { channel: CHANNEL, thread: THREAD }, reason: "session gone" },
-  ]);
-  assert.equal(store.thread(CHANNEL, THREAD), null);
-});
-
-test("keeps a thread whose session is alive", () => {
-  const dir = scratch();
-  const store = new StateStore(join(dir, "state.json"));
-  store.bind(CHANNEL, join(dir, "project"));
-  store.openThread(CHANNEL, THREAD);
-  store.setSession(CHANNEL, THREAD, SESSION);
-
-  const removed = store.prune(() => [SESSION], opened, ROOT_TIME);
+  const removed = store.prune(opened, ROOT_TIME + 30 * 86_400);
   assert.deepEqual(removed, []);
-  assert.notEqual(store.thread(CHANNEL, THREAD), null);
+  assert.equal(store.thread(CHANNEL, THREAD)?.sessionId, SESSION);
 });
 
 test("removes a no session thread older than a day", () => {
@@ -492,7 +479,7 @@ test("removes a no session thread older than a day", () => {
   store.openThread(CHANNEL, THREAD);
 
   const rootTime = ROOT_TIME;
-  const removed = store.prune(() => [], opened, rootTime + 86_401);
+  const removed = store.prune(opened, rootTime + 86_401);
   assert.deepEqual(removed, [
     { ref: { channel: CHANNEL, thread: THREAD }, reason: "never started" },
   ]);
@@ -506,46 +493,8 @@ test("keeps a young no session thread", () => {
   store.openThread(CHANNEL, THREAD);
 
   const rootTime = ROOT_TIME;
-  const removed = store.prune(() => [], opened, rootTime + 3_600);
+  const removed = store.prune(opened, rootTime + 3_600);
   assert.deepEqual(removed, []);
-  assert.notEqual(store.thread(CHANNEL, THREAD), null);
-});
-
-test("calls alive once per distinct folder", () => {
-  const calls: string[] = [];
-  const alive = (directory: string): string[] => {
-    calls.push(directory);
-    return [SESSION];
-  };
-
-  const dir = scratch();
-  const store = new StateStore(join(dir, "state.json"));
-  store.bind(CHANNEL, join(dir, "project"));
-  store.openThread(CHANNEL, THREAD);
-  store.setSession(CHANNEL, THREAD, SESSION);
-  store.openThread(CHANNEL, OTHER_THREAD);
-  store.setSession(CHANNEL, OTHER_THREAD, SESSION);
-
-  const removed = store.prune(alive, opened, ROOT_TIME);
-  assert.deepEqual(removed, []);
-  assert.deepEqual(calls, [join(dir, "project")]);
-});
-
-test("alive raising leaves the file untouched", () => {
-  const dir = scratch();
-  const path = join(dir, "state.json");
-  const store = new StateStore(path);
-  store.bind(CHANNEL, join(dir, "project"));
-  store.openThread(CHANNEL, THREAD);
-  store.setSession(CHANNEL, THREAD, SESSION);
-  const before = readFileSync(path, "utf8");
-
-  const boom = (): string[] => {
-    throw new Error("folder is gone");
-  };
-
-  assert.throws(() => store.prune(boom, opened, ROOT_TIME), /folder is gone/);
-  assert.equal(readFileSync(path, "utf8"), before);
   assert.notEqual(store.thread(CHANNEL, THREAD), null);
 });
 
@@ -767,24 +716,6 @@ test("clear repair keeps what an unlanded answer still needs", () => {
     kept,
     threadState(join(dir, "project"), { openReplies: ["ts-1"], status: "error" }),
   );
-});
-
-test("prune keeps every thread of a folder it cannot decide", () => {
-  // `alive` returns null when it cannot tell which sessions a folder holds: pruning errs on
-  // keeping, so none of that folder's threads is removed.
-  const dir = scratch();
-  const store = new StateStore(join(dir, "state.json"));
-  store.bind("chan-1", join(dir, "undecided"));
-  store.openThread("chan-1", "thread-a", "kept-1");
-  store.bind("chan-1", join(dir, "decided"));
-  store.openThread("chan-1", "thread-b", "gone-1");
-
-  const alive = (directory: string): Set<string> | null =>
-    directory.endsWith("undecided") ? null : new Set();
-
-  assert.equal(store.prune(alive, opened, 1_700_000_000).length, 1);
-  assert.notEqual(store.thread("chan-1", "thread-a"), null);
-  assert.equal(store.thread("chan-1", "thread-b"), null);
 });
 
 test("an explicit off is kept apart from never chosen", () => {
@@ -1010,13 +941,14 @@ test("the observer hears a prune that removed something", () => {
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD, SESSION);
+  store.openThread(CHANNEL, OTHER_THREAD);
   const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
-  assert.equal(store.prune(() => new Set([SESSION]), opened, ROOT_TIME).length, 0);
+  assert.equal(store.prune(opened, ROOT_TIME).length, 0);
   assert.deepEqual(heard, []);
-  assert.equal(store.prune(() => new Set(), opened, ROOT_TIME).length, 1);
-  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD }]]);
+  assert.equal(store.prune(opened, OTHER_ROOT_TIME + 2 * 86_400).length, 1);
+  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: OTHER_THREAD }]]);
 });
 
 // #88: whether a thread asks the owner (an approval or a question open) changes with its
@@ -1074,11 +1006,8 @@ test("prune leaves alone the threads it is told to keep", () => {
     { channel: CHANNEL, thread: THREAD },
     { channel: CHANNEL, thread: OTHER_THREAD },
   ];
-  assert.equal(store.prune(() => new Set(), opened, later, keep).length, 0);
-  assert.equal(
-    store.prune(() => new Set(), opened, later, [{ channel: CHANNEL, thread: THREAD }]).length,
-    1,
-  );
+  assert.equal(store.prune(opened, later, keep).length, 0);
+  assert.equal(store.prune(opened, later, [{ channel: CHANNEL, thread: THREAD }]).length, 1);
   assert.notEqual(store.thread(CHANNEL, THREAD), null);
   assert.equal(store.thread(CHANNEL, OTHER_THREAD), null);
 });

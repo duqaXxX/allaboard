@@ -21,6 +21,8 @@ function short(field: FooterField): string {
     case "model":
     case "changes":
       return value;
+    case "git_untrusted":
+      return `git: ${value}`;
     case "advisor":
       return `*advisor* ${value}`;
     case "effort":

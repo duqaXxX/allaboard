@@ -1513,7 +1513,11 @@ thread.`` (with the word you typed), and `!stop` answers ``This thread holds no 
 `!stop` in the channel to stop every session, or inside a session's thread to stop that
 one.`` A Resume click or
 `!resume <id or name>` sent to a thread that already holds a session gets
-``This thread already holds a session: send `!resume` again in the channel to pick another.`` A Resume
+``This thread already holds a session: send `!resume` again in the channel to pick another.`` That
+includes a thread whose session Claude Code no longer has (its transcript was deleted): the thread
+keeps its entry, so the answer is the same. To bring another session back, send `!resume` in the
+channel, which opens a new thread, and delete the old thread from the Home tab or with
+`!delete-thread`. A Resume
 click or
 `!resume <id or name>` that names a session already open in another thread of any channel gets
 `This session is already open in another thread: <link>.` instead, with a permalink to that thread: one
@@ -1959,9 +1963,13 @@ names again, or delete the file and bind the channels again.
 
 allaboard keeps `state.json` clean on its own: when it starts, every 6 hours, and when you press the
 Home tab's **Refresh**. It forgets only what an answer makes certain: a channel Slack says is gone,
-with its threads; a thread whose first message is gone; a thread whose Claude Code session no
-longer exists; a thread with no session opened more than a day ago. Anything it cannot tell for
-certain stays (a rate limit, a server error or an unreadable folder removes nothing), and so does
+with its threads; a thread whose first message is gone; a thread with no session opened more
+than a day ago. A thread whose Claude Code session no longer exists stays, since its messages
+remain in Slack: the Home tab lists it as `Session <id>`. Its **Delete** there needs `SLACK_USER_TOKEN`, like any
+Delete; without it, `!delete-thread` inside the thread deletes it. Writing in
+it tries to resume the session again, and answers that the session no longer exists while its
+transcript is missing. Anything it cannot tell for
+certain stays (a rate limit or a server error removes nothing), and so does
 a thread or a channel with a session open at that moment. When Slack finds none of the bound
 channels it forgets none and says so in the log, since that is what a bot token of another
 workspace looks like. The rules are in [Cleaning `state.json`](architecture.md#cleaning-statejson).
@@ -2106,7 +2114,12 @@ branch and the uncommitted lines, `!open` lists the changed files and `!diff` th
 a repository you trusted in Claude Code. A trusted folder does not stand for a repository inside
 it. A bound folder that is not a repository itself and holds one a level or two below it shows
 them for that repository once you open `claude` in it and accept the trust dialog. Without that
-trust the footer leaves the branch and the lines out, `!open` lists no changed files there, `!diff` is refused, and
+trust the footer says `git: not trusted` in place of the branch and the lines, and `!status` shows
+`Git: not trusted` and names the repository with the line that asks for the trust. Nothing is posted
+in the thread for it. This also covers a folder that becomes a repository mid-session (after `git init`) when
+Claude Code trusted it only through a parent folder: a folder trusted at its own path becomes a trusted
+repository and shows its branch at once. Once you open `claude` in the folder and accept the trust dialog,
+the next footer shows the branch again with no restart. `!open` lists no changed files there, `!diff` is refused, and
 its search reads that repository from disk, the files its `.gitignore` names included.
 
 The answer to `!bind`, and `!status` inside a thread, name the repositories one or two levels

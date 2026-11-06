@@ -22,10 +22,10 @@ export const ONE_DAY = 24 * 60 * 60;
 /** When a thread was opened, in epoch seconds; null when the chat cannot tell. */
 export type OpenedAt = (ref: ThreadRef) => number | null;
 
-/** A thread `StateStore.prune` removed, and why: its session left the folder, or none ever started. */
+/** A thread `StateStore.prune` removed, and why: none ever started. */
 export interface Pruned {
   readonly ref: ThreadRef;
-  readonly reason: "session gone" | "never started";
+  readonly reason: "never started";
 }
 
 /**
@@ -793,22 +793,14 @@ export class StateStore {
   }
 
   /**
-   * Remove a thread whose session id is gone from its folder's sessions, and a no-session
-   * thread that `openedAt` says was opened more than `ONE_DAY` before `now` (one it cannot date
-   * is kept). Calls `alive` once per distinct folder;
-   * null means it cannot tell, and that folder's threads are kept. `keep` names the
-   * (channelId, threadId) to leave alone whatever they look like: the threads with a live
-   * session, whose id may not be on disk yet. If `alive` throws, nothing is removed or written;
-   * the caller decides what to do next. Returns the entries removed, each with why.
+   * Remove a no-session thread that `openedAt` says was opened more than `ONE_DAY` before `now`
+   * (one it cannot date is kept). A thread with a session id is never removed here, whether or
+   * not the agent still lists the session: its messages remain in the chat, and the Home lists
+   * it from this file. `keep` names the (channelId, threadId) to leave alone whatever they look
+   * like: the threads with a live session. Returns the entries removed, each with why.
    */
-  prune(
-    alive: (directory: string) => Iterable<string> | null,
-    openedAt: OpenedAt,
-    now: number,
-    keep: Iterable<ThreadRef> = [],
-  ): Pruned[] {
+  prune(openedAt: OpenedAt, now: number, keep: Iterable<ThreadRef> = []): Pruned[] {
     const kept = new Set([...keep].map((ref) => threadKey(ref.channel, ref.thread)));
-    const aliveCache = new Map<string, ReadonlySet<string> | null>();
     const updated = new Map<string, ChannelRecord>();
     const removed: Pruned[] = [];
     for (const [channelId, channel] of this.channelsById) {
@@ -818,17 +810,7 @@ export class StateStore {
           survivors.set(threadId, thread);
           continue;
         }
-        if (thread.sessionId !== null) {
-          if (!aliveCache.has(thread.directory)) {
-            const sessions = alive(thread.directory);
-            aliveCache.set(thread.directory, sessions === null ? null : new Set(sessions));
-          }
-          const sessions = aliveCache.get(thread.directory);
-          if (sessions && !sessions.has(thread.sessionId)) {
-            removed.push({ ref: { channel: channelId, thread: threadId }, reason: "session gone" });
-            continue;
-          }
-        } else {
+        if (thread.sessionId === null) {
           const opened = openedAt({ channel: channelId, thread: threadId });
           if (opened !== null && now - opened > ONE_DAY) {
             removed.push({

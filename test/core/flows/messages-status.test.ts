@@ -221,6 +221,107 @@ test("a thread's !status names the repositories below its folder that still need
   assert.ok(!(await session.status()).includes(lines[at] ?? ""), "trusted since: not named");
 });
 
+test("the footer and !status say git is not trusted for a repository the agent does not cover", async (t) => {
+  const agent = new WithFolderTrust();
+  const world = await MessagesWorld.make(t, { agent });
+  mkdirSync(join(world.folder, ".git"), { recursive: true });
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  assert.ok(world.shown(ref).join("\n").includes("git not trusted"), "the footer says so");
+  assert.ok((await session.status()).includes("Git: `not trusted`"));
+  agent.trusted.add(world.folder);
+  assert.ok(!(await session.status()).includes("not trusted"), "trusted since: normal again");
+});
+
+test("!status names the repository that makes the mark, with the line that asks for the trust", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new WithFolderTrust() });
+  mkdirSync(join(world.folder, ".git"), { recursive: true });
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  const lines = (await session.status()).split("\n");
+  const at = lines.indexOf(texts.named(texts.UNTRUSTED_REPOSITORIES, PLAIN_NAMES));
+  assert.ok(at > 0, lines.join("\n"));
+  assert.equal(lines[at + 1], `\`cd ${shellQuote(world.folder)} && plain\``);
+});
+
+test("a trust lookup that fails leaves the footer and !status fields, with no mark", async (t) => {
+  const agent = new WithFolderTrust();
+  agent.untrustedRepository = async () => {
+    throw new Error("lookup failed");
+  };
+  const world = await MessagesWorld.make(t, { agent });
+  mkdirSync(join(world.folder, ".git"), { recursive: true });
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  const status = await session.status();
+  assert.ok(
+    status.includes("Context:") || status.includes("Effort:") || status.includes("Model:"),
+    status,
+  );
+  assert.ok(!status.includes("not trusted"));
+  assert.ok(
+    world
+      .shown(ref)
+      .join("\n")
+      .includes(world.folder.split("/").at(-1) ?? "?"),
+  );
+});
+
+test("!status names no repository from an earlier footer when this call read none", async (t) => {
+  const agent = new WithFolderTrust();
+  const world = await MessagesWorld.make(t, { agent });
+  mkdirSync(join(world.folder, ".git"), { recursive: true });
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  const line = `\`cd ${shellQuote(world.folder)} && plain\``;
+  assert.ok((await session.status()).includes(line), "the mark's repository is named");
+  agent.next(die());
+  await world.says("again", ref.thread);
+  await world.settle();
+  agent.trusted.add(world.folder);
+  agent.failNextStart(new Error("boom"));
+  const last = await session.status();
+  assert.ok(!last.includes(line), "trusted since, and no reading this time");
+});
+
+test("a trusted-repository lookup that fails leaves the footer fields, with no mark", async (t) => {
+  const agent = new WithFolderTrust();
+  agent.trustedRepository = async () => {
+    throw new Error("lookup failed");
+  };
+  const world = await MessagesWorld.make(t, { agent });
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  const status = await session.status();
+  assert.ok(status.includes("Effort:"), status);
+  assert.ok(!status.includes("not trusted"));
+  assert.ok(
+    world
+      .shown(ref)
+      .join("\n")
+      .includes(world.folder.split("/").at(-1) ?? "?"),
+  );
+});
+
+test("a folder that is no repository, and an agent with no record of trust, show no git mark", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new WithFolderTrust() });
+  const ref = await world.opened("one");
+  const session = world.sessions.get(ref.channel, ref.thread);
+  assert.ok(session !== null);
+  assert.ok(!(await session.status()).includes("not trusted"));
+  assert.ok(!world.shown(ref).join("\n").includes("git not trusted"));
+  // A plain agent keeps no record of trust, even where a `.git` entry stands.
+  const plain = await MessagesWorld.make(t, {});
+  mkdirSync(join(plain.folder, ".git"), { recursive: true });
+  const other = await plain.opened("one");
+  assert.ok(!plain.shown(other).join("\n").includes("git not trusted"));
+});
+
 test("a restart leaves every thread with a session listed, by how its last turn ended", async (t) => {
   const first = await MessagesWorld.make(t, { reactions: true });
   const done = await first.opened("one");

@@ -11,8 +11,8 @@ import type { Clock } from "../clock.ts";
 import type { ModuleSetup, ModuleWords } from "../module-setup.ts";
 
 /**
- * The agent refused to resume the session a start named (its transcript is gone): the thread
- * that held it cannot go on. Any other failure of a start rejects with the failure itself, and
+ * The agent refused to resume the session a start named (its transcript is gone): the turn that
+ * asked fails, and the thread keeps its entry, so the next start tries the resume again. Any other failure of a start rejects with the failure itself, and
  * the thread's next message tries again.
  */
 export class ResumeRefused extends Error {

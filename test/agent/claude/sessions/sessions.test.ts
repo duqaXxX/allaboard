@@ -220,20 +220,23 @@ test("a thread is live exactly when get would give it a session", async (t) => {
   assert.equal(h.manager.live(CHANNEL, THREAD), true);
 });
 
-test("a gone session is removed and says so", async (t) => {
-  // A stored session id that fails to resume no longer falls back to a fresh session.
+test("a gone session keeps its entry and says so", async (t) => {
+  // A stored session id that fails to resume no longer falls back to a fresh session, and the
+  // thread's entry stays: its messages remain, and the next start tries the resume again (#148).
   const h = harnessFor(t)({ startError: gone() });
   h.session(); // opens the thread
   h.state.setSession(CHANNEL, THREAD, "gone");
-  const turn = await h.session().submit("hello");
+  const session = h.session();
+  const turn = await session.submit("hello");
   await turn.done.wait();
   assert.deepEqual(
     h.clients.map((client) => client.options.resume),
     ["gone"],
   );
   assert.deepEqual(h.bodies(), [texts.named(texts.SESSION_GONE, NAMES)]);
-  assert.equal(h.state.thread(CHANNEL, THREAD), null);
-  assert.equal(h.manager.get(CHANNEL, THREAD), null);
+  assert.equal(h.state.thread(CHANNEL, THREAD)?.sessionId, "gone");
+  const rebuilt = h.manager.get(CHANNEL, THREAD);
+  assert.ok(rebuilt !== null && rebuilt !== session, "a new session, built from the kept entry");
   assert.equal(h.slack.pushes(), 1); // the reply's stream stops once
 });
 
@@ -279,7 +282,7 @@ function gatedSinks(t: TestContext, gates: readonly AsyncEvent[]): { entered: nu
   return state;
 }
 
-test("a turn that races sessiongone while its sink is made gets session gone", async (t) => {
+test("a turn that races a refused resume while its sink is made gets session gone", async (t) => {
   // `ensureConnected` finds the stored session gone, closes the session and drains the queue
   // (empty at that point). The second turn is queued only after that: nothing will ever take
   // it from an ended worker, so it must be resolved right there, as gone too.
@@ -310,9 +313,9 @@ test("a turn that races sessiongone while its sink is made gets session gone", a
 
 test("a turn that races a plain close while its sink is made gets session closed", async (t) => {
   // Whatever closed the session while the sink was made, it must not always be answered as
-  // SessionGone: a plain close (an idle close, a restart) leaves the thread's own entry in
-  // state.json, unlike SessionGone's close, and that is the only thing telling the two apart
-  // once the session is closed either way.
+  // SessionGone: a refused resume sets the session's `resumeRefused`, a plain close (an idle
+  // close, a restart) does not, and that is the only thing telling the two apart once the
+  // session is closed either way (the thread's entry stays in both).
   const h = harnessFor(t)({});
   const session = h.session();
   const gate = new AsyncEvent();

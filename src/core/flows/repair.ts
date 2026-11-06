@@ -3,7 +3,7 @@
  * whose cards still run, a request still carrying its controls, and the working or waiting
  * status a turn mid-flight left on its thread's root. Runs once on start, right after the chat
  * is built and before its connection opens (a provider's own client works without it) and
- * before the state is pruned (a pruned thread's leftovers must still be repaired); a graceful
+ * before the state is pruned (a thread the prune drops must still have its leftovers repaired); a graceful
  * stop clears these same fields itself, so a second start finds nothing to do. What the chat
  * did not repair stays in the state, and the next start asks again.
  */

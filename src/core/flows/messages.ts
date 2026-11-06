@@ -315,8 +315,8 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
           } catch (error) {
             if (!(error instanceof SessionClosed) || attempt > 0) throw error;
             const fresh = sessions.get(ref.channel, ref.thread);
-            // Not just closed: its thread's own entry is gone too (a `SessionGone` close), so
-            // a retry would find nothing here again either.
+            // Null once the thread's entry is gone. A refused resume keeps it: the retry then
+            // gets a rebuilt session, whose own refusal throws `SessionGone` (one retry only).
             if (fresh === null) throw new SessionGone(names);
             session = fresh;
           }
