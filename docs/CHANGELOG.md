@@ -46,6 +46,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A `!resume` or a Resume click of a session held by a thread in a channel the chat says is gone
+  answers ``This session is held by thread `<id>`, in a channel the chat no longer reaches.`` and
+  how to free it: the chat's own control (`ChatProvider.cleanupControl`, new and optional; Slack:
+  `Refresh on the Home tab`) at once, or the cleanup within 6 hours. A channel the chat could not
+  answer about keeps the answer with a link (#191).
 - `AgentBackend.aliveSessions` is gone from the agent seam: no core path reads it since the
   cleanup keeps a thread whose session the agent no longer lists. `sessionListing` now serves
   `listSessions` and `datedSessions`, and the live probe reads the Claude module's own listing

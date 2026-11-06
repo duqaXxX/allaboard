@@ -65,6 +65,10 @@ class Faulty implements ChatProvider {
     return this.#inner.capabilities;
   }
 
+  get cleanupControl(): string | undefined {
+    return this.#inner.cleanupControl;
+  }
+
   thread(ref: ThreadRef): ThreadChat {
     const thread = this.#inner.thread(ref);
     const sayFails = (): boolean => this.sayFails;

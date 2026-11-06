@@ -1577,6 +1577,9 @@ comment of `endReply`.
 ## Answering the cleanup
 
 The core's cleanup of `state.json` ("Cleaning `state.json`" in [architecture.md](architecture.md#cleaning-statejson)) asks the provider whether a channel and a thread are still there (`ChatProvider.channelState`, `ChatProvider.threadState`).
+A resume of a session held by a thread whose permalink Slack does not give asks `channelState` of
+that thread's channel too, and on `gone` names the Home tab's Refresh, the provider's
+`cleanupControl`.
 
 - The lookup for channels is `channels.channelLookup`: the bot's `conversations.info` answering
 ok is `there`. The bot's `channel_not_found` is the same for a deleted channel and for one the bot

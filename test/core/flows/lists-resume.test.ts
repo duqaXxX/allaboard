@@ -161,6 +161,59 @@ test("a pick of a session another thread took meanwhile is refused and leaves th
   assert.equal(world.faulty.rewrites.length, 0);
 });
 
+/** The refusal for a session held in a channel the chat says is gone, freed as `free` says. */
+function unreachable(thread: string, free: string): string {
+  return fill(texts.RESUME_HELD_UNREACHABLE, { thread, free });
+}
+
+test("a session held in a channel the chat no longer has is refused with how it is freed", async (t) => {
+  const world = await withSessions(t);
+  const ref = await world.word();
+  world.state.bind("chan-gone", world.app);
+  world.state.openThread("chan-gone", "thread-9", THIRD);
+  await world.flows.resume.word(ref, THIRD);
+  assert.equal(world.state.thread(ref.channel, ref.thread), null);
+  const later = fill(texts.RESUME_FREE_LATER, { hours: "6" });
+  assert.deepEqual(world.said().slice(-1), [unreachable("thread-9", later)]);
+});
+
+test("a chat with a control that runs the cleanup names it in the refusal", async (t) => {
+  const world = await withSessions(t);
+  world.chat.cleanupControl = "Sweep in the side panel";
+  const ref = await world.word();
+  world.state.bind("chan-gone", world.app);
+  world.state.openThread("chan-gone", "thread-9", THIRD);
+  await world.flows.resume.word(ref, THIRD);
+  const now = fill(texts.RESUME_FREE_NOW, { control: "Sweep in the side panel", hours: "6" });
+  assert.deepEqual(world.said().slice(-1), [unreachable("thread-9", now)]);
+});
+
+test("a gone channel with a live session keeps the plain refusal: the cleanup skips it", async (t) => {
+  const world = await withSessions(t);
+  const ref = await world.word();
+  const gone = world.chat.openChannel("gone");
+  world.state.bind(gone, world.app);
+  world.state.openThread(gone, "thread-9", THIRD);
+  await world.work((await world.chat.as(OWNER).says(gone, "busy")).ref);
+  world.chat.removeChannel(gone);
+  await world.flows.resume.word(ref, THIRD);
+  assert.deepEqual(world.said().slice(-1), [
+    fill(texts.RESUME_ELSEWHERE, { link: linkTo("thread-9") }),
+  ]);
+});
+
+test("a held session's channel the chat cannot answer about keeps the plain refusal", async (t) => {
+  const world = await withSessions(t);
+  const ref = await world.word();
+  world.state.bind("chan-gone", world.app);
+  world.state.openThread("chan-gone", "thread-9", THIRD);
+  world.chat.failChannelLookups();
+  await world.flows.resume.word(ref, THIRD);
+  assert.deepEqual(world.said().slice(-1), [
+    fill(texts.RESUME_ELSEWHERE, { link: linkTo("thread-9") }),
+  ]);
+});
+
 test("a pick into a thread that already holds a session is refused and leaves the list", async (t) => {
   const world = await withSessions(t);
   const ref = await world.word();
