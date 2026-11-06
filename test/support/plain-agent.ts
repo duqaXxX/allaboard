@@ -1117,10 +1117,6 @@ export class PlainAgent implements AgentBackend {
     return [...sessions].sort((a, b) => b.lastModified - a.lastModified);
   }
 
-  async aliveSessions(folder: string): Promise<ReadonlySet<string> | null> {
-    return new Set(this.store.list(folder).map((session) => session.id));
-  }
-
   // No `folderTrust`: the agent keeps no record of trust, so no folder is refused and the
   // daemon's git runs nowhere. No `stopTask` or `setEffort` either: it runs no task, and its
   // effort changes only at a start.

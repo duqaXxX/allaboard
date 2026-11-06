@@ -53,6 +53,38 @@ async function claudeRecord(content: unknown): Promise<void> {
   await writeFile(join(home, ".claude.json"), JSON.stringify(content));
 }
 
+/** The time of the one message `stamped` writes. */
+const STAMP = Date.UTC(2026, 8, 22, 9, 0, 0, 0);
+
+/** A transcript line of session `id` sent at `STAMP`. */
+function stamped(id: string): unknown {
+  return {
+    type: "user",
+    timestamp: new Date(STAMP).toISOString(),
+    sessionId: id,
+    uuid: "u1",
+    parentUuid: null,
+    message: { role: "user", content: "A question" },
+  };
+}
+
+/**
+ * The time the back end dates session `id` of `folder` at: `STAMP` only when it read the
+ * transcript in the projects folder it was given, 0 when it found none there.
+ */
+async function datedAt(backend: ClaudeBackend, folder: string, id: string): Promise<number> {
+  const listed = {
+    id,
+    title: "A question",
+    customTitle: null,
+    branch: null,
+    size: null,
+    lastModified: 0,
+  };
+  const [dated] = await backend.datedSessions(folder, [listed]);
+  return dated?.lastModified ?? -1;
+}
+
 test("the capabilities are the Claude back end's", () => {
   assert.equal(new ClaudeBackend().capabilities, CAPABILITIES);
 });
@@ -211,7 +243,7 @@ test("only a repository the owner trusted may run the daemon's git", async () =>
 });
 
 test(
-  "the sessions of a folder are listed through the SDK, the ids alive through the files",
+  "the sessions of a folder are listed through the SDK, which skips a metadata-only one",
   LIMIT,
   async (t) => {
     const previous = process.env.CLAUDE_CONFIG_DIR;
@@ -245,7 +277,6 @@ test(
       { id: sid, title: "A question", branch: "main" },
     );
     assert.equal(listed[0]?.lastModified, 1_790_000_000_000);
-    assert.deepEqual(await backend.aliveSessions(project), new Set([sid, bare]));
     const dated = await backend.datedSessions(project, listed);
     assert.equal(dated[0]?.lastModified, Date.UTC(2026, 8, 21, 10, 0, 0, 0));
   },
@@ -350,7 +381,7 @@ test("the records and the transcripts are the config folder's", LIMIT, async (t)
   const folder = join(config, "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
   await mkdir(folder, { recursive: true });
   const sid = "68da9311-0000-4000-8000-0000000000d1";
-  await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify({ type: "ledger" })}\n`);
+  await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify(stamped(sid))}\n`);
   await writeFile(
     join(config, ".claude.json"),
     JSON.stringify({
@@ -362,7 +393,11 @@ test("the records and the transcripts are the config folder's", LIMIT, async (t)
   const sdk = new FakeSdk();
   const backend = new ClaudeBackend({ query: sdk.query, home, configDir: config });
   assert.equal(await backend.folderTrusted(project), true);
-  assert.deepEqual(await backend.aliveSessions(project), new Set([sid]));
+  assert.deepEqual(
+    (await backend.listSessions(project)).map((listed) => listed.id),
+    [sid],
+  );
+  assert.equal(await datedAt(backend, project, sid), STAMP);
   const session = await backend.start({ ...START, folder: project }, NO_REQUESTS);
   assert.deepEqual(sdk.only.options.extraArgs, { "replay-user-messages": null, chrome: null });
   await session.close();
@@ -384,9 +419,9 @@ test(
     const folder = join(projects, project.replace(/[^a-zA-Z0-9]/g, "-"));
     await mkdir(folder, { recursive: true });
     const sid = "68da9311-0000-4000-8000-0000000000d2";
-    await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify({ type: "ledger" })}\n`);
+    await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify(stamped(sid))}\n`);
     const backend = new ClaudeBackend({ query: new FakeSdk().query, home, projects });
-    assert.deepEqual(await backend.aliveSessions(project), new Set([sid]));
+    assert.equal(await datedAt(backend, project, sid), STAMP);
     await backend.close();
   },
 );

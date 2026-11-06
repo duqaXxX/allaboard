@@ -474,11 +474,6 @@ export class FakeAgentBackend implements AgentBackend {
     return [...sessions].sort((a, b) => b.lastModified - a.lastModified);
   }
 
-  async aliveSessions(_folder: string): Promise<ReadonlySet<string> | null> {
-    this.called.push("aliveSessions");
-    return new Set(this.listed.map((session) => session.id));
-  }
-
   folderTrusted(folder: string): Promise<boolean> {
     this.called.push("folderTrusted");
     return this.trusted(folder);

@@ -258,7 +258,6 @@ test("the store outlives the agent: a new agent resumes, lists and refuses", LIM
     { id: listed?.id, title: listed?.title },
     { id: session.id, title: "Name this one" },
   );
-  assert.deepEqual(await again.aliveSessions(FOLDER), new Set([session.id]));
   assert.deepEqual(await again.listSessions("/srv/alice/other"), []);
   const resumed = await again.start({ ...START, resume: session.id }, handler());
   assert.equal((resumed as PlainSession).id, session.id);

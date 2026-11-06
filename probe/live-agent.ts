@@ -18,6 +18,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClaudeBackend, type ClaudeStartOptions } from "../src/agent/claude/backend.ts";
 import {
+  aliveSessions,
   LONG_PROJECT_KEY,
   projectFolder,
   projectKey,
@@ -188,7 +189,9 @@ async function main(): Promise<void> {
   // The owner's own `~/.claude.json` is not read: Chrome stays off for these sessions.
   const home = await folder("home");
   await writeFile(join(home, ".claude.json"), "{}");
-  const backend = new ClaudeBackend({ home, projects: projectsDir() });
+  // One folder for the back end and for the listing the probe reads beside it.
+  const projects = projectsDir();
+  const backend = new ClaudeBackend({ home, projects });
   const owner = new Owner();
   const sessions: AgentSession[] = [];
   const directory = await folder("project");
@@ -374,7 +377,7 @@ async function main(): Promise<void> {
         `${listed.length} listed, title ${found === undefined ? "none" : "present"}, size ${found?.size ?? "none"}`,
       );
       const dated = await backend.datedSessions(directory, listed);
-      const alive = await backend.aliveSessions(directory);
+      const alive = await aliveSessions(directory, projects);
       report(
         dated.some((entry) => entry.id === sessionId) && alive?.has(sessionId ?? "") === true,
         "the session is dated and alive",
@@ -555,7 +558,7 @@ async function main(): Promise<void> {
       const deep = await open(long);
       await turn(deep.session, deep.recorder, "Reply with the single word ok.");
       const id = ofType(deep.recorder.events, "session_started")[0]?.sessionId ?? "";
-      const alive = await backend.aliveSessions(long);
+      const alive = await aliveSessions(long, projects);
       info(
         "does the derived name of a long folder match the CLI's",
         `key of ${key.length} characters (limit ${LONG_PROJECT_KEY}); alive set ${alive === null ? "null: the folder was not found under that name" : `has the session: ${alive.has(id)}`}`,

@@ -1024,7 +1024,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       LIMIT,
       async (world, t) => {
         const { backend } = world;
-        const listing = [backend.listSessions, backend.datedSessions, backend.aliveSessions];
+        const listing = [backend.listSessions, backend.datedSessions];
         assert.ok(listing.every((member) => (member !== undefined) === caps.sessionListing));
         const trust = [
           backend.folderTrusted,
@@ -1227,7 +1227,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         assert.notEqual(ids[0], ids[1]);
         world.restart();
         const { backend } = world;
-        assert.ok(backend.listSessions && backend.aliveSessions && backend.datedSessions);
+        assert.ok(backend.listSessions && backend.datedSessions);
         const listed = await backend.listSessions(world.folder);
         assert.deepEqual(
           listed.map((session) => session.id),
@@ -1237,8 +1237,6 @@ export function agentConformance(name: string, harness: AgentHarness): void {
           assert.ok(session.title !== "" && Number.isFinite(session.lastModified));
         }
         assert.deepEqual(await backend.listSessions(world.otherFolder), []);
-        const alive = await backend.aliveSessions(world.folder);
-        assert.ok(alive !== null && ids.every((id) => alive.has(id)));
         const dated: ListedSession[] = await backend.datedSessions(world.folder, listed);
         assert.deepEqual(
           dated.map((session) => session.id),
