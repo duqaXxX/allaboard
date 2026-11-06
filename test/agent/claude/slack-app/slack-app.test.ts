@@ -193,18 +193,19 @@ test("a reply in a thread being deleted starts nothing", async (t) => {
   await world.until(() => isDeepStrictEqual(world.queries(), ["one more thing"]));
 });
 
-test("a reply after a gone session starts nothing", async (t) => {
+test("a reply after a refused resume tries the resume again from the kept entry", async (t) => {
   const world = worldOf(t);
-  // A gone session's close removes the thread's entry with it, so the next reply finds a thread
-  // that holds no session: it is refused, never treated as a fresh top-level message.
-  world.state.openThread(CHANNEL, THREAD, "68da9311-0000-4000-8000-00000000dead");
+  // A refused resume keeps the thread's entry (#148): the next reply is never treated as a fresh
+  // top-level message, and resumes the stored session once the agent accepts it.
+  const stored = "68da9311-0000-4000-8000-00000000dead";
+  world.state.openThread(CHANNEL, THREAD, stored);
   world.connectError = new ResumeRefused();
   await world.dispatch(reply("hello", THREAD));
-  assert.equal(world.state.thread(CHANNEL, THREAD), null);
+  assert.equal(world.state.thread(CHANNEL, THREAD)?.sessionId, stored);
   world.connectError = null;
   await world.dispatch(reply("hello again", THREAD));
-  assert.deepEqual(world.queries(), []);
-  assert.equal(world.ephemerals().at(-1), texts.NOT_A_SESSION);
+  assert.deepEqual(world.queries(), ["hello again"]);
+  assert.equal(world.state.thread(CHANNEL, THREAD)?.sessionId, stored);
 });
 
 test("the thread refusals send the owner to the channel", () => {
@@ -542,7 +543,10 @@ test("a gone session answers bypass with no new session", async (t) => {
   await world.dispatch(word);
   assert.deepEqual(world.ephemerals(), [namedText(texts.SESSION_GONE, NAMES)]);
   assert.deepEqual(reactionsOn(world, word.event.ts), []); // nothing took effect: no ✅
-  assert.equal(world.state.thread(CHANNEL, THREAD), null);
+  assert.equal(
+    world.state.thread(CHANNEL, THREAD)?.sessionId,
+    "68da9311-0000-4000-8000-00000000dead",
+  );
 });
 
 test("a word in code formatting is still a word", async (t) => {

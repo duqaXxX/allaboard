@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { ListedSession } from "../../../src/agent/seam.ts";
 import type { ThreadRef } from "../../../src/chat/seam.ts";
-import type { DeleteRefusal } from "../../../src/chat/slack/delete.ts";
+import { type DeleteRefusal, ThreadDeleter } from "../../../src/chat/slack/delete.ts";
 import {
   ALL,
   CHANNEL_ACTION,
@@ -59,9 +59,9 @@ import {
   threadFacts,
   YESTERDAY,
 } from "../../../src/chat/slack/home.ts";
-
 import { Status } from "../../../src/chat/slack/reply/status.ts";
 import * as slackTexts from "../../../src/chat/slack/texts.ts";
+import { clean } from "../../../src/core/cleanup.ts";
 import type { UpdateLine } from "../../../src/core/port.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
@@ -902,6 +902,65 @@ test("a session claude code does not list yet shows its id", async (t) => {
     titles(published(w.slack)[0] as Json)[0],
     `:raised_hand:  *${texts.fill(slackTexts.HOME_UNTITLED, { id: NEW.slice(0, 8) })}*`,
   );
+});
+
+// #148: the cleanup no longer drops a thread whose session the agent does not list, so the row
+// stays and the owner can delete it from the page, through the real `ThreadDeleter`.
+test("a thread whose session the agent no longer lists stays on the page and can be deleted", async (t) => {
+  const w = world(t);
+  // What the cleanup of before the change was given: an agent that lists no session of the
+  // folder. A variable, not a literal, so the option the cleanup no longer takes still compiles.
+  const options = {
+    threadLookup: async () => "there" as const,
+    alive: () => new Set<string>(),
+    live: () => [],
+    chat: "Slack",
+    openedAt: () => null,
+  };
+  await clean(async () => "there", w.state, options);
+  assert.equal(w.state.thread(CHANNEL, OLD_THREAD)?.sessionId, OLD, "the cleanup kept it");
+
+  // The thread is a root with no replies, by the owner: Slack deletes it with the owner's token.
+  const bot = new FakeSlack();
+  const owner = new FakeSlack();
+  let rootGone = false;
+  const read = () =>
+    rootGone
+      ? rejected("thread_not_found")
+      : {
+          ok: true,
+          messages: [{ type: "message", ts: OLD_THREAD, user: OWNER, text: "x" }],
+          has_more: false,
+        };
+  bot.responses["conversations.replies"] = read;
+  owner.responses["conversations.replies"] = read;
+  owner.responses["chat.delete"] = () => {
+    rootGone = true;
+    return { ok: true };
+  };
+  const deleter = new ThreadDeleter(bot, owner, {
+    botUserId: "U000BOT",
+    ownerUserId: OWNER,
+    state: w.state,
+    names: () => PLAIN_NAMES,
+    release: async () => true,
+    free: () => {},
+  });
+  const home = makeHome(w, new Map([[join(w.directory, "project"), []]]), {
+    delete: (channelId, threadTs) => deleter.delete(channelId, threadTs),
+  });
+  await home.edit(true);
+  const page = published(w.slack).at(-1) as Json;
+  assert.equal(buttons(page, DELETE_ACTION).length, 1, "the row is listed with a Delete");
+  assert.ok(
+    titles(page).some((title) =>
+      title.endsWith(`*${texts.fill(slackTexts.HOME_UNTITLED, { id: OLD.slice(0, 8) })}*`),
+    ),
+    "listed as Session <id>",
+  );
+  await home.delete(CHANNEL, OLD_THREAD);
+  assert.equal(w.state.thread(CHANNEL, OLD_THREAD), null);
+  assert.deepEqual(buttons(published(w.slack).at(-1) as Json, DELETE_ACTION), []);
 });
 
 test("a folder that cannot be listed does not stop the page", async (t) => {

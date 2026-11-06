@@ -389,6 +389,18 @@ export class PlainStore {
     return this.#sessions.get(id)?.folder === folder;
   }
 
+  /** Drops the session, as a transcript folder's cleanup would: a resume of it is then refused. */
+  forget(id: string): Stored | undefined {
+    const stored = this.#sessions.get(id);
+    this.#sessions.delete(id);
+    return stored;
+  }
+
+  /** Puts back a session `forget` returned, as a transcript that came back. */
+  bring(stored: Stored): void {
+    this.#sessions.set(stored.id, stored);
+  }
+
   /** Records that the session ran: a time later than every earlier one unless `at` says. */
   remember(folder: string, id: string, title: string, at?: number): void {
     this.#last = Math.max(this.#now(), this.#last + 1);

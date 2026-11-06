@@ -258,7 +258,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `models` | `AgentInfo.models` is ignored: the setup has no Model select and `AgentSession.setModel` is never called |
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
 | `promptDuringTurn` | the next prompt is sent once the running turn has ended |
-| `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find. A session index does not check it: the Slack provider's calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
+| `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never reads the agent's session list. A session index does not check it: the Slack provider's calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
 | `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root (`texts.BIND_LIST_ANY`; the notice of an unbound channel, `texts.UNBOUND_ANY`, and the `!bind` line of `!help`, `texts.HELP_WORDS_ANY`, say nothing of trust either), and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
 | `loadedContext` | `AgentSession.loaded` is absent: `!memory` and `!skills` answer that the agent does not list what a session loaded (`texts.LOADED_UNAVAILABLE`), and neither `!help`, the suggestions nor `!guide` offer them |
 
@@ -361,7 +361,7 @@ module that breaks it fails only in use.
 | `setPermissionMode` | A mode the agent refuses rejects. The core then changes nothing of its own: the bypass it stores is written only after the call resolves | `a permission mode the back end names is taken, another is refused` |
 | `session_started` | Emitted only once a start that resumes that id would succeed: the core stores the id when the event arrives, and the setup's Start may resume it before any prompt | `an id that session_started names can be resumed at once` |
 | A request | `RequestHandler.permission` and `RequestHandler.question` each resolve once. The agent passes a signal and aborts it when it no longer waits: the core takes the request back from the owner and resolves it as refused | `a request the agent gives up aborts the signal it passed, and the turn goes on to its end` |
-| A start that fails | `ResumeRefused`, the one error class of the seam, when the session a start names cannot be resumed: the core forgets the thread. Any other rejection is shown to the owner by its name and the next message tries again. Neither leaves a process running | `a resume the agent refuses rejects with ResumeRefused and leaves no process` |
+| A start that fails | `ResumeRefused`, the one error class of the seam, when the session a start names cannot be resumed: the turn fails and the thread keeps its entry, so the next start tries again. Any other rejection is shown to the owner by its name and the next message tries again. Neither leaves a process running | `a resume the agent refuses rejects with ResumeRefused and leaves no process` |
 
 Members that serve a capability are optional on the type and present exactly when the module
 declares it (a conformance check asserts that): `listSessions`, `datedSessions` and
@@ -427,8 +427,8 @@ reaches an agent or a chat.
    process at once.
 7. With the connection not opened yet, it repairs what a crashed daemon left open
    (`repair.repair`, see "State and the single-instance lock") and then cleans `state.json`
-   (`cleanup.clean`, see "Cleaning `state.json`"). Cleaning runs only after repair, so a pruned
-   thread's leftovers are still repaired first, and it runs again every
+   (`cleanup.clean`, see "Cleaning `state.json`"). Cleaning runs only after repair, so a thread
+   it prunes has its leftovers repaired first, and it runs again every
    `cleanup.CLEAN_EVERY_SECONDS` until a stop begins (`daemon.cleanEvery`). Every pass is requested
    through `cleanup.Cleanups`, which the chat reaches as `CorePort.cleanup` (see "Cleaning `state.json`").
 8. It sets `StateStore.onSessionsChange` and, for a chat that has a session index
@@ -739,20 +739,16 @@ chat stops. It removes only what an answer makes certain:
   exists, and its session shows in `!resume` again because no thread holds it. A channel that gave
   no answer or was just forgotten has none of its threads asked about, and a thread with a live
   session is kept. Slack's answer for a thread is in the same section.
-- `StateStore.prune` then drops a thread whose session id is no longer among its folder's sessions
-  (`AgentBackend.aliveSessions`, which for Claude is `listing.aliveSessions`: the sessions the SDK
-  lists, with every transcript file in the folder's transcript directory) and a no-session thread
-  that the chat (`ChatProvider.openedAt`) says was opened more than a day ago; one it cannot
-  date is kept. It returns each thread removed with its reason, and the pass logs one line per
-  thread (`pruned thread <channel>/<thread>: ...`, ids only). A folder the back end cannot tell about keeps its
-  threads: one whose transcript directory is there and cannot be read, one whose directory cannot be
-  checked for (a `stat` that fails with anything but `ENOENT` or `ENOTDIR`, such as `EACCES` on the
-  projects directory above it), and one whose name passes
-  `listing.LONG_PROJECT_KEY` characters and has no directory under the name the daemon derives (see
-  [Slack handlers](slack-provider.md#slack-handlers) for how that name is derived).
+- `StateStore.prune` then drops a no-session thread that the chat (`ChatProvider.openedAt`) says
+  was opened more than a day ago; one it cannot date is kept. A thread with a session id is never
+  dropped here, whether or not the agent still lists the session (#148): its messages remain in the
+  chat, and the session index lists it from `state.json` as `Session <id>`, with Delete. The pass
+  does not read the agent's session lists (`AgentBackend.aliveSessions` stays for the probe). It
+  returns each thread removed with its reason, and the pass logs one line per thread
+  (`pruned thread <channel>/<thread>: ...`, ids only).
 
 A pass leaves alone every thread and channel with a live session object
-(`SessionManager.liveThreads`), whose session id may not be on disk yet; the next pass takes them
+(`SessionManager.liveThreads`), which a stop would otherwise close under the pass; the next pass takes them
 once the session has closed. `clean` never throws: a pass that fails is logged and the next one
 tries again.
 
@@ -778,14 +774,13 @@ neither stores the tombstone's text as the prompt nor edits it (Slack's is descr
 
 ### When a thread leaves `state.json`
 
-A thread's entry is removed in four cases, and no other code removes one. An idle close, `!stop`
+A thread's entry is removed in three cases, and no other code removes one. An idle close, `!stop`
 and a restart keep it.
 
 | Case | What removes it | Described in |
 |---|---|---|
 | The chat no longer has its channel | `cleanup.forgetGoneChannels`, which removes the channel with all its threads | "Cleaning `state.json`" |
-| Its session is no longer among its folder's sessions, or it has no session and was opened more than a day ago | `StateStore.prune`, at every pass of the cleaning | "Cleaning `state.json`" |
-| Its stored session cannot be resumed | `ThreadSession.ensureConnected`, when the back end's start fails with `ResumeRefused` | "Starting and resuming the agent session", under "Sessions" |
+| It has no session and was opened more than a day ago | `StateStore.prune`, at every pass of the cleaning | "Cleaning `state.json`" |
 | The owner deletes the thread from the session index in edit mode | `ThreadDeleter.delete`, once the thread is emptied to its root and past it | [Edit mode and Delete](slack-provider.md#edit-mode-and-delete) |
 
 ## Who may talk to it
@@ -1141,7 +1136,7 @@ for another reason, it ends with the error line a prompt would get.
 `SessionManager` (in `manager`) keeps one `ThreadSession` per open thread, across every bound
 channel. A top-level message opens one in the channel's current folder (`SessionManager.open`); a
 reply inside a thread hands back its existing one, rebuilding it first if a restart, an idle close
-or a gone resume dropped it (`SessionManager.get`); a Resume click or `!resume <id or title>` opens
+or a refused resume closed it (`SessionManager.get`); a Resume click or `!resume <id or title>` opens
 one already set to a chosen session id, in the thread of the owner's `!resume` message
 (`SessionManager.resume`); the resume flow of the core (`resume.resuming`) posts the confirmation,
 then removes the list the pick came from; when the confirmation did not post, or the removal
@@ -1217,10 +1212,12 @@ closed when the start returns (`ThreadSession.connect`).
 - If the thread's stored session cannot be resumed (its transcript was deleted), the back end's
   start fails with `ResumeRefused`: Claude Code answers the start with an error result, and
   `ClaudeSession.ready` reads the stream to its end to tell that from a process that failed to start
-  (measured: "Resume of an unknown session"). The thread's entry is dropped, the thread ends
+  (measured: "Resume of an unknown session"). The thread's entry stays (#148: its messages remain in
+  the chat, and a transcript that comes back is used again), the session ends
   (`SessionGone`), and its reply, and every reply still waiting in it, says so
-  (`texts.SESSION_GONE`); the next message in that thread finds no entry, starts nothing and gets
-  `texts.NOT_A_SESSION`. Any other failure of a start leaves the thread as it is, and its next
+  (`texts.SESSION_GONE`); a prompt that raced the close reads it too (`ThreadSession.resumeRefused`,
+  in memory). The next message in that thread builds a new session from the entry and tries the
+  resume again, 1 to 5 seconds to a refusal. Any other failure of a start leaves the thread as it is, and its next
   message tries again. If the thread's directory no longer exists, nothing starts and the reply says
   so (`texts.DIRECTORY_MISSING`). If macOS privacy protection denies the daemon the directory (a
   launchd service does not inherit Terminal's access to `~/Documents`), nothing starts and the reply
@@ -1677,7 +1674,7 @@ not keep the prompt would keep its title as the prompt; that happened on a devel
 only. A root that cannot be read stops the replacement for that turn: it is logged and tried again
 at the next one, unless the chat says the refusal is permanent. `root_prompt` is the one piece of
 message content `state.json` holds, because the daemon deleted it from the chat; it goes with its
-thread when the thread is pruned.
+thread when the thread is removed.
 
 A title that resolves after a stop began (`SessionManager` closed) touches neither the chat nor the
 state. A `ChatError` with `permanent` set (the chat will refuse the same call again) marks the title as

@@ -6,9 +6,9 @@
  * by advancing `FakeClock`.
  *
  * Which sessions are alive is the Claude back end's (`ClaudeBackend.aliveSessions`, tested in
- * `test/agent/claude/listing.test.ts` and `backend.test.ts`); what `daemon.ts` owns of it, that the
- * cleanup is given the back end's function, is the test `prune uses alive sessions to drop a
- * gone thread`.
+ * `test/agent/claude/listing.test.ts` and `backend.test.ts`); the cleanup no longer reads it
+ * (#148: a thread stays while its messages remain), which is the test `a start keeps a thread
+ * whose session the back end no longer lists`.
  *
  * From the critical review of 2026-10-10: the daemon is built over one fake for each Slack client
  * it makes (`slack`, `replies`, `owner`), so a part wired to the wrong client or token fails a
@@ -60,7 +60,7 @@ import {
 import * as slackTexts from "../src/chat/slack/texts.ts";
 import { SlackChat } from "../src/chat/slack/thread.ts";
 import type { Clock } from "../src/clock.ts";
-import { CLEAN_EVERY_SECONDS, logger as cleanupLogger } from "../src/core/cleanup.ts";
+import { CLEAN_EVERY_SECONDS } from "../src/core/cleanup.ts";
 import { ConfigError } from "../src/core/config.ts";
 import { postUpgradeNotices } from "../src/core/flows/notices.ts";
 import { AlreadyRunning, identityDirectory, singleInstance, updateLock } from "../src/core/lock.ts";
@@ -523,24 +523,6 @@ test("the default instance leaves no instance name in the environment", async (t
   d.start({ environment });
   await d.booted();
   assert.deepEqual(environment, { PATH: "/usr/bin" });
-  await d.stop();
-});
-
-test("run prunes stale threads and survives alive raising", async (t) => {
-  const d = new Daemon(t);
-  // A bound channel with a stored session id: `run` must ask the back end about it before
-  // connecting, and a broken transcript read there must not stop the daemon from starting.
-  const state = new StateStore(d.path);
-  state.bind(CHANNEL, d.dir);
-  state.openThread(CHANNEL, "1780000000.000001", "some-id");
-  t.mock.method(d.backend, "aliveSessions", async () => {
-    throw new Error("transcripts unreadable");
-  });
-  const warnings = written(t, cleanupLogger, "warning");
-
-  d.start();
-  await d.booted();
-  assert.ok(warnings().some((line) => line.includes("could not prune stale threads")));
   await d.stop();
 });
 
@@ -1218,23 +1200,21 @@ test("a failed upgrade notice keeps the flag for next start", async (t) => {
   assert.deepEqual(state.pendingNotices(), [CHANNEL]);
 });
 
-test("prune uses alive sessions to drop a gone thread", async (t) => {
-  // The cleanup is given the back end's `aliveSessions`: a thread whose session the back end no
-  // longer lists is dropped at start, one it still lists is kept.
+test("a start keeps a thread whose session the back end no longer lists", async (t) => {
+  // #148: the thread's messages remain in the channel, so the cleanup at start leaves it, and
+  // drops only a thread that never started a session.
   const d = new Daemon(t);
   const state = new StateStore(d.path);
   state.bind(CHANNEL, d.dir);
   state.openThread(CHANNEL, "1780000000.000001", "gone");
-  state.openThread(CHANNEL, "1780000000.000002", "kept");
-  d.backend.listed = [
-    { id: "kept", title: "kept", customTitle: null, branch: null, size: null, lastModified: 1 },
-  ];
+  state.openThread(CHANNEL, "1000000000.000002");
+  d.backend.listed = [];
 
   d.start();
   await d.booted();
   const after = new StateStore(d.path);
-  assert.equal(after.thread(CHANNEL, "1780000000.000001"), null);
-  assert.notEqual(after.thread(CHANNEL, "1780000000.000002"), null);
+  assert.equal(after.thread(CHANNEL, "1780000000.000001")?.sessionId, "gone");
+  assert.equal(after.thread(CHANNEL, "1000000000.000002"), null);
   await d.stop();
 });
 

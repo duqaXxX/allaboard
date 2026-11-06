@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, beforeEach, test } from "node:test";
@@ -184,62 +184,49 @@ test("several gone channels go in one pass", async () => {
 
 test("clean forgets gone channels then prunes what is left", async () => {
   const lookup = channelsInChat({ [GONE_CHANNEL]: "gone" });
-  const asked: string[] = [];
-
-  function alive(folder: string): Set<string> {
-    asked.push(folder);
-    return new Set(); // the session is gone from the folder
-  }
+  state.openThread(CHANNEL, GONE_THREAD);
+  const later = (OPENED_AT[GONE_THREAD] as number) + 2 * 24 * 60 * 60;
 
   await clean(lookup, state, {
     threadLookup: threadsInChat({}),
-    alive,
+    live: nothingLive,
+    chat: "Memory chat",
+    openedAt: opened,
+    now: () => later,
+    logger: log,
+  });
+  assert.deepEqual(state.channels(), [CHANNEL]);
+  assert.equal(state.thread(CHANNEL, GONE_THREAD), null); // pruned: no session started in a day
+  assert.ok(
+    log.lines.includes(
+      `INFO pruned thread ${CHANNEL}/${GONE_THREAD}: no session started within a day`,
+    ),
+  );
+});
+
+// #148: the thread's messages remain in the chat, and the Home lists it from the state.
+test("a pass keeps a thread whose session the agent no longer lists", async () => {
+  await clean(channelsInChat({}), state, {
+    threadLookup: threadsInChat({}),
     live: nothingLive,
     chat: "Memory chat",
     openedAt: opened,
     logger: log,
   });
-  assert.deepEqual(state.channels(), [CHANNEL]);
-  assert.equal(state.thread(CHANNEL, THREAD), null); // pruned: its session no longer exists
-  // the forgotten channel's folder is not read
-  assert.deepEqual(asked, [state.channel(CHANNEL)?.directory]);
-  assert.ok(log.lines.includes(`INFO pruned thread ${CHANNEL}/${THREAD}: its session is gone`));
+  assert.equal(state.thread(CHANNEL, THREAD)?.sessionId, SESSION);
+  assert.deepEqual(log.lines, []);
 });
 
 test("clean keeps a thread with a live session", async () => {
   const live: ThreadRef[] = [{ channel: CHANNEL, thread: THREAD }];
   await clean(channelsInChat({}), state, {
     threadLookup: threadsInChat({}),
-    alive: () => new Set(),
     live: () => live,
     chat: "Memory chat",
     openedAt: opened,
     logger: log,
   });
   assert.notEqual(state.thread(CHANNEL, THREAD), null);
-});
-
-test("a thread opened while the folders are read is kept", async () => {
-  // The sessions are listed off the event loop: what is opened meanwhile, in a folder the
-  // listing did not cover, cannot be told gone.
-  const late = "thread-late";
-
-  async function alive(): Promise<Set<string>> {
-    state.bind("chan-late", join(directory, "late"));
-    state.openThread("chan-late", late, "a-session-no-listing-saw");
-    await Promise.resolve();
-    return new Set([SESSION]);
-  }
-
-  await clean(channelsInChat({}), state, {
-    threadLookup: threadsInChat({}),
-    alive,
-    live: nothingLive,
-    chat: "Memory chat",
-    openedAt: opened,
-    logger: log,
-  });
-  assert.notEqual(state.thread("chan-late", late), null);
 });
 
 test("clean goes on to prune when the channel check itself fails", async () => {
@@ -254,36 +241,17 @@ test("clean goes on to prune when the channel check itself fails", async () => {
     return NOBODY;
   }
 
+  state.openThread(CHANNEL, GONE_THREAD);
   await clean(lookup, state, {
     threadLookup: threadsInChat({}),
-    alive: () => new Set(),
+    now: () => (OPENED_AT[GONE_THREAD] as number) + 2 * 24 * 60 * 60,
     live,
     chat: "Memory chat",
     openedAt: opened,
     logger: log,
   });
   assert.ok(log.lines.join("\n").includes("could not check the bound channels"));
-  assert.equal(state.thread(CHANNEL, THREAD), null); // the prune still ran
-});
-
-test("clean survives a folder that cannot be read and a chat that fails", async () => {
-  const lookup = channelsInChat({}, new Error("network down"));
-
-  function broken(): never {
-    throw Object.assign(new Error("transcripts unreadable"), { code: "EACCES" });
-  }
-
-  await clean(lookup, state, {
-    threadLookup: threadsInChat({}),
-    alive: broken,
-    live: nothingLive,
-    chat: "Memory chat",
-    openedAt: opened,
-    logger: log,
-  }); // never throws
-  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
-  assert.notEqual(state.thread(CHANNEL, THREAD), null);
-  assert.ok(log.lines.join("\n").includes("could not prune stale threads"));
+  assert.equal(state.thread(CHANNEL, GONE_THREAD), null); // the prune still ran
 });
 
 test("a lookup that throws is no answer", async () => {
@@ -311,7 +279,6 @@ test("a thread with no session is dropped for its age only when the chat dates i
 
   await clean(channelsInChat({}), state, {
     threadLookup: threadsInChat({}),
-    alive: () => new Set([SESSION]),
     live: nothingLive,
     chat: "Memory chat",
     openedAt: dated,
@@ -320,37 +287,13 @@ test("a thread with no session is dropped for its age only when the chat dates i
   });
   assert.equal(state.thread(CHANNEL, GONE_THREAD), null); // dated and older than a day
   assert.notEqual(state.thread(CHANNEL, undated), null);
-  assert.notEqual(state.thread(CHANNEL, THREAD), null); // its session is alive
+  assert.notEqual(state.thread(CHANNEL, THREAD), null);
   assert.ok(
     log.lines.includes(
       `INFO pruned thread ${CHANNEL}/${GONE_THREAD}: no session started within a day`,
     ),
   );
   assert.ok(!log.lines.join("\n").includes(`${CHANNEL}/${undated}`));
-});
-
-test("a pass over sessions the agent cannot list prunes nothing", async () => {
-  // An agent that could not list a folder's sessions (null) says nothing of them: the thread's
-  // session may be on disk all the same. The Claude back end answers null on a closed projects
-  // folder (`test/agent/claude/listing.test.ts`).
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "awd-cleanup-")));
-  made.push(root);
-  const project = join(root, "project");
-  mkdirSync(project);
-  const unlisted = new StateStore(join(root, "state.json"), { warn: () => undefined });
-  unlisted.bind(CHANNEL, project);
-  unlisted.openThread(CHANNEL, THREAD, SESSION);
-
-  await clean(channelsInChat({}), unlisted, {
-    threadLookup: threadsInChat({}),
-    alive: async () => null,
-    live: nothingLive,
-    chat: "Memory chat",
-    openedAt: opened,
-    logger: log,
-  });
-  assert.notEqual(unlisted.thread(CHANNEL, THREAD), null);
-  assert.deepEqual(log.lines, []);
 });
 
 test("forgetGoneChannels returns the channels it found as well as those it forgot", async () => {
@@ -455,7 +398,6 @@ test("clean asks about no thread of a channel that gave no answer or was forgott
   });
   await clean(channels, state, {
     threadLookup: threadsInChat({ [THREAD]: "gone" }, asked),
-    alive: () => new Set([SESSION, SECOND_SESSION]),
     live: nothingLive,
     chat: "Memory chat",
     openedAt: () => null,
@@ -471,7 +413,6 @@ test("clean asks about no thread when no channel was found", async () => {
   const asked: ThreadRef[] = [];
   await clean(channelsInChat({}, "gone"), state, {
     threadLookup: threadsInChat({}, asked),
-    alive: () => new Set([SESSION]),
     live: nothingLive,
     chat: "Memory chat",
     openedAt: () => null,
@@ -637,7 +578,6 @@ test("a pass caught by a stop asks about no further channel, forgets none and pr
   await clean(lookup, state, {
     threadLookup: threadsInChat({}, []),
     // A folder that lists no session would prune every thread that holds one.
-    alive: () => new Set<string>(),
     live: nothingLive,
     chat: "Memory chat",
     openedAt: () => null,

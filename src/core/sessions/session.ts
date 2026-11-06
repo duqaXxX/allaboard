@@ -283,6 +283,12 @@ export class ThreadSession {
   private readonly connectLock = new Mutex();
   /** Set once close starts: no client starts after it, and no word stores a setting. */
   private closedFlag = false;
+  /**
+   * Set with `closedFlag` by a refused resume (`connectHeld`): a prompt that raced it reads
+   * `SESSION_GONE` rather than "send it again". Memory only: the next start tries the resume
+   * again from the thread's kept entry.
+   */
+  private resumeRefused = false;
   // The predecessor this object replaced at its key (the manager evicts a closed session as
   // soon as closing starts, not once it finishes). Awaited once, inside the connect lock,
   // before this session's own first connect: the agent's process needs real time to flush
@@ -1003,13 +1009,11 @@ export class ThreadSession {
         // The session closed (an idle close or a restart, or `ensureConnected`'s SessionGone
         // branch, which already drained the queue) while the reply was made: no worker will
         // ever take this turn from the queue, so it is resolved right here instead of left
-        // waiting for one that will not come. Only a SessionGone close also removes the
-        // thread's own entry: that alone is what tells the two apart, since both leave the
-        // session closed the same.
-        const gone = this.deps.state.thread(this.channelId, this.threadId) === null;
+        // waiting for one that will not come. Only a refused resume sets `resumeRefused`:
+        // that alone tells the two apart, since both leave the session closed the same.
         await this.fail(
           turn,
-          gone ? texts.named(texts.SESSION_GONE, this.names) : texts.SESSION_CLOSED,
+          this.resumeRefused ? texts.named(texts.SESSION_GONE, this.names) : texts.SESSION_CLOSED,
           { error: true },
         );
         return turn;
@@ -1086,11 +1090,12 @@ export class ThreadSession {
     } catch (error) {
       if (!(error instanceof ResumeRefused) || sessionId === null) throw error;
       // The stored session is gone (its transcript was deleted): the thread cannot continue.
-      // Its entry is dropped and the session ends itself here, so no later turn (already
+      // Its entry stays (the messages remain in the chat, and a transcript that comes back is
+      // resumed by the next start). The session ends itself here, so no later turn (already
       // queued, or the next one taken by the worker) starts a second, unrecorded session in
       // its place: it fails the same way instead.
       logger.warning(`could not resume the stored session in ${this.where}`);
-      this.deps.state.removeThread(this.channelId, this.threadId);
+      this.resumeRefused = true;
       this.closedFlag = true;
       // No client was ever connected in this branch (`connect` rejected): nothing to wait
       // on, so the "fully closed" signal fires at once, same as `close()`'s tail.

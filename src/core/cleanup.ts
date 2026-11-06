@@ -1,6 +1,6 @@
 /**
  * Forgetting what `state.json` no longer needs: a bound channel the chat no longer has, a thread
- * whose first message the chat no longer has, and a thread whose session is gone. Run once on
+ * whose first message the chat no longer has, and a thread that never started a session. Run once on
  * start and then every `CLEAN_EVERY_SECONDS`, so a daemon that stays up for weeks cleans too.
  *
  * Only a certain answer removes anything. A channel is certainly gone only when the chat provider
@@ -10,7 +10,8 @@
  * a channel that answered `there` in the same pass (the credentials of another account of the
  * chat must never wipe threads), and its certain answer is the chat saying its first message does
  * not exist, or has been replaced by a placeholder that keeps the replies. A thread whose session
- * is gone is dropped by `StateStore.prune`'s rule. The chat provider supplies the lookups that
+ * the agent no longer lists is kept, since its messages remain: only `StateStore.prune`'s
+ * `never started` rule drops a thread of this kind. The chat provider supplies the lookups that
  * turn its own answers into a `Presence` (the Slack mapping is in `docs/slack-provider.md`).
  */
 import type { Presence, ThreadRef } from "../chat/seam.ts";
@@ -47,16 +48,10 @@ export type ThreadLookup = (ref: ThreadRef) => Promise<Presence>;
  */
 export type Live = () => Iterable<ThreadRef>;
 
-/** A folder's session ids, or null when it cannot tell. */
-export type Alive = (
-  directory: string,
-) => Iterable<string> | null | Promise<Iterable<string> | null>;
-
 export interface CleanOptions {
   readonly threadLookup: ThreadLookup;
   /** True once a stop has begun: the threads not yet asked about wait for the next start. */
   readonly stopping?: () => boolean;
-  readonly alive: Alive;
   readonly live: Live;
   /** The chat's name (`ChatProvider.name`), for the log lines that say whose answer it was. */
   readonly chat: string;
@@ -186,16 +181,16 @@ export async function forgetGoneThreads(
 
 /**
  * One pass: forget the channels that are gone, then the threads of the others whose first message
- * is gone, then prune the threads whose session is (`alive`
- * gives a folder's session ids, or null when it cannot tell). Never throws: a pass that fails is
- * logged and the next one tries again.
+ * is gone, then prune the threads that never started a session. A thread whose session the agent
+ * no longer lists stays: its messages remain, and the Home lists it from the state. Never throws:
+ * a pass that fails is logged and the next one tries again.
  */
 export async function clean(
   lookup: ChannelLookup,
   state: StateStore,
   options: CleanOptions,
 ): Promise<void> {
-  const { alive, live } = options;
+  const { live } = options;
   const now = options.now ?? (() => Date.now() / 1000);
   const log = options.logger ?? logger;
   let found: readonly string[] = [];
@@ -219,34 +214,13 @@ export async function clean(
     log.warning(`could not check the threads: ${errorName(error)}`);
   }
   // A stop closes the sessions after this pass: the keep set `live` gives would then be empty,
-  // and a thread whose session id is not on disk yet would be pruned. The next start prunes.
+  // and a thread whose setup is still open (no session id yet) would be pruned for its age.
+  // The next start prunes.
   if (options.stopping?.()) return;
   try {
-    const folders = new Set(
-      state
-        .threads()
-        .filter(([, , thread]) => thread.sessionId !== null)
-        .map(([, , thread]) => thread.directory),
-    );
-    // Reading a folder's sessions is file work that may wait: the state is touched only once all
-    // of it is read, and a folder opened meanwhile has no entry here, so its threads are kept.
-    const known = new Map<string, readonly string[] | null>();
-    for (const folder of folders) {
-      const sessions = await alive(folder);
-      known.set(folder, sessions === null ? null : [...sessions]);
-    }
-    const removed = state.prune(
-      (directory) => known.get(directory) ?? null,
-      options.openedAt,
-      now(),
-      live(),
-    );
-    for (const { ref, reason } of removed) {
-      log.info(
-        `pruned thread ${ref.channel}/${ref.thread}: ${
-          reason === "session gone" ? "its session is gone" : "no session started within a day"
-        }`,
-      );
+    const removed = state.prune(options.openedAt, now(), live());
+    for (const { ref } of removed) {
+      log.info(`pruned thread ${ref.channel}/${ref.thread}: no session started within a day`);
     }
   } catch (error) {
     log.warning(`could not prune stale threads: ${errorName(error)}`);
