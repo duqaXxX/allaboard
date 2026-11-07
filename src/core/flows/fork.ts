@@ -12,6 +12,7 @@ import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
 import type { ForkFlow } from "./contract.ts";
+import type { InFlight, Ticket } from "./in-flight.ts";
 import type { FlowDeps, Talk } from "./talk.ts";
 
 const logger = getLogger("allaboard.core.flows.fork");
@@ -21,9 +22,14 @@ const logger = getLogger("allaboard.core.flows.fork");
 export const FORK_POLL_SECONDS = 2.0;
 
 /** Sends `prompt` in the thread `ref` as the owner's, by the path every message of theirs takes. */
-export type SendPrompt = (ref: ThreadRef, prompt: string) => Promise<void>;
+export type SendPrompt = (ref: ThreadRef, prompt: string, ticket: Ticket) => Promise<void>;
 
-export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow {
+export function forkFlow(
+  deps: FlowDeps,
+  talk: Talk,
+  send: SendPrompt,
+  inFlight: InFlight,
+): ForkFlow {
   const { agent, chat, sessions, state, names } = deps;
   const clock = deps.clock ?? systemClock;
 
@@ -72,70 +78,90 @@ export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow
         await talk.tell(ref, texts.NOT_SENT);
         return;
       }
-      // Past this point the copy is made, and a stop of the original no longer counts it.
+      // Past this point the copy is made, and a stop of the original thread no longer counts it.
+      // A stop of the channel still does, until the prompt is sent: the bridge (only when there is
+      // a prompt) is taken before the original's ticket is given up, and the copy's ticket, once
+      // its thread exists, follows it. Whatever ends the fork releases both.
+      const bridge = prompt === "" ? null : inFlight.take(ref, { channelOnly: true });
       ticket.release();
-      // Read again: the wait may have outlasted the thread's entry, or a restart begun.
-      const origin = state.thread(ref.channel, ref.thread);
-      if (origin?.sessionId == null) throw new SessionGone(names);
-      if (sessions.draining) {
-        await talk.refuseRestarting(ref);
-        return;
-      }
-      // The copy's thread is opened in the channel's folder, as every new thread is.
-      if (state.channel(ref.channel)?.directory !== origin.directory) {
-        await talk.tell(ref, texts.FORK_OLD_FOLDER);
-        return;
-      }
-      const line = oneLine(prompt, TITLE_LIMIT);
-      const at = new Date(deps.now() * 1000).toISOString();
-      const copy = await fork.call(agent, session.directory, origin.sessionId, line || null);
-      const back = await talk.referenceLink(
-        ref,
-        await titleOf(session.directory, origin.sessionId),
-      );
-      const root =
-        prompt === ""
-          ? fill(texts.FORK_ROOT, { link: back })
-          : fill(texts.FORK_ROOT_PROMPT, {
-              link: back,
-              prompt: chat.escape(line, "reference"),
-            });
-      let opened: ThreadRef;
+      let copyTicket: Ticket | null = null;
+      let sending = false;
       try {
-        opened = await channelChat.open.call(channelChat, root);
-      } catch (error) {
-        // The copy stays with the agent, which lists it (`!resume` finds it).
-        logger.warning(
-          `a fork's thread could not be opened, its copy ${copy} kept: ${errorName(error)}`,
+        // Read again: the wait may have outlasted the thread's entry, or a restart begun.
+        const origin = state.thread(ref.channel, ref.thread);
+        if (origin?.sessionId == null) throw new SessionGone(names);
+        if (sessions.draining) {
+          await talk.refuseRestarting(ref);
+          return;
+        }
+        // The copy's thread is opened in the channel's folder, as every new thread is.
+        if (state.channel(ref.channel)?.directory !== origin.directory) {
+          await talk.tell(ref, texts.FORK_OLD_FOLDER);
+          return;
+        }
+        const line = oneLine(prompt, TITLE_LIMIT);
+        const at = new Date(deps.now() * 1000).toISOString();
+        const copy = await fork.call(agent, session.directory, origin.sessionId, line || null);
+        const back = await talk.referenceLink(
+          ref,
+          await titleOf(session.directory, origin.sessionId),
         );
-        throw error;
+        const root =
+          prompt === ""
+            ? fill(texts.FORK_ROOT, { link: back })
+            : fill(texts.FORK_ROOT_PROMPT, {
+                link: back,
+                prompt: chat.escape(line, "reference"),
+              });
+        let opened: ThreadRef;
+        try {
+          opened = await channelChat.open.call(channelChat, root);
+        } catch (error) {
+          // The copy stays with the agent, which lists it (`!resume` finds it).
+          logger.warning(
+            `a fork's thread could not be opened, its copy ${copy} kept: ${errorName(error)}`,
+          );
+          throw error;
+        }
+        if (bridge !== null) copyTicket = inFlight.take(opened, { link: bridge.signal });
+        // The copy runs as its origin does: the effort and the bypass the origin's entry holds, and
+        // the model its transcript ends on (a resume of a copy runs it, measured 2026-10-28).
+        const copied = await sessions.resume(opened.channel, opened.thread, copy);
+        if (copied === null) throw new SessionGone(names);
+        state.setEffort(opened.channel, opened.thread, origin.effort);
+        state.setBypass(opened.channel, opened.thread, origin.bypass);
+        // What it is a copy of, for every start of it: the agent then takes no background work of
+        // the original's for its own.
+        state.setForkOf(opened.channel, opened.thread, { session: origin.sessionId, at });
+        const label =
+          chat.escape(line || (await titleOf(session.directory, copy)), "notice") ||
+          texts.FORK_COPY_LABEL;
+        // A line that stays in the thread, in a notice's markup: a notice of the session's own is
+        // plain text, which would show the link's markup as written.
+        const said =
+          prompt === "" || copyTicket?.signal.aborted ? texts.FORK_WAITING : texts.FORK_RUNNING;
+        const link = await talk.noticeLink(opened, label);
+        await talk.tell(ref, fill(said, { link, session: copy }), { stays: true });
+        // Started at once, as the terminal's `/fork` starts its copy, once the line above is there:
+        // a start that fails is told with the link to the copy's thread already given.
+        if (copyTicket !== null) {
+          sending = true;
+          await send(opened, prompt, copyTicket);
+        } else await copied.ensureConnected();
+      } finally {
+        copyTicket?.release();
+        const stopped = (copyTicket ?? bridge)?.signal.aborted === true;
+        bridge?.release();
+        // A prompt a stop dropped before it was sent is told here; once sent, the copy's thread
+        // tells it. A failed post never replaces the error that ended the fork.
+        if (stopped && !sending && !talk.stopped) {
+          try {
+            await talk.tell(ref, texts.NOT_SENT);
+          } catch (error) {
+            logger.warning(`could not tell a dropped fork prompt: ${errorName(error)}`);
+          }
+        }
       }
-      // The copy runs as its origin does: the effort and the bypass the origin's entry holds, and
-      // the model its transcript ends on (a resume of a copy runs it, measured 2026-10-28).
-      const copied = await sessions.resume(opened.channel, opened.thread, copy);
-      if (copied === null) throw new SessionGone(names);
-      state.setEffort(opened.channel, opened.thread, origin.effort);
-      state.setBypass(opened.channel, opened.thread, origin.bypass);
-      // What it is a copy of, for every start of it: the agent then takes no background work of
-      // the original's for its own.
-      state.setForkOf(opened.channel, opened.thread, { session: origin.sessionId, at });
-      const label =
-        chat.escape(line || (await titleOf(session.directory, copy)), "notice") ||
-        texts.FORK_COPY_LABEL;
-      // A line that stays in the thread, in a notice's markup: a notice of the session's own is
-      // plain text, which would show the link's markup as written.
-      await talk.tell(
-        ref,
-        fill(prompt === "" ? texts.FORK_WAITING : texts.FORK_RUNNING, {
-          link: await talk.noticeLink(opened, label),
-          session: copy,
-        }),
-        { stays: true },
-      );
-      // Started at once, as the terminal's `/fork` starts its copy, once the line above is there:
-      // a start that fails is told with the link to the copy's thread already given.
-      if (prompt !== "") await send(opened, prompt);
-      else await copied.ensureConnected();
     },
   };
 }

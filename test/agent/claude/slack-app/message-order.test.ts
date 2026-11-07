@@ -14,6 +14,11 @@ import { inAThread, message, reply, type World, worldOf } from "../../../support
 
 const ack = async (): Promise<void> => {};
 
+/** The prompt `text` never reached the agent: the stop dropped it, on its way or in the queue. */
+function neverSent(world: World, text: string): boolean {
+  return !world.clients.some((client) => JSON.stringify(client.queries).includes(text));
+}
+
 /** What reaches the thread's session, in order: the prompts it is given and its stops. */
 function reached(world: World): string[] {
   const session = world.sessions.get(CHANNEL, THREAD);
@@ -60,12 +65,9 @@ test("two messages of one thread reach the queue in the order they were sent, th
   assert.deepEqual(seen, ["first", "second"]);
 });
 
-// What is guaranteed is the order of the handover: the prompt reaches the core, and takes its
-// place in the thread's queue, before the `!stop` is handed over. Whether the prompt has reached
-// `submit` by the time the stop runs is the core's: the `!stop`'s own channel check gives a plain
-// prompt time to get there, but a prompt that reads files is submitted after the stop (measured,
-// the same before this change).
-test("a stop typed right after a prompt is handed to the core after the prompt", async (t) => {
+// A stop acts on every message handed over before it: the prompt is handed over first (its check
+// is held), the stop second, and the prompt is dropped on its way (#200).
+test("a stop typed right after a prompt drops the prompt and posts no Nothing is running", async (t) => {
   const world = worldOf(t);
   await inAThread(world);
   const seen = reached(world);
@@ -75,9 +77,16 @@ test("a stop typed right after a prompt is handed to the core after the prompt",
   assert.deepEqual(seen, []);
   hold.set();
   await world.settle();
-  // Handed over in order. Whether the prompt reaches `submit` before the stop aborts it is the
-  // core's (#200): either way it is not sent, by the ticket or by the session's own stop.
+  // Handed over in order; whether the prompt reaches `submit` before the stop aborts it is the
+  // core's: either way it is not sent, by its ticket (`Not sent.`) or by the session's own stop.
   assert.deepEqual(seen, ["first", "!stop"]);
+  assert.ok(neverSent(world, "first"));
+  assert.equal(
+    world.slack
+      .callsTo("chat.postMessage")
+      .some((call) => String(call.text ?? "").includes("Nothing is running")),
+    false,
+  );
 });
 
 test("a message from someone else takes no place and delays nothing", async (t) => {
@@ -100,16 +109,33 @@ test("a message from someone else takes no place and delays nothing", async (t) 
   assert.deepEqual(seen, ["first"]);
 });
 
-test("two threads do not wait for each other", async (t) => {
+test("the messages of two threads of one channel are handed over in the order they were sent", async (t) => {
   const world = worldOf(t);
   await inAThread(world);
   const hold = await holdNextCheck(world, () => void send(world, reply("first", THREAD)));
-  await world.dispatch(message("elsewhere", { ts: "1790000200.000100" }));
-  // The other thread's message got through its own check and into the core (which opened its
-  // session) while the first thread's check is still out.
-  assert.equal(world.clients.length, 2);
+  void world.dispatch(message("elsewhere", { ts: "1790000200.000100" }));
+  await world.idle();
+  // The other thread's message waits for the first's channel check: the order is the channel's.
+  assert.equal(world.clients.length, 1);
   hold.set();
   await world.settle();
+  assert.equal(world.clients.length, 2);
+});
+
+test("a top-level stop is handed over after a thread's message sent before it", async (t) => {
+  const world = worldOf(t);
+  await inAThread(world);
+  const seen = reached(world);
+  const hold = await holdNextCheck(world, () => void send(world, reply("first", THREAD)));
+  void send(world, message("!stop", { ts: "1790000200.000100" }));
+  await world.idle();
+  assert.deepEqual(seen, []);
+  hold.set();
+  await world.settle();
+  // Handed over in order; whether the prompt reaches `submit` before the stop aborts it is the
+  // core's: either way it is not sent, by its ticket (`Not sent.`) or by the session's own stop.
+  assert.deepEqual(seen, ["first", "!stop"]);
+  assert.ok(neverSent(world, "first"));
 });
 
 test("a message whose channel check refuses releases the next one", async (t) => {

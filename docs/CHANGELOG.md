@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The Slack provider hands over the messages and stops of one channel in the order the owner sent
+  them (`ChannelOrder`, one place per channel, the Stop control taking a place and leaving it at
+  handover, a refusal posted by `Answers.checkChannel` after the place is left), so a `!stop` or a click on Stop acts on every message
+  sent before it. `ChatInbound.message` and `ChatInbound.stop` state that order as their contract
+  (#200).
 - `!diff` shows a file's diff under the list, in the same message, when it fits; another click or a
   change of view replaces it. A larger diff is shared as a `.diff` file as before, and the next
   click on that list or a change of view deletes it (a restart forgets the file, which then

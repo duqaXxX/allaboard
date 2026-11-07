@@ -6,7 +6,7 @@
  *
  * Ordering. The core takes a thread's messages in the order they were handed over, although
  * files take a while to download. The provider keeps its part: the listener takes its place among
- * its thread's messages before its channel check (`ThreadOrder`), so the messages are handed
+ * its channel's messages and stops before its channel check (`ChannelOrder`), so the messages are handed
  * over in the order the listeners were called, and from the check to the call
  * `ChatInbound.message` nothing is awaited (`(sync)` in `app.ts`). `content` is read by the core
  * inside the message's own turn.

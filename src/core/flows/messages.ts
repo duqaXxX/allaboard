@@ -72,7 +72,7 @@ export function messages(
   inFlight: InFlight,
 ): MessagesFlow {
   const { chat, agent, sessions, state, names } = deps;
-  const word = wordFlow(deps, talk, others, forkFlow(deps, talk, sendPrompt));
+  const word = wordFlow(deps, talk, others, forkFlow(deps, talk, sendPrompt, inFlight));
   const unserved = unservedWords(deps, others);
   // One lock per thread, alive only while someone holds or waits on it (a channel keeps
   // opening new threads for as long as it runs; a lock kept forever would leak).
@@ -198,19 +198,15 @@ export function messages(
    * check included, and a failure is told in that thread. Its id is the thread's root, which
    * nothing reads for a message that is no command.
    */
-  async function sendPrompt(ref: ThreadRef, prompt: string): Promise<void> {
+  async function sendPrompt(ref: ThreadRef, prompt: string, ticket: Ticket): Promise<void> {
     const session = sessions.get(ref.channel, ref.thread);
     if (session === null) throw new SessionGone(names);
     const message: Submission = { ref, text: prompt, content: async () => prompt };
-    // Its own ticket in the copy's thread: a stop of the copy drops this prompt too.
-    const ticket = inFlight.take(ref);
-    try {
-      await talk.replyOnFailure(ref, () =>
-        submitToSession(message, session, null, { inThread: true, typed: prompt }, ticket),
-      );
-    } finally {
-      ticket.release();
-    }
+    // `ticket` is the copy's, taken by the fork as soon as the copy's thread existed and released
+    // by it: a stop of the copy's thread or of the channel drops this prompt.
+    await talk.replyOnFailure(ref, () =>
+      submitToSession(message, session, null, { inThread: true, typed: prompt }, ticket),
+    );
   }
 
   /**

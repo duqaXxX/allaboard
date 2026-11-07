@@ -44,6 +44,7 @@ import type { CorePort } from "../../src/core/port.ts";
 import type { Pending } from "../../src/core/requests.ts";
 import {
   AGENT,
+  AsyncEvent,
   CHANNEL,
   type FakeSlack,
   rejected,
@@ -96,10 +97,11 @@ function actionsList(listed: {
 function memoryPerson(
   person: ReturnType<ReturnType<typeof memoryChat>["as"]>,
   who: string,
+  order: ReturnType<typeof ordering> = ordering(),
 ): Person {
   return {
     says: async (channel, text, options) => {
-      const sent = await person.says(channel, text, options);
+      const sent = await order.run(() => person.says(channel, text, options));
       return { id: sent.id, ref: sent.ref, author: who };
     },
     answers: async (asked, answer) => {
@@ -124,11 +126,38 @@ function memoryPerson(
       await person.deletes(said);
     },
     stops: async (ref) => {
-      await person.stops(ref);
+      await order.run(() => person.stops(ref));
     },
     types: async (shown, _ref, text) => {
       if (shown.id === null) throw new Error("a suggestion is a message of the chat");
       await person.types(shown.id, text);
+    },
+  };
+}
+
+/**
+ * A stand-in for a provider's slow check: the memory chat checks nothing and calls `inbound` as
+ * the owner acts, so its rig makes the owner's sends one after the other, in the order they were
+ * made, and holds the next one on request. It orders whole handlings, where a provider orders up
+ * to the handover alone, which is enough for the contract: the handover order is the send order.
+ */
+function ordering() {
+  let tail: Promise<unknown> = Promise.resolve();
+  let gate: Promise<void> | null = null;
+  return {
+    run<T>(act: () => Promise<T>): Promise<T> {
+      const mine = gate ?? Promise.resolve();
+      gate = null;
+      const result = tail.then(() => mine).then(act);
+      tail = result.catch(() => {});
+      return result;
+    },
+    hold(): { readonly held: Promise<void>; release(): void } {
+      let release!: () => void;
+      gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return { held: Promise.resolve(), release };
     },
   };
 }
@@ -146,11 +175,13 @@ async function memoryRig(threadIds: "own" | "opening" = "own"): Promise<ChatRig>
     },
   });
   const channel = chat.openChannel("work");
+  const sends = ordering();
   return {
     provider,
     channel,
     thread: chat.openThread(channel),
-    owner: memoryPerson(chat.as(OWNER), OWNER),
+    owner: memoryPerson(chat.as(OWNER), OWNER, sends),
+    holdNextCheck: () => sends.hold(),
     other: memoryPerson(chat.as(SOMEONE), SOMEONE),
     ownerElsewhere: memoryPerson(chat.as(OWNER, ELSEWHERE), OWNER),
     keep: (thread) => chat.keepThread(thread),
@@ -497,6 +528,19 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     // The core's state holds the threads the owner started: the provider tells of those alone.
     keep: (thread) => {
       world.state.openThread(thread.channel, thread.thread);
+    },
+    holdNextCheck: () => {
+      const hold = new AsyncEvent();
+      world.slack.gated = new AsyncEvent();
+      world.slack.gate = hold;
+      world.slack.gateMethod = "conversations.info";
+      return {
+        // Out of the gate for every later call once the first is held.
+        held: world.slack.gated.wait().then(() => {
+          world.slack.gate = null;
+        }),
+        release: () => hold.set(),
+      };
     },
     ownerOnlyNotices: true,
     read: (scope) => slackRead(world.slack, scope),

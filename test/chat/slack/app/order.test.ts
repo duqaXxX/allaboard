@@ -1,17 +1,17 @@
 /**
- * `ThreadOrder`: the places of one thread are taken in the order `enter` is called and left one
- * at a time; two threads never wait for each other; nothing is kept for a thread whose last
+ * `ChannelOrder`: the places of one key (a channel) are taken in the order `enter` is called and left one
+ * at a time; two keys never wait for each other; nothing is kept for a key whose last
  * place was left.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ThreadOrder } from "../../../../src/chat/slack/app/order.ts";
+import { ChannelOrder } from "../../../../src/chat/slack/app/order.ts";
 
 /** Lets every promise callback that is ready run. */
 const flush = () => new Promise<void>((done) => setImmediate(done));
 
 test("a place waits for the places entered before it, in the order they were entered", async () => {
-  const order = new ThreadOrder();
+  const order = new ChannelOrder();
   const seen: string[] = [];
   const first = order.enter("a");
   const second = order.enter("a");
@@ -30,16 +30,16 @@ test("a place waits for the places entered before it, in the order they were ent
   third.leave();
 });
 
-test("two threads do not wait for each other", async () => {
-  const order = new ThreadOrder();
+test("two keys do not wait for each other", async () => {
+  const order = new ChannelOrder();
   order.enter("a"); // never left
   const other = order.enter("b");
   await other.turn;
   other.leave();
 });
 
-test("nothing is kept for a thread once its last place is left", async () => {
-  const order = new ThreadOrder();
+test("nothing is kept for a key once its last place is left", async () => {
+  const order = new ChannelOrder();
   const first = order.enter("a");
   const second = order.enter("a");
   assert.equal(order.size, 1);

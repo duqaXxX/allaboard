@@ -343,17 +343,35 @@ export class Answers {
     threadTs: string,
     about: string | null = null,
   ): Promise<boolean> {
+    const check = await this.checkChannel(channel, threadTs, about);
+    await check.tell();
+    return check.allowed;
+  }
+
+  /**
+   * The second check with the refusal's post held back: a listener that keeps a place in an
+   * order leaves it before calling `tell`, so a post to Slack never holds the messages after it.
+   * `tell` posts nothing when the channel is allowed or the daemon has stopped meanwhile.
+   */
+  async checkChannel(
+    channel: string,
+    threadTs: string,
+    about: string | null = null,
+  ): Promise<{ readonly allowed: boolean; readonly tell: () => Promise<void> }> {
     const reason = await this.parts.guard.refusal(channel);
     // The check can outlast the daemon: nothing is said, not even to refuse the channel.
-    if (this.stopped) return false;
-    if (reason !== null) {
-      // For the owner alone, even from a top-level message: a channel the guard refuses may
-      // hold people who must not read the bot's words.
-      const told = fill(slackTexts.CHANNEL_REFUSED, { reason });
-      if (about === null) await this.tellOwner(channel, threadTs, told);
-      else await this.tellOwnerAbout(channel, threadTs, about, told);
-      return false;
-    }
-    return true;
+    if (this.stopped) return { allowed: false, tell: async () => {} };
+    if (reason === null) return { allowed: true, tell: async () => {} };
+    return {
+      allowed: false,
+      tell: async () => {
+        if (this.stopped) return;
+        // For the owner alone, even from a top-level message: a channel the guard refuses may
+        // hold people who must not read the bot's words.
+        const told = fill(slackTexts.CHANNEL_REFUSED, { reason });
+        if (about === null) await this.tellOwner(channel, threadTs, told);
+        else await this.tellOwnerAbout(channel, threadTs, about, told);
+      },
+    };
   }
 }

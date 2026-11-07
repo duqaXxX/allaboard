@@ -878,6 +878,14 @@ export interface InboundMessage {
  * should read: the core tells them in the chat.
  */
 export interface ChatInbound {
+  /**
+   * The owner wrote `message`. Order: a provider calls `message` and `stop` for the messages and
+   * stops of one channel, whatever thread they are in, in the order the owner sent them; a
+   * `!stop` typed in a message is a message. A stop of a thread acts on the messages of that
+   * thread handed over before it that have not reached the agent, a top-level `!stop` on those of
+   * the channel. A message a provider hands over later than it was sent (a clip waiting for its
+   * transcript) is the stated exception.
+   */
   message(message: InboundMessage): Promise<void>;
   /**
    * The owner answered the request `requestId`, shown by `message` in `ref`; `message` is null
@@ -908,8 +916,9 @@ export interface ChatInbound {
   rootGone(ref: ThreadRef): Promise<void>;
   /**
    * The owner used a control of the chat to stop the session of `ref`, as `!stop` typed there
-   * does. True when something was stopped (a hold cancelled alone counts). The provider checks
-   * the owner, the core does not.
+   * does. True when something was stopped (a hold cancelled or a message not yet sent alone
+   * counts). The provider checks the owner, the core does not. Called in the order described at
+   * `message`.
    */
   stop(ref: ThreadRef): Promise<boolean>;
 }

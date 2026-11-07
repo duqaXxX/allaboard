@@ -4,6 +4,7 @@
  * its setup is dropped with `Not sent.`, and the stop says nothing more.
  */
 import assert from "node:assert/strict";
+import { join } from "node:path";
 import { test } from "node:test";
 import type { AgentSession, RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
 import * as texts from "../../../src/core/texts.ts";
@@ -344,3 +345,196 @@ test(
     assert.equal(world.chat.requests().length, 0);
   },
 );
+
+/** A plain agent whose fork waits for `gate`. */
+class SlowFork extends PlainAgent {
+  readonly gate = new AsyncEvent();
+  override async forkSession(folder: string, session: string, title: string | null) {
+    await this.gate.wait();
+    return super.forkSession(folder, session, title);
+  }
+}
+
+test(
+  "a top-level !stop while the fork is made drops the copy's prompt with Not sent. once",
+  LIMIT,
+  async (t) => {
+    const agent = new SlowFork();
+    const world = await MessagesWorld.make(t, { agent });
+    const origin = await world.opened("the first task");
+    const forking = world.says("!fork look into it", origin.thread);
+    await world.settle();
+    assert.equal(world.state.threads().length, 1, "the copy is not made yet");
+    await world.says("!stop");
+    agent.gate.set();
+    await forking;
+    await world.settle();
+    const copy = world.state.threads().find(([, thread]) => thread !== origin.thread);
+    assert.ok(copy, "the copy was made: the stop came after the fork was committed");
+    const ref = { channel: copy[0], thread: copy[1] };
+    assert.ok(!(await world.prompts()).includes("look into it"));
+    assert.equal(notSent(world.shown(ref)), 1);
+  },
+);
+
+test(
+  "a stop of the original thread after the copy is made does not drop the fork",
+  LIMIT,
+  async (t) => {
+    const agent = new SlowFork();
+    const world = await MessagesWorld.make(t, { agent });
+    const origin = await world.opened("the first task");
+    const forking = world.says("!fork look into it", origin.thread);
+    await world.settle();
+    await world.says("!stop", origin.thread);
+    agent.gate.set();
+    await forking;
+    await world.settle();
+    assert.ok((await world.prompts()).includes("look into it"));
+  },
+);
+
+// A fork that ends early gives its channel-stop bridge back: a later top-level stop with nothing
+// running answers as such.
+class FailingFork extends PlainAgent {
+  override async forkSession(): Promise<string> {
+    throw new Error("no fork");
+  }
+}
+
+test(
+  "a fork that fails leaves no ticket behind: a later top-level !stop answers",
+  LIMIT,
+  async (t) => {
+    const world = await MessagesWorld.make(t, { agent: new FailingFork() });
+    const origin = await world.opened("the first task");
+    await world.says("!fork look into it", origin.thread);
+    await world.settle();
+    await world.says("!stop");
+    await world.settle();
+    assert.equal(world.inChannel().at(-1), texts.NOTHING_TO_STOP);
+  },
+);
+
+test("a fork refused for an old folder leaves no ticket behind", LIMIT, async (t) => {
+  const world = await MessagesWorld.make(t);
+  const origin = await world.opened("the first task");
+  world.state.bind(world.channel, join(world.folder, "elsewhere"));
+  await world.says("!fork look into it", origin.thread);
+  await world.settle();
+  await world.says("!stop");
+  await world.settle();
+  assert.equal(world.inChannel().at(-1), texts.NOTHING_TO_STOP);
+});
+
+test(
+  "a fork with no prompt holds no ticket: a top-level !stop during it answers as if none",
+  LIMIT,
+  async (t) => {
+    const agent = new SlowFork();
+    const world = await MessagesWorld.make(t, { agent });
+    const origin = await world.opened("the first task");
+    const forking = world.says("!fork", origin.thread);
+    await world.settle();
+    await world.says("!stop");
+    await world.settle();
+    assert.equal(world.inChannel().at(-1), texts.NOTHING_TO_STOP);
+    agent.gate.set();
+    await forking;
+  },
+);
+
+test(
+  "a stop of the copy's thread before its prompt is sent drops the prompt once",
+  LIMIT,
+  async (t) => {
+    for (const viaInbound of [false, true]) {
+      const agent = new PlainAgent();
+      const world = await MessagesWorld.make(t, { agent });
+      const origin = await world.opened("the first task");
+      // The copy's thread exists once the fork opens it: stop it as soon as the copy is resumed.
+      const resume = world.sessions.resume.bind(world.sessions);
+      world.sessions.resume = async (channel, thread, id) => {
+        const copied = await resume(channel, thread, id);
+        void (viaInbound
+          ? world.inbound.stop({ channel, thread })
+          : world.send({ ref: { channel, thread }, id: "m-stop", text: "!stop" }));
+        return copied;
+      };
+      await world.says("!fork look into it", origin.thread);
+      await world.settle();
+      const copy = world.state.threads().find(([, thread]) => thread !== origin.thread);
+      assert.ok(copy);
+      const ref = { channel: copy[0], thread: copy[1] };
+      assert.ok(!(await world.prompts()).includes("look into it"), `inbound ${viaInbound}`);
+      assert.equal(notSent(world.shown(ref)), 1, `inbound ${viaInbound}`);
+    }
+  },
+);
+
+/** The thread the fork opened, once it did. */
+function copyOf(world: MessagesWorld, origin: { thread: string }) {
+  const copy = world.state.threads().find(([, thread]) => thread !== origin.thread);
+  assert.ok(copy, "the copy was made");
+  return { channel: copy[0], thread: copy[1] };
+}
+
+test(
+  "a stop of the copy's thread during its resume, which then fails, says Not sent. once",
+  LIMIT,
+  async (t) => {
+    for (const viaInbound of [false, true]) {
+      const world = await MessagesWorld.make(t);
+      const origin = await world.opened("the first task");
+      const resume = world.sessions.resume.bind(world.sessions);
+      world.sessions.resume = async (channel, thread, id) => {
+        await resume(channel, thread, id);
+        const ref = { channel, thread };
+        await (viaInbound
+          ? world.inbound.stop(ref)
+          : world.send({ ref, id: "m-stop", text: "!stop" }));
+        return null;
+      };
+      await world.says("!fork do X", origin.thread);
+      await world.settle();
+      const all = [...world.shown(origin), ...world.shown(copyOf(world, origin))];
+      assert.equal(notSent(all), 1, `inbound ${viaInbound}`);
+    }
+  },
+);
+
+test(
+  "a second stop in the copy's thread after the channel stop dropped nothing more",
+  LIMIT,
+  async (t) => {
+    const agent = new SlowFork();
+    const world = await MessagesWorld.make(t, { agent });
+    const origin = await world.opened("the first task");
+    const resume = world.sessions.resume.bind(world.sessions);
+    world.sessions.resume = async (channel, thread, id) => {
+      const copied = await resume(channel, thread, id);
+      await world.send({ ref: { channel, thread }, id: "m-stop-2", text: "!stop" });
+      return copied;
+    };
+    const forking = world.says("!fork fix the bug", origin.thread);
+    await world.settle();
+    await world.says("!stop");
+    agent.gate.set();
+    await forking;
+    await world.settle();
+    assert.ok(world.shown(copyOf(world, origin)).includes(texts.NOTHING_TO_STOP_THREAD));
+  },
+);
+
+test("a fork whose prompt a channel stop dropped does not say it is running", LIMIT, async (t) => {
+  const agent = new SlowFork();
+  const world = await MessagesWorld.make(t, { agent });
+  const origin = await world.opened("the first task");
+  const forking = world.says("!fork fix the bug", origin.thread);
+  await world.settle();
+  await world.says("!stop");
+  agent.gate.set();
+  await forking;
+  await world.settle();
+  assert.ok(!world.shown(origin).some((line) => line.includes("· running")));
+});
