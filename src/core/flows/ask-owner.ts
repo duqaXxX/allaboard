@@ -5,13 +5,14 @@
  * `!stop` or a drain settles, and ends with the message sent or not.
  */
 import type { ModelInfo } from "../../agent/seam.ts";
-import type {
-  HoldRequest,
-  MessageId,
-  SetupRequest,
-  ShellRequest,
-  TerminalRequest,
-  ThreadRef,
+import {
+  ChatError,
+  type HoldRequest,
+  type MessageId,
+  type SetupRequest,
+  type ShellRequest,
+  type TerminalRequest,
+  type ThreadRef,
 } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import type { HoldAnswer, HoldKind, Pending } from "../hold.ts";
@@ -19,6 +20,7 @@ import type { ThreadSession } from "../sessions/session.ts";
 import type { RequestKind } from "../state.ts";
 import * as texts from "../texts.ts";
 import { named } from "../texts.ts";
+import { rootGone } from "./gone.ts";
 import { type FlowDeps, isCancelled, logger, type Talk } from "./talk.ts";
 
 /** What applies an answer while its hold is still open (`askOwner`). */
@@ -79,6 +81,11 @@ export async function askOwner(
     await talk.refuseRestarting(ref);
     return null;
   }
+  // The thread's first message is gone and `rootGone` is forgetting it: no form, no post.
+  if (sessions.gone(ref.channel, ref.thread)) {
+    logger.info(`asked nothing in ${ref.channel}/${ref.thread}: its thread is being forgotten`);
+    return null;
+  }
   const [holdId, pending] = holds.open(
     ref.channel,
     ref.thread,
@@ -90,6 +97,14 @@ export async function askOwner(
     shownAt = await talk.thread(ref).ask(holdId, question.request(holdId), question.title);
   } catch (error) {
     if (isCancelled(error)) throw error;
+    if (error instanceof ChatError && error.failure === "gone") {
+      // The chat has no first message to put the form under (#221): nothing is posted, and the
+      // entry `sessions.open` wrote goes now, as it would at the event that tells the same.
+      holds.discard(holdId);
+      logger.info(`could not ask in ${ref.channel}/${ref.thread}: its first message is gone`);
+      await rootGone(deps, talk)(ref);
+      return null;
+    }
     // Nobody can answer a question that was never shown: fail closed, as an unpostable
     // approval does, rather than send into a folder another session is using.
     logger.error(`could not post a hold in ${ref.channel}/${ref.thread}: ${errorName(error)}`);
@@ -154,7 +169,8 @@ export async function askOwner(
     );
     return answer;
   }
-  if (answer === null) await talk.tell(ref, texts.NOT_SENT);
+  // A thread whose first message is gone is told nothing (`Holds.cancel`'s `gone`).
+  if (answer === null && !pending.gone) await talk.tell(ref, texts.NOT_SENT);
   return answer;
 }
 

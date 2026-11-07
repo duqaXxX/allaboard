@@ -33,7 +33,7 @@ import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import { type Names, namesOf } from "../../../src/core/texts.ts";
 import { Updates } from "../../../src/core/updates.ts";
-import { FakeClock } from "../../support/fake-clock.ts";
+import { type AsyncEvent, FakeClock } from "../../support/fake-clock.ts";
 import { type MemoryChat, memoryChat, OWNER } from "../../support/memory-chat.ts";
 import { NO_SYNC } from "../../support/no-sync.ts";
 import {
@@ -196,6 +196,15 @@ interface Variant {
   readonly titleFails: boolean | "permanent";
   readonly deletes: boolean;
   readonly cleans: boolean;
+  readonly gates: Gates;
+}
+
+/** Calls of a thread's chat held until the test lets them go. */
+export interface Gates {
+  /** `ask` returns only once set: the question is posted, and the core does not know it yet. */
+  readonly ask?: AsyncEvent;
+  /** `rewrite` runs only once set. */
+  readonly rewrite?: AsyncEvent;
 }
 
 /**
@@ -236,6 +245,32 @@ function variant(
   return new Proxy(inner, {
     get(target, property) {
       if (property === "capabilities") return capabilities;
+      if (property === "thread" && (how.gates.ask || how.gates.rewrite) && !how.reactions) {
+        return (ref: ThreadRef) => {
+          const thread = target.thread(ref);
+          return new Proxy(thread, {
+            get(inner, name) {
+              const member = Reflect.get(inner, name, inner);
+              if (name === "ask" && how.gates.ask !== undefined) {
+                const gate = how.gates.ask;
+                return async (...args: Parameters<typeof thread.ask>) => {
+                  const shown = await inner.ask(...args);
+                  await gate.wait();
+                  return shown;
+                };
+              }
+              if (name === "rewrite" && how.gates.rewrite !== undefined) {
+                const gate = how.gates.rewrite;
+                return async (...args: Parameters<typeof thread.rewrite>) => {
+                  await gate.wait();
+                  return inner.rewrite(...args);
+                };
+              }
+              return typeof member === "function" ? member.bind(inner) : member;
+            },
+          });
+        };
+      }
       // A chat with reactions has the members the memory chat leaves out; each records its call.
       if (property === "thread" && how.reactions) {
         return (ref: ThreadRef) => {
@@ -359,6 +394,8 @@ export interface WorldOptions {
   readonly noUnshare?: boolean;
   /** With `diff`: the chat draws a diff of up to this many characters in the list's own message. */
   readonly fits?: number;
+  /** Calls of a thread's chat held until the test lets them go (without `reactions`). */
+  readonly gates?: Gates;
   /** The chat has reactions: a word that took effect is marked on the owner's message. */
   readonly reactions?: boolean;
   /** The daemon can update itself, through this host (`World.updates`); absent, it cannot. */
@@ -529,6 +566,7 @@ export class MessagesWorld {
         titleFails: options.titleFails ?? false,
         deletes: options.deletes ?? false,
         cleans: options.cleans ?? false,
+        gates: options.gates ?? {},
       },
       options.host,
     );

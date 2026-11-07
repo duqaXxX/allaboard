@@ -81,7 +81,7 @@ for (const [name, build] of SHAPES) {
 
 test("a root whose session is working stays for the cleanup, and the index reads its row", async (t) => {
   const { world, refreshed } = worldWithThread(t);
-  t.mock.method(world.sessions, "hold", () => false);
+  t.mock.method(world.sessions, "holdGone", () => false);
   await world.dispatch(tombstoned(CHANNEL, THREAD));
   await world.settle();
   assert.notEqual(world.state.thread(CHANNEL, THREAD), null);

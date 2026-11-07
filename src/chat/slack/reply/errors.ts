@@ -114,6 +114,8 @@ export function gone(error: unknown): boolean {
  * (an error code, a rate limit, an HTTP status), anything else (a reset, a timeout) says nothing.
  */
 export function unknownOutcome(error: unknown): boolean {
+  // `postInThread` deleted the stray post itself: the call is known not to have left one.
+  if (error instanceof ChatError && error.failure === "gone") return false;
   return !(
     error instanceof WebAPIPlatformError ||
     error instanceof WebAPIRateLimitedError ||

@@ -237,8 +237,11 @@ export class ChatError extends Error {
 /**
  * `refused`: the chat answered no. `failed`: the call got no such answer (the network, a rate
  * limit, a server error). `bug`: the failure is the daemon's own and the chat had no part in it.
+ * `gone`: the thread's first message no longer exists in the chat, so a post into the thread
+ * fails. The caller of `ThreadChat.ask` forgets the thread; any other call fails as it would for
+ * a refusal, and the core tells the owner nothing of it.
  */
-export type ChatFailure = "refused" | "failed" | "bug";
+export type ChatFailure = "refused" | "failed" | "bug" | "gone";
 
 /** A message of the chat, by the id its provider gives it. The core stores it and hands it back. */
 export type MessageId = string;

@@ -168,3 +168,27 @@ test("a setup the owner has not answered does not hold the next message's check"
   await world.dispatch(reply("second", THREAD));
   assert.equal(world.slack.callsTo("conversations.info").length, checks + 1);
 });
+
+// The lookup of a new thread's root (#221) overlaps the wait for the place; it must not reorder.
+test("a top-level stop is still handed over after a prompt whose root lookup answers last", async (t) => {
+  const world = worldOf(t);
+  const handed: string[] = [];
+  const message_ = world.inbound.message.bind(world.inbound);
+  world.inbound.message = async (inbound) => {
+    handed.push(inbound.text);
+    return message_(inbound);
+  };
+  const hold = new AsyncEvent();
+  world.slack.gated = new AsyncEvent();
+  world.slack.gate = hold;
+  world.slack.gateMethod = "conversations.replies";
+  void send(world, message("a new prompt", { ts: "1790000200.000100" }));
+  await world.slack.gated.wait();
+  world.slack.gate = null;
+  void send(world, message("!stop", { ts: "1790000300.000100" }));
+  await world.idle();
+  assert.deepEqual(handed, []);
+  hold.set();
+  await world.settle();
+  assert.deepEqual(handed, ["a new prompt", "!stop"]);
+});
