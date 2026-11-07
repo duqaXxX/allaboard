@@ -32,6 +32,7 @@ test("the Claude back end declares what the core adapts to", () => {
     sessionTags: true,
     sessionTitles: true,
     sessionForks: true,
+    sessionRename: true,
     fileRestore: true,
     conversationRewind: true,
     goals: true,

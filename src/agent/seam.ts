@@ -128,6 +128,8 @@ export interface Capabilities {
   readonly sessionTitles: boolean;
   /** `AgentBackend.forkSession`. */
   readonly sessionForks: boolean;
+  /** `AgentSession.rename`. */
+  readonly sessionRename: boolean;
   /**
    * `AgentSession.restoreFiles`: the agent keeps a checkpoint of the files it changes at each
    * prompt and puts them back as they were at one. Only for sessions it started with that on.
@@ -1008,6 +1010,17 @@ export interface AgentSession {
    * only on an idle session. Rejects as `setModel` does when `interrupt` is called while it runs.
    */
   clearGoal?(): Promise<void>;
+  /**
+   * Names the session, on the live process and only on an idle one (the core waits out a turn
+   * the agent opened): the agent hides what the rename writes, a turn's end included. A turn the agent has
+   * started but whose first record the core has not read is not visible to the core: the lag of
+   * a hidden command. Names it
+   * on the live process: a name written to the agent's files behind a running
+   * process is overwritten by the title it cached. Resolves once the name is in force; whatever
+   * the agent does to set it is no event. Rejects when the agent refuses it, and as `setModel`
+   * does when `interrupt` is called while it runs. Present with `sessionRename`.
+   */
+  rename?(title: string): Promise<void>;
   /**
    * Sets the effort of the live session, null being the agent's default; rejects a level
    * `Capabilities.effortLevels` does not list. Present with `liveEffort`.

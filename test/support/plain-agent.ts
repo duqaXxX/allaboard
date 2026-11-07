@@ -135,6 +135,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   sessionTags: false,
   sessionTitles: false,
   sessionForks: true,
+  sessionRename: true,
   fileRestore: false,
   conversationRewind: false,
   goals: false,
@@ -563,6 +564,10 @@ export class PlainSession implements AgentSession {
   readonly rewindToken?: string;
   /** Every prompt sent, in order. */
   readonly prompts: Prompt[] = [];
+  /** Every name the session was given, in order. */
+  readonly renames: string[] = [];
+  /** A rename waits for this to resolve; a test holds it to keep a rename in flight. */
+  renameGate: Promise<void> | null = null;
   /** Every request put to the owner with the answer it got. */
   readonly answers: PlainAnswered[] = [];
   closed = false;
@@ -574,6 +579,7 @@ export class PlainSession implements AgentSession {
   #released: (() => void) | null = null;
   #sequence = 0;
   #cut = false;
+  #interruptRename: (() => void) | null = null;
 
   constructor(context: PlainSessionContext) {
     this.#context = context;
@@ -634,12 +640,32 @@ export class PlainSession implements AgentSession {
     this.#queue.end();
   }
 
+  /** The agent itself says `event`, with no prompt behind it (a note from another session, say). */
+  emit(event: SessionEvent): void {
+    this.#push(event);
+  }
+
   async interrupt(): Promise<void> {
+    this.#interruptRename?.();
     this.#turn?.abort();
   }
 
   async setPermissionMode(mode: PermissionMode): Promise<void> {
     if (mode !== PLAIN_MODE) throw new RangeError(`unknown permission mode: ${mode}`);
+  }
+
+  async rename(title: string): Promise<void> {
+    if (this.closed || this.lost) throw new PlainSessionClosed();
+    this.renames.push(title);
+    const gate = this.renameGate;
+    if (gate === null) return;
+    // As the seam says: an interrupt while it runs makes it reject.
+    await Promise.race([
+      gate,
+      new Promise<never>((_, reject) => {
+        this.#interruptRename = () => reject(new PlainSessionClosed());
+      }),
+    ]);
   }
 
   async setModel(model: string | null): Promise<void> {

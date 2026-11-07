@@ -473,6 +473,19 @@ export function agentConformance(name: string, harness: AgentHarness): void {
     );
 
     check(
+      "a session's rename is a member exactly when sessionRename is declared",
+      LIMIT,
+      async (world) => {
+        const session = await world.backend.start(startOptions(world), new Requests());
+        try {
+          assert.equal(typeof session.rename === "function", caps.sessionRename);
+        } finally {
+          await session.close();
+        }
+      },
+    );
+
+    check(
       "usageLimits answers with percentages from 0 to 100",
       lacks(caps.usageLimits, "usageLimits"),
       async (world) => {

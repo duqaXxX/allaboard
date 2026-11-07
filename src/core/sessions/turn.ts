@@ -26,7 +26,19 @@ export class Turn {
   /** Set when the worker enters the shell command's run: past it, a stop no longer drops the turn. */
   shellStarted = false;
 
-  constructor(prompt: PromptContent, sink: Reply, shell: string | null = null) {
+  /**
+   * What the owner typed, in the chat's plain text, for a prompt that may name a bare `!fork`
+   * copy; null for a command, a `!!command` or a message with no typed text.
+   */
+  readonly title: string | null;
+
+  constructor(
+    prompt: PromptContent,
+    sink: Reply,
+    shell: string | null = null,
+    title: string | null = null,
+  ) {
+    this.title = title;
     this.prompt = prompt;
     this.sink = sink;
     this.shell = shell;

@@ -109,6 +109,11 @@ export interface ThreadState {
   // start without it tells the copy that the original's background commands stopped. Ids and a
   // time, never content; null for any other thread, and in a file without it.
   readonly forkOf: ForkSource | null;
+  // For a bare `!fork` copy (`fork_of.ran`, `fork_of.named`; each written only while false, absent
+  // means true): whether any turn has started in it, and whether it has its name from the first
+  // prompt with text. Booleans, never content.
+  readonly forkRan: boolean;
+  readonly forkNamed: boolean;
   // The cut of a rewind no prompt has followed yet: the agent keeps a cut only once something is
   // written after it, so a restart would lose it. Ids, never content; null when no cut waits, and
   // in a file without it.
@@ -150,6 +155,8 @@ export function threadState(
     ended: null,
     rootPrompt: null,
     forkOf: null,
+    forkRan: true,
+    forkNamed: true,
     pendingCut: null,
     terminalsAllowed: [],
     ...fields,
@@ -229,6 +236,11 @@ function parseForkOf(value: unknown): ForkSource | null {
   if (!isRaw(value)) return null;
   const { session_id: session, at } = value;
   return typeof session === "string" && typeof at === "string" ? { session, at } : null;
+}
+
+/** One of a bare fork's flags in `fork_of`: true unless written false. */
+function forkFlag(value: unknown, key: "ran" | "named"): boolean {
+  return !isRaw(value) || value[key] !== false;
 }
 
 /** A thread's `pending_cut`; one that is not whole is read as none. */
@@ -314,6 +326,7 @@ function dumpBypass(bypass: boolean | null): Record<string, boolean> {
  */
 export function parseThread(raw: Raw): ThreadState {
   const requests = stringList(raw.requests);
+  const forkOf = parseForkOf(raw.fork_of);
   return {
     directory: requiredString(raw, "directory"),
     sessionId: stringOrNull(raw.session_id),
@@ -325,7 +338,9 @@ export function parseThread(raw: Raw): ThreadState {
     status: statusOrNull(raw.status),
     ended: statusOrNull(raw.ended),
     rootPrompt: stringOrNull(raw.root_prompt),
-    forkOf: parseForkOf(raw.fork_of),
+    forkOf,
+    forkRan: forkOf === null || forkFlag(raw.fork_of, "ran"),
+    forkNamed: forkOf === null || forkFlag(raw.fork_of, "named"),
     pendingCut: parsePendingCut(raw.pending_cut),
     terminalsAllowed: stringList(raw.terminals_allowed),
   };
@@ -573,7 +588,14 @@ export class StateStore {
     const current = this.thread(channelId, threadId);
     if (current !== null && current.sessionId !== sessionId) {
       // The terminals allowed were holders of the old session.
-      this.setThread(channelId, threadId, { ...current, sessionId, terminalsAllowed: [] });
+      // A copy's flags belong to the session it was made as: another session is no bare copy.
+      this.setThread(channelId, threadId, {
+        ...current,
+        sessionId,
+        terminalsAllowed: [],
+        forkRan: true,
+        forkNamed: true,
+      });
     }
   }
 
@@ -611,10 +633,35 @@ export class StateStore {
     }
   }
 
-  /** Record that a thread's session is a copy of `source` (`!fork`); a no-op for an unknown thread. */
-  setForkOf(channelId: string, threadId: string, source: ForkSource): void {
+  /**
+   * Record that a thread's session is a copy of `source` (`!fork`); a no-op for an unknown thread.
+   * `bare`: no prompt came with the fork, so the copy has not run and is not named yet.
+   */
+  setForkOf(channelId: string, threadId: string, source: ForkSource, bare = false): void {
     const current = this.thread(channelId, threadId);
-    if (current !== null) this.setThread(channelId, threadId, { ...current, forkOf: source });
+    if (current === null) return;
+    this.setThread(channelId, threadId, {
+      ...current,
+      forkOf: source,
+      forkRan: !bare,
+      forkNamed: !bare,
+    });
+  }
+
+  /** A turn started in a bare copy (`fork_of.ran`); a no-op when it already did. */
+  markForkRan(channelId: string, threadId: string): void {
+    const current = this.thread(channelId, threadId);
+    if (current !== null && !current.forkRan) {
+      this.setThread(channelId, threadId, { ...current, forkRan: true });
+    }
+  }
+
+  /** A bare copy got its name (`fork_of.named`); a no-op when it already has it. */
+  markForkNamed(channelId: string, threadId: string): void {
+    const current = this.thread(channelId, threadId);
+    if (current !== null && !current.forkNamed) {
+      this.setThread(channelId, threadId, { ...current, forkNamed: true });
+    }
   }
 
   /** Record the cut a rewind left waiting, or that none waits; a no-op for an unknown thread. */
@@ -975,7 +1022,12 @@ export class StateStore {
                   ended: t.ended,
                   root_prompt: t.rootPrompt,
                   ...(t.forkOf !== null && {
-                    fork_of: { session_id: t.forkOf.session, at: t.forkOf.at },
+                    fork_of: {
+                      session_id: t.forkOf.session,
+                      at: t.forkOf.at,
+                      ...(!t.forkRan && { ran: false }),
+                      ...(!t.forkNamed && { named: false }),
+                    },
                   }),
                   ...(t.pendingCut !== null && {
                     pending_cut: { at: t.pendingCut.at, token: t.pendingCut.token },

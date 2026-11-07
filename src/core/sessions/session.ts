@@ -422,6 +422,8 @@ export class ThreadSession {
   // Clear while a background notification's own turn is expected or running: the owner's
   // next prompt waits, so the two replies never share a thread.
   private readonly settled = new Event();
+  // Set while no turn is active; `nameCopy` waits on it for a turn the agent opened.
+  private readonly noTurn = new Event();
   private injectedExpected = false;
   // The prompt whose replay arrived with no turn running: the turn that starts next is its
   // own (`acknowledge`, `whoseTurn`).
@@ -594,12 +596,77 @@ export class ThreadSession {
     this.thread = deps.chat.thread({ channel: channelId, thread: threadId });
     this.predecessor = options.predecessor ?? null;
     this.settled.set();
+    this.noTurn.set();
     this.nativeMode = deps.agent.capabilities.permissionModes.default;
     this.mode = this.nativeMode;
   }
 
   private get where(): string {
     return `${this.channelId}/${this.threadId}`;
+  }
+
+  /** False for a bare `!fork` copy in which no turn of any kind has started (`fork_of.ran`). */
+  private get forkRan(): boolean {
+    return this.deps.state.thread(this.channelId, this.threadId)?.forkRan ?? true;
+  }
+
+  /** A turn is queued or begins: a bare copy has run. Best-effort, as the root's status is. */
+  private markRan(): void {
+    if (this.forkRan) return;
+    try {
+      this.deps.state.markForkRan(this.channelId, this.threadId);
+    } catch (error) {
+      logger.warning(`could not record that ${this.where} ran in state.json: ${errorName(error)}`);
+    }
+  }
+
+  /**
+   * The first prompt with text names a bare copy (`fork_of.named`, `Turn.title`), through the live
+   * session, on an idle one: a turn the agent opened is waited out first, since the agent hides
+   * what follows a rename. Under the connect lock, so that no start or drop of the process falls
+   * in between. `named` is cleared when the agent's answer arrives; a cancel, a lost process or a
+   * refusal leaves it, and the next prompt with text tries again.
+   */
+  private async nameCopy(client: AgentSession, turn: Turn, signal: AbortSignal): Promise<void> {
+    const stored = this.deps.state.thread(this.channelId, this.threadId);
+    if (stored === null || stored.forkNamed || turn.title === null) return;
+    const title = oneLine(turn.title, TITLE_LIMIT);
+    if (
+      title === "" ||
+      client.rename === undefined ||
+      !this.deps.agent.capabilities.sessionRename
+    ) {
+      return;
+    }
+    // The lock is taken after the wait, not during it: a turn that runs needs the process.
+    let release: () => void;
+    for (;;) {
+      // Idle and settled: no turn runs and none is expected (a task's notification is).
+      await this.noTurn.wait(signal);
+      await this.settled.wait(signal);
+      release = await this.connectLock.acquire(signal);
+      if (this.active === null && this.settled.isSet) break;
+      release();
+    }
+    // A stop or a drain may have come during the wait: the prompt goes no further, nor its name.
+    if (this.client !== client || turn === this.stopTaken || this.draining) {
+      release();
+      return;
+    }
+    try {
+      await cancellable(client.rename(title), signal);
+    } catch (error) {
+      if (error instanceof Cancelled) throw error;
+      logger.warning(`could not name the copy ${this.where}: ${errorName(error)}`);
+      return;
+    } finally {
+      release();
+    }
+    try {
+      this.deps.state.markForkNamed(this.channelId, this.threadId);
+    } catch (error) {
+      logger.warning(`could not record that ${this.where} is named: ${errorName(error)}`);
+    }
   }
 
   /** The agent's own name for the mode that skips permission requests; null when it has none. */
@@ -926,7 +993,7 @@ export class ThreadSession {
    */
   private async reactAfterHold(): Promise<void> {
     const stored = this.deps.state.thread(this.channelId, this.threadId);
-    if (stored === null || stored.sessionId === null) {
+    if (stored === null || stored.sessionId === null || !stored.forkRan) {
       await this.setStatus(null);
       return;
     }
@@ -1055,6 +1122,7 @@ export class ThreadSession {
     prompt: PromptContent,
     shell: string | null = null,
     signal?: AbortSignal,
+    title: string | null = null,
   ): Promise<Turn> {
     signal?.throwIfAborted();
     if (this.closedFlag) throw new SessionClosed();
@@ -1071,7 +1139,7 @@ export class ThreadSession {
       // reader had not read yet. So the reply is awaited here only when making it does wait,
       // which is what the check below is for.
       const made = this.sink();
-      turn = new Turn(prompt, made instanceof Promise ? await made : made, shell);
+      turn = new Turn(prompt, made instanceof Promise ? await made : made, shell, title);
       if (this.closedFlag) {
         // The session closed (an idle close or a restart, or `ensureConnected`'s SessionGone
         // branch, which already drained the queue) while the reply was made: no worker will
@@ -1088,6 +1156,7 @@ export class ThreadSession {
       // (sync) from here to the end: the turn is queued, the worker made and the idle timer
       // read with nothing in between.
       this.queue.putNowait(turn);
+      this.markRan();
       // A submitted turn is working, unless an approval or question already open in this
       // thread still holds it (that state stands until it is answered). New work, so any
       // standing ❌ ends here.
@@ -2568,6 +2637,7 @@ export class ThreadSession {
           client = await this.ensureConnected(signal);
         }
         if (!this.settled.isSet) await this.settled.wait(signal);
+        await this.nameCopy(client, turn, signal);
         // (sync) from the check to the send: a drain raises every flag before its first
         // await, so no turn is sent in between.
         if (this.draining) {
@@ -3102,6 +3172,7 @@ export class ThreadSession {
           // A turn cut before its reply closed stays the active one, for `abandon` to end.
           if (!active.cut) {
             this.active = null;
+            this.noTurn.set();
             this.compacting = false;
             this.showThreadStatus(); // whichever way it ended, `!stop` included
             // An end told after this turn had begun is reported in a turn to come, which
@@ -3631,7 +3702,10 @@ export class ThreadSession {
   ): Promise<void> {
     this.showThreadStatus();
     let done: Promise<unknown> = Promise.resolve();
-    if (this.sessionEnded() && !this.errorStanding) {
+    if (!this.forkRan) {
+      // A bare copy no turn has started in: the empty turn of a connect is not work done.
+      logger.info(`no done status set in ${this.where}, no turn has started in this copy`);
+    } else if (this.sessionEnded() && !this.errorStanding) {
       done = this.setStatus("done", { ...change, signal });
     } else {
       logger.info(`no done status set in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
@@ -3959,6 +4033,7 @@ export class ThreadSession {
     // new one, and `stop()`'s own ✅ must stand. `read` raises it too, while it settles a lost
     // process's requests, for the same reason.
     if (!this.interrupting && !run) {
+      this.markRan();
       this.errorStanding = false; // a turn is sent, or a report turn starts: new work
       // A background task's own report turn can start while a hold waits on this very
       // session; ✋ must stand through it, not be overwritten by ⏳ (`waitingForOwner` covers a
@@ -4018,6 +4093,7 @@ export class ThreadSession {
       startedAt: this.now(),
     };
     this.active = active;
+    this.noTurn.clear();
     this.endNotesRead = false;
     if (turn !== null) this.turnChanges.begin(turn.uuid);
     const reply = this.reply(renderer);
@@ -4591,6 +4667,7 @@ export class ThreadSession {
     // the first write: whatever reads the session meanwhile sees it with no turn.
     const active = this.active;
     this.active = null;
+    this.noTurn.set();
     const ended = active?.cut ? active : null;
     const whole = ended !== null;
     const released = ended?.released ?? [];

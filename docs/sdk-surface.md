@@ -470,7 +470,7 @@ union, none of which any recording carries.
 
 ### Recorded and left unread
 
-- `command_lifecycle`: in no declaration of `sdk.d.ts`; the queue of a prompt sent while a turn runs (the translator leaves it unread; `ClaudeSession.#readCommand` reads it to end the hidden model command, rows above)
+- `command_lifecycle`: in no declaration of `sdk.d.ts`; the queue of a prompt sent while a turn runs (the translator leaves it unread; `ClaudeSession.#readCommand` reads it to end the hidden model command and the rename, rows above)
 - `conversation_reset`: `SDKConversationResetMessage`
 - `stream_event:content_block_stop`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`
 - `stream_event:message_delta`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`

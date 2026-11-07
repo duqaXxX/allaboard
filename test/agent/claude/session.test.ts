@@ -1139,6 +1139,81 @@ test("two model commands at once: the second is refused, the first settles", LIM
   assert.equal(query.sent.length, 1);
 });
 
+// `/rename <title>` sent to a live session with no turn, recorded on 2026-11-07 with the TypeScript
+// SDK 0.3.319 and Claude Code 2.1.319, with the daemon's options (`replay-user-messages`, a uuid
+// per message): `fixtures/sdk/rename-command.json`, the init record of `model-command.json` in
+// place of the recorded one. The same command turn as `/model`, with a `session_title_changed`
+// record carrying the title, ended by that uuid's `completed`.
+const RENAME_COMMAND = sdkJson("rename-command") as JsonObject[];
+const RENAME_RESULT = RENAME_COMMAND.findIndex((record) => record.type === "result");
+
+test("rename sends `/rename` and settles at its completed, not at the result", LIMIT, async (t) => {
+  const { session, query, events } = await started(t);
+  let settled = false;
+  const renaming = session.rename("Fix the timeout").then(() => {
+    settled = true;
+  });
+  await pause();
+  assert.equal(textOf(query.sent[0]), "/rename Fix the timeout");
+  assert.match(String(query.sent[0]?.uuid), /^[0-9a-f-]{36}$/);
+  // The result of a connect turn, or of the command, is not the end: only its own completed is.
+  query.answer(RENAME_COMMAND.slice(0, RENAME_RESULT + 1));
+  await pause();
+  assert.equal(settled, false);
+  query.answer(RENAME_COMMAND.slice(RENAME_RESULT + 1));
+  await renaming;
+  await pause();
+  await session.close();
+  // Nothing of the command's records reached the core; only the session's own `idle` follows.
+  assert.deepEqual(await drain({ [Symbol.asyncIterator]: () => events }), [IDLE]);
+});
+
+test("a cancelled rename fails the call", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const renaming = session.rename("Fix the timeout");
+  await pause();
+  const cancelled = { ...MODEL_COMMAND[COMMAND_COMPLETED], state: "cancelled" };
+  query.answer([RUNNING, cancelled as JsonObject]);
+  await assert.rejects(renaming, /cancelled/);
+});
+
+test("a rename fails when the session is closed, and a closed one is refused", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const renaming = session.rename("Fix the timeout");
+  await pause();
+  query.answer([RUNNING, END]);
+  await assert.rejects(renaming, SessionClosedError);
+  await assert.rejects(session.rename("again"), SessionClosedError);
+});
+
+test("clearGoal waits for a rename, then sends `/goal clear`", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const renaming = session.rename("Fix the timeout");
+  await pause();
+  const clearing = session.clearGoal();
+  await pause();
+  assert.equal(query.sent.length, 1, "nothing is sent while the rename runs");
+  query.answer(RENAME_COMMAND);
+  await renaming;
+  await pause();
+  assert.equal(textOf(query.sent[1]), "/goal clear");
+  query.answer(MODEL_COMMAND);
+  await clearing;
+});
+
+test("clearGoal that waited out a session's end throws instead of sending", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const renaming = session.rename("Fix the timeout");
+  renaming.catch(() => {});
+  await pause();
+  const clearing = session.clearGoal();
+  clearing.catch(() => {});
+  await pause();
+  query.answer([RUNNING, END]);
+  await assert.rejects(clearing, SessionClosedError);
+  assert.equal(query.sent.length, 1);
+});
+
 test("a session that ends while the model is checked fails the call", LIMIT, async (t) => {
   const { session, query } = await started(t, { initDelayMs: 30 });
   const set = session.setModel("haiku");

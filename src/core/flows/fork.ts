@@ -104,7 +104,7 @@ export function forkFlow(
         const copy = await fork.call(agent, session.directory, origin.sessionId, line || null);
         const back = await talk.referenceLink(
           ref,
-          await titleOf(session.directory, origin.sessionId),
+          (await titleOf(session.directory, origin.sessionId)) || texts.FORK_ORIGINAL_LABEL,
         );
         const root =
           prompt === ""
@@ -132,7 +132,14 @@ export function forkFlow(
         state.setBypass(opened.channel, opened.thread, origin.bypass);
         // What it is a copy of, for every start of it: the agent then takes no background work of
         // the original's for its own.
-        state.setForkOf(opened.channel, opened.thread, { session: origin.sessionId, at });
+        // A bare copy runs no process until its first message: the first prompt with text names it
+        // (`ThreadSession`'s worker), and its root shows no status before a turn.
+        state.setForkOf(
+          opened.channel,
+          opened.thread,
+          { session: origin.sessionId, at },
+          prompt === "",
+        );
         const label =
           chat.escape(line || (await titleOf(session.directory, copy)), "notice") ||
           texts.FORK_COPY_LABEL;
@@ -142,12 +149,13 @@ export function forkFlow(
           prompt === "" || copyTicket?.signal.aborted ? texts.FORK_WAITING : texts.FORK_RUNNING;
         const link = await talk.noticeLink(opened, label);
         await talk.tell(ref, fill(said, { link, session: copy }), { stays: true });
-        // Started at once, as the terminal's `/fork` starts its copy, once the line above is there:
-        // a start that fails is told with the link to the copy's thread already given.
+        // With a prompt the copy starts at once, once the line above is there: a start that fails
+        // is told with the link to the copy's thread already given. A bare copy starts with its
+        // first message, as a thread does after a restart, so that its name can be set first.
         if (copyTicket !== null) {
           sending = true;
           await send(opened, prompt, copyTicket);
-        } else await copied.ensureConnected();
+        }
       } finally {
         copyTicket?.release();
         const stopped = (copyTicket ?? bridge)?.signal.aborted === true;

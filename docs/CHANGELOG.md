@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A `!fork` with no prompt no longer starts the copy's process: the first message with text sent in
+  the copy's thread names it through the live session (`AgentSession.rename`, `Capabilities.sessionRename`;
+  Claude Code's `/rename`, its records hidden like the model command's), so `!resume` lists the copy
+  under that message instead of `<title> (fork)`. The copy's first message shows no status until its
+  first turn, and the link back reads `the original thread` when the original has no title.
+  `state.json` gains `fork_of.ran` and `fork_of.named` (each written only while false). `ClaudeSession.clearGoal`
+  waits for a running hidden command instead of failing. The rename waits for a turn the agent
+  opened to end, and probe claim P46 proves the rename's lifecycle records on each release (#141).
+
 - A thread gets one notice when the agent reports, as its process exits, that it could not save the
   session or its own settings to disk (`ClosedReport.unsaved`, returned by `AgentSession.close`). The
   idle close, `!stop`, a rewind and a reconnect let the process exit on its own for up to 2 seconds
