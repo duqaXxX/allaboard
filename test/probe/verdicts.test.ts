@@ -337,6 +337,8 @@ const NO_FACTS = new Set([
   "P42",
   // Whether the copy got its note is the whole check.
   "P43",
+  // The lifecycle records and the title are the whole check.
+  "P46",
   // Limit claims: each holds on a constant the page states, or a name that is there or not.
   "L1",
   "L2",

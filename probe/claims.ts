@@ -519,6 +519,18 @@ export const CLAIMS: readonly Claim[] = [
       "`docs/limits.md` for the row on restoring the conversation",
   ),
   claim(
+    "P46",
+    "gesture",
+    "a `/rename <title>` sent under a uuid to a live session with no turn ends its turn with " +
+      "`command_lifecycle` records in the states `queued`, `started` and `completed` whose " +
+      "`command_uuid` is that uuid, a `session_title_changed` record carrying the title and a " +
+      "`result` of `success` with `num_turns` 0",
+    "src/agent/claude/session.ts#ClaudeSession.rename",
+    "the daemon names a bare `!fork` copy with it and waits for that `completed`: with the record " +
+      "gone, send `!fork` alone, then a first message in the copy's thread: the message never " +
+      "starts a turn. Read `docs/sdk-surface.md` for the rows that name it",
+  ),
+  claim(
     "L1",
     "limit",
     "the Bash tool of a session started as the daemon starts it, with no `BASH_DEFAULT_TIMEOUT_MS`, " +

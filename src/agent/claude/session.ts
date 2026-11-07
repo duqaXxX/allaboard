@@ -311,6 +311,10 @@ interface CommandTurn {
   readonly id: string;
   /** The wait is over; what is left is the hidden tail up to `completed`. */
   settled: boolean;
+  /** Whether a `result` settles the wait; the rename's only end is its own `completed`. */
+  readonly byResult: boolean;
+  /** Resolves once the wait is over, whichever way; never rejects. */
+  readonly over: Promise<void>;
   readonly settle: (error?: unknown) => void;
 }
 
@@ -472,7 +476,7 @@ export class ClaudeSession implements AgentSession {
    */
   #readCommand(command: CommandTurn, record: unknown): void {
     if (!isRecord(record)) return;
-    if (record.type === "result") command.settle();
+    if (record.type === "result" && command.byResult) command.settle();
     if (record.type !== "command_lifecycle" || record.command_uuid !== command.id) return;
     if (record.state === "completed") {
       command.settle();
@@ -751,26 +755,48 @@ export class ClaudeSession implements AgentSession {
   /** `/goal clear`, read and hidden like the model command: a turn of no model request. */
   async clearGoal(): Promise<void> {
     if (this.#closing || this.#ended) throw new SessionClosedError();
+    // A rename may be running (a channel's stop reaches here meanwhile): wait for it, as a caller
+    // may queue behind a hidden command, then look again, since the wait can outlast the session.
+    while (this.#command !== null && !this.#command.settled) await this.#command.over;
+    if (this.#closing || this.#ended) throw new SessionClosedError();
     await this.#hidden(`/${GOAL_CLEAR}`);
   }
 
+  /**
+   * Names the session with Claude Code's own `/rename`, the one that updates the title the live
+   * process caches: a rename of the transcript file is re-appended over (measured 2026-11-07, SDK
+   * 0.3.319). Settles at the command's own `completed` (or `cancelled`), which the daemon's
+   * uuid-carrying input makes Claude Code emit; the turn is hidden like the model command's.
+   */
+  async rename(title: string): Promise<void> {
+    if (this.#closing || this.#ended) throw new SessionClosedError();
+    await this.#hidden(`/rename ${title}`, false);
+  }
+
   /** Sends `content` as a command whose turn no event shows, and resolves at its result. */
-  async #hidden(content: string): Promise<void> {
+  async #hidden(content: string, byResult = true): Promise<void> {
     // The guard and the marker follow each other with no await between them: two callers cannot
-    // both pass. A second command is refused, not queued: its callers (the setup, a channel's
-    // stop on an idle session) never overlap, so a second is a defect. The hidden tail of one
+    // both pass. A second command is refused, not queued; a caller that may overlap another
+    // (`clearGoal`) waits first. The hidden tail of one
     // that has settled does not count.
     if (this.#command !== null && !this.#command.settled) {
       throw new Error("a hidden command is already running");
     }
     const id = randomUUID();
+    let end = (): void => {};
+    const over = new Promise<void>((resolve) => {
+      end = resolve;
+    });
     const done = new Promise<void>((resolve, reject) => {
       const command: CommandTurn = {
         id,
         settled: false,
+        byResult,
+        over,
         settle: (error) => {
           if (command.settled) return;
           command.settled = true;
+          end();
           if (error === undefined) resolve();
           else reject(error);
         },

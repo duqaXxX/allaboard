@@ -1096,7 +1096,12 @@ from goes on as it was. Use it when a session finds a problem that is not its ta
 - allaboard posts the new thread's first message in the channel, `Fork of <link>: <prompt>`, the
   link going back to the thread you sent it from. That thread gets one line:
   `Forked into <link> · running · session <id>`.
-- With no prompt, `!fork` opens the new thread and the copy waits for your first message there.
+- With no prompt, `!fork` opens the new thread and the copy waits for your first message there. No
+  process runs for it until then, and its first message in the thread names it: the `!resume` list
+  shows that message, not the original's title with `(fork)` after it. A command, a `!!command` or a
+  message with only files does not name it; the first message with text after them does. The
+  thread's first message shows no status until the copy's first turn. When the original has no
+  title, the link back reads `the original thread`.
 - Sent while a turn runs, it waits for the turn to end, so the copy holds the whole conversation.
 - A thread that works in an earlier folder of the channel, after a `!bind` to another, cannot be
   forked: the copy's thread would start in the channel's folder, where the session does not exist.
@@ -1109,8 +1114,8 @@ from goes on as it was. Use it when a session finds a problem that is not its ta
 - The copy works in the same folder as the original. The terminal's `/fork` tells its copy to make
   a worktree of its own before editing; a copy made here gets no such instruction
   ([limits.md](limits.md)).
-- `!resume` lists the copy among the folder's sessions, under its prompt as a title, or the
-  original's title with `(fork)` after it.
+- `!resume` lists the copy among the folder's sessions, under its prompt or first message as a
+  title, or the original's title with `(fork)` after it for a copy no message has named yet.
 
 ### Tagging a thread
 
@@ -1963,7 +1968,7 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice, the `/effort` level, the status of its root message, the ids and kinds of the replies and requests a crash repair needs, and the text the root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file), and for a thread `!fork` opened, the session it copies and when (`fork_of`), and for a rewind no message has followed yet, the prompt it cut at and the agent's token for it (`pending_cut`: two ids), and the terminals you chose **Send here** for (`terminals_allowed`: one id of a process and its start time each, replaced at the next answer, cleared when the thread's session id changes); at the top of the file, `update_notice` and `restart_notice`. The fields one by one and how they are written are in [State and the single-instance lock](architecture.md#state-and-the-single-instance-lock) |
+| `state.json` | allaboard | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice, the `/effort` level, the status of its root message, the ids and kinds of the replies and requests a crash repair needs, and the text the root message had before allaboard replaced it with the session's title (`root_prompt`, the only message content in the file), and for a thread `!fork` opened, the session it copies and when (`fork_of`; for a copy made with no prompt, `ran` and `named` while false: whether a turn has started in it and whether its first message has named it), and for a rewind no message has followed yet, the prompt it cut at and the agent's token for it (`pending_cut`: two ids), and the terminals you chose **Send here** for (`terminals_allowed`: one id of a process and its start time each, replaced at the next answer, cleared when the thread's session id changes); at the top of the file, `update_notice` and `restart_notice`. The fields one by one and how they are written are in [State and the single-instance lock](architecture.md#state-and-the-single-instance-lock) |
 
 `state.json` looks like this; you never need to edit it:
 

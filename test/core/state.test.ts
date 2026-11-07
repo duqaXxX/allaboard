@@ -858,6 +858,40 @@ test("a copy's source round trips, is written only when set, and a broken one re
   assert.equal(mustThread(new StateStore(broken)).forkOf, null);
 });
 
+test("a bare copy's flags are written only while false, and absent means true", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  const store = new StateStore(path);
+  store.bind(CHANNEL, join(dir, "project"));
+  store.openThread(CHANNEL, THREAD);
+  const source = { session: "orig-1", at: "2026-11-07T10:00:00.000Z" };
+  store.setForkOf(CHANNEL, THREAD, source);
+  assert.deepEqual(written(path).fork_of, { session_id: "orig-1", at: source.at });
+  store.setForkOf(CHANNEL, THREAD, source, true);
+  assert.deepEqual(written(path).fork_of, {
+    session_id: "orig-1",
+    at: source.at,
+    ran: false,
+    named: false,
+  });
+  const bare = mustThread(new StateStore(path));
+  assert.equal(bare.forkRan, false);
+  assert.equal(bare.forkNamed, false);
+  store.markForkRan(CHANNEL, THREAD);
+  assert.deepEqual(written(path).fork_of, {
+    session_id: "orig-1",
+    at: source.at,
+    named: false,
+  });
+  store.markForkNamed(CHANNEL, THREAD);
+  assert.deepEqual(written(path).fork_of, { session_id: "orig-1", at: source.at });
+  const whole = mustThread(new StateStore(path));
+  assert.equal(whole.forkRan, true);
+  assert.equal(whole.forkNamed, true);
+  store.markForkRan(CHANNEL, "thread-unknown"); // unknown: a no-op
+  assert.equal(store.thread(CHANNEL, "thread-unknown"), null);
+});
+
 test("the root's prompt round trips, and a file without it reads as none", () => {
   const dir = scratch();
   const path = join(dir, "state.json");

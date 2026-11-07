@@ -428,6 +428,7 @@ test("an agent that declares no optional capability runs a whole turn", async (t
     sessionTags: false,
     sessionTitles: false,
     sessionForks: false,
+    sessionRename: false,
     goals: false,
     scheduledJobs: false,
     shellCommands: false,

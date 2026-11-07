@@ -72,13 +72,7 @@ test("!fork alone opens the copy's thread and leaves it waiting", async (t) => {
   const ref = copyOf(world, origin);
   assert.ok(world.inChannel().some((line) => line.startsWith("Fork of ") && !line.includes(": ")));
   assert.equal((await world.prompts()).length, sent, "nothing is sent to the copy");
-  const copied = world.state.thread(ref.channel, ref.thread)?.sessionId;
-  assert.equal(
-    agent.starts.at(-1)?.resume,
-    copied,
-    "the copy starts at once, as the terminal's does",
-  );
-  assert.ok(agent.starts.at(-1)?.forkOf);
+  assert.equal(agent.starts.length, 1, "the copy starts with its first message, not before");
   const line = world.shown(origin).at(-1) ?? "";
   assert.ok(line.includes("waiting for your first message there"), line);
   assert.ok(world.state.thread(ref.channel, ref.thread)?.sessionId);

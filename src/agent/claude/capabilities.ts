@@ -37,6 +37,8 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   sessionTitles: true,
   // The SDK's `forkSession`.
   sessionForks: true,
+  // `/rename` through the live session (`ClaudeSession.rename`).
+  sessionRename: true,
   // The SDK's `rewindFiles` over the checkpoints `enableFileCheckpointing` keeps.
   fileRestore: true,
   // `resumeSessionAt` and `resumeDropsTurn` (`rewind.ts`).

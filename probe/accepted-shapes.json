@@ -1,6 +1,7 @@
 {
   "kinds": {
-    "system/session_title_changed": "2.1.312"
+    "system/session_title_changed": "2.1.312",
+    "system/hook_response": "2.1.319"
   },
   "paths": {
     "assistant": {
@@ -94,7 +95,8 @@
       "original_cwd:string": "2.1.304",
       "user_message_uuids:array": "2.1.304",
       "ultrathink_available:boolean": "2.1.316",
-      "ultrathink_typed_raises:boolean": "2.1.318"
+      "ultrathink_typed_raises:boolean": "2.1.318",
+      "plugins[].version:string": "2.1.319"
     },
     "user": {
       "message.content[].content[].source.data:string": "2.1.304",
@@ -125,6 +127,7 @@
   },
   "tools": {
     "SendToProject": "2.1.316",
-    "SendToProjectContext": "2.1.316"
+    "SendToProjectContext": "2.1.316",
+    "LSP": "2.1.319"
   }
 }

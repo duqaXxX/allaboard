@@ -112,6 +112,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "model and effort resume": ["P15", "P16"],
   "setup model resume": ["P18"],
   "model command after setModel": ["P27", "P28"],
+  "rename command": ["P46"],
   bypass: ["P9"],
   "working folder": ["P14"],
   replay: ["P19"],
@@ -904,6 +905,66 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
     if (late) throw new ProbeTimeout("the turns did not end in time");
     const ended = observation(true, completed, completed ? "" : "no completed named the command");
     return { P27: judgeModelOverride(precondition, startup, applied, ranOn), P28: ended };
+  } finally {
+    clearTimeout(timer);
+    input.end();
+    raw.close();
+  }
+}
+
+/**
+ * P46: a `/rename` sent under a uuid of its own, as the daemon sends it, to a live session that has
+ * had no turn. A local command: Claude Code makes no model request for it, and its turn ends with
+ * `command_lifecycle` records in the states `queued`, `started` and `completed` naming the uuid.
+ */
+async function renameCommand(s: Stage): Promise<Seen> {
+  const input = new AsyncQueue<SDKUserMessage>();
+  const cwd = join(s.workdir, "rename-command");
+  await mkdir(cwd, { recursive: true });
+  const raw = s.query({ prompt: input, options: { cwd } });
+  const commandId = randomUUID();
+  const title = "probe title";
+  const states = new Set<string>();
+  let titled = false;
+  let quiet = false;
+  let late = false;
+  const timer = setTimeout(() => {
+    late = true;
+    raw.close();
+  }, TURN_LIMIT);
+  try {
+    await raw.initializationResult();
+    input.push({
+      type: "user",
+      message: { role: "user", content: `/rename ${title}` },
+      parent_tool_use_id: null,
+      uuid: commandId,
+    });
+    try {
+      for await (const record of raw) {
+        const seen: unknown = record;
+        if (!isRecord(seen)) continue;
+        if (seen.type === "system" && seen.subtype === "session_title_changed") {
+          titled ||= seen.title === title;
+        }
+        if (seen.type === "result") quiet = seen.subtype === "success" && seen.num_turns === 0;
+        if (seen.type !== "command_lifecycle" || seen.command_uuid !== commandId) continue;
+        if (typeof seen.state === "string") states.add(seen.state);
+        if (seen.state === "completed") break;
+      }
+    } catch (error) {
+      if (!late) throw error;
+    }
+    if (late) throw new ProbeTimeout("the command did not end in time");
+    const held =
+      ["queued", "started", "completed"].every((state) => states.has(state)) && titled && quiet;
+    return {
+      P46: observation(
+        true,
+        held,
+        held ? "" : `states ${[...states].join(", ")}; title ${titled}; no model turn ${quiet}`,
+      ),
+    };
   } finally {
     clearTimeout(timer);
     input.end();
@@ -2698,6 +2759,7 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
         seen,
         await attempt("model command after setModel", s, () => modelCommandAfterSetModel(s)),
       );
+      Object.assign(seen, await attempt("rename command", s, () => renameCommand(s)));
       Object.assign(seen, await attempt("bypass", s, () => bypass(s)));
       Object.assign(seen, await attempt("working folder", s, () => workingFolder(s)));
       Object.assign(seen, await attempt("replay", s, () => replay(s)));

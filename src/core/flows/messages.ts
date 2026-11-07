@@ -42,7 +42,7 @@ import { unservedWords, wordFlow } from "./words.ts";
  * What a prompt sent to a session needs of a message: an `InboundMessage` has all of it, and a
  * prompt the daemon sends itself (`sendPrompt`) has no message of the chat, so no `id`.
  */
-type Submission = Pick<InboundMessage, "ref" | "text" | "content"> & {
+type Submission = Pick<InboundMessage, "ref" | "text" | "plain" | "content"> & {
   readonly id?: InboundMessage["id"];
 };
 
@@ -201,7 +201,12 @@ export function messages(
   async function sendPrompt(ref: ThreadRef, prompt: string, ticket: Ticket): Promise<void> {
     const session = sessions.get(ref.channel, ref.thread);
     if (session === null) throw new SessionGone(names);
-    const message: Submission = { ref, text: prompt, content: async () => prompt };
+    const message: Submission = {
+      ref,
+      text: prompt,
+      plain: prompt,
+      content: async () => prompt,
+    };
     // `ticket` is the copy's, taken by the fork as soon as the copy's thread existed and released
     // by it: a stop of the copy's thread or of the channel drops this prompt.
     await talk.replyOnFailure(ref, () =>
@@ -337,6 +342,7 @@ export function messages(
         // Retried once against a freshly looked-up session: the one this call was handed can
         // still close under it (most likely the idle close, though `touch()` at the lookup
         // already guards the common case) during the read above or the steps below.
+        let asCommand = false;
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
             if (command !== null) {
@@ -345,9 +351,8 @@ export function messages(
               if (inThread && !early && (await suggest(message, session, command, options.typed)))
                 return;
               const known = new Set(session.commands.map((offered) => offered.name));
-              prompt = known.has(firstWord(command))
-                ? `${agent.words.commandPrefix}${command.text}`
-                : message.text;
+              asCommand = known.has(firstWord(command));
+              prompt = asCommand ? `${agent.words.commandPrefix}${command.text}` : message.text;
             }
             // (sync) Checked last, with no await before the submit: a stop can start while the
             // files are read. The daemon's words still work meanwhile (`!stop` shortens the
@@ -360,7 +365,10 @@ export function messages(
               await talk.refuseRestarting(ref);
               return;
             }
-            await session.submit(prompt, null, ticket.signal);
+            // The title is what the owner typed, as the chat's plain text, for a prompt alone: a word
+            // sent as the agent's command, a file with no text or a spoken clip names nothing.
+            const title = asCommand ? null : message.plain.trim() || null;
+            await session.submit(prompt, null, ticket.signal, title);
             submitted = true;
             return;
           } catch (error) {

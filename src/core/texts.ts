@@ -531,6 +531,7 @@ export const FORK_RUNNING = "Forked into {link} · running · session `{session}
 export const FORK_WAITING =
   "Forked into {link} · waiting for your first message there · session `{session}`";
 export const FORK_COPY_LABEL = "the copy";
+export const FORK_ORIGINAL_LABEL = "the original thread"; // the link of a copy whose original has no title
 // A copy is resumed in the channel's folder, so a session of an earlier folder has nowhere to go.
 export const FORK_OLD_FOLDER =
   "This session works in an earlier folder of the channel: a copy of it would start in the " +
