@@ -46,6 +46,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A stop also drops the messages sent before it that have not reached the agent yet: a prompt
+  reading its files, waiting behind another, connecting its session or asking its setup says
+  `Not sent.` (`InFlight` tickets in `src/core/flows/`), and a `!fork` waiting on a busy thread is
+  cancelled. The Slack provider's ordering of the Stop control against a message still being
+  checked is not part of this change (refs #200).
 - `!stop` and the Stop control drop every message of the session not yet sent to the agent: the
   ones queued behind the running turn, and the one taken while the process starts. A note names
   them (`1 message was not sent because you stopped it: send it again.`). A `!!command` that

@@ -4,6 +4,7 @@ import { asking } from "./asking.ts";
 import type { OtherFlows } from "./contract.ts";
 import { diffFlow } from "./diff.ts";
 import { rootGone } from "./gone.ts";
+import { InFlight } from "./in-flight.ts";
 import { Inbound } from "./inbound.ts";
 import { lists } from "./lists.ts";
 import { messages } from "./messages.ts";
@@ -34,7 +35,8 @@ export function buildFlows(deps: FlowDeps): Built {
     rewind,
     ...(allaboard ? { allaboard } : {}),
   };
-  const all = messages(deps, talk, flows);
+  const inFlight = new InFlight();
+  const all = messages(deps, talk, flows, inFlight);
   // A failure after the provider's checks reaches the owner in the channel of the offer; a click
   // on the chat's own page has none, and that page shows the state.
   const updatePicked = (pick: Extract<ListPick, { type: "update" }>): Promise<void> => {
@@ -65,7 +67,7 @@ export function buildFlows(deps: FlowDeps): Built {
       },
       unbound: (channel) => talk.unbound(channel),
       rootGone: rootGone(deps),
-      stop: inboundStop(deps, talk),
+      stop: inboundStop(deps, talk, inFlight),
     }),
   };
 }

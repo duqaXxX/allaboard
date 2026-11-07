@@ -1028,9 +1028,17 @@ export class ThreadSession {
    * Queue a prompt; its reply starts when the agent has something to show, not before.
    * Rejects with `SessionClosed` if the session closed (an idle close, most likely) between
    * the caller's lookup and this call; the caller retries once, against a freshly looked-up
-   * session.
+   * session. An aborted `signal` (the owner stopped the prompt on its way) queues nothing and
+   * rejects with its reason; the one check runs before anything is counted. A stop that lands
+   * during the `await` on the reply is not seen here: in production `sink()` does not wait, so
+   * there is no such window.
    */
-  async submit(prompt: PromptContent, shell: string | null = null): Promise<Turn> {
+  async submit(
+    prompt: PromptContent,
+    shell: string | null = null,
+    signal?: AbortSignal,
+  ): Promise<Turn> {
+    signal?.throwIfAborted();
     if (this.closedFlag) throw new SessionClosed();
     this.workStartedAt ??= this.now();
     // Counted, not just checked-and-cancelled: `idle` reads false for as long as this stays

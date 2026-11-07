@@ -26,7 +26,7 @@ import {
   refusedInThread,
   type Shell,
 } from "../commands.ts";
-import { SessionClosed, SessionGone } from "../sessions/errors.ts";
+import { SessionClosed, SessionGone, StoppedByOwner } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import { Mutex } from "../sessions/tasks.ts";
 import * as texts from "../texts.ts";
@@ -34,6 +34,7 @@ import { fill, named } from "../texts.ts";
 import { askOwner } from "./ask-owner.ts";
 import type { MessagesFlow, OtherFlows } from "./contract.ts";
 import { forkFlow } from "./fork.ts";
+import type { InFlight, Ticket } from "./in-flight.ts";
 import type { FlowDeps, Report, Talk } from "./talk.ts";
 import { unservedWords, wordFlow } from "./words.ts";
 
@@ -64,7 +65,12 @@ export function isClear(
   return refusedInThread(commands, newSession, agentCommands).has(firstWord(command).toLowerCase());
 }
 
-export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): MessagesFlow {
+export function messages(
+  deps: FlowDeps,
+  talk: Talk,
+  others: OtherFlows,
+  inFlight: InFlight,
+): MessagesFlow {
   const { chat, agent, sessions, state, names } = deps;
   const word = wordFlow(deps, talk, others, forkFlow(deps, talk, sendPrompt));
   const unserved = unservedWords(deps, others);
@@ -73,8 +79,21 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
   const arrivalOrder = new Map<string, Mutex>();
   const arrivalWaiters = new Map<string, number>();
 
-  /** `work` in its turn among the messages of one thread: the turns are taken in call order. */
-  async function arrival(ref: ThreadRef, work: () => Promise<void>): Promise<void> {
+  /**
+   * Tells `Not sent.` under a prompt its ticket says the owner stopped, before it holds anything
+   * a drop must put back. False, with nothing awaited, while the ticket stands.
+   */
+  async function dropped(ticket: Ticket): Promise<boolean> {
+    if (!ticket.signal.aborted) return false;
+    if (!talk.stopped) await talk.tell(ticket.ref, texts.NOT_SENT);
+    return true;
+  }
+
+  /**
+   * `work` in its turn among the messages of one thread: the turns are taken in call order. A
+   * prompt stopped while it waits for its turn leaves the line at once.
+   */
+  async function arrival(ref: ThreadRef, ticket: Ticket, work: () => Promise<void>): Promise<void> {
     const key = `${ref.channel}\n${ref.thread}`;
     // (sync) The place in line is taken inside this call, before its first await.
     arrivalWaiters.set(key, (arrivalWaiters.get(key) ?? 0) + 1);
@@ -83,9 +102,16 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
       lock = new Mutex();
       arrivalOrder.set(key, lock);
     }
-    const turn = lock.acquire();
+    const turn = lock.acquire(ticket.signal);
     try {
-      const release = await turn;
+      let release: () => void;
+      try {
+        release = await turn;
+      } catch (error) {
+        if (!(error instanceof StoppedByOwner)) throw error;
+        await dropped(ticket);
+        return;
+      }
       try {
         await work();
       } finally {
@@ -176,9 +202,15 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     const session = sessions.get(ref.channel, ref.thread);
     if (session === null) throw new SessionGone(names);
     const message: Submission = { ref, text: prompt, content: async () => prompt };
-    await talk.replyOnFailure(ref, () =>
-      submitToSession(message, session, null, { inThread: true, typed: prompt }),
-    );
+    // Its own ticket in the copy's thread: a stop of the copy drops this prompt too.
+    const ticket = inFlight.take(ref);
+    try {
+      await talk.replyOnFailure(ref, () =>
+        submitToSession(message, session, null, { inThread: true, typed: prompt }, ticket),
+      );
+    } finally {
+      ticket.release();
+    }
   }
 
   /**
@@ -191,6 +223,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     opened: ThreadSession,
     command: Passthrough | null,
     options: { readonly inThread: boolean; readonly typed: string },
+    ticket: Ticket,
   ): Promise<void> {
     const { ref } = message;
     const { inThread } = options;
@@ -205,93 +238,106 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     }
     // Prompts and commands for the agent enter the queue in the order they were sent, although
     // files take a while to read. Every reply goes to the thread.
-    await arrival(ref, async () => {
+    await arrival(ref, ticket, async () => {
       let session = opened;
-      let prompt = await message.content();
-      if (prompt === null || talk.stopped) return;
-      // Checked before the hold too: a drain already cancelled every hold open when it
-      // started (`SessionManager.drain`) and will never cancel one opened after, so a message
-      // that arrives once draining has begun must never open a new one (it would wait
-      // forever).
-      if (refusing(session)) {
-        await talk.refuseRestarting(ref);
-        return;
-      }
-      // A word the session does not list is suggested for before the setup and the hold ask
-      // anything: a typo asks nothing, and they are asked once, for the text sent on Enter. Only
-      // where learning the list wakes nothing the hold guards: a session already connected, or
-      // one that never ran, which its setup connects before the hold anyway (an unsent Start's
-      // choices forgotten first, as the setup does). A session that ran and was closed is asked
-      // the hold first, and suggested for once it is connected below.
-      const early = inThread && command !== null && (session.connected || session.neverRan);
-      if (early) {
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-          try {
-            await session.forgetSetup();
-            await session.ensureConnected();
-            if (await suggest(message, session, command, options.typed)) return;
-            break;
-          } catch (error) {
-            if (!(error instanceof SessionClosed) || attempt > 0) throw error;
-            const fresh = sessions.get(ref.channel, ref.thread);
-            if (fresh === null) throw new SessionGone(names);
-            session = fresh;
-          }
-        }
-        // The connect may have outlasted a drain or an install.
+      // `held` is the object a Continue's mark was left standing on (`holdEnd({ continued: true })`
+      // bets on the `submit()` below to replace it with the working one): kept apart from
+      // `session`, which a `SessionClosed` retry below can reassign, so a non-submit exit always
+      // restores the mark on the object that actually shows it.
+      let held: ThreadSession | null = null;
+      let askedSetup = false;
+      let submitted = false;
+      let failed = false;
+      // Every checkpoint below throws `StoppedByOwner` once the owner stopped this prompt, and the
+      // one catch at the end tells `Not sent.`, forgets the Start this prompt asked and, in the
+      // finally, puts back the mark a Start, Continue or Send here left. `askOwner` tells it
+      // itself when it refuses to open, and answers null: that return is the same exit.
+      try {
+        let prompt = await message.content();
+        if (prompt === null || talk.stopped) return;
+        ticket.signal.throwIfAborted();
+        // Checked before the hold too: a drain already cancelled every hold open when it
+        // started (`SessionManager.drain`) and will never cancel one opened after, so a message
+        // that arrives once draining has begun must never open a new one (it would wait
+        // forever).
         if (refusing(session)) {
           await talk.refuseRestarting(ref);
           return;
         }
-      }
-      // The same-folder hold: this message would wake `session` (busy just queues behind what
-      // is already running); ask first when another live session, of any channel, is already
-      // busy in the same resolved folder. Later messages of this thread queue behind the wait,
-      // since it runs inside the arrival lock. `held` is the object a Continue's mark was left
-      // standing on (`holdEnd({ continued: true })` bets on the `submit()` below to replace it
-      // with the working one): kept apart from `session`, which a `SessionClosed` retry below
-      // can reassign, so a non-submit exit always restores the mark on the object that
-      // actually shows it.
-      let held: ThreadSession | null = null;
-      let askedSetup = false;
-      if (!inThread || session.neverRan) {
-        // A session's first prompt: its setup comes before anything else, the hold's question
-        // included. A reply in a thread whose setup was cancelled, or whose hold was, is a
-        // first prompt too: nothing was ever sent in it.
-        const ready = await others.setup.beforeSending(ref, session);
-        if (ready === null) return;
-        session = ready;
-        held = ready;
-        askedSetup = true;
-      }
-      if (!session.busy) {
-        const other = sessions.workingIn({ besides: session });
-        if (other !== null) {
-          if (!(await others.hold.beforeSending(ref, session, other))) {
-            // the Start that nothing was sent for
-            if (askedSetup && !talk.stopped) await session.forgetSetup();
+        // A word the session does not list is suggested for before the setup and the hold ask
+        // anything: a typo asks nothing, and they are asked once, for the text sent on Enter. Only
+        // where learning the list wakes nothing the hold guards: a session already connected, or
+        // one that never ran, which its setup connects before the hold anyway (an unsent Start's
+        // choices forgotten first, as the setup does). A session that ran and was closed is asked
+        // the hold first, and suggested for once it is connected below.
+        const early = inThread && command !== null && (session.connected || session.neverRan);
+        if (early) {
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            try {
+              await session.forgetSetup();
+              await session.ensureConnected();
+              ticket.signal.throwIfAborted();
+              if (await suggest(message, session, command, options.typed)) return;
+              break;
+            } catch (error) {
+              if (!(error instanceof SessionClosed) || attempt > 0) throw error;
+              const fresh = sessions.get(ref.channel, ref.thread);
+              if (fresh === null) throw new SessionGone(names);
+              session = fresh;
+            }
+          }
+          // The connect may have outlasted a drain or an install.
+          ticket.signal.throwIfAborted();
+          if (refusing(session)) {
+            await talk.refuseRestarting(ref);
             return;
           }
-          held = session;
         }
-      }
-      // A terminal on the host that holds the same session: its turn waited out, the owner asked
-      // once whether to write here beside it, and what it wrote shown before the reply.
-      if (!session.neverRan) {
-        if (!(await others.terminal.beforeSending(ref, session))) return;
-        // a Send here left the waiting mark for the submit below, as a Continue does
-        held = session;
-      }
-      // Retried once against a freshly looked-up session: the one this call was handed can
-      // still close under it (most likely the idle close, though `touch()` at the lookup
-      // already guards the common case) during the read above or the steps below.
-      let submitted = false;
-      let failed = false;
-      try {
+        // The same-folder hold: this message would wake `session` (busy just queues behind what
+        // is already running); ask first when another live session, of any channel, is already
+        // busy in the same resolved folder. Later messages of this thread queue behind the wait,
+        // since it runs inside the arrival lock.
+        if (!inThread || session.neverRan) {
+          // A session's first prompt: its setup comes before anything else, the hold's question
+          // included. A reply in a thread whose setup was cancelled, or whose hold was, is a
+          // first prompt too: nothing was ever sent in it.
+          const ready = await others.setup.beforeSending(ref, session, ticket.signal);
+          if (ready === null) return;
+          session = ready;
+          held = ready;
+          askedSetup = true;
+          ticket.signal.throwIfAborted();
+        }
+        if (!session.busy) {
+          const other = sessions.workingIn({ besides: session });
+          if (other !== null) {
+            if (!(await others.hold.beforeSending(ref, session, other, ticket.signal))) {
+              // the Start that nothing was sent for
+              if (askedSetup && !talk.stopped) await session.forgetSetup();
+              return;
+            }
+            held = session;
+            ticket.signal.throwIfAborted();
+          }
+        }
+        // A terminal on the host that holds the same session: its turn waited out, the owner asked
+        // once whether to write here beside it, and what it wrote shown before the reply.
+        if (!session.neverRan) {
+          // Set before the call: a Send here leaves the waiting mark for the submit below, as a
+          // Continue does, and a stop that lands before the call returns must still restore it
+          // (`reactAfterHold` recomputes the mark, harmless on an exit that left none).
+          held = session;
+          if (!(await others.terminal.beforeSending(ref, session, ticket.signal))) return;
+          ticket.signal.throwIfAborted();
+        }
+        // Retried once against a freshly looked-up session: the one this call was handed can
+        // still close under it (most likely the idle close, though `touch()` at the lookup
+        // already guards the common case) during the read above or the steps below.
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
             if (command !== null) {
               await session.ensureConnected();
+              ticket.signal.throwIfAborted();
               if (inThread && !early && (await suggest(message, session, command, options.typed)))
                 return;
               const known = new Set(session.commands.map((offered) => offered.name));
@@ -305,11 +351,12 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
             // again. A stop that ended meanwhile (the daemon is gone) sends nothing and says
             // nothing.
             if (talk.stopped) return;
+            ticket.signal.throwIfAborted();
             if (refusing(session)) {
               await talk.refuseRestarting(ref);
               return;
             }
-            await session.submit(prompt);
+            await session.submit(prompt, null, ticket.signal);
             submitted = true;
             return;
           } catch (error) {
@@ -322,6 +369,11 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
           }
         }
       } catch (error) {
+        if (error instanceof StoppedByOwner) {
+          await dropped(ticket);
+          if (askedSetup && !talk.stopped) await session.forgetSetup();
+          return;
+        }
         failed = true;
         throw error;
       } finally {
@@ -357,6 +409,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     ref: ThreadRef,
     command: Shell,
     opened: ThreadSession | null,
+    ticket: Ticket,
   ): Promise<void> {
     // Outside a session's thread it is answered in the channel, as the words of one session are.
     if (opened === null) {
@@ -375,9 +428,11 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
       await talk.tell(ref, texts.SHELL_FIRST_PROMPT);
       return;
     }
-    await arrival(ref, async () => {
+    await arrival(ref, ticket, async () => {
       let session = opened;
       if (talk.stopped) return;
+      // Before the restart refusal: a stopped command says `Not sent.`, never the refusal.
+      if (await dropped(ticket)) return;
       if (refusing(session)) {
         await talk.refuseRestarting(ref);
         return;
@@ -385,6 +440,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
       const answer = await askOwner(deps, talk, ref, session, {
         kind: "shell",
         title: texts.SHELL_TITLE,
+        signal: ticket.signal,
         request: (requestId): ShellRequest => ({
           type: "shell",
           requestId,
@@ -403,11 +459,12 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
             if (talk.stopped) return;
+            ticket.signal.throwIfAborted();
             if (refusing(session)) {
               await talk.refuseRestarting(ref);
               return;
             }
-            await session.submit(`!!${command.command}`, command.command);
+            await session.submit(`!!${command.command}`, command.command, ticket.signal);
             submitted = true;
             return;
           } catch (error) {
@@ -418,6 +475,10 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
           }
         }
       } catch (error) {
+        if (error instanceof StoppedByOwner) {
+          await dropped(ticket);
+          return;
+        }
         failed = true;
         throw error;
       } finally {
@@ -431,6 +492,42 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
    * session's thread, a thread that holds none, or the channel.
    */
   async function route(message: InboundMessage): Promise<void> {
+    const { ref } = message;
+    // (sync) A prompt, a command or a `!fork` takes its ticket the moment it is handed over; a
+    // `!stop` aborts the tickets of its thread, or of its channel, before anything is awaited.
+    const read = classify(message);
+    const { command } = read;
+    let aborted = 0;
+    if (command?.kind === "stop") {
+      aborted =
+        read.session === null && !read.outside
+          ? inFlight.abortChannel(ref.channel)
+          : inFlight.abortThread(ref);
+    }
+    const ticket =
+      command === null || ["passthrough", "shell", "fork"].includes(command.kind)
+        ? inFlight.take(ref)
+        : null;
+    try {
+      await routeRead(message, read, ticket, aborted);
+    } finally {
+      ticket?.release();
+    }
+  }
+
+  /** The ticket of a prompt or a command, which `route` takes for every one. */
+  function owned(ticket: Ticket | null): Ticket {
+    if (ticket === null) throw new TypeError("a prompt reached the session path with no ticket");
+    return ticket;
+  }
+
+  /** What a message reads as: its thread's session, and the word or command in it. */
+  function classify(message: InboundMessage): {
+    readonly session: ThreadSession | null;
+    readonly command: Command | null;
+    readonly written: string;
+    readonly outside: boolean;
+  } {
     const { ref, topLevel } = message;
     const { channel, thread } = ref;
     // (sync) From here to the turn `submitToSession` takes, unless a call to the chat is due or
@@ -464,16 +561,33 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
         }
       }
     }
+    return { session, command, written, outside: !topLevel && session === null };
+  }
+
+  /** What follows from a message read by `classify`; `ticket` is null for a word. */
+  async function routeRead(
+    message: InboundMessage,
+    read: ReturnType<typeof classify>,
+    ticket: Ticket | null,
+    aborted: number,
+  ): Promise<void> {
+    const { ref, topLevel } = message;
+    const { channel, thread } = ref;
+    const { session, command, written, outside } = read;
     if (command !== null && command.kind === "shell") {
       const typed = command;
-      await talk.replyOnFailure(ref, () => shell(ref, typed, session), wordReport(ref, session));
+      await talk.replyOnFailure(
+        ref,
+        () => shell(ref, typed, session, owned(ticket)),
+        wordReport(ref, session),
+      );
       return;
     }
     if (command !== null && command.kind !== "passthrough") {
       const typed = command;
       await talk.replyOnFailure(
         ref,
-        () => word(ref, message.id, typed, { session, outside: !topLevel && session === null }),
+        () => word(ref, message.id, typed, { session, outside, aborted, ticket }),
         wordReport(ref, session),
       );
       return;
@@ -504,7 +618,13 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
       // prompt that follows it.
       const moved = oldFolderText(channel, session);
       if (moved !== null) await talk.tell(ref, moved);
-      await submitToSession(message, session, command, { inThread: true, typed: written });
+      await submitToSession(
+        message,
+        session,
+        command,
+        { inThread: true, typed: written },
+        owned(ticket),
+      );
       return;
     }
     if (!topLevel) {
@@ -515,15 +635,24 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     // Before the thread's entry is written: an install under way starts no process, and a message
     // that would only start one changes nothing.
     if (state.channel(channel) !== null && (await sessions.refusesStarts())) {
+      if (await dropped(owned(ticket))) return;
       await talk.refuseRestarting(ref);
       return;
     }
+    // A stop during that wait, with the answer a start allows: no entry is written for it.
+    if (await dropped(owned(ticket))) return;
     const opened = sessions.open(channel, thread);
     if (opened === null) {
       await talk.unbound(channel);
       return;
     }
-    await submitToSession(message, opened, command, { inThread: false, typed: written });
+    await submitToSession(
+      message,
+      opened,
+      command,
+      { inThread: false, typed: written },
+      owned(ticket),
+    );
   }
 
   return {

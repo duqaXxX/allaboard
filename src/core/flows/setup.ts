@@ -73,6 +73,7 @@ export function setupFlow(deps: FlowDeps, talk: Talk): SetupFlow {
   async function beforeSending(
     ref: ThreadRef,
     asked: ThreadSession,
+    signal?: AbortSignal,
   ): Promise<ThreadSession | null> {
     const { sessions, state } = deps;
     let session = asked;
@@ -134,6 +135,7 @@ export function setupFlow(deps: FlowDeps, talk: Talk): SetupFlow {
       }),
       settle,
       context: models,
+      signal,
     });
     if (answer === null) {
       // A stop or drain that came while Start was applied. Not once the daemon is gone: the

@@ -75,6 +75,8 @@ test("a stop typed right after a prompt is handed to the core after the prompt",
   assert.deepEqual(seen, []);
   hold.set();
   await world.settle();
+  // Handed over in order. Whether the prompt reaches `submit` before the stop aborts it is the
+  // core's (#200): either way it is not sent, by the ticket or by the session's own stop.
   assert.deepEqual(seen, ["first", "!stop"]);
 });
 

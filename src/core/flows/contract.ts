@@ -10,24 +10,37 @@ import type {
   ThreadRef,
 } from "../../chat/seam.ts";
 import type { ThreadSession } from "../sessions/session.ts";
+import type { Ticket } from "./in-flight.ts";
 
 /** A session's setup, asked before its first prompt. */
 export interface SetupFlow {
   /**
    * Asks for the model, the effort and bypass and applies the answer to the live session. The
    * session to send the message on, which can be another object than `session` when that one
-   * closed meanwhile; null when the message is not sent, and the owner was told.
+   * closed meanwhile; null when the message is not sent, and the owner was told. An aborted
+   * `signal` (the owner stopped the prompt) before the question opens ends as null with `Not sent.`
+   * told; a stop caught later rejects with `StoppedByOwner`, which the caller maps to `Not sent.`.
    */
-  beforeSending(ref: ThreadRef, session: ThreadSession): Promise<ThreadSession | null>;
+  beforeSending(
+    ref: ThreadRef,
+    session: ThreadSession,
+    signal?: AbortSignal,
+  ): Promise<ThreadSession | null>;
 }
 
 /** The same-folder hold. */
 export interface HoldFlow {
   /**
    * Asks whether to send a message that would wake `session` while `other` works in the same
-   * folder. True to send it; false when it is not sent, and the owner was told.
+   * folder. True to send it; false when it is not sent, and the owner was told. An aborted
+   * `signal` before the question opens ends as false with `Not sent.` told.
    */
-  beforeSending(ref: ThreadRef, session: ThreadSession, other: ThreadSession): Promise<boolean>;
+  beforeSending(
+    ref: ThreadRef,
+    session: ThreadSession,
+    other: ThreadSession,
+    signal?: AbortSignal,
+  ): Promise<boolean>;
 }
 
 /** A session open in a terminal on the host. */
@@ -35,9 +48,11 @@ export interface TerminalFlow {
   /**
    * Before a message reaches `session`: waits out a turn a terminal runs, asks once per terminal
    * left open whether to send here, and shows the turns written there since. True to send; false
-   * when it is not sent, and the owner was told.
+   * when it is not sent, and the owner was told. A stop before a question opens ends as false,
+   * `Not sent.` already told; one caught after a question or with none to ask rejects with
+   * `StoppedByOwner`, which the caller maps to `Not sent.`.
    */
-  beforeSending(ref: ThreadRef, session: ThreadSession): Promise<boolean>;
+  beforeSending(ref: ThreadRef, session: ThreadSession, signal?: AbortSignal): Promise<boolean>;
   /**
    * `!terminal`: moves `session` to a terminal, confirmed first when it would stop background
    * work, and tells the owner the line to run there.
@@ -71,8 +86,16 @@ export interface ForkFlow {
    * `!fork` typed in the thread of `session` as the owner's `message`: once no turn runs there,
    * copies the session into a new thread of the channel, which inherits its effort and bypass and
    * starts on `prompt` (empty: it waits for the owner's first message), and tells this thread.
+   * A stop of this thread that comes before the copy is made (`ticket` aborts) cancels it, and
+   * the ticket is released once the copy is made, so a later stop does not count the fork.
    */
-  word(ref: ThreadRef, message: MessageId, session: ThreadSession, prompt: string): Promise<void>;
+  word(
+    ref: ThreadRef,
+    message: MessageId,
+    session: ThreadSession,
+    prompt: string,
+    ticket: Ticket,
+  ): Promise<void>;
 }
 
 /** `!diff`. */

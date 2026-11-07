@@ -75,7 +75,11 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
    * Wait for the end of the turn a terminal runs, the question showing it with a Cancel; true
    * once it ended, false when the owner cancelled (or a `!stop`, a drain).
    */
-  async function waitForTurn(ref: ThreadRef, session: ThreadSession): Promise<boolean> {
+  async function waitForTurn(
+    ref: ThreadRef,
+    session: ThreadSession,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     let holdId: string | null = null;
     // Ends the looking as soon as the wait is over, whichever way: no look outlives it.
     const over = new AbortController();
@@ -101,6 +105,7 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
           return request(requestId, "busy", null);
         },
         ends: { sent: texts.TERMINAL_TURN_ENDED, cancelled: texts.NOT_SENT },
+        signal,
       });
       return answer !== null;
     } finally {
@@ -187,13 +192,17 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
     return fill(texts.TERMINAL_TURN, { ...shown, reply: written });
   }
 
-  async function beforeSending(ref: ThreadRef, session: ThreadSession): Promise<boolean> {
+  async function beforeSending(
+    ref: ThreadRef,
+    session: ThreadSession,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     for (;;) {
       if (talk.stopped) return false;
       const found = await terminals(session);
       if (found === null || found.length === 0 || terminal === null) break;
       if (found.some((holder) => holder.busy)) {
-        if (!(await waitForTurn(ref, session))) return false;
+        if (!(await waitForTurn(ref, session, signal))) return false;
         continue;
       }
       if (found.every((holder) => session.terminalAllowed(holder.id))) break;
@@ -203,8 +212,10 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
         title: texts.TERMINAL_OPEN_TITLE,
         request: (requestId) => request(requestId, "open", command),
         ends: { sent: texts.TERMINAL_SENT, cancelled: texts.NOT_SENT },
+        signal,
       });
       if (answer === null) return false;
+      signal?.throwIfAborted();
       session.allowTerminals(found.map((holder) => holder.id));
       break;
     }
@@ -227,8 +238,10 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
           command: null,
         }),
         ends: { sent: texts.TERMINAL_SENT, cancelled: texts.NOT_SENT },
+        signal,
       });
       if (answer === null) return false;
+      signal?.throwIfAborted();
       await session.stopForTerminal();
       // A turn the agent opened meanwhile (a task's report) keeps the process: its end is waited
       // out, so the message never reaches the process that missed the terminal's turns.
@@ -236,6 +249,7 @@ export function terminalFlow(deps: FlowDeps, talk: Talk): TerminalFlow {
         await clock.sleep(TERMINAL_POLL_SECONDS, deps.stopped).catch(() => {});
       }
     }
+    signal?.throwIfAborted();
     for (const turn of await session.takeForeignTurns()) {
       await talk.say(ref.channel, ref.thread, turnText(turn));
     }

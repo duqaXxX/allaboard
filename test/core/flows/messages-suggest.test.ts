@@ -5,11 +5,13 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { AgentSession, RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
 import { WORD } from "../../../src/core/commands.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill } from "../../../src/core/texts.ts";
+import { AsyncEvent } from "../../support/fake-clock.ts";
 import { OWNER, SOMEONE } from "../../support/memory-chat.ts";
-import { hold, PLAIN_COMMANDS, type PlainAgent } from "../../support/plain-agent.ts";
+import { hold, PLAIN_COMMANDS, PlainAgent } from "../../support/plain-agent.ts";
 import { MessagesWorld } from "./messages-world.ts";
 
 test("an unknown word in a thread is suggested for, with the typed text and the arguments kept", async (t) => {
@@ -262,4 +264,33 @@ test("the words a thread refuses are not offered, for a word or for ! alone", as
       assert.ok(!names.includes(refused), refused);
     }
   }
+});
+
+/** A plain agent whose process start waits for `gate` (set at first). */
+class SlowStart extends PlainAgent {
+  readonly gate = new AsyncEvent();
+  override async start(options: StartOptions, requests: RequestHandler): Promise<AgentSession> {
+    await this.gate.wait();
+    return super.start(options, requests);
+  }
+}
+
+test("a stop during the connect of the late suggest posts no suggestion and says Not sent.", {
+  timeout: 8000,
+}, async (t) => {
+  const agent = new SlowStart();
+  agent.gate.set();
+  const world = await MessagesWorld.make(t, { suggests: true, agent });
+  const ref = await world.opened();
+  await world.sessions.get(ref.channel, ref.thread)?.close();
+  await world.settle();
+  agent.gate.clear();
+  const typing = world.says("!ech hi", ref.thread);
+  await world.settle();
+  await world.says("!stop", ref.thread);
+  agent.gate.set();
+  await typing;
+  await world.settle();
+  assert.deepEqual(world.chat.suggestions(), []);
+  assert.equal(world.shown(ref).filter((line) => line === texts.NOT_SENT).length, 1);
 });
