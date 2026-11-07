@@ -9,7 +9,8 @@
  *   the end of the shutdown. Node's signal watchers do not keep the event loop alive, and a
  *   listener removed at the end puts the default disposition back.
  * - What keeps the process running. A pending promise holds nothing. While the daemon waits for
- *   a signal, the Socket Mode client and the cleanup's timer are what the libraries and the
+ *   a signal, the Socket Mode client, the cleanup's timer and the Slack provider's sweep of old saved files
+ *   (it sleeps on the steady clock until the chat stops) are what the libraries and the
  *   clock happen to keep alive, so `run` holds one timer of its own until the shutdown ends. On
  *   a stop it clears that timer and closes everything else it made (the cleanup's sleep and the
  *   drain's limit are aborted, never left to run out).

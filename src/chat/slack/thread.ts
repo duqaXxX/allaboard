@@ -53,6 +53,7 @@ import {
 import type { AppConfig, Fetch } from "./app/answers.ts";
 import { type BuiltApp, buildApp } from "./app/app.ts";
 import type { ChannelGuard } from "./app/guards.ts";
+import { sweepEvery } from "./attachments.ts";
 import { SlackChannel } from "./channel.ts";
 import type { ChannelLine } from "./channel-line.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
@@ -527,6 +528,10 @@ export class SlackChat implements ChatProvider {
       ...(app.listings !== undefined && { listings: app.listings }),
     });
     await this.built.app.start();
+    // Ends with the stop, which the chat's `halt` signals; it never rejects.
+    if (steady !== undefined) {
+      void sweepEvery({ folder: app.uploads, clock: steady, signal: this.stopping.signal });
+    }
     logger.info(`connected to Slack workspace ${identity.teamId}`);
   }
 

@@ -15,6 +15,7 @@ import { lstatSync } from "node:fs";
 import { lstat, mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ImagePart, PromptContent, TextPart } from "../../agent/seam.ts";
+import type { Clock } from "../../clock.ts";
 import { type Names, named, texts } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
@@ -76,6 +77,9 @@ export const FILE_TYPES: ReadonlySet<string> = new Set([
 // Saved files outlive a restart, since the resumed conversation names them (the maintainer,
 // 2026-09-25).
 export const KEEP_SECONDS = 3 * 24 * 3600;
+// How often the daemon looks for files past that age while it runs: the core's channel cleanup
+// cadence (the maintainer, 2026-11-07).
+export const SWEEP_EVERY_SECONDS = 6 * 3600;
 // A file's URL receives the bot token: only Slack's own file host may have it.
 export const FILE_HOST = "files.slack.com";
 const ORIGIN_PROTOCOL = "https:";
@@ -353,22 +357,65 @@ function isPrivate(folder: string): boolean {
   return info.uid === process.getuid?.() && (info.mode & 0o077) === 0;
 }
 
-/** Remove the saved files older than `KEEP_SECONDS`, from a folder only the owner can read. */
-export async function prepareUploads(folder: string, now: () => number = Date.now): Promise<void> {
+const warnedFolders = new Set<string>();
+
+/** Create the uploads folder if needed; whether it is one only the owner can read. */
+async function privateFolder(folder: string): Promise<boolean> {
   await mkdir(folder, { mode: 0o700, recursive: true });
-  if (!isPrivate(folder)) {
-    // Never touched: `save` refuses to write there, and old files are not removed.
+  if (isPrivate(folder)) return true;
+  // Never touched: `save` refuses to write there, and old files are not removed. Said once, not
+  // at every sweep.
+  if (!warnedFolders.has(folder)) {
+    warnedFolders.add(folder);
     logger.warning(`the uploads folder ${folder} is not private: it is left untouched`);
-    return;
   }
+  return false;
+}
+
+/** Remove the files of a private `folder` older than `KEEP_SECONDS` by mtime; errors per file stay. */
+async function sweep(folder: string, now: () => number): Promise<void> {
   const cutoff = now() - KEEP_SECONDS * 1000;
   for (const name of await readdir(folder)) {
     const path = join(folder, name);
     try {
       if ((await lstat(path)).mtimeMs < cutoff) await unlink(path);
     } catch {
-      // A file that vanished or cannot be removed stays for the next start.
+      // A file that vanished or cannot be removed stays for the next sweep.
     }
+  }
+}
+
+/** Remove the saved files older than `KEEP_SECONDS`, from a folder only the owner can read. */
+export async function prepareUploads(folder: string, now: () => number = Date.now): Promise<void> {
+  if (await privateFolder(folder)) await sweep(folder, now);
+}
+
+/**
+ * The same sweep every `SWEEP_EVERY_SECONDS` until `signal` aborts, so a daemon that stays up for
+ * weeks removes files too. Resolves at the stop; a failed sweep is logged by name and the next
+ * one still runs. The folder is checked again each time, since macOS may clean the temporary
+ * folder while the daemon runs.
+ */
+export async function sweepEvery(options: {
+  readonly folder: string;
+  readonly clock: Clock;
+  readonly signal: AbortSignal;
+  readonly now?: () => number;
+  /** Called after each pass, whether or not it removed anything; a test waits on it. */
+  readonly swept?: () => void;
+}): Promise<void> {
+  for (;;) {
+    try {
+      await options.clock.sleep(SWEEP_EVERY_SECONDS, options.signal);
+    } catch {
+      return; // the stop: the only thing that ends a sleep
+    }
+    try {
+      await prepareUploads(options.folder, options.now);
+    } catch (error) {
+      logger.warning(`could not remove old saved files: ${errorName(error)}`);
+    }
+    options.swept?.();
   }
 }
 

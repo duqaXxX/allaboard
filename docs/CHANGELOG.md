@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Saved copies of attached files older than 3 days are also removed every 6 hours while the daemon runs (`attachments.sweepEvery`, `SWEEP_EVERY_SECONDS`), not only at start, under the same rules: a private folder only, by mtime, errors per file ignored.
 - A `!fork` with no prompt no longer starts the copy's process: the first message with text sent in
   the copy's thread names it through the live session (`AgentSession.rename`, `Capabilities.sessionRename`;
   Claude Code's `/rename`, its records hidden like the model command's), so `!resume` lists the copy
