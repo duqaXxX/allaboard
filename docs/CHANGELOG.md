@@ -97,6 +97,11 @@ All notable changes to this project are documented here. The format follows
   `SDKSessionWritesLostMessage` is left unread. A session is now offered `/send-to-project`, which
   answers that Remote Control is not on: the first probe run found claim P23's limit gone for it,
   so `docs/limits.md` names it beside the feature, not as a command not offered (#189).
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.319, which bundles Claude Code 2.1.319. The
+  release probe certified it on 2026-11-07 against 0.3.318: the SDK surface table holds, the 52
+  claims are unchanged, the session is offered the same commands, and the stream carries no shape
+  the fixtures or the accepted list lack. The one addition to the SDK, the setting
+  `disableWindowsBashCommandSplit`, is left unread (#216).
 
 ## [0.13.0] - 2026-11-02
 
