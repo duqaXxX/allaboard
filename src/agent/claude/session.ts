@@ -24,6 +24,7 @@ import { errorName, isRecord } from "../../values.ts";
 import {
   type AgentInfo,
   type AgentSession,
+  type ClosedReport,
   type ContextUsage,
   type FilesRestore,
   type ForkSource,
@@ -313,6 +314,12 @@ interface CommandTurn {
   readonly settle: (error?: unknown) => void;
 }
 
+// How long a close that awaits the exit lets the CLI go on by itself: the slowest of three
+// measured exits of an idle session was 841 ms (2026-11-07, SDK 0.3.319), so 2.4 times that.
+const EXIT_GRACE_MS = 2000;
+
+const NO_REPORT: ClosedReport = { unsaved: null };
+
 export class ClaudeSession implements AgentSession {
   readonly events: AsyncIterable<SessionEvent>;
   readonly #config: SessionConfig;
@@ -335,6 +342,15 @@ export class ClaudeSession implements AgentSession {
   #work: Promise<void> = Promise.resolve();
   // The last read of the transcript failed: the next failure is not logged again.
   #transcriptFailed = false;
+  // What a close that awaits the exit decides on, kept from the stream: the last state
+  // `session_state_changed` named, whether any background task lives (`background_tasks_changed`
+  // replaces its list), and the `session_writes_lost` record.
+  #state: unknown = null;
+  #liveTasks = false;
+  #lost: Record<string, unknown> | null = null;
+  // Set while a close waits for the exit: a record that says the CLI is working again ends the wait.
+  #cutWait: (() => void) | null = null;
+  readonly #exitGraceMs: number;
 
   /** The token of the cut this session was started with, else absent. */
   get rewindToken(): string | undefined {
@@ -347,7 +363,9 @@ export class ClaudeSession implements AgentSession {
     requests: RequestHandler,
     queryFunction: QueryFunction = sdkQuery,
     resolveSettings?: ResolveSettings,
+    exitGraceMs: number = EXIT_GRACE_MS,
   ) {
+    this.#exitGraceMs = exitGraceMs;
     this.#config = config;
     this.#resolveSettings = resolveSettings;
     this.events = this.#queue;
@@ -544,6 +562,69 @@ export class ClaudeSession implements AgentSession {
     await this.#readTranscript(transcript.mark());
   }
 
+  /**
+   * Keeps what a close decides on, and ends a wait for the exit at any record but those three:
+   * a hook, a replay or a stream event may come before the `running` of a turn that opens.
+   */
+  #observe(record: unknown): void {
+    if (!isRecord(record) || record.type !== "system") {
+      this.#cutWait?.();
+      return;
+    }
+    const { subtype } = record;
+    if (subtype === "session_state_changed") this.#state = record.state;
+    if (subtype === "session_writes_lost") this.#lost = record;
+    if (subtype === "background_tasks_changed") {
+      // Any task counts, an ambient one too: a notification of it opens a turn all the same.
+      const { tasks } = record;
+      this.#liveTasks = !Array.isArray(tasks) || tasks.length > 0;
+    }
+    const quiet =
+      subtype === "background_tasks_changed" ||
+      subtype === "session_writes_lost" ||
+      (subtype === "session_state_changed" && record.state === "idle");
+    if (!quiet) this.#cutWait?.();
+  }
+
+  /**
+   * What the CLI sent as it exited, in the seam's words. A conversation counts only when the
+   * record's own session is among those whose transcript lost lines (or none is named).
+   */
+  #report(): ClosedReport {
+    const record = this.#lost;
+    if (record === null) return NO_REPORT;
+    const kinds = Array.isArray(record.lost) ? record.lost : [];
+    const named = record.transcript_session_ids;
+    const conversation =
+      kinds.includes("transcript") && (!Array.isArray(named) || named.includes(record.session_id));
+    const settings = kinds.includes("global_config");
+    if (!conversation && !settings) return NO_REPORT;
+    const cause =
+      record.error_code === "ENOSPC"
+        ? "disk_full"
+        : record.error_code === "EDQUOT"
+          ? "quota"
+          : "other";
+    return { unsaved: { conversation, settings, cause } };
+  }
+
+  /**
+   * Waits for the stream to end on its own, for at most the grace; resolves early at a record
+   * that cuts the wait.
+   */
+  #awaitExit(): Promise<void> {
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.#cutWait = null;
+        resolve();
+      };
+      const timer = setTimeout(done, this.#exitGraceMs);
+      this.#cutWait = done;
+      void this.#finished.then(done);
+    });
+  }
+
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
   async #pump(): Promise<void> {
     let reason = PROCESS_EXITED;
@@ -552,6 +633,7 @@ export class ClaudeSession implements AgentSession {
       // so a hook the SDK runs later is always put in line after it. Whether a record is the
       // hidden command's is decided as it comes, when the command is.
       for await (const record of this.#query) {
+        this.#observe(record);
         if (!this.#started && isRecord(record) && record.type === "result") {
           this.#startRefused = record.is_error === true;
         }
@@ -745,12 +827,23 @@ export class ClaudeSession implements AgentSession {
 
   /**
    * Ends the input, closes the query and resolves once its stream has ended, so that a new
-   * session may resume the same id right after (the process needs real time to flush).
+   * session may resume the same id right after (the process needs real time to flush), with what
+   * the CLI reported as it exited. With `awaitExit` the CLI is let exit on its own first (it
+   * reports the writes it lost only then), but only when nothing would run after the close: it
+   * answered its start, it is idle and no background task lives, since the CLI would
+   * open a turn for a task's notification (measured 2026-11-07, SDK 0.3.319).
    */
-  async close(): Promise<void> {
+  async close(options?: { readonly awaitExit?: boolean }): Promise<ClosedReport> {
     if (!this.#closing) {
       this.#closing = true;
+      const wait =
+        options?.awaitExit === true &&
+        !this.#ended &&
+        this.#started &&
+        this.#state === "idle" &&
+        !this.#liveTasks;
       this.#input.end();
+      if (wait) await this.#awaitExit();
       try {
         this.#query.close();
       } catch (error) {
@@ -758,5 +851,6 @@ export class ClaudeSession implements AgentSession {
       }
     }
     await this.#finished;
+    return this.#report();
   }
 }

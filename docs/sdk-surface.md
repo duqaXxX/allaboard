@@ -196,6 +196,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKAssistantMessage` | `error` | field | translate.ts: assistant | reference | none |
 | `SDKAssistantMessage` | `message` | field | translate.ts: assistant | reference | none |
 | `SDKAssistantMessage` | `parent_tool_use_id` | field | translate.ts: parentOf | reference | none |
+| `SDKBackgroundTasksChangedMessage` | `tasks` | field | session.ts: ClaudeSession.#observe | package | none |
 | `SDKCompactBoundaryMessage` | `compact_metadata` | field | translate.ts: compactBoundary | reference | none |
 | `SDKCompactBoundaryMessage.compact_metadata` | `post_tokens` | field | translate.ts: compactBoundary | package | none |
 | `SDKCompactBoundaryMessage.compact_metadata` | `pre_tokens` | field | translate.ts: compactBoundary | package | none |
@@ -248,7 +249,11 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKSessionInfo` | `lastModified` | field | info.ts: listedSession | reference | none |
 | `SDKSessionInfo` | `sessionId` | field | info.ts: listedSession | reference | none |
 | `SDKSessionInfo` | `summary` | field | info.ts: listedSession | reference | none |
-| `SDKSessionStateChangedMessage` | `state` | field | translate.ts: sessionState | package | none |
+| `SDKSessionStateChangedMessage` | `state` | field | translate.ts: sessionState; session.ts: ClaudeSession.#observe | package | none |
+| `SDKSessionWritesLostMessage` | `error_code` | field | session.ts: ClaudeSession.#report | package | none |
+| `SDKSessionWritesLostMessage` | `lost` | field | session.ts: ClaudeSession.#report | package | none |
+| `SDKSessionWritesLostMessage` | `session_id` | field | session.ts: ClaudeSession.#report | package | none |
+| `SDKSessionWritesLostMessage` | `transcript_session_ids` | field | session.ts: ClaudeSession.#report | package | none |
 | `SDKStatusMessage` | `compact_result` | field | translate.ts: status | package | none |
 | `SDKStatusMessage` | `permissionMode` | field | translate.ts: status | reference | none |
 | `SDKStatusMessage` | `status` | field | translate.ts: status | reference | P22 |
@@ -399,6 +404,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKAssistantMessage.message.model` | `"<synthetic>"` | value | translate.ts: SYNTHETIC_MODEL, assistant | measured | none |
 | `SDKAssistantMessage.type` | `"assistant"` | value | translate.ts: HANDLERS | reference | none |
 | `SDKAssistantMessageError` | `"authentication_failed"` | value | translate.ts: AUTHENTICATION_FAILED, assistant | package | none |
+| `SDKBackgroundTasksChangedMessage.subtype` | `"background_tasks_changed"` | value | session.ts: ClaudeSession.#observe | package | none |
 | `SDKCompactBoundaryMessage.subtype` | `"compact_boundary"` | value | translate.ts: HANDLERS | reference | P21 |
 | `SDKMessageOrigin.kind` | `"human"` | value | translate.ts: result | reference | none |
 | `SDKMessageOrigin.kind` | `"peer"` | value | translate.ts: user | reference | none |
@@ -419,14 +425,19 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKResultMessage.terminal_reason` | `"aborted_streaming"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.terminal_reason` | `"aborted_tools"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.type` | `"result"` | value | translate.ts: HANDLERS; session.ts: ClaudeSession.#pump, ClaudeSession.#readCommand | reference | none |
-| `SDKSessionStateChangedMessage.state` | `"idle"` | value | translate.ts: AGENT_STATES | package | none |
+| `SDKSessionStateChangedMessage.state` | `"idle"` | value | translate.ts: AGENT_STATES; session.ts: ClaudeSession.#observe, ClaudeSession.close | package | none |
 | `SDKSessionStateChangedMessage.state` | `"requires_action"` | value | translate.ts: AGENT_STATES | package | none |
 | `SDKSessionStateChangedMessage.state` | `"running"` | value | translate.ts: AGENT_STATES | package | none |
 | `SDKSessionStateChangedMessage.subtype` | `"session_state_changed"` | value | translate.ts: HANDLERS | package | none |
+| `SDKSessionWritesLostMessage.error_code` | `"EDQUOT"` | value | session.ts: ClaudeSession.#report | package | none |
+| `SDKSessionWritesLostMessage.error_code` | `"ENOSPC"` | value | session.ts: ClaudeSession.#report | package | none |
+| `SDKSessionWritesLostMessage.lost[]` | `"global_config"` | value | session.ts: ClaudeSession.#report | package | none |
+| `SDKSessionWritesLostMessage.lost[]` | `"transcript"` | value | session.ts: ClaudeSession.#report | package | none |
+| `SDKSessionWritesLostMessage.subtype` | `"session_writes_lost"` | value | session.ts: ClaudeSession.#observe | package | none |
 | `SDKStatusMessage.status` | `"compacting"` | value | translate.ts: status | reference | P22 |
 | `SDKStatusMessage.subtype` | `"status"` | value | translate.ts: HANDLERS | reference | none |
 | `SDKSystemMessage.subtype` | `"init"` | value | translate.ts: HANDLERS | reference | P1 |
-| `SDKSystemMessage.type` | `"system"` | value | translate.ts: kindOf | reference | none |
+| `SDKSystemMessage.type` | `"system"` | value | translate.ts: kindOf; session.ts: ClaudeSession.#observe | reference | none |
 | `SDKTaskNotificationMessage.status` | `"stopped"` | value | translate.ts: taskNotification | package | none |
 | `SDKTaskNotificationMessage.subtype` | `"task_notification"` | value | translate.ts: HANDLERS | reference | none |
 | `SDKTaskProgressMessage.subtype` | `"task_progress"` | value | translate.ts: HANDLERS | reference | none |
@@ -467,6 +478,7 @@ union, none of which any recording carries.
 - `system:background_tasks_changed`: `SDKBackgroundTasksChangedMessage`
 - `system:hook_started`: `SDKHookStartedMessage`
 - `system:notification`: `SDKNotificationMessage`
+- `system:session_writes_lost`: `SDKSessionWritesLostMessage`
 - `system:thinking_tokens`: `SDKThinkingTokensMessage`
 - `tool_progress`: `SDKToolProgressMessage`
 
@@ -486,7 +498,6 @@ union, none of which any recording carries.
 - `SDKPermissionDeniedMessage`
 - `SDKPluginInstallMessage`
 - `SDKPromptSuggestionMessage`
-- `SDKSessionWritesLostMessage`
 - `SDKToolUseSummaryMessage`
 - `SDKWorkerShuttingDownMessage`
 
@@ -528,6 +539,11 @@ no check covers them here.
 - `"stopped"` among the values of `SDKTaskUpdatedMessage.patch.status` is in the translator's
   `TERMINAL_TASK_STATUSES`, taken from the Python SDK's list. The declaration of `patch.status`
   lacks it and the recordings show `"completed"` and `"failed"` only.
+- The rows of `SDKSessionWritesLostMessage` stand on `sdk.d.ts` 0.3.319 and on a recording written
+  by hand to that shape (`session-writes-lost.jsonl`); no real stream of one is recorded, since the
+  CLI sends it only when a disk refuses a write. `error_code` is `ENOSPC` or
+  `EDQUOT` and "more codes may be added" per the declaration; the daemon maps any other to a
+  generic cause.
 - The rows of `SDKModelRefusalFallbackMessage` and `SDKModelRefusalNoFallbackMessage` stand on
   `sdk.d.ts` 0.3.304 and on two recordings written by hand to that shape
   (`model-refusal-fallback.jsonl`, `model-refusal-no-fallback.jsonl`), with the `content` of a

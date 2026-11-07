@@ -1,0 +1,1 @@
+{"type": "system", "subtype": "session_writes_lost", "error_code": "ENOSPC", "lost": ["transcript", "global_config"], "transcript_session_ids": ["cce8a58a-5d75-487b-a79a-2f38a183fea7"], "uuid": "00000000-0000-4000-8000-0000000000c1", "session_id": "cce8a58a-5d75-487b-a79a-2f38a183fea7"}

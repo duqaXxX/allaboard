@@ -595,6 +595,23 @@ export const REWIND_ALREADY = "That rewind is already done.";
 export const REWIND_DROPPED_TERMINAL =
   "The rewind you made earlier is dropped: a terminal resumes the whole conversation, the turns " +
   "you went back over included.";
+// What the agent reported it could not save as its process exited (`ClosedReport.unsaved`);
+// `{cause}` is one of `UNSAVED_CAUSES`.
+export const UNSAVED_CONVERSATION = naming(
+  "{agent} could not save part of this session to disk ({cause}). Resuming it may miss part of " +
+    "the conversation.",
+);
+export const UNSAVED_SETTINGS = naming(
+  "{agent} could not save its own settings to disk ({cause}). Changes made in this session may " +
+    "be lost.",
+);
+// Appended to `UNSAVED_CONVERSATION` when the settings were lost too.
+export const UNSAVED_SETTINGS_TOO = "Its own settings were not saved either.";
+export const UNSAVED_CAUSES = {
+  disk_full: "the disk is full",
+  quota: "the disk quota is used up",
+  other: "a write failed",
+} as const;
 export const REWIND_DROPPED =
   "The rewind you made earlier was not kept: the session changed since, so it goes on with the " +
   "whole conversation, the turns you went back over included.";

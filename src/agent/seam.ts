@@ -1032,9 +1032,24 @@ export interface AgentSession {
   info(): Promise<AgentInfo>;
   /**
    * Resolves once the agent's process has gone, so a session started right after may resume
-   * the same id. Safe to call again, and on a session whose process was lost.
+   * the same id, with what the agent reported as it exited. Safe to call again (the same report),
+   * and on a session whose process was lost. `awaitExit`: the agent may let its process exit on
+   * its own, within a bound, so that what it reports as it exits is read; absent or false closes
+   * it at once.
    */
-  close(): Promise<void>;
+  close(options?: { readonly awaitExit?: boolean }): Promise<ClosedReport>;
+}
+
+/** What an agent reported as its process exited. */
+export interface ClosedReport {
+  /** Writes the agent could not save, or null when it reported none. */
+  readonly unsaved: {
+    /** The session's own history: a resume may miss part of it. */
+    readonly conversation: boolean;
+    /** The agent's own settings file. */
+    readonly settings: boolean;
+    readonly cause: "disk_full" | "quota" | "other";
+  } | null;
 }
 
 /** A folder's git repository, as the filesystem shows it. */

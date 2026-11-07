@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A thread gets one notice when the agent reports, as its process exits, that it could not save the
+  session or its own settings to disk (`ClosedReport.unsaved`, returned by `AgentSession.close`). The
+  idle close, `!stop`, a rewind and a reconnect let the process exit on its own for up to 2 seconds
+  (`close({ awaitExit: true })`) so the report is read; the move to a terminal, the deletion of a thread and a restart or a stop of the daemon close at once
+  and shows none (#194).
 - The Slack provider hands over the messages and stops of one channel in the order the owner sent
   them (`ChannelOrder`, one place per channel, the Stop control taking a place and leaving it at
   handover, a refusal posted by `Answers.checkChannel` after the place is left), so a `!stop` or a click on Stop acts on every message

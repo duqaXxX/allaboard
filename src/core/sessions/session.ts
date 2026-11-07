@@ -46,6 +46,7 @@ import type {
   AgentAccount,
   AgentSession,
   AgentState,
+  ClosedReport,
   CommandInfo,
   ContextUsage,
   ForeignTurn,
@@ -146,6 +147,9 @@ import { RewindMemory } from "./rewind-memory.ts";
 import { Cancelled, cancellable, Event, Mutex, Queue, Task } from "./tasks.ts";
 import { ThreadTitle } from "./title.ts";
 import { type ActiveTurn, notSent, Turn, takenNote } from "./turn.ts";
+
+/** What an agent reported it could not save as a client closed. */
+type Unsaved = NonNullable<ClosedReport["unsaved"]>;
 
 export const logger = getLogger("allaboard.core.sessions");
 
@@ -298,6 +302,10 @@ export class ThreadSession {
   private sent: Turn[] = [];
   private active: ActiveTurn | null = null;
   private readonly connectLock = new Mutex();
+  /** What clients reported they could not save, kept until `announceUnsaved` posts it. */
+  private readonly unsavedReports: Unsaved[] = [];
+  /** The clients whose report was kept: a client is reported once. */
+  private readonly reportedClients = new WeakSet<AgentSession>();
   /** Set once close starts: no client starts after it, and no word stores a setting. */
   private closedFlag = false;
   /**
@@ -1218,7 +1226,8 @@ export class ThreadSession {
       }
     } catch (error) {
       // A client nobody holds would leave its agent process running.
-      await this.disconnect(client);
+      await this.disconnect(client, false);
+      await this.announceUnsaved();
       throw error;
     }
     this.client = client;
@@ -1282,13 +1291,14 @@ export class ThreadSession {
       try {
         this.rewinds.cutAt = promptId;
         this.rewinds.token = null;
-        await this.dropClientLocked();
+        await this.dropClientLocked(true);
         try {
           await this.connectHeld();
           // A move to a terminal during the hold clears the cut: the rewind did not stand.
           // The process just started holds the cut, and the next prompt would make it stick.
+          // Closed at once: the terminal already uses the session id, as in `moveToTerminal`.
           if (this.rewinds.cutAt !== promptId) {
-            await this.dropClientLocked();
+            await this.dropClientLocked(false);
             return { outcome: "refused", ...none };
           }
         } catch (error) {
@@ -1302,6 +1312,7 @@ export class ThreadSession {
         throw error;
       } finally {
         release();
+        await this.announceUnsaved();
       }
       // The saved message may lie in the range just dropped, and so may a turn's edits.
       this.saved = null;
@@ -1521,7 +1532,9 @@ export class ThreadSession {
     this.setupApplied = false;
     this.deps.state.setEffort(this.channelId, this.threadId, null);
     this.deps.state.setBypass(this.channelId, this.threadId, null);
-    await this.dropClient();
+    // The process has saved nothing worth a notice before the first turn, and a wait would
+    // add its exit to every new thread's start.
+    await this.dropClient(false);
   }
 
   /**
@@ -1529,7 +1542,7 @@ export class ThreadSession {
    * is now: the way to a new effort for a back end that cannot change it live.
    */
   private async reconnect(): Promise<AgentSession> {
-    await this.dropClient();
+    await this.dropClient(true);
     return this.ensureConnected();
   }
 
@@ -1563,11 +1576,13 @@ export class ThreadSession {
     const release = await this.connectLock.acquire();
     try {
       if (this.client !== null && this.idle && !this.injectedExpected && !this.reporting) {
-        await this.dropClientLocked();
+        // No wait: the terminal already uses the same session id.
+        await this.dropClientLocked(false);
       }
     } finally {
       release();
     }
+    await this.announceUnsaved();
     return turns;
   }
 
@@ -1638,17 +1653,21 @@ export class ThreadSession {
     return warnings;
   }
 
-  private async dropClient(): Promise<void> {
+  private async dropClient(awaitExit: boolean): Promise<void> {
     const release = await this.connectLock.acquire();
     try {
-      await this.dropClientLocked();
+      await this.dropClientLocked(awaitExit);
     } finally {
       release();
     }
+    await this.announceUnsaved();
   }
 
-  /** `dropClient` for a caller that holds the connect lock. */
-  private async dropClientLocked(): Promise<void> {
+  /**
+   * `dropClient` for a caller that holds the connect lock. What the agent reports it could not
+   * save is kept: the caller posts it with `announceUnsaved` once it let go of the lock.
+   */
+  private async dropClientLocked(awaitExit: boolean): Promise<void> {
     const reader = this.reader;
     this.reader = null;
     const client = this.client;
@@ -1657,7 +1676,7 @@ export class ThreadSession {
       reader.cancel();
       await reader.settled();
     }
-    if (client !== null) await this.disconnect(client);
+    if (client !== null) await this.disconnect(client, awaitExit);
   }
 
   /**
@@ -1850,11 +1869,12 @@ export class ThreadSession {
       const release = await this.connectLock.acquire();
       try {
         if (this.idle) {
-          await this.dropClientLocked();
+          await this.dropClientLocked(false);
           return "idle";
         }
       } finally {
         release();
+        await this.announceUnsaved();
       }
     }
     // A turn that started while the idle path waited for the lock is cut too, and said so.
@@ -1873,9 +1893,10 @@ export class ThreadSession {
       const release = await this.connectLock.acquire();
       try {
         await this.cancelTasks();
-        await this.dropClientLocked();
+        await this.dropClientLocked(false);
       } finally {
         release();
+        await this.announceUnsaved();
       }
       // Answered once the process is gone, so no denial reaches the turn the terminal continues.
       await this.settleRequests(requests);
@@ -1931,7 +1952,7 @@ export class ThreadSession {
         () => {},
       );
       this.interrupting = true;
-      await this.dropClientLocked();
+      await this.dropClientLocked(false);
       await this.leaveLoop().catch(() => {});
       // An approval a background agent waits on goes with the process, as in a stopped turn.
       for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
@@ -1973,6 +1994,7 @@ export class ThreadSession {
       this.interrupting = false;
       this.closingContext = null;
       release();
+      await this.announceUnsaved();
     }
     this.idleTimerCheck();
     return true;
@@ -2210,7 +2232,7 @@ export class ThreadSession {
    * rebuilt session's `ensureConnected` waiting on it forever, or `closeAll` hanging at
    * shutdown, or the manager's map holding a session nothing can ever evict.
    */
-  async close(reason: string = texts.ENDED_SHUTDOWN): Promise<void> {
+  async close(reason: string = texts.ENDED_SHUTDOWN, awaitExit = false): Promise<void> {
     // (sync) Read before anything below settles it back to idle. A close that cuts anything
     // short (a shutdown or a restart's drain, most likely: `busy` alone misses a queued or
     // taken turn and a task that outlived its own turn, which `idle` already accounts for)
@@ -2256,7 +2278,10 @@ export class ThreadSession {
       if (this.client !== null) {
         const client = this.client;
         this.client = null;
-        await this.disconnect(client);
+        // The caller says whether the process may exit on its own: a shutdown keeps its time,
+        // since closes are sequential and launchd kills the job 60 s after `bootout`.
+        await this.disconnect(client, awaitExit);
+        await this.announceUnsaved();
       }
     } finally {
       if (this.predecessor !== null) {
@@ -2337,13 +2362,38 @@ export class ThreadSession {
     for (const task of tasks) await task.settled();
   }
 
-  private async disconnect(client: AgentSession): Promise<void> {
+  /**
+   * Closes `client` and keeps what the agent reported it could not save, once per client; the
+   * caller posts it with `announceUnsaved`, outside the connect lock. `awaitExit`: the agent may
+   * let its process exit on its own first (`AgentSession.close`). Never throws.
+   */
+  private async disconnect(client: AgentSession, awaitExit: boolean): Promise<void> {
     try {
-      await client.close();
+      const { unsaved } = await client.close({ awaitExit });
+      if (unsaved !== null && !this.reportedClients.has(client)) {
+        this.reportedClients.add(client);
+        this.unsavedReports.push(unsaved);
+      }
     } catch (error) {
       logger.warning(
         `could not close ${this.deps.agent.name} in ${this.where}: ${errorName(error)}`,
       );
+    }
+  }
+
+  /** Posts one notice per report `disconnect` kept. A failed post is logged, never thrown. */
+  private async announceUnsaved(): Promise<void> {
+    for (const unsaved of this.unsavedReports.splice(0)) {
+      const cause = texts.UNSAVED_CAUSES[unsaved.cause];
+      const text = unsaved.conversation
+        ? texts.fill(texts.named(texts.UNSAVED_CONVERSATION, this.names), { cause }) +
+          (unsaved.settings ? ` ${texts.UNSAVED_SETTINGS_TOO}` : "")
+        : texts.fill(texts.named(texts.UNSAVED_SETTINGS, this.names), { cause });
+      try {
+        await this.post(text);
+      } catch (error) {
+        logger.warning(`could not post a notice in ${this.where}: ${errorName(error)}`);
+      }
     }
   }
 
@@ -2387,7 +2437,10 @@ export class ThreadSession {
         // The start goes on by itself: a process nobody holds is closed when it is there, and
         // `close` waits for that.
         const closing = starting.then(
-          (client) => this.disconnect(client),
+          async (client) => {
+            await this.disconnect(client, false);
+            await this.announceUnsaved();
+          },
           () => {},
         );
         this.abandoned.add(closing);
@@ -2627,7 +2680,8 @@ export class ThreadSession {
         }
       }
     } finally {
-      await client.close().catch(() => {});
+      await this.disconnect(client, false);
+      await this.announceUnsaved();
       // The session stays alive (not closed): the next turn reconnects. `abandon` settles it
       // from outside this loop's own per-event check above, so it needs its own call.
       this.idleTimerCheck();
@@ -3779,7 +3833,7 @@ export class ThreadSession {
     // Cleared first: `close()` cancels its tasks through `cancelTasks`, and a task cannot
     // await itself.
     this.idleExpiry = null;
-    await this.close(texts.ENDED_IDLE);
+    await this.close(texts.ENDED_IDLE, true);
     // The agent may write its title a moment after the turn's end, when the turn's own read had
     // already found none: a session that rested an hour asks once more, after its close so that
     // nothing awaited sits between the idle check and the close. The read needs no live process.

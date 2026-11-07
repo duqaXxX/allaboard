@@ -332,7 +332,7 @@ export class SessionManager {
   async closeHeld(channelId: string, threadId: string): Promise<void> {
     const session = this.sessions.get(keyOf(channelId, threadId));
     if (session !== undefined) {
-      if (!session.closed) await session.close(texts.ENDED_IDLE);
+      if (!session.closed) await session.close(texts.ENDED_IDLE, false);
       await session.doneClosing.wait();
     }
     // The thread is being deleted: nothing of it is remembered after the session let go of it.

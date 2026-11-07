@@ -377,6 +377,24 @@ export class Declarations {
     return found;
   }
 
+  /**
+   * The literals of the element type of an array member: `(A | B)[]`, `Array<A | B>` or `Alias[]`
+   * (through the declared alias); empty for a member that is no array.
+   */
+  elementLiterals(texts: readonly string[]): Set<string> {
+    const found = new Set<string>();
+    for (const text of texts) {
+      const type = typeOf(text).trim().replace(/;$/, "").trim();
+      const element =
+        /^\(([\s\S]*)\)\[\]$/.exec(type)?.[1] ??
+        /^Array<([\s\S]*)>$/.exec(type)?.[1] ??
+        /^([\w$]+)\[\]$/.exec(type)?.[1];
+      if (element === undefined) continue;
+      for (const value of this.literals([element])) found.add(value);
+    }
+    return found;
+  }
+
   /** Every string literal a type allows at its top level, through the declared names it uses. */
   literals(texts: readonly string[], seen = new Set<string>()): Set<string> {
     const found = new Set<string>();
@@ -445,7 +463,9 @@ export function inPackage(
     } else {
       const texts = members.get(fieldOfValue);
       if (texts === undefined) return null;
-      allowed = declarations.literals(texts);
+      allowed = row.owner.endsWith("[]")
+        ? declarations.elementLiterals(texts)
+        : declarations.literals(texts);
     }
     return allowed.size > 0 ? allowed.has(row.member.replace(/^"|"$/g, "")) : null;
   }
