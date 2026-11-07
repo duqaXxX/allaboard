@@ -1376,9 +1376,9 @@ An image becomes an image part, and the turn's prompt one user message of conten
 (`prompt.userMessage`); any other file is saved to the instance's scratch folder (`ChatContext.scratchDir`, `$TMPDIR/allaboard/` for the default instance) and its path is appended to
 the prompt, but only once every file arrived, so a failed message leaves no copy. The folder must be
 a real directory of this user with no group or other permission bit set (it is created with mode 700),
-or nothing is written there; at each start the files older
-than 3 days are removed (`attachments.prepareUploads`), so a conversation resumed after a restart
-still finds its files. A refused file or a failed download sends nothing: `content` answers null after the provider told
+or nothing is written there; at each start and every 6 hours after it the files older
+than 3 days (by modification time, whether or not the daemon restarted) are removed (`attachments.prepareUploads`, `attachments.sweepEvery`), so a conversation resumed after a restart
+still finds its files, while a session that runs longer than that can lose a file it still names. A refused file or a failed download sends nothing: `content` answers null after the provider told
 the owner which file and why.
 
 ## Questions and the form

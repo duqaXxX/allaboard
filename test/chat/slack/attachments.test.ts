@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,12 +27,15 @@ import {
   prepareUploads,
   promptFor,
   refusal,
+  SWEEP_EVERY_SECONDS,
   save,
   savedName,
+  sweepEvery,
 } from "../../../src/chat/slack/attachments.ts";
 import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { named } from "../../../src/core/texts.ts";
+import { FakeClock } from "../../support/fake-clock.ts";
 import { slackPayload } from "../../support/fixtures.ts";
 import { PLAIN_NAMES } from "../../support/names.ts";
 
@@ -535,4 +546,86 @@ test("an octet-stream file of invalid UTF-8 is refused as before", () => {
 test("a text/plain file is not looked into", () => {
   const bytes = Buffer.from([0x00, 0xff]);
   assert.equal(contentRefusal(shared("snippet", { mimetype: "text/plain" }), bytes), null);
+});
+
+/** A `swept` callback and the wait for its next call: the pass's file work ends before it fires. */
+function passes(): { swept: () => void; next: () => Promise<void> } {
+  let count = 0;
+  const waiting: Array<() => void> = [];
+  return {
+    swept: () => {
+      count += 1;
+      for (const wake of waiting.splice(0)) wake();
+    },
+    next: async () => {
+      const seen = count;
+      while (count === seen) await new Promise<void>((resolve) => waiting.push(resolve));
+    },
+  };
+}
+
+test("the sweep runs again while the daemon runs, and ends at the stop", async (t) => {
+  const folder = join(folderIn(t), "uploads");
+  const clock = new FakeClock();
+  const stop = new AbortController();
+  const pass = passes();
+  const swept = sweepEvery({ folder, clock, signal: stop.signal, swept: pass.swept });
+  const old = await save(folder, { id: "F1", name: "old.txt" }, Buffer.from("x"));
+  const fresh = await save(folder, { id: "F2", name: "fresh.txt" }, Buffer.from("x"));
+  const stamp = Date.now() / 1000 - KEEP_SECONDS - 60;
+  await utimes(old, stamp, stamp);
+  await clock.advance(SWEEP_EVERY_SECONDS - 1);
+  assert.ok(existsSync(old)); // not yet
+  const first = pass.next();
+  await clock.advance(1);
+  await first;
+  assert.ok(!existsSync(old) && existsSync(fresh));
+  const later = await save(folder, { id: "F3", name: "later.txt" }, Buffer.from("x"));
+  await utimes(later, stamp, stamp);
+  stop.abort();
+  await swept; // resolves at the stop
+  await clock.advance(SWEEP_EVERY_SECONDS);
+  assert.ok(existsSync(later)); // no sweep after the stop
+});
+
+test("the periodic sweep leaves a folder that is not private untouched", WINDOWS, async (t) => {
+  const folder = join(folderIn(t), "uploads");
+  mkdirSync(folder, { mode: 0o777 });
+  chmodSync(folder, 0o777);
+  const old = join(folder, "old.txt");
+  writeFileSync(old, "x");
+  const stamp = Date.now() / 1000 - KEEP_SECONDS - 60;
+  await utimes(old, stamp, stamp);
+  const clock = new FakeClock();
+  const stop = new AbortController();
+  const pass = passes();
+  const swept = sweepEvery({ folder, clock, signal: stop.signal, swept: pass.swept });
+  const first = pass.next();
+  await clock.advance(SWEEP_EVERY_SECONDS);
+  await first; // a pass ran, and left the file
+  assert.ok(existsSync(old));
+  stop.abort();
+  await swept;
+});
+
+test("a sweep that fails does not end the timer", async (t) => {
+  const folder = join(folderIn(t), "uploads");
+  const clock = new FakeClock();
+  const stop = new AbortController();
+  const pass = passes();
+  writeFileSync(folder, "a file where the folder should be");
+  const swept = sweepEvery({ folder, clock, signal: stop.signal, swept: pass.swept });
+  const failed = pass.next();
+  await clock.advance(SWEEP_EVERY_SECONDS); // mkdir fails: logged, not thrown
+  await failed;
+  rmSync(folder);
+  const old = await save(folder, { id: "F1", name: "old.txt" }, Buffer.from("x"));
+  const stamp = Date.now() / 1000 - KEEP_SECONDS - 60;
+  await utimes(old, stamp, stamp);
+  const second = pass.next();
+  await clock.advance(SWEEP_EVERY_SECONDS);
+  await second;
+  assert.ok(!existsSync(old));
+  stop.abort();
+  await swept;
 });

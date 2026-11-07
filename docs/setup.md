@@ -632,7 +632,7 @@ The bot answers one person, and the rest of this list protects what that person 
   it, so allaboard checks that the deleted message was yours, in your workspace, and that it is a
   thread it keeps. That proves whose message went, not who removed it.
 - Files you attach are copied to `$TMPDIR/allaboard/` (`$TMPDIR/allaboard-<name>/` for a named
-  instance; mode `700`) and stay there for 3 days, so a conversation resumed after a restart still finds them.
+  instance; mode `700`) and stay there for 3 days after they were saved, restart or not (older files are removed at each start and every 6 hours while the daemon runs), so a conversation resumed after a restart still finds them. A session that runs longer than that can lose a file it still names.
 - `!!<command>` runs a shell command on this Mac from Slack, after you click **Run**, outside
   Claude Code's permission rules and its sandbox, as the terminal's `!` does. The click passes
   the same owner check as the message, so it guards against your own mistakes and not against
@@ -1549,7 +1549,7 @@ A message with files: Claude sees a JPEG, PNG, GIF or WebP image (up to 7.5 MB, 
 at most 10 images and 15 MB of images per message) as an image. Any other image type (SVG, HEIC,
 TIFF...) is refused. A text or source code file (JavaScript, shell, SQL and TOML
 included), a PDF, JSON, XML, YAML, Jupyter notebook, Excel (`.xls`, `.xlsx`), Word (`.docx`), PowerPoint (`.pptx`) or zip file, up to 100 MB, reaches Claude as the path of a copy in `$TMPDIR/allaboard/` (an instance's own folder, see
-[Part 6](#part-6-a-second-instance)), kept 3 days; any other
+[Part 6](#part-6-a-second-instance)), removed 3 days after they were saved, at start and every 6 hours; any other
 file (other archives, `.doc`, `.ppt`, `.xlsm`, `.docm`, binaries) is refused. Claude Code's Read tool refuses `.xlsx` as binary, so reading such a file takes a command (a zip reaches the session unopened), and what it can read depends on what the Mac has installed. A file past a limit, or one that fails to
 download, stops the whole message, and the reply says which file and why.
 
