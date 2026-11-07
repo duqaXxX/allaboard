@@ -221,7 +221,7 @@ test("a refusal that names the token or the app stops the calls for the run, log
 test("another code is logged once in a row and does not stop the calls", async () => {
   const log = new Lines();
   const { slack, clock, sessions } = setup(log);
-  slack.responses["agents.sessions.setStatus"] = () => rejected("thread_not_found");
+  slack.responses["agents.sessions.setStatus"] = () => rejected("internal_error");
   sessions.root(REF, "working");
   await clock.advance(0);
   sessions.root(REF, "waiting");
@@ -301,20 +301,19 @@ test("a bridged clear while the explicit call is out gets its resend", async () 
   assert.deepEqual(sent(slack), ["processing", "processing"]);
 });
 
-test("a failed call keeps what was sent and waits for the next input", async () => {
+test("a failed call counts as not sent: the entry is kept and the status is tried again", async () => {
   const { slack, clock, sessions } = setup();
   sessions.root(REF, "working");
   await clock.advance(0);
   slack.responses["agents.sessions.setStatus"] = () => rejected("internal_error");
   sessions.root(REF, "done"); // the `active` fails; the entry is kept
   await clock.advance(0);
-  // Only the processing refresh, armed by the first call, tries again, once.
+  assert.deepEqual(sent(slack), ["processing", "active"]);
+  slack.responses["agents.sessions.setStatus"] = { ok: true };
+  await clock.advance(5); // the retry, not the next input, sends it again
+  assert.deepEqual(sent(slack), ["processing", "active", "active"]);
   await clock.advance(SESSION_REFRESH_SECONDS * 4);
   assert.deepEqual(sent(slack), ["processing", "active", "active"]);
-  slack.responses["agents.sessions.setStatus"] = { ok: true };
-  sessions.root(REF, "done"); // the next input tries again
-  await clock.advance(0);
-  assert.deepEqual(sent(slack), ["processing", "active", "active", "active"]);
   await sessions.close();
 });
 
@@ -508,5 +507,184 @@ test("afterWrite does nothing once a refusal stopped the calls", async () => {
   sessions.root(REF, "done");
   await clock.advance(0);
   assert.equal(sent(slack).length, 1);
+  await sessions.close();
+});
+
+// ---- #206: a failed status call is retried on a timer of its own
+
+const FAILING = () => rejected("internal_error");
+
+test("a failed active is sent again after 5 s, 15 s, 45 s, then every 300 s, until it succeeds", {
+  timeout: 8000,
+}, async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  slack.responses["agents.sessions.setStatus"] = FAILING;
+  sessions.root(REF, "done");
+  await clock.advance(0);
+  assert.equal(sent(slack).length, 2);
+  let expected = 2;
+  for (const [step, wait] of [
+    [4, false],
+    [1, true],
+    [14, false],
+    [1, true],
+    [44, false],
+    [1, true],
+    [299, false],
+    [1, true],
+    [299, false],
+    [1, true],
+  ] as const) {
+    await clock.advance(step);
+    if (wait) expected += 1;
+    assert.equal(sent(slack).length, expected, `after ${clock.now} s`);
+  }
+  slack.responses["agents.sessions.setStatus"] = { ok: true };
+  await clock.advance(300);
+  assert.equal(sent(slack).length, expected + 1);
+  await clock.advance(300);
+  await clock.advance(SESSION_REFRESH_SECONDS * 2);
+  assert.equal(sent(slack).length, expected + 1, "a success ends the retries");
+  await sessions.close();
+});
+
+test("a failed call leaves the processing refresh at thirty minutes", {
+  timeout: 8000,
+}, async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  slack.responses["agents.sessions.setStatus"] = FAILING;
+  sessions.bridged(REF, true); // a second writer: processing is sent again and fails
+  await clock.advance(0);
+  for (const step of [5, 15, 45, 300, 300, 300, 300, 300]) await clock.advance(step); // t = 1565
+  assert.equal(sent(slack).length, 10); // first, again, three fast retries, five slow ones
+  await clock.advance(1800 - 1565 - 1);
+  assert.equal(sent(slack).length, 10);
+  await clock.advance(1); // t = 1800: the refresh, the next retry is due at 2100
+  assert.equal(sent(slack).length, 11);
+  await sessions.close();
+});
+
+test("a failed active then an input that wants processing: processing is sent, the refresh armed, the retry gone", {
+  timeout: 8000,
+}, async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  let failing = true;
+  slack.responses["agents.sessions.setStatus"] = (args) =>
+    failing && args.status === "active" ? rejected("internal_error") : { ok: true };
+  sessions.root(REF, "done");
+  await clock.advance(0);
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing", "active", "processing"]);
+  failing = false;
+  for (const step of [5, 15, 45, 300]) await clock.advance(step);
+  assert.equal(sent(slack).length, 3, "no retry is left");
+  await clock.advance(SESSION_REFRESH_SECONDS - 365);
+  assert.equal(sent(slack).length, 4, "the refresh fires at thirty minutes");
+  await sessions.close();
+});
+
+test("a new wanted status during the backoff is sent at once, and its own backoff starts at 5 s", {
+  timeout: 8000,
+}, async () => {
+  const { slack, clock, sessions } = setup();
+  slack.responses["agents.sessions.setStatus"] = FAILING;
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  await clock.advance(5);
+  await clock.advance(15); // failures of processing: 3, the next retry is 45 s away
+  assert.deepEqual(sent(slack), ["processing", "processing", "processing"]);
+  sessions.root(REF, "waiting");
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["processing", "processing", "processing", "suspended"]);
+  await clock.advance(4);
+  assert.equal(sent(slack).length, 4);
+  await clock.advance(1);
+  assert.equal(sent(slack).length, 5, "suspended starts again at 5 s");
+  assert.equal(sent(slack)[4], "suspended");
+  await sessions.close();
+});
+
+test("no retry after close", { timeout: 8000 }, async () => {
+  const { slack, clock, sessions } = setup();
+  slack.responses["agents.sessions.setStatus"] = FAILING;
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  await sessions.close();
+  for (const step of [5, 15, 45, 300]) await clock.advance(step);
+  assert.equal(sent(slack).length, 1);
+});
+
+test("no retry after a refusal that names the app, or after gone", { timeout: 8000 }, async () => {
+  for (const code of ["missing_scope", "thread_not_found"]) {
+    const { slack, clock, sessions } = setup();
+    slack.responses["agents.sessions.setStatus"] = FAILING;
+    sessions.root(REF, "working");
+    await clock.advance(0);
+    slack.responses["agents.sessions.setStatus"] = () => rejected(code);
+    await clock.advance(5); // the retry meets the answer
+    for (const step of [15, 45, 300, 300]) await clock.advance(step);
+    assert.equal(sent(slack).length, 2, code);
+    await sessions.close();
+  }
+});
+
+test("repeated failures with the same code log once", { timeout: 8000 }, async () => {
+  const log = new Lines();
+  const { slack, clock, sessions } = setup(log);
+  slack.responses["agents.sessions.setStatus"] = FAILING;
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  for (const step of [5, 15, 45, 300]) await clock.advance(step);
+  assert.equal(sent(slack).length, 5);
+  assert.equal(log.warnings.length, 1);
+  await sessions.close();
+});
+
+test("a call whose answer was lost does not leave the old status counted as sent", {
+  timeout: 8000,
+}, async () => {
+  const { slack, clock, sessions } = setup();
+  sessions.root(REF, "waiting");
+  await clock.advance(0);
+  slack.responses["agents.sessions.setStatus"] = FAILING;
+  sessions.root(REF, "working"); // processing may have reached Slack; the answer was lost
+  await clock.advance(0);
+  slack.responses["agents.sessions.setStatus"] = { ok: true };
+  sessions.root(REF, "waiting");
+  await clock.advance(0);
+  assert.deepEqual(sent(slack), ["suspended", "processing", "suspended"]);
+  await sessions.close();
+});
+
+test("a thread failing with the same code logs once, whatever other threads do", {
+  timeout: 8000,
+}, async () => {
+  const log = new Lines();
+  const { slack, clock, sessions } = setup(log);
+  const other = { channel: CHANNEL, thread: "1780000000.000009" };
+  slack.responses["agents.sessions.setStatus"] = (args) =>
+    args.thread_ts === THREAD ? rejected("internal_error") : { ok: true };
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  let status: RootStatus = "working";
+  for (const step of [5, 15, 45, 300]) {
+    status = status === "working" ? "waiting" : "working";
+    sessions.root(other, status); // a success elsewhere between the retries
+    await clock.advance(step);
+  }
+  assert.equal(
+    sent(slack).filter(
+      (_, i) => slack.callsTo("agents.sessions.setStatus")[i]?.thread_ts === THREAD,
+    ).length,
+    5,
+  );
+  assert.equal(log.warnings.length, 1);
   await sessions.close();
 });

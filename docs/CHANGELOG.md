@@ -32,6 +32,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A failed `agents.sessions.setStatus` call is sent again (#206). It counts as not sent and a
+  timer of its own retries after 5, 15 and 45 seconds, then every 300 seconds, until a call
+  succeeds; a newly wanted status is sent at once and gets its own backoff from 5 seconds. The
+  30-minute `processing` refresh is not touched.
 - A thread stays in `state.json` while its messages remain in Slack (#148). The cleanup no longer
   drops a thread because the agent stopped listing its session, and a refused resume no longer
   removes the entry: the Home tab keeps the row as `Session <id>` and, with `SLACK_USER_TOKEN`, Delete works (without

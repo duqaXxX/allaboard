@@ -24,6 +24,9 @@ export type SessionState = "active" | "processing" | "suspended";
 // A session left in `processing` times out after one hour: set again at half of it.
 export const SESSION_REFRESH_SECONDS = 30 * 60;
 
+// A failed call is tried again after these seconds, the last one repeating until a call succeeds.
+export const SESSION_RETRY_SECONDS = [5, 15, 45, 300];
+
 // Answers that name the token or the app, never one thread: no later call can succeed.
 export const SESSION_REFUSED = ["missing_scope", "not_allowed_token_type", "feature_disabled"];
 
@@ -44,6 +47,11 @@ interface Entry {
   resend: number;
   draining: Promise<void> | null;
   refresh: AbortController | null;
+  // The retry of a failed call: a timer of its own, so the refresh above is never touched by it.
+  retry: AbortController | null;
+  failures: number; // calls of `failedStatus` failed in a row
+  failedStatus: SessionState | null;
+  failedCode: string | null; // the code last logged for this entry, until a call succeeds
 }
 
 export interface AgentSessionsOptions {
@@ -64,7 +72,6 @@ export class AgentSessions {
   // One `agents.sessions.setStatus` succeeded since start: agent sessions work on this app.
   #proven = false;
   #closed = false;
-  #failed: string | null = null;
 
   constructor(slack: WebClient, options: AgentSessionsOptions) {
     this.#slack = slack;
@@ -151,7 +158,10 @@ export class AgentSessions {
   /** Cancels the timers, then waits for the calls in flight and queued. */
   async close(): Promise<void> {
     this.#closed = true;
-    for (const entry of this.#entries.values()) this.#disarm(entry);
+    for (const entry of this.#entries.values()) {
+      this.#disarm(entry);
+      this.#disarmRetry(entry);
+    }
     while (this.#draining.size > 0) await Promise.all([...this.#draining]);
   }
 
@@ -166,6 +176,10 @@ export class AgentSessions {
       resend: 0,
       draining: null,
       refresh: null,
+      retry: null,
+      failures: 0,
+      failedStatus: null,
+      failedCode: null,
     };
     this.#entries.set(key(ref), made);
     return made;
@@ -194,11 +208,20 @@ export class AgentSessions {
         const outcome = await this.#send(entry, wanted);
         if (outcome === "gone") return this.#drop(entry);
         if (outcome === "failed") {
-          // `sent` stays; a change meanwhile is sent at once, else the next input or the refresh tries.
-          if (wanted === wantedStatus(entry.root, entry.activity) && resend === entry.resend)
+          // A call whose answer was lost may or may not have reached Slack: nothing counts as sent.
+          entry.sent = null;
+          entry.failures = entry.failedStatus === wanted ? entry.failures + 1 : 1;
+          entry.failedStatus = wanted;
+          // A change meanwhile is sent at once, else the retry timer tries again.
+          if (wanted === wantedStatus(entry.root, entry.activity) && resend === entry.resend) {
+            this.#armRetry(entry);
             return;
+          }
           continue;
         }
+        entry.failures = 0;
+        entry.failedStatus = null;
+        this.#disarmRetry(entry);
         if (resend === entry.resend) entry.sent = wanted;
         this.#arm(entry, wanted === "processing" ? this.#refresh : null);
       }
@@ -214,6 +237,7 @@ export class AgentSessions {
 
   #drop(entry: Entry): void {
     this.#disarm(entry);
+    this.#disarmRetry(entry);
     if (this.#entries.get(key(entry.ref)) === entry) this.#entries.delete(key(entry.ref));
   }
 
@@ -225,15 +249,15 @@ export class AgentSessions {
         thread_ts: thread,
         status,
       });
-      this.#failed = null;
+      entry.failedCode = null;
       this.#proven = true;
       return "sent";
     } catch (error) {
       const code = describe(error);
-      if (code !== this.#failed) {
+      if (code !== entry.failedCode) {
         this.#log.warning(`agents.sessions.setStatus failed on ${channel}/${thread}: ${code}`);
       }
-      this.#failed = code;
+      entry.failedCode = code;
       if (SESSION_REFUSED.includes(code)) this.#refused = true;
       return gone(error) ? "gone" : "failed";
     }
@@ -253,6 +277,29 @@ export class AgentSessions {
       },
       () => {},
     );
+  }
+
+  /** Sends the wanted status again after the backoff step of the entry's failures. */
+  #armRetry(entry: Entry): void {
+    this.#disarmRetry(entry);
+    if (this.#refused || this.#closed) return;
+    const steps = SESSION_RETRY_SECONDS;
+    const seconds = steps[Math.min(Math.max(entry.failures, 1), steps.length) - 1] as number;
+    const timer = new AbortController();
+    entry.retry = timer;
+    this.#clock.sleep(seconds, timer.signal).then(
+      () => {
+        if (entry.retry !== timer) return;
+        entry.retry = null;
+        this.#kick(entry);
+      },
+      () => {},
+    );
+  }
+
+  #disarmRetry(entry: Entry): void {
+    entry.retry?.abort();
+    entry.retry = null;
   }
 
   #disarm(entry: Entry): void {
