@@ -3,13 +3,55 @@
  * channel (`SlackChannel`) and the handlers that post blocks of their own (`Answers.deliver`): a
  * message to the channel or to its thread, and a message rewritten into a notice.
  */
-import type { KnownBlock, WebClient } from "@slack/web-api";
+import type {
+  ChatPostMessageArguments,
+  ChatPostMessageResponse,
+  KnownBlock,
+  WebClient,
+} from "@slack/web-api";
 import { Cancelled } from "../../core/port.ts";
+import { getLogger } from "../../log.ts";
 import { ChatError } from "../seam.ts";
+import { threadLookup } from "./channels.ts";
 import { contextBlock, FALLBACK_LIMIT, noticeText } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
 import { crossedError, describe } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
+
+const logger = getLogger("allaboard.chat.slack.notice");
+
+/**
+ * `chat.postMessage` into the thread `args.thread_ts` names. Slack answers `ok` to a post whose
+ * thread root was deleted and puts it in the channel, with no `thread_ts` on the message
+ * (measured 2026-11-07, #221; not in the method's reference). Such a post is deleted at once and
+ * the call fails as `gone`, so that no message of the daemon's lands outside its thread. Every
+ * post with a `thread_ts` goes through here.
+ */
+export async function postInThread(
+  slack: WebClient,
+  args: ChatPostMessageArguments & { readonly thread_ts: string },
+): Promise<ChatPostMessageResponse> {
+  const posted = await slack.chat.postMessage(args);
+  if (posted.message?.thread_ts !== undefined) return posted;
+  // The shape alone is not trusted with a deletion: the root is asked for before the post goes.
+  const root = await threadLookup(slack)({ channel: args.channel, thread: args.thread_ts }).catch(
+    (error: unknown) => describe(error),
+  );
+  if (root !== "gone") {
+    logger.warning(
+      `a post in ${args.channel}/${args.thread_ts} came back with no thread_ts, and the root is ${root === "there" ? "there" : `unconfirmed (${root})`}: kept`,
+    );
+    return posted;
+  }
+  if (typeof posted.ts === "string") {
+    try {
+      await slack.chat.delete({ channel: args.channel, ts: posted.ts });
+    } catch (error) {
+      logger.warning(`could not delete a stray post in ${args.channel}: ${describe(error)}`);
+    }
+  }
+  throw new ChatError("thread_gone", { permanent: true, failure: "gone" });
+}
 
 /** Where a message goes: a thread of the channel, or the channel itself when `threadTs` is null. */
 export interface Place {
@@ -32,9 +74,9 @@ export async function deliver(
   blocks: readonly object[],
   options: { readonly ephemeral: boolean },
 ): Promise<string | null> {
-  const where = place.threadTs === null ? {} : { thread_ts: place.threadTs };
   const shown = blocks as unknown as KnownBlock[];
   if (options.ephemeral) {
+    const where = place.threadTs === null ? {} : { thread_ts: place.threadTs };
     await slack.chat.postEphemeral({
       channel: place.channel,
       user: ownerUserId,
@@ -44,14 +86,17 @@ export async function deliver(
     });
     return null;
   }
-  const posted = await slack.chat.postMessage({
+  const message = {
     channel: place.channel,
     text: take(text, FALLBACK_LIMIT),
     blocks: shown,
     unfurl_links: false,
     unfurl_media: false,
-    ...where,
-  });
+  };
+  const posted =
+    place.threadTs === null
+      ? await slack.chat.postMessage(message)
+      : await postInThread(slack, { ...message, thread_ts: place.threadTs });
   return posted.ts ?? null;
 }
 

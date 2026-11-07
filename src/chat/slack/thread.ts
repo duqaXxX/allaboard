@@ -62,7 +62,7 @@ import { formatFooter, slackTime } from "./footer.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
 import { diffFits, listBlocks } from "./lists.ts";
-import { crossing, deliver, deliverNotice } from "./notice.ts";
+import { crossing, deliver, deliverNotice, postInThread } from "./notice.ts";
 import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
 import { AgentSessions } from "./reply/agent-session.ts";
@@ -714,7 +714,7 @@ export class SlackThread implements ThreadChat {
     try {
       if (await (this.places ?? this.lease.peek())?.tell(mention)) return;
       if (kind === "done") return;
-      const posted = await this.slack.chat.postMessage({
+      const posted = await postInThread(this.slack, {
         channel: this.channel,
         thread_ts: this.threadTs,
         text: `Failed <@${mention}>`,
@@ -782,7 +782,7 @@ export class SlackThread implements ThreadChat {
     // mrkdwn reads `&`, `<` and `>` as markup, and a notice can quote the owner's own message.
     const shown = mrkdwnEscape(text);
     try {
-      const posted = await this.slack.chat.postMessage({
+      const posted = await postInThread(this.slack, {
         channel: this.channel,
         thread_ts: this.threadTs,
         text: shown,
@@ -833,7 +833,7 @@ export class SlackThread implements ThreadChat {
     }
     try {
       if (this.loopTs === null) {
-        const posted = await this.slack.chat.postMessage({
+        const posted = await postInThread(this.slack, {
           channel: this.channel,
           thread_ts: this.threadTs,
           text: label,
@@ -868,7 +868,7 @@ export class SlackThread implements ThreadChat {
       this.loopTs = null;
       const shown = `_${mrkdwnEscape(line)}_`;
       try {
-        const posted = await this.slack.chat.postMessage({
+        const posted = await postInThread(this.slack, {
           channel: this.channel,
           thread_ts: this.threadTs,
           text: shown,
@@ -916,7 +916,7 @@ export class SlackThread implements ThreadChat {
     await (this.places ?? this.lease.peek())?.beforeRequest();
     let ts: unknown;
     try {
-      const posted = await this.slack.chat.postMessage({
+      const posted = await postInThread(this.slack, {
         channel: this.channel,
         thread_ts: this.threadTs,
         // The owner's mention, out of sight, pushes his phone and opens the thread on a tap, beside
@@ -960,7 +960,7 @@ export class SlackThread implements ThreadChat {
         await this.slack.chat.update({ channel: this.channel, ts: replacing, text: title, blocks });
         return replacing;
       }
-      const posted = await this.slack.chat.postMessage({
+      const posted = await postInThread(this.slack, {
         channel: this.channel,
         thread_ts: this.threadTs,
         text: title,

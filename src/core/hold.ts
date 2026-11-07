@@ -44,6 +44,13 @@ export interface Pending {
    * asker sends nothing once it is done.
    */
   cancelled: boolean;
+  /**
+   * Set by `Holds.cancel` when the thread's first message is gone: the asker posts and rewrites
+   * nothing, and `ended` tells whoever cancelled that it is done.
+   */
+  gone: boolean;
+  /** Settles once the asker discarded the hold, though `cancel` removed its entry long before. */
+  readonly ended: Promise<void>;
 }
 
 interface Entry {
@@ -57,6 +64,8 @@ interface Entry {
  */
 export class Holds {
   private readonly entries = new Map<string, Entry>();
+  /** Resolves a hold's `ended`; kept after `cancel` deletes the entry, until the asker discards. */
+  private readonly endings = new Map<string, () => void>();
 
   open(
     channelId: string,
@@ -69,6 +78,9 @@ export class Holds {
     const answer = new Promise<HoldAnswer | null>((resolve) => {
       settle = resolve;
     });
+    const ended = new Promise<void>((resolve) => {
+      this.endings.set(holdId, resolve);
+    });
     const pending: Pending = {
       channelId,
       threadId,
@@ -78,6 +90,8 @@ export class Holds {
       kind,
       context,
       cancelled: false,
+      gone: false,
+      ended,
     };
     this.entries.set(holdId, { pending, settle });
     return [holdId, pending];
@@ -127,12 +141,18 @@ export class Holds {
   /**
    * Cancel the hold open in this thread, if any: the same outcome as the owner clicking Cancel
    * (`!stop`, a top-level `!stop` of its channel, a drain). One already answered but still being
-   * applied is flagged `cancelled` instead: its asker sends nothing.
+   * applied is flagged `cancelled` instead: its asker sends nothing. With `gone` the pending is
+   * also marked `gone` (the thread's first message was deleted).
    */
-  cancel(channelId: string, threadId: string): Pending | null {
+  cancel(
+    channelId: string,
+    threadId: string,
+    options: { readonly gone?: boolean } = {},
+  ): Pending | null {
     for (const [holdId, entry] of [...this.entries]) {
       const { pending } = entry;
       if (pending.channelId !== channelId || pending.threadId !== threadId) continue;
+      if (options.gone === true) pending.gone = true;
       if (!pending.decided) {
         pending.decided = true;
         // withdrawn, not answered: whoever waits removes nothing and rewrites nothing
@@ -141,7 +161,8 @@ export class Holds {
         this.entries.delete(holdId);
         return pending;
       }
-      if (!pending.cancelled) {
+      // Already cancelled: a `gone` cancel still returns it, so its caller awaits `ended`.
+      if (!pending.cancelled || options.gone === true) {
         pending.cancelled = true;
         return pending;
       }
@@ -186,5 +207,7 @@ export class Holds {
 
   discard(holdId: string): void {
     this.entries.delete(holdId);
+    this.endings.get(holdId)?.();
+    this.endings.delete(holdId);
   }
 }

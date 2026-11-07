@@ -424,6 +424,11 @@ class MemoryThread implements ThreadChat {
   }
 
   async ask(requestId: string, request: OwnerRequest, title: string): Promise<MessageId> {
+    // A chat that places a post outside a thread whose first message is gone (Slack, #221) tells
+    // the core so; this one refuses the same way.
+    if (!this.#room.knowsThread(this.#ref)) {
+      throw new ChatError("thread_gone", { permanent: true, failure: "gone" });
+    }
     const message = this.#room.write(this.#ref.channel, this.#ref.thread, DAEMON, title, "request");
     this.#room.addRequest({ requestId, message: message.id, ref: this.#ref, request, title });
     return message.id;
@@ -447,6 +452,10 @@ class MemoryThread implements ThreadChat {
   }
 
   async tell(text: string): Promise<void> {
+    if (!this.#room.knowsThread(this.#ref)) {
+      this.#room.dropped.push(text); // the seam: a line for a gone thread is dropped
+      return;
+    }
     await this.#post(text, "notice").catch(() => {});
   }
 

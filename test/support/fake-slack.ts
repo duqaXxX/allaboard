@@ -371,6 +371,8 @@ export class FakeSlack extends WebClient {
    */
   gate: AsyncEvent | null = null;
   gateMethod = GATE_DEFAULT;
+  /** Roots deleted before a post into their thread: Slack answers `ok` and posts outside it (#221). */
+  readonly goneRoots = new Set<string>();
   gated = new AsyncEvent();
   /**
    * A response may be an error: the call throws it, as a failed request would. It may be a
@@ -515,6 +517,16 @@ export class FakeSlack extends WebClient {
     if (answer instanceof Error) throw answer;
     if ((method === "chat.postMessage" || method === "chat.startStream") && answer === scripted) {
       answer = { ...answer, ts: this.#newTs() }; // the default: a new ts for each message
+    }
+    if (
+      method === "chat.postMessage" &&
+      answer.ok !== false &&
+      typeof args.thread_ts === "string" &&
+      !this.goneRoots.has(args.thread_ts)
+    ) {
+      // Measured 2026-11-07 (#221): a post into a thread that exists says which thread it is in.
+      const shown = typeof answer.message === "object" ? answer.message : {};
+      answer = { ...answer, message: { ...shown, thread_ts: args.thread_ts } };
     }
     const refused = this.#streamState(method, args);
     if (refused !== null) answer = refused;

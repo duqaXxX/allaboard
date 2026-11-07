@@ -82,8 +82,8 @@ test("a reply in a thread that holds no session is told so, and sent nowhere", a
 
 test("a message the chat marks literal is a prompt, whatever its first characters", async (t) => {
   const world = await MessagesWorld.make(t);
-  const ref = { channel: world.channel, thread: "root-1" };
-  const sending = world.send({ ref, id: "root-1", topLevel: true, text: "!stop", literal: true });
+  const ref = world.chat.openThread(world.channel); // the root exists: a form can be asked under it
+  const sending = world.send({ ref, id: ref.thread, topLevel: true, text: "!stop", literal: true });
   const open = await world.asked("setup");
   await world.start(open.ref);
   await sending;

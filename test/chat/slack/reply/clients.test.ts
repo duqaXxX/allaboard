@@ -21,6 +21,7 @@ import {
   RATE_LIMIT_WAIT_SECONDS,
   repliesClient,
   sharedClient,
+  unretried,
 } from "../../../../src/chat/slack/reply/clients.ts";
 import { describe, unknownOutcome } from "../../../../src/chat/slack/reply/errors.ts";
 import type { Clock } from "../../../../src/clock.ts";
@@ -695,3 +696,26 @@ for (const [name, build] of UNMUTED) {
     assert.deepEqual(written, []);
   });
 }
+
+test("the lookup client reports a rate limit at once, with no pause and no second send", async () => {
+  const requests: string[] = [];
+  const clock = new Pauses();
+  const failure = await unretried(shared(network(requests, "429:10"), clock))
+    .apiCall("conversations.replies", {})
+    .catch((error: unknown) => error);
+  assert.ok(failure instanceof WebAPIRateLimitedError);
+  assert.equal(describe(failure), "ratelimited");
+  assert.deepEqual(requests, ["conversations.replies"]);
+  assert.deepEqual(clock.slept, []);
+});
+
+test("the lookup client does not resend a call that failed on the connection", async () => {
+  const requests: string[] = [];
+  const clock = new Pauses();
+  const failure = await unretried(shared(network(requests, "reset", "ok"), clock))
+    .apiCall("conversations.replies", {})
+    .catch((error: unknown) => error);
+  assert.ok(failure instanceof WebAPIRequestError);
+  assert.deepEqual(requests, ["conversations.replies"]);
+  assert.deepEqual(clock.slept, []);
+});

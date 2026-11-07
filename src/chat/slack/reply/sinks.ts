@@ -51,6 +51,7 @@ import { cancellable, formatDuration, Mutex, type Previews } from "../../../core
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, RunningList, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
+import { postInThread } from "../notice.ts";
 import type { SessionState } from "./agent-session.ts";
 import {
   asideBlock,
@@ -1939,7 +1940,7 @@ export class ReplySink implements Sink {
     let posted: { ts?: string };
     try {
       this.wrote = true;
-      posted = await this.slack.chat.postMessage({
+      posted = await postInThread(this.slack, {
         channel: this.channel,
         thread_ts: this.threadTs,
         text: plainText(blocks),
@@ -1977,7 +1978,7 @@ export class ReplySink implements Sink {
       // Claude's text can carry a link built to leak data when Slack fetches it for a preview:
       // no previews for anything the daemon posts.
       this.wrote = true;
-      posted = await this.slack.chat.postMessage({
+      posted = await postInThread(this.slack, {
         channel: this.channel,
         thread_ts: this.threadTs,
         text: banner,
@@ -2712,7 +2713,7 @@ export class ReplySink implements Sink {
     try {
       if (this.closing === null) {
         this.wrote = true;
-        const posted = await this.slack.chat.postMessage({
+        const posted = await postInThread(this.slack, {
           channel: this.channel,
           thread_ts: this.threadTs,
           text: this.banner(),

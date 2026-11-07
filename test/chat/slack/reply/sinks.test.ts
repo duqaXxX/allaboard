@@ -3143,6 +3143,23 @@ test("a continuation post of unknown outcome is adopted", async () => {
   assert.equal(slack.postedTs.length, 2);
 });
 
+test("a continuation post into a gone root is a definite failure: not adopted, not posted again", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.text("start\n");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  slack.goneRoots.add(THREAD);
+  slack.responses["conversations.replies"] = rejected("thread_not_found");
+  await sink.text("a line of text\n".repeat(1_000));
+  await settled();
+  assert.equal(slack.callsTo("chat.postMessage").length, 1); // the stray post, never sent again
+  assert.equal(slack.callsTo("chat.delete").length, 1); // and deleted at once
+  // Only `postInThread`'s own confirmation of the root: `adopt` would read the thread again.
+  assert.equal(slack.callsTo("conversations.replies").length, 1);
+});
+
 test("a closing post of unknown outcome is adopted", async () => {
   const slack = new ResetAfterApply();
   const clock = new FakeClock();

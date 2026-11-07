@@ -243,6 +243,8 @@ export class Room {
   readonly #channels = new Set<string>();
   readonly #threads = new Map<string, number>();
   readonly #kept = new Set<string>();
+  /** The lines `tell` dropped because the thread's first message is gone, as the seam says. */
+  readonly dropped: string[] = [];
   readonly #messages: StoredMessage[] = [];
   readonly #requests = new Map<string, OpenRequest>();
   readonly #lists = new Map<MessageId, OpenList>();

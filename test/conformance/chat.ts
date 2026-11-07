@@ -785,6 +785,16 @@ export function chatConformance(
         assert.equal(await provider.threadState(ref), "gone");
       });
 
+      check("ask into a thread whose first message went rejects as `gone`", async (s) => {
+        s.rig.removeThread(s.ref);
+        const failure = await s.provider
+          .thread(s.ref)
+          .ask("request-gone", setup("request-gone"), "A setup")
+          .catch((error: unknown) => error);
+        assert.ok(failure instanceof ChatError);
+        assert.equal(failure.failure, "gone");
+      });
+
       check(
         "says `no answer`, or rejects with a named ChatError, when it can not say",
         async ({ rig, provider, ref }) => {

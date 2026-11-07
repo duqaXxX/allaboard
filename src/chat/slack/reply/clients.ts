@@ -108,6 +108,8 @@ export interface ClientOptions extends Omit<WebClientOptions, keyof typeof SENT_
    * the call it answered `ratelimited`.
    */
   readonly stopped?: AbortSignal;
+  /** Sent once, whatever fails: no rate limit, connection or server error retry (`unretried`). */
+  readonly once?: boolean;
   /** Temporary, #116: log every call with the ids it addresses. Set by `makeClients` only. */
   readonly traceCalls?: boolean;
 }
@@ -133,15 +135,26 @@ class PolicyClient extends WebClient {
   readonly #random: () => number;
   readonly #stopped: AbortSignal | undefined;
   readonly #traceCalls: boolean;
+  readonly #once: boolean;
+  readonly #token: string | undefined;
+  readonly #options: ClientOptions;
 
   constructor(token: string | undefined, notRetried: readonly string[], options: ClientOptions) {
-    const { clock, random, stopped, traceCalls, ...rest } = options;
+    const { clock, random, stopped, traceCalls, once, ...rest } = options;
     super(token, { timeout: REQUEST_TIMEOUT_MS, ...rest, ...SENT_ONCE, logger: silentLogger() });
     this.#notRetried = new Set(notRetried);
     this.#clock = clock ?? systemClock;
     this.#random = random ?? Math.random;
     this.#stopped = stopped;
     this.#traceCalls = traceCalls ?? false;
+    this.#once = once ?? false;
+    this.#token = token;
+    this.#options = options;
+  }
+
+  /** The same client on the same token, with every retry off. */
+  sentOnce(): PolicyClient {
+    return new PolicyClient(this.#token, [], { ...this.#options, once: true });
   }
 
   /**
@@ -149,6 +162,7 @@ class PolicyClient extends WebClient {
    * the sum of the `Retry-After` pauses the call already took.
    */
   #pause(method: string, error: unknown, retries: number, waited: number): number | null {
+    if (this.#once) return null;
     if (error instanceof WebAPIRateLimitedError) {
       return retries < RATE_LIMIT_RETRIES && waited + error.retryAfter <= RATE_LIMIT_WAIT_SECONDS
         ? error.retryAfter + this.#random()
@@ -221,4 +235,13 @@ export function sharedClient(token: string | undefined, options: ClientOptions =
  */
 export function repliesClient(token: string | undefined, options: ClientOptions = {}): WebClient {
   return new PolicyClient(token, CREATING_METHODS, options);
+}
+
+/**
+ * `client` for a call whose answer is not worth a wait: a rate limit, a failed connection or a
+ * server error is thrown at once instead of being sent again after a pause. A client that is not
+ * one of this file's (a test's) is returned as it is.
+ */
+export function unretried(client: WebClient): WebClient {
+  return client instanceof PolicyClient ? client.sentOnce() : client;
 }

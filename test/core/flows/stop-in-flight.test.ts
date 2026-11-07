@@ -133,7 +133,7 @@ test(
   LIMIT,
   async (t) => {
     const world = await MessagesWorld.make(t);
-    const ref = { channel: world.channel, thread: "m-new" };
+    const ref = world.chat.openThread(world.channel); // the root exists: a line can be told under it
     const release = new AsyncEvent();
     world.sessions.refusesStarts = async () => {
       await release.wait();
@@ -172,7 +172,7 @@ test(
   LIMIT,
   async (t) => {
     const world = await MessagesWorld.make(t);
-    const ref = { channel: world.channel, thread: "m-new" };
+    const ref = world.chat.openThread(world.channel); // the root exists: a line can be told under it
     const release = new AsyncEvent();
     world.sessions.refusesStarts = async () => {
       await release.wait();

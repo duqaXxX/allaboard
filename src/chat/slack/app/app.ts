@@ -49,6 +49,7 @@ import { Listings } from "../../../core/port.ts";
 import type { ChatInbound, CommandSuggestion } from "../../seam.ts";
 import { download } from "../attachments.ts";
 import { BIND_ACTION } from "../bind.ts";
+import { threadLookup } from "../channels.ts";
 import { CLEAN_CHANNEL_CANCEL, CLEAN_CHANNEL_CONFIRM } from "../clean-channel.ts";
 import type { ThreadDeletion } from "../delete.ts";
 import { DELETE_THREAD_CANCEL, DELETE_THREAD_CONFIRM } from "../delete-thread.ts";
@@ -73,7 +74,7 @@ import {
 } from "../lists.ts";
 import { OPEN_FIELD, OPEN_FILE_ACTIONS } from "../openfile/search.ts";
 import { levelLogger } from "../quiet-logger.ts";
-import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
+import { REQUEST_TIMEOUT_MS, unretried } from "../reply/clients.ts";
 import { describe } from "../reply/errors.ts";
 import {
   APPROVAL_ALLOW,
@@ -117,6 +118,9 @@ import { Requests } from "./requests.ts";
 import { ResumeBind } from "./resume-bind.ts";
 import { Suggestions } from "./suggest.ts";
 import { type Ack, type Payload, type Respond, str, text } from "./wire.ts";
+
+/** How long a new thread's root lookup may take before the message goes through unchecked. */
+export const ROOT_LOOKUP_SECONDS = 3;
 
 export const DECISION_ACTIONS = [APPROVAL_ALLOW, APPROVAL_DENY, QUESTION_SKIP] as const;
 
@@ -301,6 +305,21 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
 
   const registered: Registration[] = [];
   const order = new ChannelOrder();
+  // Asked once per new thread, with no retry: an answer worth no wait (see the listener below).
+  const rootThere = threadLookup(unretried(options.slack));
+  const lookRoot = async (channel: string, thread: string): Promise<string> => {
+    const deadline = new AbortController();
+    const lookup = rootThere({ channel, thread }).catch(() => "unknown");
+    const late = (options.clock ?? monotonicClock)
+      .sleep(ROOT_LOOKUP_SECONDS, deadline.signal)
+      .then(() => "unknown")
+      .catch(() => "unknown");
+    try {
+      return await Promise.race([lookup, late]);
+    } finally {
+      deadline.abort();
+    }
+  };
   const suggestions = new Suggestions(parts, answers, order);
 
   app.event("message", async ({ event, body }) => {
@@ -328,6 +347,18 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     // over after the download of that file, so a typed reply sent after it can be handed over
     // first.
     // A `!stop` of the channel is ordered against the messages of every thread in it.
+    // A redelivered event can name a message the owner deleted since (#221): Slack then answers
+    // a post into its thread `ok` and puts it in the channel. The lookup starts here, before the
+    // wait for the place, so it overlaps that wait. Created with its fail-open conversion, so a
+    // listener that returns before awaiting it leaves no unhandled rejection; only `gone` drops
+    // the message, and a rate limit or any other failure lets it through (a later post into a
+    // gone root is caught by `postInThread`).
+    // A `!` word opens no setup, so it asks nothing; the lookup gives up after
+    // `ROOT_LOOKUP_SECONDS` and the message goes through.
+    const rooted =
+      threadTs === ts && !(text(message.text) ?? "").trimStart().startsWith("!")
+        ? lookRoot(channel, ts)
+        : null;
     const place = order.enter(channel);
     let handed: Promise<void>;
     try {
@@ -335,6 +366,10 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
       // The daemon can have stopped while this message waited for the ones before it: calling
       // Slack then would break the contract of a listener in flight after the stop.
       if (answers.stopped) return;
+      if (rooted !== null && (await rooted) === "gone") {
+        logger.info(`dropped a message in ${channel}: deleted before it was read`);
+        return;
+      }
       const check = await answers.checkChannel(channel, threadTs, ts);
       // (sync) From the check to the call that hands the message over, nothing is awaited. A
       // refusal is posted without the place held, and awaited once it is left.

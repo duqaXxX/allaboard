@@ -66,7 +66,7 @@ export function buildFlows(deps: FlowDeps): Built {
         return picks.picked(pick);
       },
       unbound: (channel) => talk.unbound(channel),
-      rootGone: rootGone(deps),
+      rootGone: rootGone(deps, talk),
       stop: inboundStop(deps, talk, inFlight),
     }),
   };

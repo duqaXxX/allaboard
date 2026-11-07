@@ -5,7 +5,13 @@
  * The work handed to `replyOnFailure` is a function, called inside its guard.
  */
 import type { AgentBackend } from "../../agent/seam.ts";
-import type { ChatProvider, MessageId, ThreadChat, ThreadRef } from "../../chat/seam.ts";
+import {
+  ChatError,
+  type ChatProvider,
+  type MessageId,
+  type ThreadChat,
+  type ThreadRef,
+} from "../../chat/seam.ts";
 import type { Clock } from "../../clock.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
@@ -159,6 +165,11 @@ export class Talk {
       await work();
     } catch (error) {
       if (isCancelled(error)) throw error;
+      if (error instanceof ChatError && error.failure === "gone") {
+        // The thread's first message is gone: a line there would land outside it.
+        logger.info(`a request failed in ${ref.channel}/${ref.thread}: its first message is gone`);
+        return;
+      }
       if (
         error instanceof DirectoryUnavailable ||
         error instanceof SessionClosed ||

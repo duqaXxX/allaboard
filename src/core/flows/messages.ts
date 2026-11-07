@@ -35,7 +35,7 @@ import { askOwner } from "./ask-owner.ts";
 import type { MessagesFlow, OtherFlows } from "./contract.ts";
 import { forkFlow } from "./fork.ts";
 import type { InFlight, Ticket } from "./in-flight.ts";
-import type { FlowDeps, Report, Talk } from "./talk.ts";
+import { type FlowDeps, logger, type Report, type Talk } from "./talk.ts";
 import { unservedWords, wordFlow } from "./words.ts";
 
 /**
@@ -235,6 +235,14 @@ export function messages(
     // Prompts and commands for the agent enter the queue in the order they were sent, although
     // files take a while to read. Every reply goes to the thread.
     await arrival(ref, ticket, async () => {
+      // The thread's first message went while this prompt waited behind another (#221): it opens
+      // no form and posts nothing (`rootGone` is forgetting the thread).
+      if (sessions.gone(ref.channel, ref.thread)) {
+        logger.info(
+          `dropped a message in ${ref.channel}/${ref.thread}: its thread is being forgotten`,
+        );
+        return;
+      }
       let session = opened;
       // `held` is the object a Continue's mark was left standing on (`holdEnd({ continued: true })`
       // bets on the `submit()` below to replace it with the working one): kept apart from
