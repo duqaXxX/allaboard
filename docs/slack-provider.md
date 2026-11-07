@@ -868,7 +868,7 @@ from the container, as `!delete-thread` does. A text field and a button cannot s
 Block Kit, so Send sits in an `actions` block right under the field.
 
 - `onEdit` (Enter): checks the owner and the workspace before anything (`Answers.fromOwner`),
-  takes its place among the thread's messages (`ThreadOrder.enter`, as the `message` listener
+  takes its place among the channel's messages (`ChannelOrder.enter`, as the `message` listener
   does), checks the channel, marks the field's block id as used (a second Enter on it, which
   waits for its place behind the first, does nothing; a refused channel leaves it unused),
   takes the suggestion away with `respond({ delete_original: true })` and hands the field's text
@@ -1012,17 +1012,17 @@ The app registers no slash command.
 
 The `message` listener is the one that keeps an order. It checks the owner and the workspace
 first, with nothing awaited (`Answers.fromOwner`), so that an event from anyone else takes no
-place and reaches no Slack call. Then it takes its place among the messages of its thread
-(`ThreadOrder.enter`, keyed by channel and thread, before its first await), waits for the places
-taken before it, runs the channel check (`Answers.channelAllowed`) inside it and calls
+place and reaches no Slack call. Then it takes its place among the messages and stops of its
+channel (`ChannelOrder.enter`, keyed by channel, before its first await), waits for the places
+taken before it, runs the channel check (`Answers.checkChannel`) inside it and calls
 `ChatInbound.message`, or `Clips.takeClip` for a clip, which ends the stretch: the place is left
 on that call's return, before the core's work on the message ends, so a later message never waits
 for a turn, a download or a setup the owner has not answered. A refused check leaves the place too.
-Threads do not wait for each other, and a thread's entry is dropped when its last place is left.
-A later message of a thread waits for the checks of the messages before it. A check is two calls,
+The Stop control (`agent_session_stopped`) takes a place too and leaves it as soon as it has called `ChatInbound.stop`, before the interrupt returns, so a stop is handed over after the messages sent before it in any thread of the channel and never holds the ones after. Threads of one channel wait for each other's checks, and a channel's entry is dropped when its last place is left. A refusal's post (`Answers.checkChannel`) is made after the place is left.
+A later message of a channel waits for the checks of the messages before it. A check is two calls,
 each bounded by the client's 30 seconds (`clients.REQUEST_TIMEOUT_MS`), so about 60 seconds per
 message ahead with no network, plus the pause of the one connection retry and up to 60 seconds of `Retry-After`
-Slack sends; a message with none ahead waits for nothing. Other threads are not affected.
+Slack sends; a message with none ahead waits for nothing. That is also the longest a stop can wait: the checks of the messages ahead of it in its channel, never a turn, a download or a form. Other channels are not affected.
 The buttons and forms keep no such order: each names the message it answers.
 
 A clip whose transcript is in the file's `vtt` is the exception: `Clips.takeClip` hands it over after the download of that file, and a typed reply sent after it can be handed over first.

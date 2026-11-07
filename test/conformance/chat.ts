@@ -156,6 +156,15 @@ export interface ChatRig {
   /** The core keeps `thread`: the daemon holds it, as it does for a thread the owner started. */
   keep(thread: ThreadRef): void;
   /**
+   * From now on the check the provider runs on the owner's next message or stop takes as long as
+   * it takes `release` to be called. `held` settles once that check is under way. What the owner
+   * sends after it is sent while it is held. The hold sits inside the provider's own check path
+   * (Slack: its `conversations.info`), never in the rig's sending: a rig that orders the sends
+   * itself tests the rig, not the provider. A chat with no check of its own (the memory chat)
+   * hands over synchronously, which is the order this test asks for.
+   */
+  holdNextCheck(): { readonly held: Promise<void>; release(): void };
+  /**
    * The chat can show a line to the owner alone. Where it can not, a line asked for the owner
    * is a message of the thread.
    */
@@ -448,8 +457,11 @@ class Recorder implements ChatInbound {
   readonly unboundChannels: string[] = [];
   readonly goneRoots: ThreadRef[] = [];
   readonly stopped: ThreadRef[] = [];
+  /** Messages and stops in the order they were handed over, one log for both. */
+  readonly order: string[] = [];
 
   async message(message: InboundMessage): Promise<void> {
+    this.order.push(`message ${message.text}`);
     this.messages.push(message);
   }
 
@@ -476,6 +488,7 @@ class Recorder implements ChatInbound {
   }
 
   async stop(ref: ThreadRef): Promise<boolean> {
+    this.order.push(`stop ${ref.thread}`);
     this.stopped.push(ref);
     return true;
   }
@@ -1744,6 +1757,30 @@ export function chatConformance(
           }
           await s.rig.owner.stops(s.ref);
           assert.deepEqual(s.inbound.stopped, [s.ref]);
+        },
+      );
+
+      inbound(
+        "a message whose check is slow is handed over before the stops sent after it, in any thread",
+        async (s) => {
+          const root = await s.rig.owner.says(s.rig.channel, "thread B");
+          s.rig.keep(root.ref);
+          s.rig.keep(s.ref);
+          s.inbound.order.splice(0);
+          const hold = s.rig.holdNextCheck();
+          const sent: Array<Promise<unknown>> = [
+            s.rig.owner.says(s.rig.channel, "in thread A", { thread: s.ref.thread }),
+          ];
+          await hold.held;
+          sent.push(s.rig.owner.says(s.rig.channel, "!stop"));
+          const expected = ["message in thread A", "message !stop"];
+          if (s.rig.owner.stops !== undefined) {
+            sent.push(s.rig.owner.stops(root.ref));
+            expected.push(`stop ${root.ref.thread}`);
+          }
+          hold.release();
+          await Promise.all(sent);
+          assert.deepEqual(s.inbound.order, expected);
         },
       );
 

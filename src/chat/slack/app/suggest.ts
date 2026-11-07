@@ -18,7 +18,7 @@ import { parsePick, SUGGEST_EDIT, suggestionBlocks, typedMessage } from "../sugg
 import * as slackTexts from "../texts.ts";
 import type { Answers, AppParts } from "./answers.ts";
 import { interactionActor } from "./guards.ts";
-import { type ThreadOrder, threadKey } from "./order.ts";
+import type { ChannelOrder } from "./order.ts";
 import {
   type Ack,
   clickThread,
@@ -35,14 +35,14 @@ const KEPT = 20;
 export class Suggestions {
   private readonly parts: AppParts;
   private readonly answers: Answers;
-  private readonly order: ThreadOrder;
+  private readonly order: ChannelOrder;
   // By id, oldest first (a Map keeps insertion order).
   private readonly kept = new Map<string, CommandSuggestion>();
   private nonce = 0;
   // The fields whose text was taken, so that a second Enter or Send on one hands over nothing.
   private readonly consumed = new Set<string>();
 
-  constructor(parts: AppParts, answers: Answers, order: ThreadOrder) {
+  constructor(parts: AppParts, answers: Answers, order: ChannelOrder) {
     this.parts = parts;
     this.answers = answers;
     this.order = order;
@@ -76,9 +76,8 @@ export class Suggestions {
 
   /** Enter in the field: the text is the action's own value. */
   onEdit = async (ack: Ack, body: Payload, respond?: Respond): Promise<void> => {
-    await ack();
     const action = firstAction(body);
-    await this.hand(body, respond, text(action.block_id), text(action.value) ?? "");
+    await this.hand(ack, body, respond, text(action.block_id), text(action.value) ?? "");
   };
 
   /**
@@ -86,19 +85,26 @@ export class Suggestions {
    * as edited and never sent with Enter (measured 2026-10-21, desktop).
    */
   onSend = async (ack: Ack, body: Payload, respond?: Respond): Promise<void> => {
-    await ack();
     const blockId = text(firstAction(body).value);
     const values = record(record(body.state).values);
     const field = blockId !== null && Object.hasOwn(values, blockId) ? values[blockId] : null;
-    await this.hand(body, respond, blockId, text(record(record(field)[SUGGEST_EDIT]).value) ?? "");
+    await this.hand(
+      ack,
+      body,
+      respond,
+      blockId,
+      text(record(record(field)[SUGGEST_EDIT]).value) ?? "",
+    );
   };
 
   /**
    * The text of the field `blockId` goes to the core as the message the owner typed, in the
-   * thread, in the place its listener took among the thread's messages. The owner and the
-   * workspace are checked here, before the place is taken.
+   * thread, in the place its listener took among the channel's messages. The owner and the
+   * workspace are checked, and the place taken, before the click is acknowledged: the
+   * acknowledgement is an await, and a message typed meanwhile would otherwise be ordered first.
    */
   private async hand(
+    ack: Ack,
     body: Payload,
     respond: Respond | undefined,
     blockId: string | null,
@@ -108,17 +114,29 @@ export class Suggestions {
     const channel = text(record(body.channel).id);
     const threadTs = clickThread(body);
     // The owner and the workspace first, with nothing awaited: anyone else takes no place.
-    if (!this.answers.fromOwner(user, team, channel) || channel === null) return;
+    if (!this.answers.fromOwner(user, team, channel) || channel === null) {
+      await ack();
+      return;
+    }
     const typed = typedMessage(blockId);
-    if (sent.trim() === "" || typed === null || blockId === null) return;
-    // (sync) The place among the thread's messages, as `app.event("message")` takes it.
-    const place = this.order.enter(threadKey(channel, threadTs));
+    if (sent.trim() === "" || typed === null || blockId === null) {
+      await ack();
+      return;
+    }
+    // (sync) The place among the channel's messages, as `app.event("message")` takes it.
+    const place = this.order.enter(channel);
     let handed: Promise<void>;
     let withdrawn: Promise<void>;
+    let refused: Promise<void> | null = null;
     try {
+      await ack();
       await place.turn;
       if (this.answers.stopped) return;
-      if (!(await this.answers.channelAllowed(channel, threadTs))) return;
+      const check = await this.answers.checkChannel(channel, threadTs);
+      if (!check.allowed) {
+        refused = check.tell();
+        return;
+      }
       // (sync) From the check to the call that hands the message over, nothing is awaited. The
       // field is marked used only now, so a refusal above leaves it working; a second Enter or
       // Send waits for its place behind this one and finds it used.
@@ -129,7 +147,11 @@ export class Suggestions {
       withdrawn = this.answers.takeBack(respond, "a command suggestion");
       handed = this.parts.inbound.message(typedIn(channel, threadTs, typed, sent));
     } finally {
+      // The place is left only after its turn: a rejected `ack()` above would otherwise release
+      // the next place while an earlier one is still held.
+      await place.turn;
       place.leave();
+      if (refused !== null) await refused;
     }
     await Promise.all([handed, withdrawn]);
   }

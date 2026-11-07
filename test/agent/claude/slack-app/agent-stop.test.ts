@@ -7,12 +7,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ThreadRef } from "../../../../src/chat/seam.ts";
-import { CHANNEL, OTHER_TEAM, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
+import {
+  AsyncEvent,
+  CHANNEL,
+  OTHER_TEAM,
+  OWNER,
+  STRANGER,
+  THREAD,
+} from "../../../support/fake-slack.ts";
 import {
   agentSessionStopped,
   type Body,
   message,
   recorded,
+  reply,
   type World,
   worldOf,
 } from "../../../support/slack-app.ts";
@@ -184,4 +192,63 @@ test("the hidden message_changed of a root setStatus touched is acted on by no l
   assert.deepEqual(seen.gone, []);
   assert.notEqual(world.state.thread(CHANNEL, THREAD), null);
   assert.deepEqual(world.slack.apiCalls, []);
+});
+
+/** Holds the next channel check of the world, and returns what lets it go. */
+async function holdNextCheck(world: World, sendFirst: () => unknown): Promise<AsyncEvent> {
+  const hold = new AsyncEvent();
+  world.slack.gated = new AsyncEvent();
+  world.slack.gate = hold;
+  world.slack.gateMethod = "conversations.info";
+  sendFirst();
+  await world.slack.gated.wait();
+  world.slack.gate = null;
+  return hold;
+}
+
+test("a Stop is handed over after a message whose channel check is still out", {
+  timeout: 8000,
+}, async (t) => {
+  const world = worldOf(t);
+  arranged(world);
+  const log: string[] = [];
+  const inbound = world.inbound as unknown as Record<string, unknown>;
+  inbound.message = async () => {
+    log.push("message");
+  };
+  inbound.stop = async () => {
+    log.push("stop");
+    return true;
+  };
+  const hold = await holdNextCheck(world, () => void world.dispatch(reply("first", THREAD)));
+  void world.dispatch(agentSessionStopped(CHANNEL, THREAD, OWNER));
+  await world.idle();
+  assert.deepEqual(log, []);
+  hold.set();
+  await world.settle();
+  assert.deepEqual(log, ["message", "stop"]);
+});
+
+test("a message sent after a Stop is not held by the stop's interrupt", {
+  timeout: 8000,
+}, async (t) => {
+  const world = worldOf(t);
+  arranged(world);
+  const log: string[] = [];
+  const inbound = world.inbound as unknown as Record<string, unknown>;
+  const interrupt = new AsyncEvent();
+  inbound.message = async () => {
+    log.push("message");
+  };
+  inbound.stop = async () => {
+    log.push("stop");
+    await interrupt.wait(); // an interrupt that takes a while
+    return true;
+  };
+  void world.dispatch(agentSessionStopped(CHANNEL, THREAD, OWNER));
+  await world.idle();
+  await world.dispatch(reply("after", THREAD));
+  assert.deepEqual(log, ["stop", "message"]);
+  interrupt.set();
+  await world.settle();
 });

@@ -53,7 +53,6 @@ import {
 import type { AppConfig, Fetch } from "./app/answers.ts";
 import { type BuiltApp, buildApp } from "./app/app.ts";
 import type { ChannelGuard } from "./app/guards.ts";
-import { threadKey } from "./app/order.ts";
 import { SlackChannel } from "./channel.ts";
 import type { ChannelLine } from "./channel-line.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
@@ -90,6 +89,11 @@ import {
 } from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 import type { RootEditor } from "./tag.ts";
+
+/** The key of a thread among the maps of a provider: its channel and its root. */
+function threadKey(channel: string, thread: string): string {
+  return `${channel}\n${thread}`;
+}
 
 export const logger = getLogger("allaboard.chat.slack.thread");
 

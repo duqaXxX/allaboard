@@ -112,7 +112,7 @@ import { HomeControls } from "./home-controls.ts";
 import { ThreadLists } from "./lists.ts";
 import { filesOf, inboundMessage } from "./messages.ts";
 import { Open } from "./open.ts";
-import { ThreadOrder, threadKey } from "./order.ts";
+import { ChannelOrder } from "./order.ts";
 import { Requests } from "./requests.ts";
 import { ResumeBind } from "./resume-bind.ts";
 import { Suggestions } from "./suggest.ts";
@@ -300,7 +300,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   });
 
   const registered: Registration[] = [];
-  const order = new ThreadOrder();
+  const order = new ChannelOrder();
   const suggestions = new Suggestions(parts, answers, order);
 
   app.event("message", async ({ event, body }) => {
@@ -319,7 +319,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     // also a message the filter below drops.
     parts.chat.ownerPosted(channel, threadTs, ts);
     if (!isPromptMessage(message)) return;
-    // (sync) The place among the thread's messages is taken in the order the listeners were
+    // (sync) The place among the channel's messages and stops is taken in the order the listeners were
     // called, before the first await: the channel check below takes longer for one message than
     // for the next, and a message that passed it first would be handed over first. The place is
     // left once the message is handed over (`arrival` in `core/flows/messages.ts` orders it from
@@ -327,25 +327,31 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     // The exception is a clip whose transcript is in the file's `vtt`: `Clips.takeClip` hands it
     // over after the download of that file, so a typed reply sent after it can be handed over
     // first.
-    const place = order.enter(threadKey(channel, threadTs));
+    // A `!stop` of the channel is ordered against the messages of every thread in it.
+    const place = order.enter(channel);
     let handed: Promise<void>;
     try {
       await place.turn;
       // The daemon can have stopped while this message waited for the ones before it: calling
       // Slack then would break the contract of a listener in flight after the stop.
       if (answers.stopped) return;
-      if (!(await answers.channelAllowed(channel, threadTs, ts))) return;
-      // (sync) From the check to the call that hands the message over, nothing is awaited.
-      const spoken = voice.clip(filesOf(message));
-      // A failure of the prompt itself (or of the session it starts) lands in that session's
-      // thread: it is the turn's one push. A word answers where it was typed instead. The core
-      // tells the owner of a failure of its own.
-      handed =
-        spoken !== null
-          ? answers.replyOnFailure(channel, threadTs, () =>
-              clips.takeClip(channel, threadTs, ts, message, spoken),
-            )
-          : parts.inbound.message(inboundMessage(parts, answers, channel, threadTs, ts, message));
+      const check = await answers.checkChannel(channel, threadTs, ts);
+      // (sync) From the check to the call that hands the message over, nothing is awaited. A
+      // refusal is posted without the place held, and awaited once it is left.
+      if (!check.allowed) {
+        handed = check.tell();
+      } else {
+        const spoken = voice.clip(filesOf(message));
+        // A failure of the prompt itself (or of the session it starts) lands in that session's
+        // thread: it is the turn's one push. A word answers where it was typed instead. The core
+        // tells the owner of a failure of its own.
+        handed =
+          spoken !== null
+            ? answers.replyOnFailure(channel, threadTs, () =>
+                clips.takeClip(channel, threadTs, ts, message, spoken),
+              )
+            : parts.inbound.message(inboundMessage(parts, answers, channel, threadTs, ts, message));
+      }
     } finally {
       place.leave();
     }
@@ -401,10 +407,25 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     if (!answers.fromOwner(text(stop.user), team, channel) || channel === null) return;
     const thread = text(stop.thread_ts);
     if (thread === null || parts.state.thread(channel, thread) === null) return;
-    if (!(await answers.channelAllowed(channel, thread))) return;
     const ref = { channel, thread };
-    // The core tells the owner of a failure itself (`ChatInbound`): no member rejects for one.
-    await chat.agentSessions.stopped(ref, await parts.inbound.stop(ref));
+    // (sync) The place among the channel's messages, taken before the first await: a message
+    // sent before this stop is handed over before it, and one sent after waits for it. It is left
+    // as soon as the stop is handed over, never held through the interrupt.
+    const place = order.enter(channel);
+    let refused: Promise<void> | null = null;
+    let stopping: Promise<boolean> | null = null;
+    try {
+      await place.turn;
+      if (answers.stopped) return;
+      const check = await answers.checkChannel(channel, thread);
+      // The core tells the owner of a failure itself (`ChatInbound`): no member rejects for one.
+      if (check.allowed) stopping = parts.inbound.stop(ref);
+      else refused = check.tell();
+    } finally {
+      place.leave();
+    }
+    if (refused !== null) await refused;
+    if (stopping !== null) await chat.agentSessions.stopped(ref, await stopping);
   });
 
   app.event("file_change", ({ event }) => clips.onFileChange(event as unknown as Payload));

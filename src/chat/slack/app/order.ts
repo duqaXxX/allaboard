@@ -1,17 +1,12 @@
 /**
- * The places of the messages of one thread, in the order their listeners were called. A listener
- * takes its place (`enter`) before its first await, so the channel check that follows, which
- * takes longer for one message than for the next, cannot reorder them; it leaves the place when
- * it has handed its message to the core, whose own ordering holds from there (`arrival` in
- * `core/flows/messages.ts`).
+ * The places of the messages and stops of one channel (keyed by its id), in the order their
+ * listeners were called. A listener takes its place (`enter`) before its first await, so the
+ * channel check that follows, which takes longer for one message than for the next, cannot
+ * reorder them; it leaves the place when it has handed its message or stop to the core, whose own
+ * ordering holds from there (`arrival` in `core/flows/messages.ts`).
  */
 
-/** The key of a thread among the maps of a provider: its channel and its root. */
-export function threadKey(channel: string, thread: string): string {
-  return `${channel}\n${thread}`;
-}
-
-/** One message's place among its thread's. */
+/** One message's or stop's place among its channel's. */
 export interface Place {
   /** Settles when every place entered before this one has been left. */
   readonly turn: Promise<void>;
@@ -23,12 +18,12 @@ export interface Place {
   leave(): void;
 }
 
-export class ThreadOrder {
-  // The last place entered, by thread. A thread is in the map only while a place of it is held
-  // or waits: a channel keeps opening threads for as long as it runs.
+export class ChannelOrder {
+  // The last place entered, by key. A key is in the map only while a place of it is held
+  // or waits.
   readonly #last = new Map<string, Promise<void>>();
 
-  /** The threads that hold or await a place. */
+  /** The keys that hold or await a place. */
   get size(): number {
     return this.#last.size;
   }
