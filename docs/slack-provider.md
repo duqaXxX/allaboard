@@ -1548,6 +1548,14 @@ outcome, sends the wanted status again. A stop whose request timed out could sti
 after that resend; while `processing` is wanted the 30-minute refresh corrects it, otherwise it
 stays until the thread's next status change or Slack's one-hour timeout.
 
+A call that fails (any refusal except the codes that drop the entry, a timeout, a network error) counts as not
+sent, since its answer may have been lost on the way: the entry forgets what it had sent and
+sends the wanted status again. A retry timer of its own does it after 5, 15 and 45 seconds, then
+every 300 seconds until a call succeeds, a different status is wanted (it is sent at once and its
+backoff starts again at 5 seconds), the entry is dropped or the daemon closes. The retry never
+touches the 30-minute `processing` refresh. `channel_not_found`, `message_not_found` and `thread_not_found` drop the entry and its timers; any
+other failure is retried. A refusal that names the token or the app ends the retries with the calls.
+
 Failures are logged with the channel, the ts and the code, once per code in a row. `missing_scope`,
 `not_allowed_token_type` and `feature_disabled` stop the calls for the rest of the run. On shutdown
 the queue ignores the provider's `stopped` signal (the sessions' end statuses are drawn after the
