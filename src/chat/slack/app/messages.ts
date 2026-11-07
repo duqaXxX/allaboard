@@ -17,6 +17,7 @@ import { fill, named } from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
 import type { InboundMessage } from "../../seam.ts";
 import {
+  contentRefusal,
   type DownloadedImage,
   DownloadFailed,
   imagesRefusal,
@@ -201,6 +202,15 @@ async function withAttachments(
       return null;
     }
     throw outcome.reason;
+  }
+  for (const [index, outcome] of fetched.entries()) {
+    if (outcome.status !== "fulfilled") continue;
+    const file = files[index] as SlackFile;
+    const reason = contentRefusal(file, outcome.value);
+    if (reason !== null) {
+      await refuse(file, reason);
+      return null;
+    }
   }
   const images: DownloadedImage[] = [];
   const paths: string[] = [];

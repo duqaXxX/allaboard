@@ -10,6 +10,7 @@
  * prompt without its attachment would mislead Claude.
  */
 
+import { isUtf8 } from "node:buffer";
 import { lstatSync } from "node:fs";
 import { lstat, mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -48,6 +49,7 @@ export const IMAGE_SIDE = 8000;
 // at every turn, and a request is capped at 32 MB (Vision, read 2026-09-25).
 export const IMAGES_PER_MESSAGE = 10;
 export const IMAGES_LIMIT = 15 * 1024 * 1024;
+const OCTET_STREAM = "application/octet-stream";
 export const FILE_LIMIT = 100 * 1024 * 1024;
 // The files that are not images Claude receives (the maintainer, 2026-09-25: the most common
 // ones): any text/* type, which covers source code and Slack's .csv and .tsv, plus these. Read
@@ -168,7 +170,9 @@ export function refusal(file: SlackFile, names: Names): string | null {
         height: String(height ?? "None"),
       });
     }
-  } else if (!(mimetype.startsWith("text/") || FILE_TYPES.has(mimetype))) {
+  } else if (
+    !(mimetype.startsWith("text/") || FILE_TYPES.has(mimetype) || mimetype === OCTET_STREAM)
+  ) {
     return texts.fill(slackTexts.UPLOAD_FILE_TYPE, { mimetype: mimetype || "unknown" });
   } else if (size > FILE_LIMIT) {
     return texts.fill(slackTexts.UPLOAD_FILE_SIZE, {
@@ -177,6 +181,19 @@ export function refusal(file: SlackFile, names: Names): string | null {
     });
   }
   return null;
+}
+
+/**
+ * Why a downloaded file cannot reach Claude, judged from its bytes; null when it can. Slack labels
+ * a large text file `application/octet-stream` (a 5 MB `.txt` of HTML, measured 2026-11-07, #183;
+ * the same content at 2 KB arrives as `text/plain`), so that type passes `refusal` and is a text
+ * file only when its bytes are UTF-8 with no NUL byte; any other is refused as `refusal` did.
+ */
+export function contentRefusal(file: SlackFile, bytes: Uint8Array): string | null {
+  const mimetype = String(field(file, "mimetype") || "");
+  if (mimetype !== OCTET_STREAM) return null;
+  const text = isUtf8(bytes) && !bytes.includes(0);
+  return text ? null : texts.fill(slackTexts.UPLOAD_FILE_TYPE, { mimetype });
 }
 
 /** Why the images of one message, together, cannot reach Claude; null when they can. */
