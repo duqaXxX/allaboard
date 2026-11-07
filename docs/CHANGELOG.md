@@ -32,6 +32,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The SDK release watch installs the release it tests with `npm install --no-save`, so
+  `package.json` keeps the pin. With the pin moved, the two tests that ask for the pinned release's
+  probe observations failed on every new release, and the issue read `fail` whether or not the
+  release broke anything (#216).
 - A failed `agents.sessions.setStatus` call is sent again (#206). It counts as not sent and a
   timer of its own retries after 5, 15 and 45 seconds, then every 300 seconds, until a call
   succeeds; a newly wanted status is sent at once and gets its own backoff from 5 seconds. The
