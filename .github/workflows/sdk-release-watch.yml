@@ -62,10 +62,14 @@ jobs:
         id: tests
         env:
           LATEST: ${{ steps.versions.outputs.latest }}
+        # `--no-save` puts the release in node_modules and leaves package.json on the pin. The
+        # suite asks for the pinned release's probe observations, which only the certifying run on
+        # the owner's machine writes: with the pin moved here, every new release failed on that
+        # alone, and a real failure read the same.
         run: |
           set -uo pipefail
           if ! npm ci --silent ||
-            ! npm install --silent --save-exact "@anthropic-ai/claude-agent-sdk@$LATEST"; then
+            ! npm install --silent --no-save "@anthropic-ai/claude-agent-sdk@$LATEST"; then
             echo "outcome=install failed" >> "$GITHUB_OUTPUT"; echo "cli=0.0.0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
