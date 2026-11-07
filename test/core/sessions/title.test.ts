@@ -1,13 +1,13 @@
 /** ThreadTitle over a state file and a chat and an agent that are a few functions each. */
+
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { AgentBackend } from "../../../src/agent/seam.ts";
 import { ChatError, type ChatProvider } from "../../../src/chat/seam.ts";
 import { logger, ThreadTitle } from "../../../src/core/sessions/title.ts";
 import { StateStore } from "../../../src/core/state.ts";
+import { tempDirSync } from "../../support/temp.ts";
 
 const CHANNEL = "chan-1";
 const THREAD = "thread-1";
@@ -20,7 +20,7 @@ function setup(
   options: { title?: () => Promise<string | null> } = {},
 ) {
   (t.mock.method as (o: object, m: string, f: () => void) => unknown)(logger, "warning", () => {});
-  const dir = mkdtempSync(join(tmpdir(), "allaboard-title-"));
+  const dir = tempDirSync("allaboard-title-");
   const state = new StateStore(join(dir, "state.json"));
   state.bind(CHANNEL, dir);
   state.openThread(CHANNEL, THREAD, "session-1");

@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { CLAIMS } from "../../probe/claims.ts";
 import { byHand, FEATURES, features, testModuleExists } from "../../probe/features.ts";
+import { tempDirSync } from "../support/temp.ts";
 
 function tableAt(text: string): string {
-  const path = join(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")), "features.md");
+  const path = join(tempDirSync("allaboard-probe-test-"), "features.md");
   writeFileSync(path, text);
   return path;
 }

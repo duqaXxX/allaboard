@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { readLimits } from "../../probe/limits.ts";
 import { LIMITS_HEADING } from "../../src/agent/claude/module.ts";
+import { tempDirSync } from "../support/temp.ts";
 
 function pageAt(text: string): string {
-  const path = join(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")), "limits.md");
+  const path = join(tempDirSync("allaboard-probe-test-"), "limits.md");
   writeFileSync(path, text);
   return path;
 }

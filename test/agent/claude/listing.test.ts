@@ -7,11 +7,11 @@
  * derived here independently of `listing.ts`, and the SDK's own `listSessions` has to find them:
  * the test fails when the package names its folders differently.
  */
+
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { closeSync, constants, openSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, realpath, rm, symlink, utimes, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, realpath, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import {
@@ -27,6 +27,7 @@ import {
 } from "../../../src/agent/claude/listing.ts";
 import type { ListedSession } from "../../../src/agent/seam.ts";
 import { RESUME_ROWS as PICKER_ROWS } from "../../../src/chat/slack/resume.ts";
+import { tempDir } from "../../support/temp.ts";
 
 const LIMIT = { timeout: 10_000 };
 // A superuser reads a closed folder anyway, and Windows has no such mode.
@@ -41,7 +42,7 @@ const NOW = new Date(2026, 8, 25, 12, 0).getTime();
 
 /** A config directory and a project folder of the test, with `CLAUDE_CONFIG_DIR` pointing at it. */
 async function workspace(t: TestContext): Promise<{ config: string; project: string }> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), "allaboard-listing-")));
+  const root = await realpath(await tempDir("allaboard-listing-"));
   const previous = process.env.CLAUDE_CONFIG_DIR;
   process.env.CLAUDE_CONFIG_DIR = join(root, "config");
   t.after(() => {
@@ -322,7 +323,7 @@ const POSIX = {
 const ENTRY = `${JSON.stringify({ type: "user", timestamp: "2026-09-25T10:00:00.000Z" })}\n`;
 
 async function folderOf(t: TestContext): Promise<string> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), "allaboard-stamp-")));
+  const root = await realpath(await tempDir("allaboard-stamp-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }

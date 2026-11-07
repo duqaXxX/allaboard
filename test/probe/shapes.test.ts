@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Query } from "@anthropic-ai/claude-agent-sdk";
@@ -15,6 +14,7 @@ import {
 } from "../../probe/shapes.ts";
 import { type Records, tapped } from "../../probe/tap.ts";
 import { type JsonObject, sdkRecords } from "../support/fixtures.ts";
+import { tempDirSync } from "../support/temp.ts";
 
 const NONE: Accepted = { kinds: {}, paths: {}, tools: {} };
 
@@ -70,7 +70,7 @@ test("a null is covered by any type the path is known with", () => {
 });
 
 test("an accepted file that is not its shape is refused before a run", () => {
-  const folder = mkdtempSync(join(tmpdir(), "allaboard-shapes-"));
+  const folder = tempDirSync("allaboard-shapes-");
   const bad = join(folder, "accepted.json");
   writeFileSync(
     bad,

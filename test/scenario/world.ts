@@ -12,10 +12,10 @@
  * for a capability the chat does not declare (`strayCalls`), and the plain agent is wrapped to
  * record a call the core made for one it does not declare (`World.undeclared`).
  */
+
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
 import type { AgentEntry, AgentSession, Prompt } from "../../src/agent/seam.ts";
@@ -36,6 +36,7 @@ import {
 } from "../support/plain-agent.ts";
 import { repositoryAt } from "../support/repositories.ts";
 import { heldByARunningDaemon, realWorkDone, SettledClock } from "../support/settle.ts";
+import { tempDirSync } from "../support/temp.ts";
 import { FakeMachine } from "../support/updates.ts";
 
 /** The names the registry holds the two modules under, and so the values of the `.env`. */
@@ -194,7 +195,7 @@ export class World {
   #started = latch();
 
   private constructor(t: TestContext, options: WorldOptions) {
-    const base = realpathSync(mkdtempSync(join(tmpdir(), "allaboard-scenario-")));
+    const base = realpathSync(tempDirSync("allaboard-scenario-"));
     this.base = base;
     this.home = options.home ?? join(base, "home");
     this.machine = new FakeMachine(join(base, "machine"), installedVersion());

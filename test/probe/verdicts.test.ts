@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
@@ -23,6 +22,7 @@ import {
   summary,
   writeObservations,
 } from "../../probe/verdicts.ts";
+import { tempDirSync } from "../support/temp.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 const GESTURE = claim("P1", "gesture", "a gesture", "src/core/commands.ts#parseBang", "how");
@@ -111,7 +111,7 @@ test("a limit claim that fell is newly supported and asks for the page to change
 });
 
 test("claim ids sort P before L and by number in the observations file", () => {
-  const dir = mkdtempSync(join(tmpdir(), "allaboard-probe-test-"));
+  const dir = tempDirSync("allaboard-probe-test-");
   try {
     writeObservations(dir, "0.0.1", stored({ L2: {}, P10: {}, L1: {}, P2: {} }));
     const kept = readObservations(dir, "0.0.1");
@@ -223,7 +223,7 @@ test("a report against no stored baseline says so", () => {
 });
 
 test("observations keep the facts of the claims that hold, and read back as written", () => {
-  const dir = mkdtempSync(join(tmpdir(), "allaboard-observations-"));
+  const dir = tempDirSync("allaboard-observations-");
   try {
     const results = [
       holds(GESTURE, { z: 1, a: { y: true, b: ["q"] } }),
@@ -245,7 +245,7 @@ test("observations keep the facts of the claims that hold, and read back as writ
 });
 
 test("a file that is not an observations file is refused", () => {
-  const dir = mkdtempSync(join(tmpdir(), "allaboard-observations-"));
+  const dir = tempDirSync("allaboard-observations-");
   try {
     writeObservations(dir, "1.0.0", stored({}));
     writeObservations(dir, "1.0.1", { cli: "1", date: "d", claims: { P1: 3 as unknown as Facts } });

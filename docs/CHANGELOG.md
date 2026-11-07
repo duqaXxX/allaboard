@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- The tests no longer leave their scratch folders in the temp directory (about 100,000 had piled up).
+  `test/support/temp.ts` makes a folder and removes it when the test process ends; the `test` script runs
+  through `.github/scripts/run-tests.mjs`, which fails when a run leaves a new `allaboard-*` entry in
+  the temp directory.
+
 ### Added
 
 - Saved copies of attached files older than 3 days are also removed every 6 hours while the daemon runs (`attachments.sweepEvery`, `SWEEP_EVERY_SECONDS`), not only at start, under the same rules: a private folder only, by mtime, errors per file ignored.

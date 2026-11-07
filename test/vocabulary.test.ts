@@ -12,16 +12,9 @@
  * and the entry files); the `patterns` of the Web API's methods (all of `src/` outside the
  * modules); the ids of Slack in the core's tests and the scenarios.
  */
+
 import assert from "node:assert/strict";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { test } from "node:test";
 import { loadSurface, type Row, setAside } from "../probe/surface.ts";
@@ -30,6 +23,7 @@ import { systemClock } from "../src/clock.ts";
 import type { ModuleWords } from "../src/module-setup.ts";
 import { REGISTRY } from "../src/registry.ts";
 import { blank } from "./support/source-scan.ts";
+import { tempDirSync } from "./support/temp.ts";
 
 const SRC = join(import.meta.dirname, "..", "src");
 
@@ -97,7 +91,7 @@ test("the scan finds a word in an identifier and in a string, and not in a comme
 });
 
 test("the homes and the words come from the module directories, whatever their names", () => {
-  const src = mkdtempSync(join(tmpdir(), "allaboard-vocabulary-"));
+  const src = tempDirSync("allaboard-vocabulary-");
   for (const directory of ["agent/codex", "agent/claude", "chat/discord", "core"]) {
     mkdirSync(join(src, directory), { recursive: true });
   }
@@ -202,7 +196,7 @@ export function importingModules(
 }
 
 test("the scan finds the files that reach an agent module, whatever its name and however far", () => {
-  const root = mkdtempSync(join(tmpdir(), "allaboard-imports-"));
+  const root = tempDirSync("allaboard-imports-");
   for (const directory of [
     "src/agent/codex",
     "src/chat",
@@ -237,7 +231,7 @@ test("the scan finds the files that reach an agent module, whatever its name and
 });
 
 test("the scan follows an import through a source file and finds a bare import", () => {
-  const root = mkdtempSync(join(tmpdir(), "allaboard-imports-"));
+  const root = tempDirSync("allaboard-imports-");
   for (const directory of ["src/agent/codex", "src/chat", "src/core", "tests/core"]) {
     mkdirSync(join(root, directory), { recursive: true });
   }
@@ -287,7 +281,7 @@ test("no scenario reaches an agent module", () => {
 });
 
 test("the scan keeps the two kinds of module apart, whatever their names", () => {
-  const root = mkdtempSync(join(tmpdir(), "allaboard-imports-"));
+  const root = tempDirSync("allaboard-imports-");
   for (const directory of [
     "src/agent/codex",
     "src/chat/discord",
@@ -322,7 +316,7 @@ test("the scan keeps the two kinds of module apart, whatever their names", () =>
 });
 
 test("a file listed as wiring is skipped only through its importers, and a direct import counts", () => {
-  const root = mkdtempSync(join(tmpdir(), "allaboard-imports-"));
+  const root = tempDirSync("allaboard-imports-");
   for (const directory of ["src/agent", "src/chat/discord", "tests/scenario", "tests/core"]) {
     mkdirSync(join(root, directory), { recursive: true });
   }
@@ -592,7 +586,7 @@ export function patternLeaks(src: string, patterns: readonly RegExp[]): string[]
 }
 
 test("a module's literals and patterns are found in the core, an entry file and the host", () => {
-  const src = mkdtempSync(join(tmpdir(), "allaboard-literals-"));
+  const src = tempDirSync("allaboard-literals-");
   for (const directory of ["agent/codex", "chat/discord", "core", "host"]) {
     mkdirSync(join(src, directory), { recursive: true });
   }
@@ -646,7 +640,7 @@ test("no source outside the modules names a method of a chat's Web API", () => {
   const patterns = declaredWords().flatMap((words) => words.patterns);
   assert.ok(patterns.length > 0);
   // The `agents.` family (`agents.sessions.setStatus`) is a method of the chat's Web API too.
-  const probe = mkdtempSync(join(tmpdir(), "allaboard-agents-"));
+  const probe = tempDirSync("allaboard-agents-");
   for (const directory of ["agent", "chat", "core"]) {
     mkdirSync(join(probe, directory), { recursive: true });
   }
@@ -762,7 +756,7 @@ test("the SDK's names are read from the surface table, minus the seam's own and 
 });
 
 test("an SDK name in the core, the chat or an entry file is found, and an allowed one is not", () => {
-  const src = mkdtempSync(join(tmpdir(), "allaboard-sdk-"));
+  const src = tempDirSync("allaboard-sdk-");
   for (const directory of ["core", "chat/discord", "host", "agent/codex"]) {
     mkdirSync(join(src, directory), { recursive: true });
   }
@@ -816,7 +810,7 @@ test("the core, the chat and the entry files hold no model alias of the agent", 
   assert.ok(aliases.includes("opus"), "the recording lists the alias the audit used");
   const found = leaks(SRC, filesOf(SRC, ["core", "chat"], true), (s) => literalsNamed(s, aliases));
   assert.deepEqual(found, []);
-  const src = mkdtempSync(join(tmpdir(), "allaboard-alias-"));
+  const src = tempDirSync("allaboard-alias-");
   mkdirSync(join(src, "core"), { recursive: true });
   writeFileSync(join(src, "core", "m.ts"), 'const model = "opus";\n');
   assert.deepEqual(
@@ -900,7 +894,7 @@ test("the strings of an agent's AgentWords are found in the core and the chat", 
     "goal clear",
     "login",
   ]);
-  const src = mkdtempSync(join(tmpdir(), "allaboard-agent-words-"));
+  const src = tempDirSync("allaboard-agent-words-");
   for (const directory of ["core", "chat"]) mkdirSync(join(src, directory), { recursive: true });
   writeFileSync(
     join(src, "core", "c.ts"),
@@ -942,7 +936,7 @@ test("the core and the chat hold none of the strings an agent's AgentWords decla
 });
 
 test("the scan reaches an agent module from a scenario, except through the daemon's registry", () => {
-  const root = mkdtempSync(join(tmpdir(), "allaboard-scenario-"));
+  const root = tempDirSync("allaboard-scenario-");
   for (const directory of ["src/agent/codex", "src/chat", "tests/scenario"]) {
     mkdirSync(join(root, directory), { recursive: true });
   }
