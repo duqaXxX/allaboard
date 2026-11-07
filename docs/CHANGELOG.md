@@ -41,6 +41,15 @@ All notable changes to this project are documented here. The format follows
   `package.json` keeps the pin. With the pin moved, the two tests that ask for the pinned release's
   probe observations failed on every new release, and the issue read `fail` whether or not the
   release broke anything (#216).
+- A message whose first message is already gone opens nothing and posts nothing outside its
+  thread (#221). The Slack provider asks `conversations.replies` for the root of each new thread
+  before it hands the message over (no resend of a rate limited or failed lookup: it lets the
+  message through), and drops it on `thread_not_found`. Every post into a thread goes through
+  `postInThread`, which deletes a post Slack placed in the channel (the thread's root is gone, so
+  `message.thread_ts` is absent) and fails with the new `ChatFailure` `gone`. A deleted first
+  message now cancels a waiting setup or same-folder hold first (the form is deleted, nothing is
+  sent, no `Not sent.`), then forgets the thread; a reply queued behind the cancelled question is
+  dropped. A post that comes back with no `message.thread_ts` is deleted only once `conversations.replies` confirms the root is gone; a `!` word asks no lookup and a lookup past 3 seconds lets the message through. `chat.startStream` and `files.uploadV2` into a gone root are not measured; a reply under a tombstoned root answers with `thread_ts` and keeps working.
 - A failed `agents.sessions.setStatus` call is sent again (#206). It counts as not sent and a
   timer of its own retries after 5, 15 and 45 seconds, then every 300 seconds, until a call
   succeeds; a newly wanted status is sent at once and gets its own backoff from 5 seconds. The

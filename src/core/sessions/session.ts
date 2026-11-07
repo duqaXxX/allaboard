@@ -697,6 +697,16 @@ export class ThreadSession {
     return this.rewinding || this.waitingForOwner || !this.idle;
   }
 
+  /**
+   * `inUse` with the owner's same-folder hold or setup question left out (`HOLD_MARKER`): a turn,
+   * a rewind, an approval or an agent question still count. What a deleted first message may
+   * cancel (`SessionManager.holdGone`).
+   */
+  get inUseBesidesHold(): boolean {
+    const asked = [...this.waiting].some((marker) => marker !== HOLD_MARKER);
+    return this.rewinding || asked || !this.idle;
+  }
+
   /** Whether the owner chose `Send here` for the terminal `id`: stored, so a restart keeps it. */
   terminalAllowed(id: string): boolean {
     return (

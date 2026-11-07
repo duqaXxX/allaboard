@@ -38,6 +38,8 @@ export class SessionManager {
   private readonly rewinds = new Map<string, Kept>();
   /** The threads being deleted (`release`): no session is handed out or built in one. */
   private readonly heldThreads = new Set<string>();
+  /** The held threads whose first message is gone (`holdGone`). */
+  private readonly goneThreads = new Set<string>();
   /**
    * Set at the top of `closeAll`: a listener still in flight when a stop ends must not build a
    * session nobody will close, nor write `state.json` after the lock was released (Node's
@@ -288,11 +290,38 @@ export class SessionManager {
    * and so never ends another's.
    */
   hold(channelId: string, threadId: string): boolean {
+    return this.take(channelId, threadId, (session) => session.inUse);
+  }
+
+  /**
+   * `hold` for a thread whose first message is gone: a session whose only use is the owner's
+   * question (a setup or a same-folder hold, about to be cancelled) does not refuse it. A turn,
+   * a rewind or an approval still do.
+   */
+  holdGone(channelId: string, threadId: string): boolean {
+    const taken = this.take(channelId, threadId, (session) => session.inUseBesidesHold);
+    if (taken) this.goneThreads.add(keyOf(channelId, threadId));
+    return taken;
+  }
+
+  /**
+   * Whether the thread is held because its first message is gone (`holdGone`), as against a
+   * delete under way (`held`): a message queued meanwhile asks and posts nothing.
+   */
+  gone(channelId: string, threadId: string): boolean {
+    return this.goneThreads.has(keyOf(channelId, threadId));
+  }
+
+  private take(
+    channelId: string,
+    threadId: string,
+    busy: (session: ThreadSession) => boolean,
+  ): boolean {
     if (this.closed) return false;
     const key = keyOf(channelId, threadId);
     if (this.heldThreads.has(key)) return false;
     const session = this.sessions.get(key);
-    if (session !== undefined && !session.closed && session.inUse) return false;
+    if (session !== undefined && !session.closed && busy(session)) return false;
     // (sync) Held before the first await: a message that arrives while the session closes, or
     // while the thread's messages are deleted, must not build a session in it.
     this.heldThreads.add(key);
@@ -323,6 +352,7 @@ export class SessionManager {
   /** End the hold `release` put on a thread: its delete ended, either way. */
   free(channelId: string, threadId: string): void {
     this.heldThreads.delete(keyOf(channelId, threadId));
+    this.goneThreads.delete(keyOf(channelId, threadId));
   }
 
   /**

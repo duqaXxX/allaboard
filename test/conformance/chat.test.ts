@@ -550,7 +550,8 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     },
     refuseWrites: () => refuse(...WRITES),
     removeChannel: () => refuse("conversations.info"),
-    removeThread: () => {
+    removeThread: (gone) => {
+      world.slack.goneRoots.add(gone.thread);
       world.slack.responses["conversations.replies"] = rejected("thread_not_found");
     },
     failLookups: () => {
