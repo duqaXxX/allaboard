@@ -345,7 +345,7 @@ test("a stop of the channel closes the processes of its sessions together", asyn
     client.close = async () => {
       entered.push(index);
       await gate.wait();
-      await close();
+      return close();
     };
   }
   const stopping = world.dispatch(message("!stop", { ts: "1790019999.000100" }));

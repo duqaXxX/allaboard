@@ -33,6 +33,7 @@ import type {
   AgentSession,
   AgentWords,
   Capabilities,
+  ClosedReport,
   CommandInfo,
   ContextUsage,
   FileChange,
@@ -665,13 +666,20 @@ export class PlainSession implements AgentSession {
     };
   }
 
-  async close(): Promise<void> {
+  /** What `close` reports; a test sets it. */
+  report: ClosedReport = { unsaved: null };
+  /** The options of every `close` call, in order. */
+  readonly closeCalls: Array<{ readonly awaitExit?: boolean } | undefined> = [];
+
+  async close(options?: { readonly awaitExit?: boolean }): Promise<ClosedReport> {
+    this.closeCalls.push(options);
     if (!this.closed) {
       this.closed = true;
       this.#turn?.abort();
       this.#queue.end();
     }
     await this.#chain;
+    return this.report;
   }
 
   #nextId(prefix: string): string {

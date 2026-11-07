@@ -431,6 +431,9 @@ test("a move to a terminal during a rewind's start leaves no cut stored", async 
   open();
   await rewinding;
   assert.equal(world.state.thread(ref.channel, ref.thread)?.pendingCut, null);
+  // The terminal already uses the session id: the process the rewind started is not let exit on
+  // its own.
+  assert.deepEqual(agent.sessions[1]?.closeCalls, [{ awaitExit: false }]);
 
   // The process that start left holds the cut: the next message must not make it stick.
   agent.start = start;
@@ -538,7 +541,7 @@ test("a move to the terminal during a rewind leaves it refused, not done", async
   });
   old.close = async () => {
     await gate;
-    await close();
+    return close();
   };
   const rewinding = session.rewindConversation(first, [first]);
   await world.settle(5);
@@ -567,7 +570,7 @@ test("a prompt queued behind a rewind is answered by the session the rewind left
   });
   old.close = async () => {
     await gate;
-    await close();
+    return close();
   };
   const rewinding = session.rewindConversation(first, [first]);
   agent.next(say("answered after the rewind"));
@@ -599,7 +602,7 @@ test("a session reads in use while it rewinds", async (t) => {
   old.close = async () => {
     seen = session.inUse;
     await gate;
-    await close();
+    return close();
   };
   const rewinding = session.rewindConversation(first, [first]);
   await world.settle(5);

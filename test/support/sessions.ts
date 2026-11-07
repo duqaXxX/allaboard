@@ -37,6 +37,7 @@ import type {
   AgentInfo,
   AgentSession,
   Capabilities,
+  ClosedReport,
   ContextUsage,
   ListedSession,
   PermissionAnswer,
@@ -413,11 +414,12 @@ export class FakeAgentSession implements AgentSession {
     return this.#script.advisor?.() ?? null;
   }
 
-  async close(): Promise<void> {
+  async close(): Promise<ClosedReport> {
     if (this.#script.closeGate !== undefined) await this.#script.closeGate.wait();
     this.connected = false;
     this.#feed.put(CLOSED);
     if (this.#script.closeError !== undefined) throw this.#script.closeError;
+    return { unsaved: null };
   }
 }
 

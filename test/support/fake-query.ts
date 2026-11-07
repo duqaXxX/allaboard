@@ -11,6 +11,7 @@
  * - inside a batch, `ask` (a call of the permission callback), `hook` (a run of a registered
  *   hook), `written` (entries Claude Code appends to the session's transcript, the file
  *   `FakeScript.transcript`), `END` (the process exits) and `fail` (the stream throws);
+ * - `afterInput`: what the process does once the input ends, before it exits on its own;
  * - `holdClose`: a close that ends the stream only when the test lets it, as a CLI takes real
  *   time to flush and exit after EOF.
  */
@@ -111,6 +112,11 @@ export interface FakeScript {
   readonly start?: Batch;
   /** The answer to the initialize request. */
   readonly init?: unknown;
+  /**
+   * Delivered when the input ends, as the CLI does as it exits; a batch that holds `END` exits.
+   * Absent, the process stays up until it is closed.
+   */
+  readonly afterInput?: Batch;
   /** The initialize request answers after this many milliseconds. */
   readonly initDelayMs?: number;
   /** The initialize request fails with this, as when Claude Code refuses to resume. */
@@ -188,6 +194,7 @@ export class FakeQuery implements QueryHandle {
       if (batch !== undefined) this.#feed.push(this.#replayed(batch, message));
     }
     this.inputEnded = true;
+    if (this.#script.afterInput !== undefined) this.#feed.push(this.#script.afterInput);
   }
 
   /** `batch` with the replay of the prompt it answers, as Claude Code sends it. */
