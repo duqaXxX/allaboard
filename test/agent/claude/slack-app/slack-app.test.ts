@@ -1785,6 +1785,29 @@ test("a file reaches claude as a path to its saved copy", async (t) => {
   assert.equal(queries[0], `${body.event.text}\n\nAttached files:\n- ${saved}`);
 });
 
+// Slack labels a large text file `application/octet-stream` (#183, measured 2026-11-07).
+test("a text file Slack labels octet-stream reaches claude as a path to its saved copy", async (t) => {
+  const world = worldOf(t);
+  const body = sharedFile("snippet", { mimetype: "application/octet-stream" });
+  world.downloads.set(body.event.files[0].url_private_download, HELLO);
+  await world.dispatch(body);
+  const saved = join(world.uploads, "F000FILE-notes.txt");
+  assert.deepEqual(world.queries(), [`${body.event.text}\n\nAttached files:\n- ${saved}`]);
+});
+
+test("a binary file Slack labels octet-stream sends nothing, saves nothing and says why", async (t) => {
+  const world = worldOf(t);
+  const body = sharedFile("snippet", { mimetype: "application/octet-stream" });
+  world.downloads.set(body.event.files[0].url_private_download, new Uint8Array([0x68, 0, 0x69]));
+  await world.dispatch(body);
+  const reason = fill(slackTexts.UPLOAD_FILE_TYPE, { mimetype: "application/octet-stream" });
+  assert.deepEqual(world.ephemerals(), [
+    fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), { name: "notes.txt", reason }),
+  ]);
+  assert.deepEqual(world.queries(), []);
+  assert.deepEqual(existsSync(world.uploads) ? readdirSync(world.uploads) : [], []);
+});
+
 test("a refused file sends nothing and says why", async (t) => {
   const world = worldOf(t);
   await world.dispatch(sharedFile("image", { mimetype: "image/heic" }));

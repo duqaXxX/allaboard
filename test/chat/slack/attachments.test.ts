@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import {
+  contentRefusal,
   DownloadFailed,
   download,
   type FetchFn,
@@ -286,7 +287,6 @@ for (const mimetype of READABLE) {
 
 const OTHERS: [string, string][] = [
   ["7z", "application/x-7z-compressed"],
-  ["application/octet-stream", "application/octet-stream"],
   ["application/x-msdownload", "application/x-msdownload"],
   ["macro-enabled workbook", "application/vnd.ms-excel.sheet.macroenabled.12"],
   ["empty", ""],
@@ -504,4 +504,35 @@ test("a size too large for a double keeps its digits, as Python shows them", () 
       texts.fill(slackTexts.UPLOAD_FILE_SIZE, { size: shown, limit: "100.0MB" }),
     );
   }
+});
+
+// Slack labelled a 5 MB `.txt` of HTML `application/octet-stream` (measured 2026-11-07, #183): the
+// bytes decide, once downloaded.
+const OCTET = { mimetype: "application/octet-stream" };
+const BINARY_REFUSAL = texts.fill(slackTexts.UPLOAD_FILE_TYPE, {
+  mimetype: "application/octet-stream",
+});
+
+test("an octet-stream file is not refused before its bytes are read", () => {
+  assert.equal(refusal(shared("snippet", OCTET), PLAIN_NAMES), null);
+});
+
+test("an octet-stream file of valid UTF-8 is passed on", () => {
+  const html = Buffer.from("<html><body>h\u00e9llo \u2603</body></html>");
+  assert.equal(contentRefusal(shared("snippet", OCTET), html), null);
+});
+
+test("an octet-stream file with a NUL byte is refused as before", () => {
+  const bytes = Buffer.from([0x3c, 0x68, 0x00, 0x3e]);
+  assert.equal(contentRefusal(shared("snippet", OCTET), bytes), BINARY_REFUSAL);
+});
+
+test("an octet-stream file of invalid UTF-8 is refused as before", () => {
+  const bytes = Buffer.from([0x3c, 0xff, 0xfe, 0x3e]);
+  assert.equal(contentRefusal(shared("snippet", OCTET), bytes), BINARY_REFUSAL);
+});
+
+test("a text/plain file is not looked into", () => {
+  const bytes = Buffer.from([0x00, 0xff]);
+  assert.equal(contentRefusal(shared("snippet", { mimetype: "text/plain" }), bytes), null);
 });

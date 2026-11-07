@@ -1361,8 +1361,11 @@ files and makes the prompt; the message flow reads it when the message's turn am
 comes, so nothing of the files reaches Claude Code before that. Every file is checked first (`attachments.refusal`): its download URL must be
 `https://files.slack.com/...`, the only host that receives the bot token, and its type and size
 must be within the limits listed in [Files in a message](setup.md#files-in-a-message). The image
-limits are those of Claude's vision API; a non-image file must be a `text/*` type or one of
-`attachments.FILE_TYPES`. One message takes at most the images `attachments.imagesRefusal` allows,
+limits are those of Claude's vision API; a non-image file must be a `text/*` type, one of
+`attachments.FILE_TYPES`, or `application/octet-stream`, the type Slack gives a large text file. An
+`application/octet-stream` file is judged on its bytes once downloaded (`attachments.contentRefusal`):
+it passes as text when they are UTF-8 with no NUL byte, and the whole message is refused otherwise,
+before any of its files is saved. One message takes at most the images `attachments.imagesRefusal` allows,
 since images stay in the conversation and are sent again at every turn, and a request is capped at
 32 MB. Then the
 files are downloaded together, with the bot token and no redirect followed, each within

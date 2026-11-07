@@ -37,6 +37,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A text file Slack labels `application/octet-stream` (a 5 MB `.txt` of HTML arrived so, measured
+  2026-11-07) is downloaded and passed on when its bytes are UTF-8 with no NUL byte; any other
+  `application/octet-stream` file is refused as before (#183).
 - The SDK release watch installs the release it tests with `npm install --no-save`, so
   `package.json` keeps the pin. With the pin moved, the two tests that ask for the pinned release's
   probe observations failed on every new release, and the issue read `fail` whether or not the
