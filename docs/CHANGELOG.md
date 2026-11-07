@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- The tests no longer leave their scratch folders in the temp directory (about 100,000 had piled up).
+  `test/support/temp.ts` makes a folder and removes it when the test process ends; the `test` script runs
+  through `.github/scripts/run-tests.mjs`, which gives the suite a temp folder of its own and fails
+  when a test leaves something in it.
+
 ### Added
 
 - A `!fork` with no prompt no longer starts the copy's process: the first message with text sent in

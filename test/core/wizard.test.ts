@@ -2,20 +2,18 @@
  * `allaboard setup` as the core runs it: a fake prompter answers, a fake chat asks, and the
  * configuration folder is a temporary home.
  */
+
 import assert from "node:assert/strict";
 import {
   chmodSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { test } from "node:test";
 import { parseEnv } from "node:util";
 import { REQUIRED, SELECTORS } from "../../src/core/config.ts";
@@ -29,6 +27,7 @@ import {
   type WizardHost,
 } from "../../src/core/wizard.ts";
 import type { Check, ModuleSetup, SetupQuestion } from "../../src/module-setup.ts";
+import { tempDirSync } from "../support/temp.ts";
 
 /** A path under the home as the wizard shows it: `~`, then the system's separator. */
 const onScreen = (...parts: string[]): string => join("~", ...parts);
@@ -70,7 +69,7 @@ function chatOf(
 }
 
 function setupOf(root: string) {
-  const home = mkdtempSync(join(tmpdir(), "allaboard-wizard-"));
+  const home = tempDirSync("allaboard-wizard-");
   const output = {
     stdout: "",
     stderr: "",
@@ -134,7 +133,7 @@ const envOf = (home: string, folder = ".config/allaboard") => join(home, folder,
 
 test("the happy path writes the file, readable by its owner alone, and shows the path with ~", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf([
     question("A_TOKEN", () => ({ note: "fine" }), { secret: true }),
     question("B_NAME", accept),
@@ -184,7 +183,7 @@ test("the happy path writes the file, readable by its owner alone, and shows the
 
 test("the file's variables are listed before the file is written", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const file = envOf(home);
   let existedAtSummary: boolean | null = null;
   const watching = {
@@ -215,7 +214,7 @@ test("the file's variables are listed before the file is written", async () => {
 
 test("--instance writes that instance's folder", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const code = await answerWizard(
     DEV,
     chatOf([question("A", accept)]),
@@ -248,7 +247,7 @@ test("an .env that exists is refused before anything is asked, and left as it is
 
 test("a refused answer is said and asked again", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf([
     question("A", (answer): Check => (answer === "good" ? {} : { refusal: "Not that one." })),
   ]);
@@ -267,7 +266,7 @@ test("a refused answer is said and asked again", async () => {
 
 test("each answer prints one line: a fixed mask for a secret, the text, skipped, and the refusal", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf(
     [
       question("S", (a): Check => (a === "no" ? { refusal: "Nope." } : { note: "ok" }), {
@@ -298,7 +297,7 @@ test("each answer prints one line: a fixed mask for a secret, the text, skipped,
 
 test("a value that cannot be written is refused when it is typed and asked again", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const code = await answerWizard(
     DEFAULT_INSTANCE,
     chatOf([question("A", accept)]),
@@ -337,7 +336,7 @@ test("a configuration folder that cannot be looked at is a refusal naming the co
 
 test("the allowed root follows the daemon's rule: a relative path and a missing folder are refused", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const code = await answerWizard(
     DEFAULT_INSTANCE,
     chatOf([]),
@@ -351,7 +350,7 @@ test("the allowed root follows the daemon's rule: a relative path and a missing 
 
 test("an optional question is skipped on an empty answer and its variable is not written", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf([question("A", accept), question("OPT", accept, { optional: true })]);
   await answerWizard(DEFAULT_INSTANCE, chat, output, hostOf(home, ["a", "", projects], asked));
   assert.deepEqual(Object.keys(parseEnv(readFileSync(envOf(home), "utf8"))).sort(), [
@@ -364,7 +363,7 @@ test("an optional question is skipped on an empty answer and its variable is not
 
 test("a variable a check sets is written and its question is not asked", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf([
     question("USER", () => ({ set: { WHO: "alice" } }), {
       optional: true,
@@ -422,7 +421,7 @@ function twoOf(): SetupModules {
 
 test("the lists show every name with the default first, and a picked chat and agent run their own questions", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const listed: Listed[] = [];
   const code = await answerWizard(
     DEFAULT_INSTANCE,
@@ -468,7 +467,7 @@ test("a chosen chat with no setup is refused after the pick, and nothing is writ
 
 test("a chosen agent with no setup asks nothing more for it", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const modules = twoOf();
   const code = await answerWizard(
     DEFAULT_INSTANCE,
@@ -520,7 +519,7 @@ for (const at of [0, 1, 2]) {
 
 test("the service is offered where a manager exists, and yes installs it", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   let installed = 0;
   const host = hostOf(home, ["a", projects, "y"], asked, {
     installService: () => {
@@ -541,7 +540,7 @@ test("an empty answer to the service question means yes; n installs nothing", as
     ["n", 0],
   ] as const) {
     const { home, output, asked } = setupOf("");
-    const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+    const projects = tempDirSync("allaboard-projects-");
     let installed = 0;
     const host = hostOf(home, ["a", projects, typed], asked, {
       installService: () => {
@@ -557,7 +556,7 @@ test("an empty answer to the service question means yes; n installs nothing", as
 
 test("where there is no service manager the wizard ends after Wrote and asks nothing more", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const code = await answerWizard(
     DEFAULT_INSTANCE,
     chatOf([question("A", accept)]),
@@ -570,7 +569,7 @@ test("where there is no service manager the wizard ends after Wrote and asks not
 
 test("Ctrl-C at the service question keeps the file and ends with 130", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const host = hostOf(home, ["a", projects, null], asked, {
     installService: () => assert.fail("installed"),
   });
@@ -583,7 +582,7 @@ test("Ctrl-C at the service question keeps the file and ends with 130", async ()
 
 test("the file is never replaced: an .env that appears while the owner answers survives", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf([
     question("A", () => {
       mkdirSync(join(home, ".config/allaboard"), { recursive: true });
@@ -620,7 +619,7 @@ test("envText quotes what a bare value would not read back, and refuses what can
 
 test("the selectors are written first from the registry's defaults and never asked", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   await answerWizard(
     DEFAULT_INSTANCE,
     chatOf([question("A", accept)]),
@@ -636,7 +635,7 @@ test("the selectors are written first from the registry's defaults and never ask
 
 test("the agent's questions come after the chat's and the root, and Enter skips an optional one", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const modules = chatOf(
     [question("A", accept)],
     [
@@ -677,7 +676,7 @@ test("the variables the core writes are its selectors and its required ones", ()
 
 test("the chat and the agent are picked first, each from a list with the default preselected", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const listed: Listed[] = [];
   await answerWizard(
     DEFAULT_INSTANCE,
@@ -702,7 +701,7 @@ test("the chat and the agent are picked first, each from a list with the default
 
 test("the summary lists the file in order: a secret masked, a set value in clear, a skipped one absent", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf(
     [
       question("T", () => ({ set: { WHO: "alice" } }), { secret: true, sets: ["WHO"] }),
@@ -738,7 +737,7 @@ test("the summary lists the file in order: a secret masked, a set value in clear
 
 test("an empty answer gives the question's default, and a check's value is what is written", async () => {
   const { home, output, asked } = setupOf("");
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
+  const projects = tempDirSync("allaboard-projects-");
   const chat = chatOf([
     question(
       "HOURS",

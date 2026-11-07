@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
@@ -23,6 +22,7 @@ import { baselineOf, certified, compared, pinnedTo, storedResults } from "../../
 import { writeObservations } from "../../probe/verdicts.ts";
 import { LIMITS_HEADING } from "../../src/agent/claude/module.ts";
 import { type JsonObject, sdkRecords } from "../support/fixtures.ts";
+import { tempDirSync } from "../support/temp.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 const GESTURE = claim(
@@ -103,7 +103,7 @@ test("the baseline is the newest certified release below the probed one", () => 
 });
 
 test("a certified release reprints its comparison from what was stored", () => {
-  const dir = mkdtempSync(join(tmpdir(), "allaboard-probe-test-"));
+  const dir = tempDirSync("allaboard-probe-test-");
   const [first, second] = CLAIMS.filter((c) => c.retired === null);
   assert.ok(first && second);
   const stored = (a: number) => ({
@@ -128,7 +128,7 @@ test("a certified release reprints its comparison from what was stored", () => {
 });
 
 test("a certificate that lists the limits that fell is read, one with other keys is refused", () => {
-  const dir = mkdtempSync(join(tmpdir(), "allaboard-probe-test-"));
+  const dir = tempDirSync("allaboard-probe-test-");
   const path = join(dir, "certified-versions.json");
   const entry = { cli: "2", date: "d", holds: [], open: [], retired: [] };
   writeFileSync(path, JSON.stringify({ "0.3.1": { ...entry, fell: ["L1"] }, "0.3.2": entry }));
@@ -146,7 +146,7 @@ test("a certificate that lists the limits that fell is read, one with other keys
 });
 
 test("a certified release with a fallen limit reprints it as newly supported", () => {
-  const dir = mkdtempSync(join(tmpdir(), "allaboard-probe-test-"));
+  const dir = tempDirSync("allaboard-probe-test-");
   const entry = { cli: "2", date: "d", holds: [], open: [], retired: [], fell: ["L9"] };
   const stored = { cli: "2", date: "d", claims: {} };
   writeObservations(dir, "0.3.2", stored);
@@ -244,10 +244,7 @@ test("the pin moves only when there is exactly one", () => {
 });
 
 test("a certificate file of another shape is refused", () => {
-  const path = join(
-    mkdtempSync(join(tmpdir(), "allaboard-probe-test-")),
-    "certified-versions.json",
-  );
+  const path = join(tempDirSync("allaboard-probe-test-"), "certified-versions.json");
   assert.deepEqual(certified(path), {});
   const entry = { cli: "2.1.283", date: "2026-09-27", holds: [], open: [], retired: [] };
   writeFileSync(path, JSON.stringify({ "0.2.160": entry }));
@@ -259,7 +256,7 @@ test("a certificate file of another shape is refused", () => {
 test("the probe runs when started through a symlink, as `--latest` starts it under macOS's tmpdir", () => {
   // `/var` on macOS links to `/private/var`: a guard comparing `process.argv[1]` with the
   // module's own path skipped `main`, and the run in the worktree exited 0 having done nothing.
-  const link = join(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")), "probe");
+  const link = join(tempDirSync("allaboard-probe-test-"), "probe");
   symlinkSync(join(ROOT, "probe"), link);
   // An unknown option is refused by `main` alone: a run that never reached it exits 0.
   const run = spawnSync(process.execPath, [join(link, "main.ts"), "--no-such-option"], {
@@ -292,7 +289,7 @@ const PAGES: [string, string][] = [
 for (const [name, page] of PAGES) {
   test(`a limits page that names no command is an error [${name}]`, () => {
     // A page that lists nothing would make the claim hold on nothing.
-    const path = join(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")), "limits.md");
+    const path = join(tempDirSync("allaboard-probe-test-"), "limits.md");
     writeFileSync(path, page);
     assert.throws(() => notOffered(path), /limits\.md/);
   });
@@ -504,7 +501,7 @@ function isRecordOrigin(record: JsonObject, kind: string): boolean {
 test("P29: the SDK lists a transcript under the folder CLAUDE_CONFIG_DIR names", async () => {
   const { configFolderListing } = await import("../../probe/scenes.ts");
   // The real path, as the probe's own root is: Claude Code names a project by it.
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")));
+  const root = realpathSync(tempDirSync("allaboard-probe-test-"));
   const before = process.env.CLAUDE_CONFIG_DIR;
   const seen = await configFolderListing(root);
   assert.deepEqual(seen.P29, observation(true, true, ""));
@@ -515,7 +512,7 @@ test("P29: the SDK lists a transcript under the folder CLAUDE_CONFIG_DIR names",
 // P31 needs no token either: the scene writes a transcript of its own and tags it.
 test("P31: the SDK sets, changes and clears the tag of a transcript", async () => {
   const { sessionTag } = await import("../../probe/scenes.ts");
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")));
+  const root = realpathSync(tempDirSync("allaboard-probe-test-"));
   const before = process.env.CLAUDE_CONFIG_DIR;
   const seen = await sessionTag(root);
   assert.deepEqual(seen.P31, observation(true, true, ""));
@@ -771,7 +768,7 @@ test("the plain-session scene puts back the variables it removed when it throws"
   delete process.env.CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS;
   try {
     // A folder that does not exist makes the first mkdir throw, before any session starts.
-    const missing = join(mkdtempSync(join(tmpdir(), "allaboard-probe-test-")), "gone");
+    const missing = join(tempDirSync("allaboard-probe-test-"), "gone");
     await assert.rejects(plainSession({ root: missing } as never));
     assert.equal(process.env.BASH_DEFAULT_TIMEOUT_MS, "123");
     assert.equal(process.env.CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS, undefined);

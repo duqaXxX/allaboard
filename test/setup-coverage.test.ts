@@ -3,9 +3,9 @@
  * asked, or declared as set by an answer, in that entry's setup, and every question belongs to a
  * variable the entry declares. A new variable fails here until the wizard covers it.
  */
+
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { parseEnv } from "node:util";
@@ -14,6 +14,7 @@ import { DEFAULT_INSTANCE } from "../src/core/instance.ts";
 import { answerWizard } from "../src/core/wizard.ts";
 import type { ModuleSetup } from "../src/module-setup.ts";
 import { REGISTRY } from "../src/registry.ts";
+import { tempDirSync } from "./support/temp.ts";
 
 interface Described {
   readonly name: string;
@@ -54,8 +55,8 @@ for (const { name, declared, setup } of entries()) {
 }
 
 test("the wizard writes every selector and every variable the core requires", async () => {
-  const home = mkdtempSync(join(tmpdir(), "allaboard-coverage-"));
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-coverage-root-"));
+  const home = tempDirSync("allaboard-coverage-");
+  const projects = tempDirSync("allaboard-coverage-root-");
   const { chat, agent } = REGISTRY.defaults;
   // The modules ask nothing of their own here: what is left is the core's part of the file.
   const code = await answerWizard(
@@ -93,7 +94,7 @@ test("the wizard asks each selector as a list of the registry's names, not just 
     REGISTRY,
     { out: () => {}, err: () => {} },
     {
-      home: mkdtempSync(join(tmpdir(), "allaboard-coverage-")),
+      home: tempDirSync("allaboard-coverage-"),
       interactive: true,
       installService: null,
       prompter: {

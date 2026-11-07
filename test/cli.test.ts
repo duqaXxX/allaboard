@@ -3,10 +3,10 @@
  * else is refused with the usage, so a mistyped argument never starts a daemon. `--instance` (or
  * `ALLABOARD_INSTANCE`) picks which of the machine's daemons a command is about.
  */
+
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
@@ -22,6 +22,7 @@ import { DEFAULT_INSTANCE } from "../src/core/instance.ts";
 import { updateLock } from "../src/core/lock.ts";
 import type { ChatEntry } from "../src/core/port.ts";
 import type { Report, ServiceManager } from "../src/host/service/seam.ts";
+import { tempDirSync } from "./support/temp.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const VERSION = (
@@ -280,7 +281,7 @@ test("service stop goes on during an update when its daemon is not running", () 
 test("the machine's host reads the real update lock", {
   skip: process.platform === "darwin" ? false : "the lock of a service: macOS only",
 }, async (t) => {
-  const home = mkdtempSync(join(tmpdir(), "cli-update-lock-"));
+  const home = tempDirSync("cli-update-lock-");
   const before = process.env.HOME;
   t.after(() => {
     process.env.HOME = before;
@@ -328,7 +329,7 @@ function runEntry(args: string[], home: string, extra: Record<string, string> = 
 
 test("the entry answers --version without reading .env", (t) => {
   // Were the daemon started, it would end with 1 on the missing `.env`.
-  const home = mkdtempSync(join(tmpdir(), "allaboard-home-"));
+  const home = tempDirSync("allaboard-home-");
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const result = runEntry(["--version"], home);
   assert.equal(result.status, 0);
@@ -337,7 +338,7 @@ test("the entry answers --version without reading .env", (t) => {
 });
 
 test("the entry refuses an unknown argument with status 2 and starts nothing", (t) => {
-  const home = mkdtempSync(join(tmpdir(), "allaboard-home-"));
+  const home = tempDirSync("allaboard-home-");
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const result = runEntry(["status"], home);
   assert.equal(result.status, 2);
@@ -346,7 +347,7 @@ test("the entry refuses an unknown argument with status 2 and starts nothing", (
 });
 
 test("the entry refuses a bad instance name with status 2 and starts nothing", (t) => {
-  const home = mkdtempSync(join(tmpdir(), "allaboard-home-"));
+  const home = tempDirSync("allaboard-home-");
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const flag = runEntry(["--instance", "Work"], home);
   assert.equal(flag.status, 2);
@@ -358,7 +359,7 @@ test("the entry refuses a bad instance name with status 2 and starts nothing", (
 });
 
 test("the entry answers --version whatever ALLABOARD_INSTANCE holds", (t) => {
-  const home = mkdtempSync(join(tmpdir(), "allaboard-home-"));
+  const home = tempDirSync("allaboard-home-");
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const result = runEntry(["--version"], home, { ALLABOARD_INSTANCE: "Work" });
   assert.equal(result.status, 0);
@@ -366,7 +367,7 @@ test("the entry answers --version whatever ALLABOARD_INSTANCE holds", (t) => {
 });
 
 test("a named instance looks for its .env in its own folder", (t) => {
-  const home = mkdtempSync(join(tmpdir(), "allaboard-home-"));
+  const home = tempDirSync("allaboard-home-");
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const result = runEntry(["--instance", "dev"], home);
   assert.equal(result.status, 1);
@@ -417,8 +418,8 @@ test("setup hands the wizard the service of the instance, and the manager the pr
     build: () => assert.fail("built"),
     setup: () => ({ intro: [], questions: [] }),
   };
-  const projects = mkdtempSync(join(tmpdir(), "allaboard-projects-"));
-  const home = mkdtempSync(join(tmpdir(), "allaboard-home-"));
+  const projects = tempDirSync("allaboard-projects-");
+  const home = tempDirSync("allaboard-home-");
   const answers = [projects, "y"];
   const output = captured();
   const modules = {

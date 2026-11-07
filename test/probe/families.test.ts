@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { costOf, FAMILIES, type FamilyRun, familiesReport } from "../../probe/families.ts";
 import { type FullRecording, fullDue, lastFull } from "../../probe/main.ts";
 import { FIXTURES, fixtureRecords, missing } from "../../probe/shapes.ts";
 import { sdkRecords } from "../support/fixtures.ts";
+import { tempDirSync } from "../support/temp.ts";
 
 const LAST: FullRecording = {
   date: "2026-10-20",
@@ -117,7 +117,7 @@ test("each family checks it caused what it exists for", () => {
 });
 
 test("the last full recording is read whole or refused", () => {
-  const folder = mkdtempSync(join(tmpdir(), "allaboard-full-"));
+  const folder = tempDirSync("allaboard-full-");
   const path = join(folder, "full-recording.json");
   assert.equal(lastFull(path), null);
   writeFileSync(path, JSON.stringify(LAST));
