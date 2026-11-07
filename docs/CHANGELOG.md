@@ -9,8 +9,8 @@ All notable changes to this project are documented here. The format follows
 
 - The tests no longer leave their scratch folders in the temp directory (about 100,000 had piled up).
   `test/support/temp.ts` makes a folder and removes it when the test process ends; the `test` script runs
-  through `.github/scripts/run-tests.mjs`, which gives the suite a temp folder of its own and fails
-  when a test leaves something in it.
+  through `.github/scripts/run-tests.mjs`, which fails when a run leaves a new `allaboard-*` entry in
+  the temp directory.
 
 ### Added
 

@@ -4,7 +4,6 @@ import {
   existsSync,
   linkSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -16,7 +15,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import { open } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import {
@@ -36,13 +34,15 @@ import {
   gitTakesItFor,
   trust,
 } from "../../support/git-layouts.ts";
+import { tempDirSync } from "../../support/temp.ts";
 
 let tmp = "";
 let home = "";
 let warnings: string[] = [];
 
 beforeEach(() => {
-  tmp = realpathSync.native(mkdtempSync(join(tmpdir(), "allaboard-trust-")));
+  // Removed after each test, and at the process exit too should a test end before its hook runs.
+  tmp = realpathSync.native(tempDirSync("allaboard-trust-"));
   home = join(tmp, "home");
   mkdirSync(home);
   warnings = [];
