@@ -96,3 +96,14 @@ export class StartsBlocked extends Error {
     this.name = "StartsBlocked";
   }
 }
+
+/**
+ * The reason a prompt's ticket aborts with when the owner stops it before it reached the agent.
+ * Never `Cancelled`, which means the daemon stops and is rethrown by the flows.
+ */
+export class StoppedByOwner extends Error {
+  constructor() {
+    super("stopped by the owner");
+    this.name = "StoppedByOwner";
+  }
+}

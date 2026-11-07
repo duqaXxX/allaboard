@@ -21,12 +21,14 @@ export function holdFlow(deps: FlowDeps, talk: Talk): HoldFlow {
     ref: ThreadRef,
     session: ThreadSession,
     other: ThreadSession,
+    signal?: AbortSignal,
   ): Promise<boolean> {
     const otherRef = { channel: other.channelId, thread: other.threadId };
     const link = await talk.noticeLink(otherRef, "Session");
     const answer = await askOwner(deps, talk, ref, session, {
       kind: "hold",
       title: fill(texts.HOLD_QUESTION, { link }),
+      signal,
       request: (requestId): HoldRequest => ({ type: "hold", requestId, other: otherRef, link }),
     });
     return answer === true;

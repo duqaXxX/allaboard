@@ -112,7 +112,12 @@ One message's way from the chat to the agent and back, with Slack and Claude Cod
    [The message listener](slack-provider.md#the-message-listener).
 3. The listener calls `ChatInbound.message`. The message flow (`messages.messages`) reads a message
    that starts with `!` with `commands.parseBang`, as one of the daemon's words (`words.wordFlow`)
-   or as a passthrough to a command of the agent. Anything else is a prompt. A top-level message
+   or as a passthrough to a command of the agent. Anything else is a prompt. A prompt, a command and a `!fork` hold an in-flight ticket
+   (`InFlight`, `src/core/flows/in-flight.ts`) until they reach the session's queue; a stop of their
+   thread or channel aborts it and the message says `Not sent.`. A `!fork`'s ticket is released
+   before the copy is made, and the copy's prompt takes one in the copy's thread. A message refused
+   before it reaches the session (`hostOnly`, a thread that is not a session's, a file that could
+   not be read) says its refusal, not `Not sent.`. A top-level message
    opens a session (`SessionManager.open`); a reply in a thread gets that thread's session
    (`SessionManager.get`), rebuilt when a restart or an idle close dropped it. Before the prompt is
    sent, it can wait for the owner: a first prompt for the session's setup, and a prompt that would

@@ -43,6 +43,11 @@ export interface Question {
   readonly settle?: Settle;
   /** What comes back with an answer that carries only the id. */
   readonly context?: readonly ModelInfo[];
+  /**
+   * The prompt's ticket: aborted before the hold opens, the question is not asked and `Not sent.`
+   * is told here. An abort after that reaches the hold through `session.stop()`.
+   */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -65,6 +70,10 @@ export async function askOwner(
   // (sync) The check and the hold it guards: a drain cancels every hold open when it starts
   // and never one opened after, so nothing is awaited between the two.
   if (talk.stopped) return null;
+  if (question.signal?.aborted) {
+    await talk.tell(ref, texts.NOT_SENT);
+    return null;
+  }
   if (sessions.draining) {
     // a restart could have started during an await before this
     await talk.refuseRestarting(ref);

@@ -16,6 +16,7 @@ import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
 import type { ForkFlow, OtherFlows } from "./contract.ts";
+import type { InFlight, Ticket } from "./in-flight.ts";
 import { channelStatus } from "./status.ts";
 import { type FlowDeps, logger, type Talk } from "./talk.ts";
 
@@ -29,6 +30,10 @@ export interface WordPlace {
    * to send them, for the owner alone, and change nothing.
    */
   readonly outside: boolean;
+  /** The prompts this word aborted before they reached a session (a `!stop`); 0 for any other. */
+  readonly aborted: number;
+  /** The word's own ticket, taken by `!fork` only: a stop of its thread ends the wait. */
+  readonly ticket: Ticket | null;
 }
 
 /**
@@ -107,6 +112,14 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
 }
 
 /**
+ * A stop's answer given the prompts it aborted on their way: they were told `Not sent.` already,
+ * so a session that had nothing running answers null (nothing more to say), not false.
+ */
+function folded(result: boolean | null, aborted: number): boolean | null {
+  return result === false && aborted > 0 ? null : result;
+}
+
+/**
  * `!stop` inside a session's thread: either answer is a post that stays (a line for the owner
  * alone is gone on reload). False when nothing was stopped; when only a hold was cancelled or
  * messages not sent were dropped (null from the session, which said `Not sent.` or the note
@@ -115,9 +128,9 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
 export function threadStop(
   deps: FlowDeps,
   talk: Talk,
-): (ref: ThreadRef, session: ThreadSession) => Promise<boolean> {
-  return async (ref, session) => {
-    const stopped = await session.stop();
+): (ref: ThreadRef, session: ThreadSession, aborted: number) => Promise<boolean> {
+  return async (ref, session, aborted) => {
+    const stopped = folded(await session.stop(), aborted);
     // The answer goes under the ending and footer of the reply the stop cut short.
     if (stopped) await session.stopLanded();
     if (stopped !== null) {
@@ -132,12 +145,19 @@ export function threadStop(
  * `ChatInbound.stop`: the word's stop. A thread being deleted gets no post, which would outlive
  * it. A failure is told in the thread, as the word's is, and counts as stopped: work may be cut.
  */
-export function inboundStop(deps: FlowDeps, talk: Talk): (ref: ThreadRef) => Promise<boolean> {
+export function inboundStop(
+  deps: FlowDeps,
+  talk: Talk,
+  inFlight: InFlight,
+): (ref: ThreadRef) => Promise<boolean> {
   const stopThread = threadStop(deps, talk);
   return async (ref) => {
-    if (deps.sessions.held(ref.channel, ref.thread)) return false;
+    // (sync) First: what was handed over before this stop and has not reached a session.
+    const aborted = inFlight.abortThread(ref);
+    if (deps.sessions.held(ref.channel, ref.thread)) return aborted > 0;
     const session = deps.sessions.get(ref.channel, ref.thread);
     if (session === null) {
+      if (aborted > 0) return true;
       await talk.tell(ref, texts.NOTHING_TO_STOP_THREAD, { stays: true });
       return false;
     }
@@ -145,7 +165,7 @@ export function inboundStop(deps: FlowDeps, talk: Talk): (ref: ThreadRef) => Pro
     await talk.replyOnFailure(
       ref,
       async () => {
-        stopped = await stopThread(ref, session);
+        stopped = await stopThread(ref, session, aborted);
       },
       (told) => talk.tell(ref, told),
     );
@@ -179,7 +199,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
     }
   }
 
-  return async (ref, message, command, { session, outside }) => {
+  return async (ref, message, command, { session, outside, aborted, ticket }) => {
     const { channel, thread } = ref;
     const where = session === null ? null : thread;
     const quiet = session !== null;
@@ -319,9 +339,10 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
         return;
       case "stop":
         if (outside) {
-          await talk.tell(ref, texts.STOP_OUTSIDE_SESSION);
+          // A new thread whose prompt was still on its way: that prompt was told `Not sent.`
+          if (aborted === 0) await talk.tell(ref, texts.STOP_OUTSIDE_SESSION);
         } else if (session === null) {
-          const stopped = await sessions.stopChannel(channel);
+          const stopped = folded(await sessions.stopChannel(channel), aborted);
           // null: only a hold was cancelled or unsent messages were dropped somewhere in the
           // channel (`Not sent.` or the note, from the session); no second notice, since nothing
           // the agent was doing stopped.
@@ -329,7 +350,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
             await talk.inChannel(channel, stopped ? texts.STOPPED_CHANNEL : texts.NOTHING_TO_STOP);
           }
         } else {
-          await stopThread(ref, session);
+          await stopThread(ref, session, aborted);
         }
         return;
       case "memory":
@@ -352,7 +373,8 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
         if (session === null) {
           await talk.inChannel(channel, texts.FORK_TOP_LEVEL);
         } else {
-          await fork.word(ref, message, session, command.prompt);
+          if (ticket === null) throw new TypeError("a !fork reached its flow with no ticket");
+          await fork.word(ref, message, session, command.prompt, ticket);
         }
         return;
       case "diff":

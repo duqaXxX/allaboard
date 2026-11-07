@@ -39,7 +39,7 @@ export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow
   }
 
   return {
-    async word(ref, message, session, prompt) {
+    async word(ref, message, session, prompt, ticket) {
       const fork = agent.forkSession;
       const channelChat = chat.channel(ref.channel);
       if (
@@ -61,11 +61,19 @@ export function forkFlow(deps: FlowDeps, talk: Talk, send: SendPrompt): ForkFlow
       const live = (): ThreadSession | null => sessions.get(ref.channel, ref.thread);
       if (session.busy) {
         await talk.acknowledge(ref, message);
-        while ((live()?.busy ?? false) && !talk.stopped) {
-          await clock.sleep(FORK_POLL_SECONDS, deps.stopped).catch(() => {});
+        // A stop of this thread ends the wait as a daemon stop does.
+        const ends = AbortSignal.any([deps.stopped, ticket.signal]);
+        while ((live()?.busy ?? false) && !talk.stopped && !ends.aborted) {
+          await clock.sleep(FORK_POLL_SECONDS, ends).catch(() => {});
         }
         if (talk.stopped) return;
       }
+      if (ticket.signal.aborted) {
+        await talk.tell(ref, texts.NOT_SENT);
+        return;
+      }
+      // Past this point the copy is made, and a stop of the original no longer counts it.
+      ticket.release();
       // Read again: the wait may have outlasted the thread's entry, or a restart begun.
       const origin = state.thread(ref.channel, ref.thread);
       if (origin?.sessionId == null) throw new SessionGone(names);
