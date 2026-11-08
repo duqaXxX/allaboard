@@ -102,7 +102,7 @@ export function rootKind(status: string | null, ended: string | null): LineKind 
 
 /**
  * A thread of a channel as the line reads it: its root's `ts`, the word of its status, whether it
- * waits for the owner's answer to the agent (`asks`), and whether its root waits on its setup
+ * waits for the owner's answer (`asks`), and whether its root waits on its setup
  * form (`setup`), which the line draws as a wait and otherwise counts as work.
  */
 export interface LineThread {
@@ -114,9 +114,9 @@ export interface LineThread {
 
 /**
  * The thread whose root is `thread` as the line reads its entry of `state.json`: it asks the
- * owner while its root waits with an approval or a question open (`asksOwner`). A root that waits
- * on a request the owner just set off (the setup form, the hold, a shell command's confirmation)
- * is taken for working: he is there. A root waiting on its setup form is also `setup`: no turn
+ * owner while its root waits with an approval, a question or a held message open (`asksOwner`).
+ * A root that waits on a request the owner just set off (the setup form, a shell command's
+ * confirmation) is taken for working: he is there. A root waiting on its setup form is also `setup`: no turn
  * runs before his Start, and the line draws it as a wait (#233).
  */
 export function lineThread(
@@ -130,7 +130,7 @@ export function lineThread(
   const kind = rootKind(entry.status, entry.ended);
   const kinds = Object.values(entry.requestKinds);
   const asks = kind === "waiting" && kinds.some(asksOwner);
-  // What blocks on the owner and is not the agent's request: the setup form (`blocksOnOwner`).
+  // What blocks on the owner and is not a wait he is told of: the setup form (`blocksOnOwner`).
   const setup = kind === "waiting" && !asks && kinds.some(blocksOnOwner);
   return { thread, kind: kind === "waiting" && !asks ? "working" : kind, asks, setup };
 }

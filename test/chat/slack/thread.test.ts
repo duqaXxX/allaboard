@@ -489,6 +489,47 @@ test("a request's line links that request, and hears of its delete", async () =>
   assert.deepEqual(withdrawn, [[CHANNEL, THREAD, ts]]);
 });
 
+// #163: a message held back (by another session in the folder, or by a terminal) waits on the
+// owner as an approval does: he may have sent it and left.
+for (const request of [
+  {
+    type: "hold",
+    requestId: "hold-1",
+    other: { channel: CHANNEL, thread: "1792626999.000001" },
+    link: "the other thread",
+  },
+  { type: "terminal", requestId: "terminal-1", state: "open", running: null, command: "claude" },
+] as const satisfies readonly OwnerRequest[]) {
+  test(`a held message mentions the owner when asked, and moves the channel's line [${request.type}]`, async () => {
+    for (const mentionOwner of [true, false]) {
+      const { line, shown } = recordingLine();
+      const { slack, thread } = made({ line, mentionOwner });
+      await thread.ask(request.requestId, request, "Held");
+      assert.deepEqual(shown, [[CHANNEL, THREAD, "waiting"]]);
+      assert.equal(
+        slack.callsTo("chat.postMessage")[0]?.text,
+        mentionOwner ? `Held <@${OWNER}>` : "Held",
+      );
+    }
+  });
+}
+
+// A turn the terminal runs is waited out, asking nothing: the question after it tells him, once.
+test("a terminal's turn waited out names nothing, in the channel's line or to him", async () => {
+  const { line, shown } = recordingLine();
+  const { slack, thread } = made({ line, mentionOwner: true });
+  const busy: OwnerRequest = {
+    type: "terminal",
+    requestId: "t-1",
+    state: "busy",
+    running: null,
+    command: null,
+  };
+  await thread.ask("t-1", busy, "Held");
+  assert.deepEqual(shown, []);
+  assert.equal(slack.callsTo("chat.postMessage")[0]?.text, "Held");
+});
+
 // #72: these answer what the owner has just written in the thread, so he is there.
 for (const request of [
   {
@@ -500,12 +541,6 @@ for (const request of [
     selection: { model: "default", effort: "default", bypass: false },
   },
   { type: "shell", requestId: "shell-1", command: "git status", folder: "/work/web" },
-  {
-    type: "hold",
-    requestId: "hold-1",
-    other: { channel: CHANNEL, thread: "1792626999.000001" },
-    link: "the other thread",
-  },
 ] as const satisfies readonly OwnerRequest[]) {
   test(`a request the owner set off names nothing, in the channel's line or to him [${request.type}]`, async () => {
     const { line, shown } = recordingLine();

@@ -998,12 +998,17 @@ test("a request is announced when it changes whether the thread blocks on the ow
   const ref = { channel: CHANNEL, thread: THREAD };
   store.addRequest(CHANNEL, THREAD, "msg-7", "setup");
   assert.deepEqual(heard, [[ref]]);
-  store.addRequest(CHANNEL, THREAD, "msg-8", "hold"); // blocks already
-  store.removeRequest(CHANNEL, THREAD, "msg-7"); // the hold alone: the owner set it off
+  // The setup form answered, then a hold (#163): blocking already, the thread now asks the
+  // owner, and the line goes from drawing the form to asking.
+  store.addRequest(CHANNEL, THREAD, "msg-8", "hold");
+  assert.deepEqual(heard, [[ref], [ref]]);
+  store.removeRequest(CHANNEL, THREAD, "msg-7"); // the hold alone blocks and asks still
   assert.deepEqual(heard, [[ref], [ref]]);
   store.removeRequest(CHANNEL, THREAD, "msg-8");
-  store.addRequest(CHANNEL, THREAD, "msg-9", "shell");
-  assert.deepEqual(heard, [[ref], [ref]]);
+  assert.deepEqual(heard, [[ref], [ref], [ref]]);
+  heard.length = 0;
+  store.addRequest(CHANNEL, THREAD, "msg-9", "shell"); // the owner set it off
+  assert.deepEqual(heard, []);
   heard.length = 0;
   store.addRequest(CHANNEL, THREAD, "msg-10", "question");
   store.addRequest(CHANNEL, THREAD, "msg-11", "approval"); // blocks already

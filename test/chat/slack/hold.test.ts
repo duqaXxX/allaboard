@@ -11,12 +11,19 @@ function buttons(blocks: Record<string, unknown>[]): Button[] {
 
 test("the hold question names the link and carries the id on both buttons", () => {
   const blocks = holdBlocks("hold-1", "<https://example.slack.com/x|Session>");
+  // Rich text, beside which the request's mention pushes (#163).
   assert.deepEqual(blocks[0], {
-    type: "section",
-    text: {
-      type: "mrkdwn",
-      text: "Another session is working in this folder: <https://example.slack.com/x|Session>. Send anyway?",
-    },
+    type: "rich_text",
+    elements: [
+      {
+        type: "rich_text_section",
+        elements: [
+          { type: "text", text: "Another session is working in this folder: " },
+          { type: "link", url: "https://example.slack.com/x", text: "Session" },
+          { type: "text", text: ". Send anyway?" },
+        ],
+      },
+    ],
   });
   const [send, keep] = buttons(blocks) as [Button, Button];
   assert.deepEqual([send.action_id, keep.action_id], [HOLD_CONTINUE, HOLD_CANCEL]);
@@ -33,4 +40,20 @@ test("the hold question s buttons answer it in its own words", () => {
   assert.deepEqual([send.text.text, send.style], ["Send anyway", "primary"]);
   assert.deepEqual([keep.text.text, keep.style], ["Don't send", undefined]);
   assert.ok(Math.abs(Array.from(send.text.text).length - Array.from(keep.text.text).length) <= 1);
+});
+
+test("the hold question shows a link's label as written, and words with no link as text", () => {
+  const heading = (link: string) =>
+    (holdBlocks("hold-1", link)[0] as { elements: { elements: unknown[] }[] }).elements[0]
+      ?.elements;
+  assert.deepEqual(heading("<https://example.slack.com/x|A | B &amp; &lt;1&gt;>")?.[1], {
+    type: "link",
+    url: "https://example.slack.com/x",
+    text: "A | B & <1>",
+  });
+  // The core's words when Slack gave no permalink, their code span as code.
+  assert.deepEqual(heading("thread `1.2`")?.slice(1, 3), [
+    { type: "text", text: "thread " },
+    { type: "text", text: "1.2", style: { code: true } },
+  ]);
 });

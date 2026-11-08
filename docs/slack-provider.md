@@ -500,13 +500,17 @@ request it opens; a change that leaves it as it was writes nothing. When its own
 thread it names, its word and its mention in its metadata's payload (ids, no content), so after a
 start the first refresh takes over the line an earlier run left and brings it to the threads'
 status; a line with no such payload stays as it is until the next post. The mention stays, and an
-edit pushes nothing. The setup form, a `!!` command's confirmation, the same-folder hold and a question about a
-terminal post no line: they answer what the owner has just written in the thread.
+edit pushes nothing. The setup form and a `!!` command's confirmation post no line: they answer what the owner has
+just written in the thread. The same-folder hold and a question about a terminal (a message
+held back, or `!terminal` that would stop work here) post a line as an approval does: the owner may
+have sent the message and left (`state.asksOwner`, #163). A terminal's turn waited out asks
+nothing and posts no line of its own; it is kept as a hold, so a refresh may edit the line to
+name its thread as waiting, with no push.
 
 The line mentions nobody. With `SLACK_MENTION_OWNER=on` (`SlackChatOptions.mentionOwner`) the
 thread tells the owner, since a push from the thread opens the thread and one from the channel
 opens the channel. `SlackThread.ask` puts his mention in the `text` alone of each request that
-waits on him, an approval or a question, whose heading is then a rich text block; at the end of
+waits on him, an approval, a question, the same-folder hold or a question about a terminal (not a terminal's turn waited out), whose heading is then a rich text block; at the end of
 the work `SlackThread.showStatus` (done or error, with `notify`) has `ThreadPlaces.tell` ask the
 newest reply (`ReplySink.tell`) to write its last message again, the same blocks, with the mention
 added to its `text`, once; with no reply to carry it, an error posts a line of its own (the root's

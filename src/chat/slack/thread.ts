@@ -199,13 +199,17 @@ export interface SlackChatOptions {
 }
 
 /**
- * Whether `request` is the agent's, which waits on the owner wherever he is (`asksOwner`, by the
- * kind `state.json` keeps of it): the setup form, a `!!` command's confirmation and the
- * same-folder hold answer what he has just written in the thread, and he is there to answer them.
+ * Whether `request` waits on the owner wherever he is (`asksOwner`, by the kind `state.json`
+ * keeps of it): the agent's approval or question, or his message held back (a terminal's
+ * question is kept as a hold). The setup form and a `!!` command's confirmation answer what he
+ * has just written in the thread, and he is there to answer them.
  */
 function waitsOnOwner(request: OwnerRequest): boolean {
-  if (request.type === "terminal") return false; // he has just written, as with a hold
-  return asksOwner(request.type === "permission" ? "approval" : request.type);
+  if (request.type === "permission") return asksOwner("approval");
+  // A turn the terminal runs is waited out with no answer asked: the question that may follow
+  // once it ends (`open`) is the one that tells him, once.
+  if (request.type === "terminal") return request.state !== "busy" && asksOwner("hold");
+  return asksOwner(request.type);
 }
 
 /** The emoji of each root reaction (`REACTIONS`), as a character. */
@@ -891,8 +895,8 @@ export class SlackThread implements ThreadChat {
   }
 
   async ask(requestId: string, request: OwnerRequest, title: string): Promise<MessageId> {
-    // Only a wait on the agent's approval or question tells the owner; the rest answers what he
-    // has just written, and he is there.
+    // Only a wait on the agent's approval or question, or on a message of his held back, tells
+    // the owner; the rest answers what he has just written, and he is there.
     const mention = waitsOnOwner(request) ? this.mention() : undefined;
     let blocks: readonly object[];
     switch (request.type) {
