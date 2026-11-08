@@ -32,6 +32,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A copy made by `!fork` (#141) starts its thread with the original's last turn: the owner's prompt as a quote
+  and the start of the final reply (`FORK_LAST_TURN_LIMIT`), saying the rest is in the original (a turn the owner stopped is marked `(stopped)`). The copy is read, not the original, and a command record such as `/rename` is skipped. Nothing is
+  posted when the agent cannot read the record or it holds no turn. New seam member `AgentBackend.lastTurn`,
+  present with `foreignTurns`.
 - Saved copies of attached files older than 3 days are also removed every 6 hours while the daemon runs (`attachments.sweepEvery`, `SWEEP_EVERY_SECONDS`), not only at start, under the same rules: a private folder only, by mtime, errors per file ignored.
 - A `!fork` with no prompt no longer starts the copy's process: the first message with text sent in
   the copy's thread names it through the live session (`AgentSession.rename`, `Capabilities.sessionRename`;

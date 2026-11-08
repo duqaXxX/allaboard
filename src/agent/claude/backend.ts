@@ -16,6 +16,7 @@ import type {
   AgentBackend,
   AgentSession,
   AgentWords,
+  ForeignTurn,
   ForeignTurns,
   ListedSession,
   Repository,
@@ -40,7 +41,7 @@ import { shellMode } from "./shell.ts";
 import { TOOLS } from "./tools.ts";
 import { Transcript } from "./transcript.ts";
 import { trustedRepository, untrustedRepository, workspaceTrusted } from "./trust.ts";
-import { type GetSessionMessages, turnsAfter } from "./turns.ts";
+import { type GetSessionMessages, lastTurn, turnsAfter } from "./turns.ts";
 import { type BareStart, UsageProbe } from "./usage-probe.ts";
 
 export const NAME = "Claude Code";
@@ -396,6 +397,11 @@ export class ClaudeBackend implements AgentBackend {
         getSessionMessages: this.#getSessionMessages,
       }),
     });
+  }
+
+  /** The last turn of a session of `folder` (`turns.lastTurn`). */
+  lastTurn(folder: string, session: string): Promise<ForeignTurn | null> {
+    return lastTurn(folder, session, this.#getSessionMessages);
   }
 
   /** Stops the usage probe: its session is closed and no read starts another. */
