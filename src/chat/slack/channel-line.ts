@@ -41,7 +41,7 @@ import { threadFacts } from "./home.ts";
 import { describe, gone } from "./reply/errors.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
 import { stripMarkdown } from "./reply/markdown.ts";
-import { retaggedText } from "./tag.ts";
+import { retaggedText, retitledText, rootLead } from "./tag.ts";
 
 export const logger = getLogger("allaboard.chat.slack.channel_line");
 
@@ -61,7 +61,12 @@ type Message = Readonly<Record<string, unknown>>;
 
 /** The thread's root as one short line of plain words: its title, or its first words. */
 export function lineLabel(root: Message | undefined): string {
-  const text = typeof root?.text === "string" ? root.text : "";
+  // A root opened with a lead is named by its title once it has one; its `text` is never read.
+  const title = root === undefined ? null : (rootLead(root)?.title ?? null);
+  // The title goes through the same text form `retitle` is handed (`retitledText`), so both paths
+  // of a titled root's label read alike.
+  const text =
+    title !== null ? retitledText(title, null) : typeof root?.text === "string" ? root.text : "";
   const words = stripMarkdown(slackUnescape(retaggedText(text, null)))
     .split("\n")
     .map((line) => line.trim())
@@ -487,7 +492,12 @@ export class ChannelLine {
   async #fetch(channel: string, rootTs: string): Promise<Message | typeof GONE | undefined> {
     const key = `${channel}/${rootTs}`;
     try {
-      const replies = await this.#slack.conversations.replies({ channel, ts: rootTs, limit: 1 });
+      const replies = await this.#slack.conversations.replies({
+        channel,
+        ts: rootTs,
+        limit: 1,
+        include_all_metadata: true,
+      });
       const root = replies.messages?.[0] as Message | undefined;
       if (root === undefined || isTombstone(root)) {
         this.#gone.add(key);

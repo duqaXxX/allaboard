@@ -806,9 +806,13 @@ export interface ChannelChat {
   say(markdown: string): Promise<void>;
   /**
    * Posts `markdown` as a message of the channel that starts a thread of its own, in one message,
-   * and resolves with that thread. Present with `threadOpen`.
+   * and resolves with that thread. Present with `threadOpen`. `root`: `lead`, a prefix of
+   * `markdown`, is what a later `titleThread` keeps in front of the title (the root then reads the
+   * tag, the lead and the title); `words` is what the owner typed that the root shows, in the form
+   * the agent receives a message (empty for none), which `titleThread` hands its `keep` before
+   * the first edit, as it hands the words of any other root.
    */
-  open?(markdown: string): Promise<ThreadRef>;
+  open?(markdown: string, root?: { lead: string; words: string }): Promise<ThreadRef>;
   /** Posts a list, each row with its control; `title` is the list in one line. */
   offer(list: OwnerList, title: string): Promise<void>;
   /** Removes a list that did its job. False when the chat refused and it still shows. */

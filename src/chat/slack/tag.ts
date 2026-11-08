@@ -6,8 +6,9 @@
  *
  * The root is the owner's own message, and `chat.update` changes only "messages posted by the
  * authenticated user" (docs.slack.dev/reference/methods/chat.update, read 2026-10-19), so the
- * edit (`chat:write`) and the pin (`pins:write`) both go through the owner's user token
- * (`SLACK_USER_TOKEN`); the bot only reads the root. Measured on a dev workspace on
+ * edit (`chat:write`) and the pin (`pins:write`) go through the owner's user token
+ * (`SLACK_USER_TOKEN`); the bot reads the root, and edits one it posted itself (a root with a
+ * lead, below). Measured on a dev workspace on
  * 2026-10-19: that token edits and pins the owner's root; no `pinned_item` message is posted;
  * no push reaches iOS for any of the four actions; the edit reaches the daemon as
  * `message_changed`, which `app/guards.ts` drops, so no prompt is sent; `conversations.replies`
@@ -17,7 +18,8 @@
  * The tag is read back from the root's own blocks (`rootMarks`, which the Home tab uses too), so
  * `state.json` keeps nothing of it: the first element of the first `rich_text_section` is a text
  * element in code style whose text is `[name]` for a name that satisfies `TAG_NAME`, followed by
- * an element that is exactly a space.
+ * an element that is exactly a space or, in a root the app posted as a markdown block, by a text
+ * that starts with one (measured 2026-11-07).
  *
  * The title of a thread (`titleThread`) replaces the whole root: one `rich_text` block with one
  * section, the tag's two elements when the root carries a tag, then a bold text element with the
@@ -27,20 +29,29 @@
  * other. Tag and title edits of one root are serialized, since each reads the message and writes
  * it back whole. Titling needs `chat:write` alone: no pin is involved.
  *
+ * A root opened with a lead (`ChannelChat.open`) carries message metadata
+ * (`event_type: "allaboard_root"`, payload `{ lead, rest, title, words }`; measured 2026-11-07: a bot
+ * root is stored as `rich_text`, its `text` fallback HTML-escaped, `conversations.replies` returns
+ * the payload with `include_all_metadata`, and `chat.update` keeps metadata it is not given).
+ * The bot edits its own root, and such a root is always composed from metadata and tag alone as
+ * one `markdown` block, never parsed from `text`; the metadata is rewritten with each edit. `keep`
+ * gets the payload's `words`, the owner's words the root showed.
+ *
  * `pins.add` answers `already_pinned` for a pinned item (docs.slack.dev/reference/methods/pins.add,
  * read 2026-10-19); `pins.remove` answers `not_pinned` ("The item isn't pinned to the channel") or
  * `no_pin` ("The pin couldn't be found", docs.slack.dev/reference/methods/pins.remove, read
  * 2026-10-19). Both mean the pin is already as asked, so neither is a failure.
  */
 import { isDeepStrictEqual } from "node:util";
-import type { KnownBlock, WebClient } from "@slack/web-api";
+import type { ChatUpdateArguments, KnownBlock, WebClient } from "@slack/web-api";
 import { TAG_NAME } from "../../core/port.ts";
 import { isRecord } from "../../values.ts";
 import { ChatError } from "../seam.ts";
 import { slackUnescape } from "./app/messages.ts";
 import { isTombstone } from "./channels.ts";
+import type { MessageMetadata } from "./notice.ts";
 import { crossedError, describe, GONE } from "./reply/errors.ts";
-import { mrkdwnEscape } from "./reply/escape.ts";
+import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 
 type Json = Record<string, unknown>;
 
@@ -163,7 +174,20 @@ export function retaggedBlocks(blocks: readonly unknown[], tag: string | null): 
   ) {
     const inner = section.elements;
     const tagged = nameOf(inner[0]) !== null;
-    if (tagged) inner.splice(0, isSpace(inner[1]) ? 2 : 1);
+    if (tagged) {
+      inner.splice(0, isSpace(inner[1]) ? 2 : 1);
+      // A markdown block stores the space after the tag inside the next text (measured 2026-11-07).
+      const next = inner[0];
+      if (
+        isRecord(next) &&
+        next.type === "text" &&
+        typeof next.text === "string" &&
+        next.text.startsWith(" ")
+      ) {
+        if (next.text.length === 1) inner.shift();
+        else next.text = next.text.slice(1);
+      }
+    }
     if (tag !== null) inner.unshift(...tagElements(tag));
     // The tag may have had a section of its own (a root that starts with a list or a code
     // block), or a block of its own (a root with no rich_text block): taking it off takes those
@@ -222,23 +246,73 @@ export function retaggedText(text: string, tag: string | null): string {
   return tag === null ? body : `\`[${tag}]\` ${body}`;
 }
 
+const ROOT_EVENT = "allaboard_root";
+
+/** What a root opened with a lead remembers of its words. */
+export interface RootLead {
+  readonly lead: string;
+  /** The markdown after the lead, shown while the root has no title. */
+  readonly rest: string;
+  readonly title: string | null;
+  /** What the owner typed that the root showed, as the agent receives a message. */
+  readonly words: string;
+}
+
+/** The metadata of a root opened with `lead` and showing `title` (null: not titled yet). */
+export function leadMetadata(
+  lead: string,
+  rest: string,
+  title: string | null,
+  words: string,
+): MessageMetadata {
+  return { event_type: ROOT_EVENT, event_payload: { lead, rest, title, words } };
+}
+
+/** The lead a root was opened with, or null; a missing `title` is null and a missing `rest` empty. */
+export function rootLead(root: Readonly<Json>): RootLead | null {
+  const metadata = root.metadata;
+  if (!isRecord(metadata) || metadata.event_type !== ROOT_EVENT) return null;
+  const payload = metadata.event_payload;
+  if (!isRecord(payload) || typeof payload.lead !== "string") return null;
+  return {
+    lead: payload.lead,
+    rest: typeof payload.rest === "string" ? payload.rest : "",
+    title: typeof payload.title === "string" ? payload.title : null,
+    words: typeof payload.words === "string" ? payload.words : "",
+  };
+}
+
+/** A root with a lead as one `markdown` block: the tag, the lead, then the rest or the title. */
+function leadBlock(lead: RootLead, tag: string | null): string {
+  const shown = lead.title === null ? lead.rest : `: **${markdownEscape(lead.title)}**`;
+  return `${tag === null ? "" : `\`[${tag}]\` `}${lead.lead}${shown}`;
+}
+
 /** What a root edit rewrites: its text and its blocks. */
 interface Rewrite {
   readonly text: (text: string) => string;
   readonly blocks: (blocks: readonly unknown[]) => unknown[];
 }
 
-/** Changes the root of a thread with the owner's own token: its tag, its title line, its pin. */
+/**
+ * Changes the root of a thread: its tag, its title line, its pin. The owner's token edits the
+ * owner's root; the bot's edits a root the app posted.
+ */
 export class RootEditor {
   readonly #bot: WebClient;
   readonly #owner: WebClient;
+  readonly #botUserId: string;
   // The last edit of each root still running or queued, by channel and thread.
   readonly #tails = new Map<string, Promise<void>>();
 
-  /** `bot` reads the root; `owner` is the client of the owner's user token and writes. */
-  constructor(bot: WebClient, owner: WebClient) {
+  /**
+   * `bot` reads the root and edits the roots it posted (`botUserId`); `owner` is the client of
+   * the owner's user token and edits the owner's.
+   */
+  constructor(bot: WebClient, owner: WebClient, botUserId: string) {
     this.#bot = bot;
     this.#owner = owner;
+    this.#botUserId = botUserId;
   }
 
   /**
@@ -249,6 +323,11 @@ export class RootEditor {
   tag(channel: string, thread: string, tag: string | null): Promise<void> {
     return this.#serially(channel, thread, async () => {
       const root = await this.#root(channel, thread);
+      const lead = rootLead(root);
+      if (lead !== null) {
+        await this.#compose(channel, thread, root, lead, lead.title, tag);
+        return;
+      }
       await this.#edit(channel, thread, root, {
         text: (text) => retaggedText(text, tag),
         blocks: (blocks) => retaggedBlocks(blocks, tag),
@@ -287,6 +366,13 @@ export class RootEditor {
     return this.#serially(channel, thread, async () => {
       const root = await permanently(() => this.#root(channel, thread));
       const { tag } = rootMarks(root);
+      const lead = rootLead(root);
+      if (lead !== null) {
+        // The words the root showed are kept before the edit, as for any root.
+        if (keep !== undefined) await keep(lead.words);
+        await permanently(() => this.#compose(channel, thread, root, lead, line, tag));
+        return retitledText(line, null);
+      }
       if (keep !== undefined) {
         const text = typeof root.text === "string" ? root.text : "";
         await keep(slackUnescape(retaggedText(text, null)));
@@ -325,7 +411,12 @@ export class RootEditor {
   }
 
   async #root(channel: string, thread: string): Promise<Json> {
-    const answer = await this.#bot.conversations.replies({ channel, ts: thread, limit: 1 });
+    const answer = await this.#bot.conversations.replies({
+      channel,
+      ts: thread,
+      limit: 1,
+      include_all_metadata: true,
+    });
     const messages: unknown[] = Array.isArray(answer.messages) ? answer.messages : [];
     const root = messages.find((message) => isRecord(message) && String(message.ts) === thread);
     if (!isRecord(root)) throw new ChatError("root_not_returned");
@@ -338,6 +429,40 @@ export class RootEditor {
     return root;
   }
 
+  /** The client that may edit `root`: its author's. */
+  #writer(root: Json): WebClient {
+    return root.user === this.#botUserId ? this.#bot : this.#owner;
+  }
+
+  /**
+   * Rewrites a root with a lead from its metadata with `title` and `tag`; nothing is sent when
+   * the metadata's title and the tag read from the blocks are already those.
+   */
+  async #compose(
+    channel: string,
+    thread: string,
+    root: Json,
+    lead: RootLead,
+    title: string | null,
+    tag: string | null,
+  ): Promise<void> {
+    if (title === lead.title && rootMarks(root).tag === tag) return;
+    const next = { ...lead, title };
+    const text = leadBlock(next, tag);
+    await this.#writer(root).chat.update({
+      channel,
+      ts: thread,
+      text,
+      blocks: [{ type: "markdown", text }] as KnownBlock[],
+      metadata: leadMetadata(
+        next.lead,
+        next.rest,
+        title,
+        next.words,
+      ) as ChatUpdateArguments["metadata"],
+    });
+  }
+
   /** Rewrites the root's text and blocks; nothing is sent when they would not change. */
   async #edit(channel: string, thread: string, root: Json, rewrite: Rewrite): Promise<void> {
     const text = typeof root.text === "string" ? root.text : "";
@@ -345,7 +470,7 @@ export class RootEditor {
     const hasBlocks = Array.isArray(root.blocks);
     const nextBlocks = hasBlocks ? rewrite.blocks(root.blocks as unknown[]) : null;
     if (nextText === text && (!hasBlocks || isDeepStrictEqual(nextBlocks, root.blocks))) return;
-    await this.#owner.chat.update({
+    await this.#writer(root).chat.update({
       channel,
       ts: thread,
       text: nextText,

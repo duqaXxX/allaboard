@@ -274,7 +274,7 @@ test("the session index tells the channels' line of the sessions that changed", 
 
 test("with the owner's token the provider declares threadTags, has tagThread, and refreshes the Home", async (t) => {
   const world = worldOf(t);
-  const tagger = new RootEditor(world.slack, new FakeSlack());
+  const tagger = new RootEditor(world.slack, new FakeSlack(), "UBOT");
   const tagged: unknown[] = [];
   t.mock.method(tagger, "tag", async (...args: unknown[]) => {
     tagged.push(args);
@@ -296,7 +296,7 @@ test("with the owner's token the provider declares threadTags, has tagThread, an
 
 test("with the pin's scope the provider declares threadPins, has pinThread, and refreshes the Home", async (t) => {
   const world = worldOf(t);
-  const editor = new RootEditor(world.slack, new FakeSlack());
+  const editor = new RootEditor(world.slack, new FakeSlack(), "UBOT");
   const pinned: unknown[] = [];
   t.mock.method(editor, "pin", async (...args: unknown[]) => {
     pinned.push(args);
@@ -317,7 +317,7 @@ test("with the pin's scope the provider declares threadPins, has pinThread, and 
 
 test("with the owner's token the provider declares threadTitles, has titleThread, and refreshes the Home", async (t) => {
   const world = worldOf(t);
-  const titler = new RootEditor(world.slack, new FakeSlack());
+  const titler = new RootEditor(world.slack, new FakeSlack(), "UBOT");
   const titled: unknown[] = [];
   t.mock.method(titler, "title", async (...args: unknown[]) => {
     titled.push(args);
@@ -361,7 +361,7 @@ test("with a deleter the provider declares threadDelete, and deleteThread asks t
 
 test("a refused tag still asks the Home to read the root again, and the refusal reaches the caller", async (t) => {
   const world = worldOf(t);
-  const tagger = new RootEditor(world.slack, new FakeSlack());
+  const tagger = new RootEditor(world.slack, new FakeSlack(), "UBOT");
   t.mock.method(tagger, "tag", async () => {
     throw new ChatError("missing_scope");
   });
@@ -427,7 +427,7 @@ test("escape for the owner's words keeps formatting marks live and escapes only 
 
 test("a title resolving after the stop began touches nothing", async (t) => {
   const world = worldOf(t);
-  const titler = new RootEditor(world.slack, new FakeSlack());
+  const titler = new RootEditor(world.slack, new FakeSlack(), "UBOT");
   const titled: unknown[] = [];
   t.mock.method(titler, "title", async (...args: unknown[]) => {
     titled.push(args);

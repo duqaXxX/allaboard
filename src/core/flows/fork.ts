@@ -106,16 +106,18 @@ export function forkFlow(
           ref,
           (await titleOf(session.directory, origin.sessionId)) || texts.FORK_ORIGINAL_LABEL,
         );
+        // What a later title keeps in front of itself on the root (`ChannelChat.open`).
+        const lead = fill(texts.FORK_ROOT, { link: back });
         const root =
           prompt === ""
-            ? fill(texts.FORK_ROOT, { link: back })
+            ? lead
             : fill(texts.FORK_ROOT_PROMPT, {
                 link: back,
                 prompt: chat.escape(line, "reference"),
               });
         let opened: ThreadRef;
         try {
-          opened = await channelChat.open.call(channelChat, root);
+          opened = await channelChat.open.call(channelChat, root, { lead, words: line });
         } catch (error) {
           // The copy stays with the agent, which lists it (`!resume` finds it).
           logger.warning(

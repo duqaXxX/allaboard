@@ -547,9 +547,11 @@ class MemoryChannel implements ChannelChat {
     this.#room.write(this.#channel, null, DAEMON, markdown, "reference");
   }
 
-  async open(markdown: string): Promise<ThreadRef> {
+  async open(markdown: string, lead?: { lead: string; words: string }): Promise<ThreadRef> {
     const root = this.#room.write(this.#channel, null, DAEMON, markdown, "reference", true);
-    return { channel: this.#channel, thread: root.thread as string };
+    const ref = { channel: this.#channel, thread: root.thread as string };
+    if (lead !== undefined) this.#room.keepLead(ref, lead);
+    return ref;
   }
 
   async offer(list: OwnerList, title: string): Promise<void> {
@@ -646,6 +648,10 @@ export class MemoryProvider implements ChatProvider {
 
   channelName(channel: string, _markup: Markup): string {
     return `#${channel}`;
+  }
+
+  leadOf(ref: ThreadRef): { lead: string; words: string } | null {
+    return this.#room.leadOf(ref);
   }
 
   openedAt(ref: ThreadRef): number | null {

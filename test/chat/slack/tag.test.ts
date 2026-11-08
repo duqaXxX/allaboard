@@ -153,7 +153,7 @@ function made(message: JsonObject | Error): Made {
   const owner = new FakeSlack();
   bot.responses["conversations.replies"] =
     message instanceof Error ? message : { ok: true, messages: [message], has_more: false };
-  return { bot, owner, tagger: new RootEditor(bot, owner) };
+  return { bot, owner, tagger: new RootEditor(bot, owner, "UBOT") };
 }
 
 const PLAIN = root([rich(HELLO)], "fix the footer ");
@@ -162,7 +162,10 @@ test("a tag edits the root with the owner's client, and does not pin it", async 
   const { bot, owner, tagger } = made(PLAIN);
   await tagger.tag(CHANNEL, THREAD, "devops");
   assert.deepEqual(bot.apiCalls, [
-    { method: "conversations.replies", args: { channel: CHANNEL, ts: THREAD, limit: 1 } },
+    {
+      method: "conversations.replies",
+      args: { channel: CHANNEL, ts: THREAD, limit: 1, include_all_metadata: true },
+    },
   ]);
   assert.deepEqual(owner.apiCalls, [
     {
@@ -328,7 +331,10 @@ test("a title rewrites the root, the owner's words included, and keeps its tag",
   const { bot, owner, tagger } = made(PLAIN);
   await tagger.title(CHANNEL, THREAD, "Fix the footer");
   assert.deepEqual(bot.apiCalls, [
-    { method: "conversations.replies", args: { channel: CHANNEL, ts: THREAD, limit: 1 } },
+    {
+      method: "conversations.replies",
+      args: { channel: CHANNEL, ts: THREAD, limit: 1, include_all_metadata: true },
+    },
   ]);
   assert.deepEqual(owner.apiCalls, [
     {
@@ -426,7 +432,7 @@ test("a tag and a title asked together edit the root one after the other, each o
     current = { ...current, text: args.text, blocks: args.blocks } as JsonObject;
     return { ok: true };
   };
-  const editor = new RootEditor(bot, owner);
+  const editor = new RootEditor(bot, owner, "UBOT");
   await Promise.all([
     editor.title(CHANNEL, THREAD, "Fix the footer"),
     editor.tag(CHANNEL, THREAD, "devops"),
@@ -568,4 +574,192 @@ test("a root returned as a tombstone is gone: nothing is kept, titled or tagged"
     "thread_not_found",
   );
   assert.deepEqual(tagging.owner.apiCalls, [], "not edited");
+});
+
+// A root the app posted with a lead (`ChannelChat.open`): `user` is the bot user, the blocks are
+// the stored `rich_text` with a `link` element, and the metadata is what `conversations.replies`
+// returns with `include_all_metadata` (shapes measured 2026-11-07).
+const LEAD = "Fork of [the first thread](https://example.invalid/archives/C1/p1)";
+const LINK = {
+  type: "link",
+  url: "https://example.invalid/archives/C1/p1",
+  text: "the first thread",
+};
+
+function leadRoot(title: string | null, tagged = false, fields: JsonObject = {}): JsonObject {
+  return root(
+    [
+      rich(...(tagged ? [TAG, SPACE] : []), { type: "text", text: "Fork of " }, LINK, {
+        type: "text",
+        text: ": look into x",
+      }),
+    ],
+    "Fork of the first thread: look into x",
+    {
+      user: "UBOT",
+      bot_id: "B1",
+      app_id: "A1",
+      metadata: {
+        event_type: "allaboard_root",
+        event_payload: { lead: LEAD, rest: ": look into x", title },
+      },
+      ...fields,
+    },
+  );
+}
+
+test("a root with a lead is titled by the bot, from its metadata, and keep gets its words", async () => {
+  const { bot, owner, tagger } = made(leadRoot(null));
+  let kept: string | undefined;
+  const shown = await tagger.title(CHANNEL, THREAD, "Fix *the* timeout", (text) => {
+    kept = text;
+  });
+  assert.equal(kept, "");
+  assert.deepEqual(owner.apiCalls, []);
+  const update = bot.apiCalls.find((call) => call.method === "chat.update");
+  const text = `${LEAD}: **Fix \\*the\\* timeout**`;
+  assert.deepEqual(update?.args, {
+    channel: CHANNEL,
+    ts: THREAD,
+    text,
+    blocks: [{ type: "markdown", text }],
+    metadata: {
+      event_type: "allaboard_root",
+      event_payload: { lead: LEAD, rest: ": look into x", title: "Fix *the* timeout", words: "" },
+    },
+  });
+  assert.equal(shown, "*Fix *the* timeout*");
+});
+
+test("a tag on a root with a lead before its first title keeps the owner's words as they were", async () => {
+  const { bot, tagger } = made(leadRoot(null));
+  await tagger.tag(CHANNEL, THREAD, "ops");
+  const update = bot.apiCalls.find((call) => call.method === "chat.update");
+  assert.equal(update?.args.text, `\`[ops]\` ${LEAD}: look into x`);
+});
+
+test("a tag and a title of a root with a lead compose from metadata and tag alone", async () => {
+  const { bot, tagger } = made(leadRoot("Fix it", true));
+  await tagger.tag(CHANNEL, THREAD, null);
+  const update = bot.apiCalls.find((call) => call.method === "chat.update");
+  assert.equal(update?.args.text, `${LEAD}: **Fix it**`);
+});
+
+test("a root with a lead already showing the title and the tag is not edited", async () => {
+  const { bot, owner, tagger } = made(leadRoot("Fix it", true));
+  await tagger.title(CHANNEL, THREAD, "Fix it");
+  await tagger.tag(CHANNEL, THREAD, "devops");
+  assert.deepEqual(
+    [...bot.apiCalls, ...owner.apiCalls].map((c) => c.method),
+    ["conversations.replies", "conversations.replies"],
+  );
+});
+
+test("metadata with a missing title and rest reads as null and empty", async () => {
+  const bare = leadRoot(null, false, {
+    metadata: { event_type: "allaboard_root", event_payload: { lead: LEAD } },
+  });
+  const { bot, tagger } = made(bare);
+  await tagger.tag(CHANNEL, THREAD, "ops");
+  const update = bot.apiCalls.find((call) => call.method === "chat.update");
+  assert.equal(update?.args.text, `\`[ops]\` ${LEAD}`);
+});
+
+test("a root with metadata of another event is titled as any root, by the owner's client", async () => {
+  const { bot, owner, tagger } = made(
+    root([rich(HELLO)], "fix the footer ", {
+      metadata: { event_type: "other", event_payload: { lead: "x" } },
+    }),
+  );
+  await tagger.title(CHANNEL, THREAD, "Fix");
+  assert.equal(owner.apiCalls.at(-1)?.method, "chat.update");
+  assert.ok(!bot.apiCalls.some((call) => call.method === "chat.update"));
+});
+
+test("a root the bot posted with no metadata is titled whole by the bot", async () => {
+  const { bot, owner, tagger } = made(root([rich(HELLO)], "fix the footer ", { user: "UBOT" }));
+  await tagger.title(CHANNEL, THREAD, "Fix");
+  assert.ok(bot.apiCalls.some((call) => call.method === "chat.update"));
+  assert.deepEqual(owner.apiCalls, []);
+});
+
+test("a refused edit of a root with a lead stays permanent", async () => {
+  const { bot, tagger } = made(leadRoot(null));
+  bot.responses["chat.update"] = rejected("cant_update_message");
+  const error = await failure(tagger.title(CHANNEL, THREAD, "Fix"));
+  assert.equal((error as { permanent?: boolean }).permanent, true);
+});
+
+// Measured 2026-11-07 on the dev app: a bot `markdown` block "`[ops]` Fork of [x](...): **Title**"
+// is stored with the space inside the next text element, not as an element of its own.
+const MARKDOWN_ROOT = rich(
+  { type: "text", text: "[ops]", style: { code: true } },
+  { type: "text", text: " Fork of " },
+  { type: "link", url: "https://example.com", text: "x" },
+  { type: "text", text: ": " },
+  { type: "text", text: "Title", style: { bold: true } },
+);
+
+test("a tag stored as a code element and a text starting with a space is read, and untagged whole", () => {
+  assert.equal(rootMarks(root([MARKDOWN_ROOT], "x")).tag, "ops");
+  const elementsOf = (blocks: unknown[]): JsonObject[] => {
+    const block = blocks[0] as { elements: Array<{ elements: JsonObject[] }> };
+    return block.elements[0]?.elements ?? [];
+  };
+  assert.deepEqual(elementsOf(retaggedBlocks([MARKDOWN_ROOT], null))[0], {
+    type: "text",
+    text: "Fork of ",
+  });
+  const first = elementsOf(retaggedBlocks([MARKDOWN_ROOT], "dev")).slice(0, 3);
+  assert.deepEqual(first, [TAG_DEV, SPACE, { type: "text", text: "Fork of " }]);
+});
+
+const TAG_DEV = { type: "text", text: "[dev]", style: { code: true } };
+
+test("a lead root titled again keeps the tag the markdown block stored", async () => {
+  const stored = leadRoot("Old", false);
+  stored.blocks = [MARKDOWN_ROOT];
+  const { bot, tagger } = made(stored);
+  await tagger.title(CHANNEL, THREAD, "New");
+  const update = bot.apiCalls.find((call) => call.method === "chat.update");
+  assert.equal(update?.args.text, `\`[ops]\` ${LEAD}: **New**`);
+});
+
+test("keep gets the owner's words of a lead root before the first title; a refused edit leaves them", async () => {
+  const payload = (words: string) => ({
+    metadata: { event_type: "allaboard_root", event_payload: { lead: LEAD, rest: "", words } },
+  });
+  const { tagger } = made(leadRoot(null, false, payload("look into x")));
+  let kept: string | undefined;
+  await tagger.title(CHANNEL, THREAD, "Fix", (text) => {
+    kept = text;
+  });
+  assert.equal(kept, "look into x");
+  const missing = made(
+    leadRoot(null, false, {
+      metadata: { event_type: "allaboard_root", event_payload: { lead: LEAD } },
+    }),
+  );
+  await missing.tagger.title(CHANNEL, THREAD, "Fix", (text) => {
+    kept = text;
+  });
+  assert.equal(kept, "");
+  const refused = made(leadRoot(null, false, payload("look into x")));
+  refused.bot.responses["chat.update"] = rejected("cant_update_message");
+  let after = false;
+  await failure(
+    refused.tagger.title(CHANNEL, THREAD, "Fix", () => {
+      after = true;
+    }),
+  );
+  assert.equal(after, true, "kept before the edit, which the core clears when it is refused");
+  const update = made(leadRoot(null, false, payload("look into x")));
+  await update.tagger.title(CHANNEL, THREAD, "Fix");
+  const sent = update.bot.apiCalls.find((call) => call.method === "chat.update");
+  assert.deepEqual(((sent?.args.metadata ?? {}) as JsonObject).event_payload, {
+    lead: LEAD,
+    rest: "",
+    title: "Fix",
+    words: "look into x",
+  });
 });

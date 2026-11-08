@@ -200,7 +200,9 @@ function toJson(value: unknown, where: string): Json {
   if (typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
     const out: JsonObject = {};
     for (const [key, item] of Object.entries(value)) {
-      if (item !== undefined && item !== null) out[key] = toJson(item, `${where}.${key}`);
+      // Slack keeps a null inside message metadata (measured 2026-11-07), unlike a plain field.
+      if (item !== undefined && (item !== null || where.startsWith("metadata")))
+        out[key] = toJson(item, `${where}.${key}`);
     }
     return out;
   }

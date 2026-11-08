@@ -53,6 +53,14 @@ export async function postInThread(
   throw new ChatError("thread_gone", { permanent: true, failure: "gone" });
 }
 
+/** Slack's message metadata: what a root keeps for the daemon's own later edits. */
+export interface MessageMetadata {
+  readonly event_type: string;
+  // A null value is accepted by Slack and read back as sent (measured 2026-11-07), though the
+  // library's type allows none: `deliver` and the root editor cast.
+  readonly event_payload: Readonly<Record<string, string | null>>;
+}
+
 /** Where a message goes: a thread of the channel, or the channel itself when `threadTs` is null. */
 export interface Place {
   readonly channel: string;
@@ -72,7 +80,7 @@ export async function deliver(
   place: Place,
   text: string,
   blocks: readonly object[],
-  options: { readonly ephemeral: boolean },
+  options: { readonly ephemeral: boolean; readonly metadata?: MessageMetadata },
 ): Promise<string | null> {
   const shown = blocks as unknown as KnownBlock[];
   if (options.ephemeral) {
@@ -92,6 +100,9 @@ export async function deliver(
     blocks: shown,
     unfurl_links: false,
     unfurl_media: false,
+    ...(options.metadata !== undefined && {
+      metadata: options.metadata as ChatPostMessageArguments["metadata"],
+    }),
   };
   const posted =
     place.threadTs === null
