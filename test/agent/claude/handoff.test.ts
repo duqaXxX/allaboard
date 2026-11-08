@@ -13,7 +13,7 @@ import { ClaudeBackend } from "../../../src/agent/claude/backend.ts";
 import { savedMessage, transcriptEvents } from "../../../src/agent/claude/goals.ts";
 import { listed, parents, sessionHolders } from "../../../src/agent/claude/holders.ts";
 import { projectKey } from "../../../src/agent/claude/listing.ts";
-import { promptOf, turnsAfter, turnsOf } from "../../../src/agent/claude/turns.ts";
+import { lastTurn, promptOf, turnsAfter, turnsOf } from "../../../src/agent/claude/turns.ts";
 
 const SESSION = "1f3f5507-0000-4000-8000-000000000001";
 const OTHER = "a9ebe601-0000-4000-8000-000000000002";
@@ -404,4 +404,39 @@ test("a pid the list names but ps no longer shows is gone and left out", async (
         : "12 777 Sun Nov  1 17:00:01 2026\n",
   });
   assert.deepEqual(holders, [{ id: "12@Sun Nov 1 17:00:01 2026", own: false, busy: false }]);
+});
+
+test("lastTurn is the final turn of the record, read from the session's folder", async () => {
+  const asked: unknown[] = [];
+  const found = await lastTurn(folder, SESSION, async (session, options) => {
+    asked.push([session, options]);
+    return [
+      user("u0", "First"),
+      assistant("a0", [{ type: "text", text: "One" }]),
+      user("u1", "Second"),
+      assistant("a1", [{ type: "text", text: "Two" }]),
+    ];
+  });
+  assert.deepEqual(found, { prompt: "Second", reply: "Two" });
+  assert.deepEqual(asked, [[SESSION, { dir: folder }]]);
+});
+
+test("lastTurn is null for a record with no turn, and rejects when it cannot be read", async () => {
+  assert.equal(await lastTurn(folder, SESSION, async () => []), null);
+  await assert.rejects(
+    lastTurn(folder, SESSION, async () => {
+      throw new Error("unreadable");
+    }),
+    /unreadable/,
+  );
+});
+
+test("lastTurn skips command records written after the last real exchange", async () => {
+  const found = await lastTurn(folder, SESSION, async () => [
+    user("u1", "Real question"),
+    assistant("a1", [{ type: "text", text: "Real answer" }]),
+    user("u2", "<command-name>/rename</command-name>\n<command-args>x</command-args>"),
+    user("u3", "<local-command-stdout>Renamed</local-command-stdout>"),
+  ]);
+  assert.deepEqual(found, { prompt: "Real question", reply: "Real answer" });
 });

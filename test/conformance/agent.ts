@@ -459,6 +459,10 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       assert.equal(typeof world.backend.turnsAfter === "function", caps.foreignTurns);
     });
 
+    check("lastTurn is a member exactly when foreignTurns is declared", LIMIT, async (world) => {
+      assert.equal(typeof world.backend.lastTurn === "function", caps.foreignTurns);
+    });
+
     check(
       "a session's clearGoal is a member exactly when goals is declared",
       LIMIT,

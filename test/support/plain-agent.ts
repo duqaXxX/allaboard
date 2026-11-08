@@ -38,6 +38,7 @@ import type {
   ContextUsage,
   FileChange,
   FilesRestore,
+  ForeignTurn,
   ForeignTurns,
   GoalChange,
   ListedSession,
@@ -1016,6 +1017,7 @@ export class PlainAgent implements AgentBackend {
   untrustedRepository?: (folder: string) => Promise<Repository | null>;
   sessionHolders?: (session: string) => Promise<readonly SessionHolder[] | null>;
   turnsAfter?: (folder: string, session: string, after: SavedMessage) => Promise<ForeignTurns>;
+  lastTurn?: (folder: string, session: string) => Promise<ForeignTurn | null>;
   prompts?: (folder: string, session: string) => Promise<readonly RewindPoint[]>;
   /** What each live session answers to `loaded`, with `loadedContext`. */
   readonly loaded: LoadedContext | null;
@@ -1074,6 +1076,8 @@ export class PlainAgent implements AgentBackend {
       });
       this.sessionHolders = async (session) =>
         this.holders.has(session) ? (this.holders.get(session) ?? null) : [];
+      // A test assigns its own answer; the original's record holds no turn otherwise.
+      this.lastTurn = async () => null;
       this.turnsAfter = async (_folder, session, after) => {
         this.foreignAsked.push(`${session} ${after.id}`);
         const found = this.foreign.get(session) ?? { changed: false, turns: [], last: null };

@@ -1097,6 +1097,10 @@ from goes on as it was. Use it when a session finds a problem that is not its ta
   link going back to the thread you sent it from. Once the copy has a title, with `SLACK_USER_TOKEN`
   set, that message reads `Fork of <link>: ` and the title in bold, after the tag when there is one. That thread gets one line:
   `Forked into <link> · running · session <id>`.
+- The new thread's next message is the original's last turn, `Last in the original:`: your prompt
+  as a quote and the start of the final reply, each cut at 300 characters, with the rest left in
+  the original's thread, and `(stopped)` under a turn you interrupted. Commands such as `/model` are not turns and are skipped. Nothing is posted when the original has no turn yet or its record cannot
+  be read.
 - With no prompt, `!fork` opens the new thread and the copy waits for your first message there. No
   process runs for it until then, and its first message in the thread names it: the `!resume` list
   shows that message, not the original's title with `(fork)` after it. A command, a `!!command` or a
