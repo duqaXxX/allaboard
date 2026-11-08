@@ -14,6 +14,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A confirmed `!!command` reached its session past the questions a typed message gets (#240): it
+  now asks `Send anyway?` beside another session at work in the same folder and `Send here`
+  beside a terminal that holds the session, before its own **Run**. A message and a `!!command`
+  both go through one function (`deliver` in `src/core/flows/messages.ts`).
 - A message held back, by another session at work in the same folder or by a terminal that holds
   the session, now waits on the owner as an approval does (#163): with `SLACK_MENTION_OWNER=on` its
   question mentions him, and the channel's line names its thread as `✋ Waiting:`. The question's

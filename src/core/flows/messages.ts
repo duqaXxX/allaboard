@@ -11,7 +11,7 @@
  * checks take, with nothing awaited between its last check and the call.
  */
 
-import type { CommandInfo } from "../../agent/seam.ts";
+import type { CommandInfo, PromptContent } from "../../agent/seam.ts";
 import type { InboundMessage, ShellRequest, ThreadRef } from "../../chat/seam.ts";
 import { strip } from "../../text.ts";
 import {
@@ -46,6 +46,20 @@ import { unservedWords, wordFlow } from "./words.ts";
 type Submission = Pick<InboundMessage, "ref" | "text" | "plain" | "content"> & {
   readonly id?: InboundMessage["id"];
 };
+
+/**
+ * What `deliver` sends to a session: a message (a prompt, files, a command for the agent), or a
+ * `!!command`, which the owner confirms once every other guard has passed.
+ */
+type Outgoing =
+  | {
+      readonly kind: "message";
+      readonly message: Submission;
+      readonly command: Passthrough | null;
+      readonly inThread: boolean;
+      readonly typed: string;
+    }
+  | { readonly kind: "shell"; readonly command: Shell };
 
 /** The first word of a passthrough, as typed: the text up to its first space. */
 function firstWord(command: Passthrough): string {
@@ -241,165 +255,244 @@ export function messages(
     }
     // Prompts and commands for the agent enter the queue in the order they were sent, although
     // files take a while to read. Every reply goes to the thread.
-    await arrival(ref, ticket, async () => {
-      // The thread's first message went while this prompt waited behind another (#221): it opens
-      // no form and posts nothing (`rootGone` is forgetting the thread).
-      if (sessions.gone(ref.channel, ref.thread)) {
-        logger.info(
-          `dropped a message in ${ref.channel}/${ref.thread}: its thread is being forgotten`,
-        );
+    await arrival(ref, ticket, () =>
+      deliver(ref, opened, ticket, {
+        kind: "message",
+        message,
+        command,
+        inThread,
+        typed: options.typed,
+      }),
+    );
+  }
+
+  /**
+   * The body of a send, run inside the thread's arrival lock, which its caller holds (`arrival`
+   * cannot be taken twice): the setup when due, the restart refusal, the same-folder hold, the
+   * terminal that holds the session, a `!!command`'s confirmation, then `submit`. A typed message
+   * and a `!!command` both pass here, so neither can wake a session the other could not.
+   */
+  async function deliver(
+    ref: ThreadRef,
+    opened: ThreadSession,
+    ticket: Ticket,
+    outgoing: Outgoing,
+  ): Promise<void> {
+    // The thread's first message went while this prompt waited behind another (#221): it opens
+    // no form and posts nothing (`rootGone` is forgetting the thread).
+    if (sessions.gone(ref.channel, ref.thread)) {
+      logger.info(
+        `dropped a message in ${ref.channel}/${ref.thread}: its thread is being forgotten`,
+      );
+      return;
+    }
+    const message = outgoing.kind === "message" ? outgoing : null;
+    const command = message?.command ?? null;
+    // A `!!command` is only ever typed in a session's thread.
+    const inThread = message?.inThread ?? true;
+    let session = opened;
+    // `held` is the object a Continue's mark was left standing on (`holdEnd({ continued: true })`
+    // bets on the `submit()` below to replace it with the working one): kept apart from
+    // `session`, which a `SessionClosed` retry below can reassign, so a non-submit exit always
+    // restores the mark on the object that actually shows it.
+    let held: ThreadSession | null = null;
+    let askedSetup = false;
+    let submitted = false;
+    let failed = false;
+    // Every checkpoint below throws `StoppedByOwner` once the owner stopped this prompt, and the
+    // one catch at the end tells `Not sent.`, forgets the Start this prompt asked and, in the
+    // finally, puts back the mark a Start, Continue, Send here or Run left. `askOwner` tells it
+    // itself when it refuses to open, and answers null: that return is the same exit.
+    try {
+      // A `!!command`'s text is built at the submit below: only a message has content to read.
+      let prompt: PromptContent = "";
+      if (message !== null) {
+        const read = await message.message.content();
+        if (read === null) return;
+        prompt = read;
+      }
+      if (talk.stopped) return;
+      // Before the restart refusal: a stopped message says `Not sent.`, never the refusal.
+      ticket.signal.throwIfAborted();
+      // Checked before the hold too: a drain already cancelled every hold open when it
+      // started (`SessionManager.drain`) and will never cancel one opened after, so a message
+      // that arrives once draining has begun must never open a new one (it would wait
+      // forever).
+      if (refusing(session)) {
+        await talk.refuseRestarting(ref);
         return;
       }
-      let session = opened;
-      // `held` is the object a Continue's mark was left standing on (`holdEnd({ continued: true })`
-      // bets on the `submit()` below to replace it with the working one): kept apart from
-      // `session`, which a `SessionClosed` retry below can reassign, so a non-submit exit always
-      // restores the mark on the object that actually shows it.
-      let held: ThreadSession | null = null;
-      let askedSetup = false;
-      let submitted = false;
-      let failed = false;
-      // Every checkpoint below throws `StoppedByOwner` once the owner stopped this prompt, and the
-      // one catch at the end tells `Not sent.`, forgets the Start this prompt asked and, in the
-      // finally, puts back the mark a Start, Continue or Send here left. `askOwner` tells it
-      // itself when it refuses to open, and answers null: that return is the same exit.
-      try {
-        let prompt = await message.content();
-        if (prompt === null || talk.stopped) return;
+      // A word the session does not list is suggested for before the setup and the hold ask
+      // anything: a typo asks nothing, and they are asked once, for the text sent on Enter. Only
+      // where learning the list wakes nothing the hold guards: a session already connected, or
+      // one that never ran, which its setup connects before the hold anyway (an unsent Start's
+      // choices forgotten first, as the setup does). A session that ran and was closed is asked
+      // the hold first, and suggested for once it is connected below.
+      const early =
+        message !== null && inThread && command !== null && (session.connected || session.neverRan);
+      if (early) {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            await session.forgetSetup();
+            await session.ensureConnected();
+            ticket.signal.throwIfAborted();
+            if (await suggest(message.message, session, command, message.typed)) return;
+            break;
+          } catch (error) {
+            if (!(error instanceof SessionClosed) || attempt > 0) throw error;
+            const fresh = sessions.get(ref.channel, ref.thread);
+            if (fresh === null) throw new SessionGone(names);
+            session = fresh;
+          }
+        }
+        // The connect may have outlasted a drain or an install.
         ticket.signal.throwIfAborted();
-        // Checked before the hold too: a drain already cancelled every hold open when it
-        // started (`SessionManager.drain`) and will never cancel one opened after, so a message
-        // that arrives once draining has begun must never open a new one (it would wait
-        // forever).
         if (refusing(session)) {
           await talk.refuseRestarting(ref);
           return;
         }
-        // A word the session does not list is suggested for before the setup and the hold ask
-        // anything: a typo asks nothing, and they are asked once, for the text sent on Enter. Only
-        // where learning the list wakes nothing the hold guards: a session already connected, or
-        // one that never ran, which its setup connects before the hold anyway (an unsent Start's
-        // choices forgotten first, as the setup does). A session that ran and was closed is asked
-        // the hold first, and suggested for once it is connected below.
-        const early = inThread && command !== null && (session.connected || session.neverRan);
-        if (early) {
-          for (let attempt = 0; attempt < 2; attempt += 1) {
-            try {
-              await session.forgetSetup();
-              await session.ensureConnected();
-              ticket.signal.throwIfAborted();
-              if (await suggest(message, session, command, options.typed)) return;
-              break;
-            } catch (error) {
-              if (!(error instanceof SessionClosed) || attempt > 0) throw error;
-              const fresh = sessions.get(ref.channel, ref.thread);
-              if (fresh === null) throw new SessionGone(names);
-              session = fresh;
-            }
-          }
-          // The connect may have outlasted a drain or an install.
-          ticket.signal.throwIfAborted();
-          if (refusing(session)) {
-            await talk.refuseRestarting(ref);
-            return;
-          }
-        }
-        // The same-folder hold: this message would wake `session` (busy just queues behind what
-        // is already running); ask first when another live session, of any channel, is already
-        // busy in the same resolved folder. Later messages of this thread queue behind the wait,
-        // since it runs inside the arrival lock.
-        if (!inThread || session.neverRan) {
-          // A session's first prompt: its setup comes before anything else, the hold's question
-          // included. A reply in a thread whose setup was cancelled, or whose hold was, is a
-          // first prompt too: nothing was ever sent in it.
-          const ready = await others.setup.beforeSending(ref, session, ticket.signal);
-          if (ready === null) return;
-          session = ready;
-          held = ready;
-          askedSetup = true;
-          ticket.signal.throwIfAborted();
-        }
+      }
+      // The same-folder hold: this message would wake `session` (busy just queues behind what
+      // is already running); ask first when another live session, of any channel, is already
+      // busy in the same resolved folder. Later messages of this thread queue behind the wait,
+      // since it runs inside the arrival lock.
+      if (!inThread || session.neverRan) {
+        // A session's first prompt: its setup comes before anything else, the hold's question
+        // included. A reply in a thread whose setup was cancelled, or whose hold was, is a
+        // first prompt too: nothing was ever sent in it.
+        const ready = await others.setup.beforeSending(ref, session, ticket.signal);
+        if (ready === null) return;
+        session = ready;
+        held = ready;
+        askedSetup = true;
+        ticket.signal.throwIfAborted();
+      }
+      // The busy neighbour the owner already chose to send beside (Continue): a second look after
+      // the owner's Run asks only about a session that started working since.
+      let besideOf: ThreadSession | null = null;
+      // The same-folder hold, then the terminal: true when nothing stands between the message and
+      // the session, false when the owner cancelled (each question tells it itself).
+      const besideOthers = async (): Promise<boolean> => {
         if (!session.busy) {
           const other = sessions.workingIn({ besides: session });
-          if (other !== null) {
+          if (other !== null && other !== besideOf) {
             if (!(await others.hold.beforeSending(ref, session, other, ticket.signal))) {
               // the Start that nothing was sent for
               if (askedSetup && !talk.stopped) await session.forgetSetup();
-              return;
+              return false;
             }
+            besideOf = other;
             held = session;
             ticket.signal.throwIfAborted();
           }
         }
-        // A terminal on the host that holds the same session: its turn waited out, the owner asked
-        // once whether to write here beside it, and what it wrote shown before the reply.
+        // A terminal on the host that holds the same session: its turn waited out, the owner
+        // asked once whether to write here beside it, and what it wrote shown before the reply.
         if (!session.neverRan) {
           // Set before the call: a Send here leaves the waiting mark for the submit below, as a
           // Continue does, and a stop that lands before the call returns must still restore it
           // (`reactAfterHold` recomputes the mark, harmless on an exit that left none).
           held = session;
-          if (!(await others.terminal.beforeSending(ref, session, ticket.signal))) return;
+          if (!(await others.terminal.beforeSending(ref, session, ticket.signal))) return false;
           ticket.signal.throwIfAborted();
         }
-        // Retried once against a freshly looked-up session: the one this call was handed can
-        // still close under it (most likely the idle close, though `touch()` at the lookup
-        // already guards the common case) during the read above or the steps below.
-        let asCommand = false;
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-          try {
-            if (command !== null) {
-              await session.ensureConnected();
-              ticket.signal.throwIfAborted();
-              if (inThread && !early && (await suggest(message, session, command, options.typed)))
-                return;
-              const known = new Set(session.commands.map((offered) => offered.name));
-              asCommand = known.has(firstWord(command));
-              prompt = asCommand ? `${agent.words.commandPrefix}${command.text}` : message.text;
-            }
-            // (sync) Checked last, with no await before the submit: a stop can start while the
-            // files are read. The daemon's words still work meanwhile (`!stop` shortens the
-            // wait); a new turn would not finish, and the chat does not send this message
-            // again. A stop that ended meanwhile (the daemon is gone) sends nothing and says
-            // nothing.
-            if (talk.stopped) return;
+        return true;
+      };
+      if (!(await besideOthers())) return;
+      // A `!!command` is confirmed once nothing else stands between it and the session: Run
+      // leaves the waiting mark for the submit to replace (`holdEnd`), and any other way out puts
+      // back the mark the thread had, in the finally.
+      if (outgoing.kind === "shell") {
+        held = session;
+        const asked = session;
+        const answer = await askOwner(deps, talk, ref, asked, {
+          kind: "shell",
+          title: texts.SHELL_TITLE,
+          signal: ticket.signal,
+          request: (requestId): ShellRequest => ({
+            type: "shell",
+            requestId,
+            command: outgoing.command.command,
+            folder: asked.directory,
+          }),
+        });
+        if (answer === null) return;
+        // The confirmation waited on the owner, maybe for minutes: a terminal turn or another
+        // session of the folder may have started meanwhile, so both are looked at again. Each
+        // asks nothing when nothing changed (a terminal already allowed is not asked again).
+        ticket.signal.throwIfAborted();
+        if (!(await besideOthers())) return;
+      }
+      // Retried once against a freshly looked-up session: the one this call was handed can
+      // still close under it (most likely the idle close, though `touch()` at the lookup
+      // already guards the common case) during the read above or the steps below.
+      let asCommand = false;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          if (message !== null && command !== null) {
+            await session.ensureConnected();
             ticket.signal.throwIfAborted();
-            if (refusing(session)) {
-              await talk.refuseRestarting(ref);
+            if (
+              inThread &&
+              !early &&
+              (await suggest(message.message, session, command, message.typed))
+            )
               return;
-            }
-            // The title is what the owner typed, as the chat's plain text, for a prompt alone: a word
-            // sent as the agent's command, a file with no text or a spoken clip names nothing.
-            const title = asCommand ? null : message.plain.trim() || null;
+            const known = new Set(session.commands.map((offered) => offered.name));
+            asCommand = known.has(firstWord(command));
+            prompt = asCommand
+              ? `${agent.words.commandPrefix}${command.text}`
+              : message.message.text;
+          }
+          // (sync) Checked last, with no await before the submit: a stop can start while the
+          // files are read. The daemon's words still work meanwhile (`!stop` shortens the
+          // wait); a new turn would not finish, and the chat does not send this message
+          // again. A stop that ended meanwhile (the daemon is gone) sends nothing and says
+          // nothing.
+          if (talk.stopped) return;
+          ticket.signal.throwIfAborted();
+          if (refusing(session)) {
+            await talk.refuseRestarting(ref);
+            return;
+          }
+          if (outgoing.kind === "shell") {
+            const typed = outgoing.command.command;
+            await session.submit(`!!${typed}`, typed, ticket.signal);
+          } else {
+            // The title is what the owner typed, as the chat's plain text, for a prompt alone: a
+            // word sent as the agent's command, a file with no text or a spoken clip names
+            // nothing.
+            const title = asCommand ? null : outgoing.message.plain.trim() || null;
             sessions.suggestions.clear(ref);
             await session.submit(prompt, null, ticket.signal, title);
-            submitted = true;
-            return;
-          } catch (error) {
-            if (!(error instanceof SessionClosed) || attempt > 0) throw error;
-            const fresh = sessions.get(ref.channel, ref.thread);
-            // Null once the thread's entry is gone. A refused resume keeps it: the retry then
-            // gets a rebuilt session, whose own refusal throws `SessionGone` (one retry only).
-            if (fresh === null) throw new SessionGone(names);
-            session = fresh;
           }
-        }
-      } catch (error) {
-        if (error instanceof StoppedByOwner) {
-          await dropped(ticket);
-          if (askedSetup && !talk.stopped) await session.forgetSetup();
+          submitted = true;
           return;
+        } catch (error) {
+          if (!(error instanceof SessionClosed) || attempt > 0) throw error;
+          const fresh = sessions.get(ref.channel, ref.thread);
+          // Null once the thread's entry is gone. A refused resume keeps it: the retry then
+          // gets a rebuilt session, whose own refusal throws `SessionGone` (one retry only).
+          if (fresh === null) throw new SessionGone(names);
+          session = fresh;
         }
-        failed = true;
-        throw error;
-      } finally {
-        // `submitted` alone, not a fixed set of error types: `ensureConnected` can also reject
-        // with the agent's own failure (a logged-out CLI, most likely) or anything a stray bug
-        // throws; none of them may ever leave a Continue's mark standing forever. A failure
-        // gets the mark a turn that reached the queue and then failed gets; a plain return (the
-        // drain notice posted fine) restores a Cancel's own mark instead.
-        if (held !== null && !submitted) await held.reactHoldAbandoned({ error: failed });
       }
-    });
+    } catch (error) {
+      if (error instanceof StoppedByOwner) {
+        await dropped(ticket);
+        if (askedSetup && !talk.stopped) await session.forgetSetup();
+        return;
+      }
+      failed = true;
+      throw error;
+    } finally {
+      // `submitted` alone, not a fixed set of error types: `ensureConnected` can also reject
+      // with the agent's own failure (a logged-out CLI, most likely) or anything a stray bug
+      // throws; none of them may ever leave a Continue's mark standing forever. A failure
+      // gets the mark a turn that reached the queue and then failed gets; a plain return (the
+      // drain notice posted fine) restores a Cancel's own mark instead.
+      if (held !== null && !submitted) await held.reactHoldAbandoned({ error: failed });
+    }
   }
 
   /**
@@ -416,9 +509,10 @@ export function messages(
   /**
    * `!!command`: the owner's shell command, run in the session's folder once the owner confirms
    * it, then told to the session, whose answer is the turn's reply. In the thread's arrival
-   * order, as a prompt is, so a message sent after it waits for the confirmation. Refused where
-   * the instance turned it off, for an agent that cannot be told of it, outside a session's
-   * thread and in a session that has not started (its setup comes first).
+   * order, as a prompt is, so a message sent after it waits for the confirmation, and through the
+   * same guards (`deliver`): the same-folder hold and the terminal are asked before the
+   * confirmation. Refused where the instance turned it off, for an agent that cannot be told of
+   * it, outside a session's thread and in a session that has not started (its setup comes first).
    */
   async function shell(
     ref: ThreadRef,
@@ -443,63 +537,8 @@ export function messages(
       await talk.tell(ref, texts.SHELL_FIRST_PROMPT);
       return;
     }
-    await arrival(ref, ticket, async () => {
-      let session = opened;
-      if (talk.stopped) return;
-      // Before the restart refusal: a stopped command says `Not sent.`, never the refusal.
-      if (await dropped(ticket)) return;
-      if (refusing(session)) {
-        await talk.refuseRestarting(ref);
-        return;
-      }
-      const answer = await askOwner(deps, talk, ref, session, {
-        kind: "shell",
-        title: texts.SHELL_TITLE,
-        signal: ticket.signal,
-        request: (requestId): ShellRequest => ({
-          type: "shell",
-          requestId,
-          command: command.command,
-          folder: session.directory,
-        }),
-      });
-      if (answer === null) return;
-      // Run left the waiting mark standing for the submit to replace (`holdEnd`): any other way
-      // out puts back the mark the thread had, as `submitToSession` does after a hold.
-      const held = session;
-      let submitted = false;
-      let failed = false;
-      try {
-        // Retried once against a freshly looked-up session, as a prompt is.
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-          try {
-            if (talk.stopped) return;
-            ticket.signal.throwIfAborted();
-            if (refusing(session)) {
-              await talk.refuseRestarting(ref);
-              return;
-            }
-            await session.submit(`!!${command.command}`, command.command, ticket.signal);
-            submitted = true;
-            return;
-          } catch (error) {
-            if (!(error instanceof SessionClosed) || attempt > 0) throw error;
-            const fresh = sessions.get(ref.channel, ref.thread);
-            if (fresh === null) throw new SessionGone(names);
-            session = fresh;
-          }
-        }
-      } catch (error) {
-        if (error instanceof StoppedByOwner) {
-          await dropped(ticket);
-          return;
-        }
-        failed = true;
-        throw error;
-      } finally {
-        if (!submitted) await held.reactHoldAbandoned({ error: failed });
-      }
-    });
+    if (talk.stopped) return;
+    await arrival(ref, ticket, () => deliver(ref, opened, ticket, { kind: "shell", command }));
   }
 
   /**
