@@ -162,9 +162,10 @@ export interface Capabilities {
    */
   readonly sessionHolders: boolean;
   /**
-   * `AgentBackend.turnsAfter` and `message_saved`: the session says which messages it wrote, and
-   * the agent reads the turns another process wrote after them. Without it a turn written in a
-   * terminal is not shown in the thread, and a live session is not resumed again to see it.
+   * `AgentBackend.turnsAfter`, `AgentBackend.lastTurn` and `message_saved`: the session says which
+   * messages it wrote, and the agent reads the turns another process wrote after them, or the
+   * last one of a session. Without it a turn written in a terminal is not shown in the thread, a
+   * live session is not resumed again to see it, and a copy shows nothing of its original.
    */
   readonly foreignTurns: boolean;
   /**
@@ -1182,6 +1183,11 @@ export interface AgentBackend {
    * Rejects when the agent cannot read it. Present with `foreignTurns`.
    */
   turnsAfter?(folder: string, session: string, after: SavedMessage): Promise<ForeignTurns>;
+  /**
+   * The last turn the record of `session` holds, null when it holds none. Rejects when the agent
+   * cannot read it. Present with `foreignTurns`.
+   */
+  lastTurn?(folder: string, session: string): Promise<ForeignTurn | null>;
   /** How a shell command the owner sends runs and reaches a session. Present with `shellCommands`. */
   readonly shell?: ShellMode;
   /** Ends what the back end keeps running besides its sessions. Safe to call again. */

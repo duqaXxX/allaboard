@@ -526,6 +526,11 @@ export const FORK_NOT_STARTED = "This session has not started yet: send it a mes
 // The new thread's root, in a reference's markup.
 export const FORK_ROOT = "Fork of {link}";
 export const FORK_ROOT_PROMPT = "Fork of {link}: {prompt}";
+// The original's last turn, first thing in a copy's thread after its root (#141).
+export const FORK_LAST_TURN = "Last in the original:\n\n{turn}";
+// Said under a last turn the owner interrupted, which would otherwise read as answered.
+export const FORK_LAST_TURN_STOPPED = "(stopped)";
+export const FORK_LAST_TURN_MORE = " (open the original for more)";
 // The line in the origin's thread, as the terminal's `/fork` confirms in one line.
 export const FORK_RUNNING = "Forked into {link} · running · session `{session}`";
 export const FORK_WAITING =

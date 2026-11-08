@@ -6,7 +6,7 @@ import type { ThreadRef } from "../../chat/seam.ts";
 import { systemClock } from "../../clock.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
-import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
+import { oneLine, quoted, spaced, TITLE_LIMIT } from "../reply/words.ts";
 import { SessionGone } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
@@ -20,6 +20,10 @@ const logger = getLogger("allaboard.core.flows.fork");
 // How often a running turn is looked at while a fork waits for its end, as a message waits for a
 // terminal's turn (`TERMINAL_POLL_SECONDS`).
 export const FORK_POLL_SECONDS = 2.0;
+
+// How much of the original's last turn a copy's thread shows, prompt and reply each, in
+// characters: the product's own cut, enough to recognise where the conversation stood.
+export const FORK_LAST_TURN_LIMIT = 300;
 
 /** Sends `prompt` in the thread `ref` as the owner's, by the path every message of theirs takes. */
 export type SendPrompt = (ref: ThreadRef, prompt: string, ticket: Ticket) => Promise<void>;
@@ -41,6 +45,38 @@ export function forkFlow(
     } catch (error) {
       logger.warning(`could not read the title of a session: ${errorName(error)}`);
       return "";
+    }
+  }
+
+  /**
+   * The original's last turn, read from the copy and first in its thread, cut short; nothing when
+   * the agent cannot read it or there is no turn. Never fails the fork.
+   */
+  async function showLastTurn(opened: ThreadRef, directory: string, id: string): Promise<void> {
+    if (!agent.capabilities.foreignTurns || agent.lastTurn === undefined) return;
+    try {
+      const turn = await agent.lastTurn(directory, id);
+      if (turn === null) return;
+      const parts: string[] = [];
+      if (turn.prompt !== null) {
+        // The owner's words as a quote, every line of it.
+        parts.push(quoted(chat.escape(oneLine(turn.prompt, FORK_LAST_TURN_LIMIT), "written")));
+      }
+      if (turn.reply !== null) {
+        const more = Array.from(spaced(turn.reply)).length > FORK_LAST_TURN_LIMIT;
+        const reply =
+          oneLine(turn.reply, FORK_LAST_TURN_LIMIT) + (more ? texts.FORK_LAST_TURN_MORE : "");
+        parts.push(chat.escape(reply, "written"));
+      }
+      if (turn.interrupted) parts.push(texts.FORK_LAST_TURN_STOPPED);
+      if (parts.length === 0) return;
+      await talk.say(
+        opened.channel,
+        opened.thread,
+        fill(texts.FORK_LAST_TURN, { turn: parts.join("\n\n") }),
+      );
+    } catch (error) {
+      logger.warning(`could not show the last turn of a fork's original: ${errorName(error)}`);
     }
   }
 
@@ -125,6 +161,9 @@ export function forkFlow(
           );
           throw error;
         }
+        // The copy is read, not the original: it holds exactly what was copied, while the original
+        // may have moved on since.
+        await showLastTurn(opened, session.directory, copy);
         if (bridge !== null) copyTicket = inFlight.take(opened, { link: bridge.signal });
         // The copy runs as its origin does: the effort and the bypass the origin's entry holds, and
         // the model its transcript ends on (a resume of a copy runs it, measured 2026-10-28).

@@ -144,3 +144,17 @@ export async function turnsAfter(
   if (rest.length === 0) return { changed: false, turns: [], last: null };
   return { changed: true, turns: turnsOf(rest), last };
 }
+
+/**
+ * The last turn of `session` of `folder` that the owner's own prompt opened, null when it has
+ * none: a command record (the daemon's `/rename`, a `/model`) is no turn to show. Rejects when
+ * it cannot be read.
+ */
+export async function lastTurn(
+  folder: string,
+  session: string,
+  read: GetSessionMessages = sdkGetSessionMessages,
+): Promise<ForeignTurn | null> {
+  const messages = (await read(session, { dir: folder })).filter((m) => !isCommandRecord(m));
+  return turnsOf(messages).findLast((turn) => turn.prompt !== null) ?? null;
+}

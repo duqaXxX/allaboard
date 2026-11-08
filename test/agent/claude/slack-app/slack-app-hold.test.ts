@@ -18,7 +18,7 @@ import { Status } from "../../../../src/chat/slack/reply/status.ts";
 import { IDLE_CLOSE_SECONDS } from "../../../../src/core/sessions/constants.ts";
 import type { ThreadSession } from "../../../../src/core/sessions/session.ts";
 import * as texts from "../../../../src/core/texts.ts";
-import { fill, named } from "../../../../src/core/texts.ts";
+import { named } from "../../../../src/core/texts.ts";
 import {
   CHANNEL,
   OTHER_CHANNEL,
@@ -103,12 +103,14 @@ test("a busy session in the same folder holds the message", async (t) => {
   const world = worldOf(t);
   await startAHold(world);
   assertHeldUnsent(world); // held, not sent
-  // mrkdwn's own `<url|label>` form (a `section` block, like approvals and the resume picker
-  // use for their own buttons), not `threadLink`'s standard-Markdown form.
-  const link = "<https://example.slack.com/archives/C000CHAN/p1780000000000001|Session>";
-  const section = postedBlocks(world)[0] as Body;
-  assert.equal(section.type, "section");
-  assert.deepEqual(section.text, { type: "mrkdwn", text: fill(texts.HOLD_QUESTION, { link }) });
+  // A rich text heading (#163), the other thread's permalink as a link element.
+  const heading = postedBlocks(world)[0] as Body;
+  assert.equal(heading.type, "rich_text");
+  assert.deepEqual(heading.elements[0].elements[1], {
+    type: "link",
+    url: "https://example.slack.com/archives/C000CHAN/p1780000000000001",
+    text: "Session",
+  });
   // Crash repair: a hold is a request like an approval or a question.
   assert.deepEqual(world.state.thread(CHANNEL, THREAD)?.requests, [world.slack.postedTs.at(-1)]);
 });

@@ -92,7 +92,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `SessionMessage` | type | turns.ts: turnsOf | package | none |
 | `@anthropic-ai/claude-agent-sdk` | `forkSession` | function | backend.ts: ClaudeBackend.forkSession | reference | P43 |
 | `@anthropic-ai/claude-agent-sdk` | `getSessionInfo` | function | backend.ts: ClaudeBackend.sessionTitle | reference | none |
-| `@anthropic-ai/claude-agent-sdk` | `getSessionMessages` | function | turns.ts: turnsAfter | reference | none |
+| `@anthropic-ai/claude-agent-sdk` | `getSessionMessages` | function | turns.ts: turnsAfter, lastTurn | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `listSessions` | function | listing.ts: directorySessions | reference | P6 |
 | `@anthropic-ai/claude-agent-sdk` | `query` | function | session.ts: ClaudeSession.constructor | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `resolveSettings` | function | advisor.ts: advisorModel | reference | none |
@@ -161,7 +161,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `getSessionInfo` | `dir` | option | backend.ts: ClaudeBackend.sessionTitle | reference | none |
 | `getSessionInfo` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | none |
 | `getSessionMessages` | `includeSystemMessages` | option | backend.ts: ClaudeBackend.#rewindStart | package | none |
-| `getSessionMessages` | `dir` | option | turns.ts: turnsAfter | reference | none |
+| `getSessionMessages` | `dir` | option | turns.ts: turnsAfter, lastTurn | reference | none |
 | `listSessions` | `dir` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `includeWorktrees` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | P29 |

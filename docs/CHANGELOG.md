@@ -14,11 +14,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A message held back, by another session at work in the same folder or by a terminal that holds
+  the session, now waits on the owner as an approval does (#163): with `SLACK_MENTION_OWNER=on` its
+  question mentions him, and the channel's line names its thread as `✋ Waiting:`. The question's
+  heading is rich text (`requests.richSentence`), beside which the mention pushes; it was a mrkdwn
+  section, beside which it did not. `state.asksOwner` counts the hold; the crash repair's stopped
+  line keeps to a turn's question or approval (`state.asksInTurn`).
 - The channel's line said `⏳ Working: 1 thread` while a new thread waited on its setup form. The
   line now draws that thread as `✋ Waiting:`, as its root shows, by an edit that rings nothing,
   unless an approval or a question waits; what the line names, posts and deletes is unchanged, so
-  a form cancelled before Start leaves the line as it was. A `!!` command's confirmation and the
-  same-folder hold still count as work. `state.json` announces a request that changes whether a
+  a form cancelled before Start leaves the line as it was. A `!!` command's confirmation still counts
+  as work. `state.json` announces a request that changes whether a
   thread blocks on the owner (`state.blocksOnOwner`), so the line follows the form (#233).
 - A fork's root shows the copy's title after `Fork of <link>: ` instead of failing with
   `cant_update_message`. The app edits the root it posted with its own token, `!tag` works on it, and
@@ -40,6 +46,10 @@ All notable changes to this project are documented here. The format follows
   session object, and is dropped by a message of the owner's, a turn or a close; an offer made earlier
   carries a fresh id and is refused when it no longer matches. Probe claim P47 checks that a second turn
   yields one suggestion (#151).
+- A copy made by `!fork` (#141) starts its thread with the original's last turn: the owner's prompt as a quote
+  and the start of the final reply (`FORK_LAST_TURN_LIMIT`), saying the rest is in the original (a turn the owner stopped is marked `(stopped)`). The copy is read, not the original, and a command record such as `/rename` is skipped. Nothing is
+  posted when the agent cannot read the record or it holds no turn. New seam member `AgentBackend.lastTurn`,
+  present with `foreignTurns`.
 - Saved copies of attached files older than 3 days are also removed every 6 hours while the daemon runs (`attachments.sweepEvery`, `SWEEP_EVERY_SECONDS`), not only at start, under the same rules: a private folder only, by mtime, errors per file ignored.
 - A `!fork` with no prompt no longer starts the copy's process: the first message with text sent in
   the copy's thread names it through the live session (`AgentSession.rename`, `Capabilities.sessionRename`;
