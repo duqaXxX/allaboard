@@ -10,7 +10,7 @@ import type { Capabilities } from "../../../src/agent/seam.ts";
 import type { ThreadRef } from "../../../src/chat/seam.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { hold, PLAIN_CAPABILITIES, PlainAgent, say } from "../../support/plain-agent.ts";
-import { MessagesWorld, PLAIN_NAMES, WithBypass } from "./messages-world.ts";
+import { MessagesWorld, PLAIN_NAMES, WithBypass, WithSessionTitle } from "./messages-world.ts";
 
 /** The thread of the channel that is not `origin`, once the fork made it. */
 function copyOf(world: MessagesWorld, origin: ThreadRef): ThreadRef {
@@ -157,4 +157,61 @@ test("!fork while allaboard waits to restart makes no copy", async (t) => {
   await world.settle();
   assert.equal(world.state.threads().length, 1, "no copy's thread");
   assert.ok(!world.inChannel().some((line) => line.startsWith("Fork of ")));
+});
+
+/** The text of the copy's root, and the lead the chat was given with it. */
+function rootOf(world: MessagesWorld, ref: ThreadRef) {
+  const text = world.inChannel().find((line) => line.startsWith("Fork of ")) ?? "";
+  return { text, lead: world.chat.leadOf(ref) };
+}
+
+test("!fork <prompt> opens a root with its lead and the one-line words, and stores nothing yet", async (t) => {
+  const agent = new WithSessionTitle();
+  const world = await MessagesWorld.make(t, { agent, titles: true });
+  const origin = await world.opened("the first task");
+  await world.says("!fork look into the timeout", origin.thread);
+  await world.settle();
+  const ref = copyOf(world, origin);
+  const { text, lead } = rootOf(world, ref);
+  assert.ok(lead?.lead.startsWith("Fork of "), JSON.stringify(lead));
+  assert.ok(text.startsWith(lead?.lead ?? "?") && text.length > (lead?.lead.length ?? 0), text);
+  assert.equal(lead?.words, "look into the timeout");
+  assert.equal(world.state.thread(ref.channel, ref.thread)?.rootPrompt, null);
+});
+
+test("!fork alone opens a root that is its lead, with empty words", async (t) => {
+  const agent = new WithSessionTitle();
+  const world = await MessagesWorld.make(t, { agent, titles: true });
+  const origin = await world.opened("the first task");
+  await world.says("!fork", origin.thread);
+  await world.settle();
+  const { text, lead } = rootOf(world, copyOf(world, origin));
+  assert.equal(text, lead?.lead);
+  assert.equal(lead?.words, "");
+});
+
+test("the copy's first title stores the one-line words, not the whole prompt", async (t) => {
+  const agent = new WithSessionTitle();
+  const world = await MessagesWorld.make(t, { agent, titles: true });
+  const origin = await world.opened("the first task");
+  agent.title = "Fix the timeout";
+  const long = `look into the timeout ${"and more ".repeat(30)}`.trim();
+  await world.says(`!fork ${long}`, origin.thread);
+  await world.settle();
+  const ref = copyOf(world, origin);
+  const stored = world.state.thread(ref.channel, ref.thread)?.rootPrompt;
+  assert.ok(stored?.startsWith("look into the timeout"), String(stored));
+  assert.ok(stored !== undefined && stored !== null);
+  assert.ok(stored.length < long.length && stored.length <= 80, String(stored.length));
+});
+
+test("a title refused for good leaves no stored words on the copy", async (t) => {
+  const agent = new WithSessionTitle();
+  const world = await MessagesWorld.make(t, { agent, titles: true, titleFails: "permanent" });
+  const origin = await world.opened("the first task");
+  agent.title = "Fix the timeout";
+  await world.says("!fork look into it", origin.thread);
+  await world.settle();
+  const ref = copyOf(world, origin);
+  assert.equal(world.state.thread(ref.channel, ref.thread)?.rootPrompt, null);
 });

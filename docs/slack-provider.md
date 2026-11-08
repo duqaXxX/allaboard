@@ -897,7 +897,9 @@ Slack reports none, gets no `pinThread` and one warning in the log; tags, titles
 deleter, which need `chat:write` alone, are there either way. The first message of a thread is the owner's,
 and `chat.update` changes only messages posted by the authenticated user (method reference, read
 2026-10-19), so `RootEditor.tag` reads the root with the bot (`conversations.replies`, `limit=1`,
-the message whose `ts` is the thread) and writes with the owner: `chat.update`. A root already tagged as asked sends no edit.
+the message whose `ts` is the thread, `include_all_metadata`) and writes with the owner: `chat.update`.
+A root the app posted itself (its `user` is the bot user) is written with the bot, which may update
+the messages it posts (same reference). A root already tagged as asked sends no edit.
 `RootEditor.pin` reads nothing and calls `pins.add` or `pins.remove` with the owner's token, whoever
 made the pin; `already_pinned`, `not_pinned` and `no_pin` are not failures (`pins.add` and
 `pins.remove` references, read 2026-10-19). Any other refusal rejects with a `ChatError` named by
@@ -905,7 +907,9 @@ Slack's code, which the core shows the owner (`texts.TAG_FAILED`, `texts.PIN_FAI
 
 The tag lives in the root's own blocks and nowhere else. `tag.retaggedBlocks` takes off a leading
 tag, a `text` element in code style (`style.code` alone) whose text is `[name]` for a name that
-satisfies `commands.TAG_NAME` plus a following element that is exactly a space, and puts the new
+satisfies `commands.TAG_NAME` plus a following element that is exactly a space (or a `text` that starts
+with one: a root the app posted as a markdown block stores it so, measured 2026-11-07, and the untag
+strips that one space), and puts the new
 one first in the first `rich_text_section` of the first `rich_text` block. When taking a tag off
 leaves that section empty (the tag had a section of its own) the section goes, and the block with it
 when nothing else is in it, so a tag and an untag give back the blocks the root had. A root with no
@@ -947,6 +951,22 @@ first. A root with no blocks is edited through its `text`. Files attached to the
 preserved on purpose, and what `chat.update` does to one has not been measured. `!tag` and
 `!untag` work on a titled root as on any other: the tag goes before the title, and an untag leaves
 the title.
+
+A root the core opened with a lead (`ChannelChat.open` with `lead`, `SlackChannel.open`; a lead that is not a prefix of the root posted leaves the root plain, with a
+warning) carries
+message metadata of type `allaboard_root` whose payload is `{ lead, rest, title, words }`: the lead,
+the markdown after it, the title (null until one is set) and the owner's words the root shows, in the
+form the agent receives a message (`tag.leadMetadata`, read back by
+`tag.rootLead`, which reads a missing `title` as null and a missing `rest` or `words` as empty). Such a root
+is always written whole from that payload and the tag, as one `markdown` block: the tag, the lead,
+then `rest` while no title is set, or `: ` and the title in bold. Each edit rewrites the payload
+with the title it shows. `keep` gets the payload's `words` before the edit, as it gets the text of
+any other root, and nothing is sent when the payload's title and the tag read from the
+blocks already match. Its `text` fallback is never read back: Slack stores it with `&`, `<` and
+`>` turned to entities (measured 2026-11-07 on a dev app, `@slack/web-api` 8.3.0, which also showed
+the metadata kept through an edit that omits it, and the payload returned only with
+`include_all_metadata`). The channel's line names such a thread by the payload's title, and by its
+text as for any root while no title is set.
 
 Every edit of a root, a tag or a title, queues behind the earlier one of the same channel and
 thread inside `RootEditor`, since each reads the message and writes it back whole and two

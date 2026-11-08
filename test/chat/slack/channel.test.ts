@@ -161,3 +161,31 @@ test("the channel does nothing once the provider stopped", async () => {
   await channel.offer({ type: "folders", root: "/work", folders: [], bound: null }, "Folders");
   assert.deepEqual(slack.apiCalls, []);
 });
+
+test("open with a lead posts the root with metadata holding the lead, the rest and no title", async () => {
+  const { slack, chat } = madeChat();
+  const lead = "Fork of [the first thread](https://example.invalid/t)";
+  await chat.channel(CHANNEL).open?.(`${lead}: look into x`, { lead, words: "look into x" });
+  const [posted] = slack.callsTo("chat.postMessage");
+  assert.deepEqual(posted?.blocks, [{ type: "markdown", text: `${lead}: look into x` }]);
+  assert.deepEqual(posted?.metadata, {
+    event_type: "allaboard_root",
+    event_payload: { lead, rest: ": look into x", title: null, words: "look into x" },
+  });
+});
+
+test("open with no lead posts no metadata", async () => {
+  const { slack, chat } = madeChat();
+  await chat.channel(CHANNEL).open?.("A root");
+  assert.equal(slack.callsTo("chat.postMessage")[0]?.metadata, undefined);
+});
+
+test("open posts no metadata, and warns, when the lead is not a prefix of the root it posts", async (t) => {
+  const warned: string[] = [];
+  t.mock.method(logger, "warning", (text: string) => warned.push(text));
+  const { slack, chat } = madeChat();
+  await chat.channel(CHANNEL).open?.("A root", { lead: "Another lead", words: "" });
+  assert.equal(slack.callsTo("chat.postMessage")[0]?.metadata, undefined);
+  assert.equal(warned.length, 1);
+  assert.ok(!warned[0]?.includes("A root"), "names only");
+});

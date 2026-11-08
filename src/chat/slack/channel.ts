@@ -20,6 +20,7 @@ import { split } from "./reply/blocks.ts";
 import { describe } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { resumeBlocks } from "./resume.ts";
+import { leadMetadata } from "./tag.ts";
 import { updateBlocks } from "./update.ts";
 
 export const logger = getLogger("allaboard.chat.slack.channel");
@@ -75,10 +76,18 @@ export class SlackChannel implements ChannelChat {
 
   // A thread of Slack is named by its root's `ts`. A root past one message's limit is cut there:
   // the core gives a line.
-  async open(markdown: string): Promise<ThreadRef> {
+  async open(markdown: string, lead?: { lead: string; words: string }): Promise<ThreadRef> {
     const { slack, ownerUserId, stopped } = this.#parts;
     if (stopped.aborted) throw new ChatError("stopped");
     const root = split(markdown)[0] ?? markdown;
+    // The metadata names the lead the root starts with: a root cut inside it has none.
+    const metadata =
+      lead !== undefined && root.startsWith(lead.lead)
+        ? leadMetadata(lead.lead, root.slice(lead.lead.length), null, lead.words)
+        : undefined;
+    if (lead !== undefined && metadata === undefined) {
+      logger.warning(`a root opened in ${this.#channel} does not start with its lead: kept plain`);
+    }
     const ts = await crossing(() =>
       deliver(
         slack,
@@ -86,7 +95,7 @@ export class SlackChannel implements ChannelChat {
         { channel: this.#channel, threadTs: null },
         root,
         [{ type: "markdown", text: root }],
-        { ephemeral: false },
+        { ephemeral: false, ...(metadata !== undefined && { metadata }) },
       ),
     );
     if (ts === null) throw new ChatError("no_ts");

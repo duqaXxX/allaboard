@@ -1692,6 +1692,15 @@ at the next one, unless the chat says the refusal is permanent. `root_prompt` is
 message content `state.json` holds, because the daemon deleted it from the chat; it goes with its
 thread when the thread is removed.
 
+A root opened with a lead (`ChannelChat.open(markdown, { lead, words })`, used by `!fork` for
+`Fork of <link>`) keeps the lead in front of the title. The chat remembers the lead, the rest of the
+root's words, the title and `words` (what the owner typed that the root shows, one line, in the form
+the agent receives a message) in the message's metadata (Slack: `event_type` `allaboard_root`), and
+composes the root from that and the tag alone; the app edits its own root with the bot token. The
+chat hands `keep` the `words` before the first edit, so a fork's `root_prompt` is that one line and
+the rules above (stored before the edit, cleared after a refusal for good) apply unchanged. The
+channel's line names the thread by the metadata's title.
+
 A title that resolves after a stop began (`SessionManager` closed) touches neither the chat nor the
 state. A `ChatError` with `permanent` set (the chat will refuse the same call again) marks the title as
 handled, so it is offered again only when it changes; any other failure is tried again at the next

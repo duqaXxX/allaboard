@@ -324,7 +324,10 @@ function variant(
           if (how.root.gone) throw new ChatError("thread_not_found", { permanent: true });
           if (how.root.readFails) throw new ChatError("ratelimited");
           if (keep !== undefined) {
-            await keep(how.root.text);
+            const lead = (
+              target as unknown as { leadOf(ref: ThreadRef): { words: string } | null }
+            ).leadOf(ref);
+            await keep(lead?.words ?? how.root.text);
             how.root.log.push("kept");
           }
           how.root.log.push("edit");

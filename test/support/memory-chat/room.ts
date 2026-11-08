@@ -69,6 +69,12 @@ export interface StoredMessage {
   inside: string | null;
 }
 
+/** What `ChannelChat.open` was given besides the markdown. */
+export interface RootLeadOf {
+  readonly lead: string;
+  readonly words: string;
+}
+
 /** A message as a test reads it: a copy, so what it holds does not change under the reader. */
 export interface ShownMessage {
   readonly id: MessageId;
@@ -266,6 +272,7 @@ export class Room {
   /** `ThreadChat.unshare` rejects with a `ChatError` while this is set. */
   unshareRefused = false;
 
+  readonly #leads = new Map<string, RootLeadOf>();
   readonly #threadIds: "own" | "opening";
 
   /**
@@ -420,6 +427,16 @@ export class Room {
 
   lookupFails(): boolean {
     return this.#lookupFails;
+  }
+
+  /** The lead a root was opened with (`ChannelChat.open`), for a test to read; null for none. */
+  leadOf(ref: ThreadRef): RootLeadOf | null {
+    return this.#leads.get(key(ref.channel, ref.thread)) ?? null;
+  }
+
+  /** Remembers the lead a root was opened with. */
+  keepLead(ref: ThreadRef, lead: RootLeadOf): void {
+    this.#leads.set(key(ref.channel, ref.thread), lead);
   }
 
   openedAt(ref: ThreadRef): number | null {

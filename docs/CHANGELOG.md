@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A fork's root shows the copy's title after `Fork of <link>: ` instead of failing with
+  `cant_update_message`. The app edits the root it posted with its own token, `!tag` works on it, and
+  the channel's line names the fork by its title. The chat seam's `ChannelChat.open` takes a lead and
+  the owner's words for a root (#230).
+
 - The tests no longer leave their scratch folders in the temp directory (about 100,000 had piled up).
   `test/support/temp.ts` makes a folder and removes it when the test process ends; the `test` script runs
   through `.github/scripts/run-tests.mjs`, which fails when a run leaves a new `allaboard-*` entry in

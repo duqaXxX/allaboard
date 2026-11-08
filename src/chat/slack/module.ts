@@ -297,7 +297,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
   const names = (): Names => chat.names();
   const owner = await ownerClient(context.variables.SLACK_USER_TOKEN ?? null, identity, clients);
   // One editor serves tags and titles, so their edits of a root queue behind one another.
-  const roots = owner === null ? null : new RootEditor(slack, owner.client);
+  const roots = owner === null ? null : new RootEditor(slack, owner.client, identity.botUserId);
   const threadDeleter = deleter(
     owner?.client ?? null,
     slack,

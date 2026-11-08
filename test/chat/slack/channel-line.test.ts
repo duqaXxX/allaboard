@@ -10,6 +10,7 @@ import {
   lineThread,
   rootKind,
 } from "../../../src/chat/slack/channel-line.ts";
+import { retitledText } from "../../../src/chat/slack/tag.ts";
 import { FakeSlack, rejected } from "../../support/fake-slack.ts";
 import type { JsonObject } from "../../support/fixtures.ts";
 
@@ -820,4 +821,39 @@ test("a root's word is its end first, then its pending status, as the session in
   assert.equal(rootKind("working", null), "working");
   assert.equal(rootKind(null, "done"), "done");
   assert.equal(rootKind(null, null), null);
+});
+
+test("the label of a root with a lead is its metadata title; untitled, the root's text", () => {
+  const metadata = (title: string | null) => ({
+    event_type: "allaboard_root",
+    event_payload: { lead: "Fork of x", rest: ": go", title },
+  });
+  // The retitle path is handed the text `title()` returns; the fetch path reads the payload.
+  const title = "Fix `a` & *b* <c>";
+  assert.equal(
+    lineLabel({ text: "Fork of x: **Old**", metadata: metadata(title) }),
+    lineLabel({ text: retitledText(title, null) }),
+  );
+  assert.equal(lineLabel({ text: "Fork of x: go", metadata: metadata(null) }), "Fork of x: go");
+});
+
+test("the line reads a root with include_all_metadata and names a fork by its title", async () => {
+  const fake = slack();
+  fake.responses["conversations.replies"] = {
+    ok: true,
+    messages: [
+      {
+        ts: ROOT,
+        user: BOT,
+        text: "Fork of x: **Old**",
+        metadata: {
+          event_type: "allaboard_root",
+          event_payload: { lead: "Fork of x", rest: "", title: "Fix the login page" },
+        },
+      },
+    ],
+  };
+  await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT, "done");
+  assert.equal(fake.callsTo("conversations.replies")[0]?.include_all_metadata, true);
+  assert.equal(fake.callsTo("chat.postMessage")[0]?.text, "Status: Done: Fix the login page");
 });

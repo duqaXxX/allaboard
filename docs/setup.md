@@ -1094,7 +1094,8 @@ runs the same model, effort and bypass, and starts on the prompt, while the thre
 from goes on as it was. Use it when a session finds a problem that is not its task.
 
 - allaboard posts the new thread's first message in the channel, `Fork of <link>: <prompt>`, the
-  link going back to the thread you sent it from. That thread gets one line:
+  link going back to the thread you sent it from. Once the copy has a title, with `SLACK_USER_TOKEN`
+  set, that message reads `Fork of <link>: ` and the title in bold, after the tag when there is one. That thread gets one line:
   `Forked into <link> · running · session <id>`.
 - With no prompt, `!fork` opens the new thread and the copy waits for your first message there. No
   process runs for it until then, and its first message in the thread names it: the `!resume` list
@@ -1157,7 +1158,10 @@ in `state.json` (`root_prompt`) just before the first replacement, in the form t
 `!status` in the thread shows it. It is the one piece of message content `state.json` holds, kept
 because allaboard deleted it from Slack. A thread that is not titled yet has none. A
 message you wrote with a file attached keeps the file: the edit replaces the text only (an image,
-seen on 2026-10-20). Before the session has a title the message is untouched.
+seen on 2026-10-20). Before the session has a title the message is untouched. The first message of a
+fork keeps its `Fork of <link>` start and shows the title after it; the text allaboard keeps
+(`root_prompt`) is the one line of your prompt the message showed (empty for a bare `!fork`), stored when
+the title first replaces it.
 
 allaboard asks Claude Code for the title at the end of every turn, at `!status`, and when an idle
 session closes after an hour. Claude Code generates one after

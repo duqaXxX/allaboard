@@ -1495,6 +1495,28 @@ export function chatConformance(
         );
       });
 
+      check("open with a lead posts the root whole, and a title keeps the lead", async (s) => {
+        const channel = s.provider.channel(s.rig.channel);
+        if (channel.open === undefined) return;
+        const lead = "Fork of the first thread";
+        const ref = await channel.open(`${lead}: look into the timeout`, {
+          lead,
+          words: "look into the timeout",
+        });
+        const root = () =>
+          s.rig.read({ channel: s.rig.channel }).find((m) => m.text.includes(lead));
+        assert.ok(root()?.text.includes("look into the timeout"), "posted whole");
+        if (s.provider.titleThread === undefined) return;
+        await s.provider.titleThread(ref, "Fix the timeout");
+        assert.ok(root()?.text.includes("Fix the timeout"), "shows the title");
+        assert.ok(root()?.text.includes(lead), "keeps the lead");
+        if (s.provider.tagThread === undefined) return;
+        await s.provider.tagThread(ref, "ops");
+        const tagged = root()?.text ?? "";
+        assert.ok(tagged.includes("ops"), "shows the tag");
+        assert.ok(tagged.includes(lead) && tagged.includes("Fix the timeout"), "keeps both");
+      });
+
       check("notice and say reject with ChatError when the chat refused", async (s) => {
         s.rig.refuseWrites();
         const channel = s.provider.channel(s.rig.channel);
