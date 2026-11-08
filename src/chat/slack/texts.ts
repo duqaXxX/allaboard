@@ -171,6 +171,9 @@ export const REWIND_BOTH = "Restore code and conversation";
 export const REWIND_CONVERSATION = "Restore conversation";
 export const REWIND_CODE = "Restore code";
 export const REWIND_CANCEL = "Never mind";
+// A suggested next prompt (`!next`): Send and Cancel.
+export const NEXT_SEND = "Send";
+export const NEXT_CANCEL = "Cancel";
 // Ends a folded message whose text did not fit the card.
 export const FOLD_CUT = "[cut: the rest did not fit]";
 export const RESUME_BUTTON = "Resume";

@@ -9,6 +9,7 @@ import type { RewindAction } from "../../seam.ts";
 import { parseValue, REWIND_ACTIONS } from "../lists.ts";
 import type { Answers, AppParts } from "./answers.ts";
 import { interactionActor } from "./guards.ts";
+import type { ChannelOrder } from "./order.ts";
 import {
   type Ack,
   clickThread,
@@ -22,10 +23,12 @@ import {
 export class ThreadLists {
   private readonly parts: AppParts;
   private readonly answers: Answers;
+  private readonly order: ChannelOrder;
 
-  constructor(parts: AppParts, answers: Answers) {
+  constructor(parts: AppParts, answers: Answers, order: ChannelOrder) {
     this.parts = parts;
     this.answers = answers;
+    this.order = order;
   }
 
   /** A Diff button of a file's row. */
@@ -86,6 +89,52 @@ export class ThreadLists {
       list: messageTs(body),
     });
   };
+
+  /**
+   * Send or Cancel of a `!next` offer (the value is `[session, id]`, never the text). It takes its
+   * place among the channel's messages before the acknowledgement, as a typed message does.
+   */
+  onSuggestion =
+    (send: boolean) =>
+    async (ack: Ack, body: Payload): Promise<void> => {
+      const [user, team] = interactionActor(body);
+      const channel = text(record(body.channel).id);
+      const thread = clickThread(body);
+      const value = parseValue(String(firstAction(body).value), 2);
+      // The owner and the workspace first, nothing awaited: anyone else takes no place.
+      if (!this.answers.fromOwner(user, team, channel) || channel === null || value === null) {
+        await ack();
+        return;
+      }
+      const [session, id] = value as [string, string];
+      // (sync) The place among the channel's messages.
+      const place = this.order.enter(channel);
+      let handed: Promise<void> | null = null;
+      let refused: Promise<void> | null = null;
+      try {
+        await ack();
+        await place.turn;
+        if (this.answers.stopped) return;
+        const check = await this.answers.checkChannel(channel, thread);
+        if (!check.allowed) {
+          refused = check.tell();
+          return;
+        }
+        handed = this.parts.inbound.picked({
+          type: "suggestion",
+          ref: { channel, thread },
+          session,
+          id,
+          send,
+          list: messageTs(body),
+        });
+      } finally {
+        await place.turn;
+        place.leave();
+        if (refused !== null) await refused;
+      }
+      await handed;
+    };
 
   /** A button of the actions at a prompt. */
   onRewindAction = async (ack: Ack, body: Payload): Promise<void> => {

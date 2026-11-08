@@ -725,6 +725,13 @@ export type ThreadList =
         readonly deletions: number;
       } | null;
       readonly conversation: boolean;
+    }
+  /** The suggested next prompt (`!next`), to send or leave: a pick carries `session` and `id`, never the text. */
+  | {
+      readonly type: "suggestion";
+      readonly session: string;
+      readonly id: string;
+      readonly text: string;
     };
 
 /** What the owner chose to do at a prompt of a rewind list. */
@@ -781,6 +788,15 @@ export type ListPick =
       readonly session: string;
       readonly promptId: string;
       readonly action: RewindAction;
+      readonly list: MessageId;
+    }
+  /** Send (`send`) or Cancel of a suggestion list; `session` and `id` are as carried, untrusted. */
+  | {
+      readonly type: "suggestion";
+      readonly ref: ThreadRef;
+      readonly session: string;
+      readonly id: string;
+      readonly send: boolean;
       readonly list: MessageId;
     }
   /** The selector of a diff list: `view` as the option carried it, which is untrusted. */

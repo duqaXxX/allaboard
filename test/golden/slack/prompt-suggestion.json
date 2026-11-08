@@ -1,0 +1,517 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "elements": [
+      {
+       "text": "Read 2 files",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "It's a toy demo app whose only code is an `add(a, b)` function exported from `math.js`, and the README doesn't say more than that.",
+     "type": "markdown"
+    },
+    {
+     "block_id": "preview-toolu_044-1-1",
+     "child_blocks": [
+      {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "    1 export const add = (a, b) => a + b;\n+🟩 2 export const subtract = (a, b) => a - b;",
+           "type": "text"
+          }
+         ],
+         "language": "diff",
+         "type": "rich_text_preformatted"
+        }
+       ],
+       "type": "rich_text"
+      }
+     ],
+     "default_collapsed": true,
+     "is_collapsible": true,
+     "rich_text_title": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "style": {
+           "code": true
+          },
+          "text": "Update(/home/dev/project/math.js)",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "subtitle": {
+      "text": "Added 1 line",
+      "type": "plain_text"
+     },
+     "title": {
+      "text": "Update(/home/dev/project/math.js)",
+      "type": "plain_text"
+     },
+     "type": "container",
+     "width": "full"
+    },
+    {
+     "text": "I added `subtract` to `math.js`, next to `add`:\n\n```js\nexport const subtract = (a, b) => a - b;\n```\n\nThe file is untracked and I didn't commit anything. Nothing is left to do unless you want it committed or tested.",
+     "type": "markdown"
+    },
+    {
+     "elements": [
+      {
+       "text": "Read 1 file",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "Here is the final `math.js`:\n\n```js\nexport const add = (a, b) => a + b;\nexport const subtract = (a, b) => a - b;\n```\n\nNothing is left to do.",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn",
+       "verbatim": true
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   []
+  ],
+  "message_texts": [
+   "It's a toy demo app whose only code is an `add(a, b)` function exported from `math.js`, and the README doesn't say more than that.\n\nI added `subtract` to `math.js`, next to `add`:\n\n```js\nexport const subtract = (a, b) => a - b;\n```\n\nThe file is untracked and I didn't commit anything. Nothing is left to do unless you want it committed or tested.\n\nHere is the final `math.js`:\n\n```js\nexport const add = (a, b) => a + b;\nexport const subtract = (a, b) => a - b;\n```\n\nNothing is left to do."
+  ],
+  "pushes": 1
+ },
+ "recording": "prompt-suggestion",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_042",
+      "status": "in_progress",
+      "title": "Read: /home/dev/project/README.md",
+      "type": "task_update"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_042",
+      "status": "complete",
+      "title": "Read 1 file",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_042",
+      "status": "in_progress",
+      "title": "Read: /home/dev/project/math.js",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_042",
+      "status": "complete",
+      "title": "Read 2 files",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "It's a toy demo app whose only code is an `add(a, b)` function exported from `math.js`, and the README doesn't say more than that.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 5,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "blocks": [
+       {
+        "block_id": "preview-toolu_044-1-1",
+        "child_blocks": [
+         {
+          "elements": [
+           {
+            "elements": [
+             {
+              "text": "    1 export const add = (a, b) => a + b;\n+🟩 2 export const subtract = (a, b) => a - b;",
+              "type": "text"
+             }
+            ],
+            "language": "diff",
+            "type": "rich_text_preformatted"
+           }
+          ],
+          "type": "rich_text"
+         }
+        ],
+        "default_collapsed": true,
+        "is_collapsible": true,
+        "rich_text_title": {
+         "elements": [
+          {
+           "elements": [
+            {
+             "style": {
+              "code": true
+             },
+             "text": "Update(/home/dev/project/math.js)",
+             "type": "text"
+            }
+           ],
+           "type": "rich_text_section"
+          }
+         ],
+         "type": "rich_text"
+        },
+        "subtitle": {
+         "text": "Added 1 line",
+         "type": "plain_text"
+        },
+        "title": {
+         "text": "Update(/home/dev/project/math.js)",
+         "type": "plain_text"
+        },
+        "type": "container",
+        "width": "full"
+       }
+      ],
+      "type": "blocks"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "I added `subtract` to `math.js`, next to `add`:\n\n```js\nexport const subtract = (a, b) => a - b;\n```\n\nThe file is untracked and I didn't commit anything. Nothing is left to do unless you want it committed or tested.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 7,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_045",
+      "status": "in_progress",
+      "title": "Read: /home/dev/project/math.js",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 8,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_045",
+      "status": "complete",
+      "title": "Read 1 file",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 9,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "Here is the final `math.js`:\n\n```js\nexport const add = (a, b) => a + b;\nexport const subtract = (a, b) => a - b;\n```\n\nNothing is left to do.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "blocks": [
+     {
+      "elements": [
+       {
+        "text": "Read 2 files",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "It's a toy demo app whose only code is an `add(a, b)` function exported from `math.js`, and the README doesn't say more than that.",
+      "type": "markdown"
+     },
+     {
+      "block_id": "preview-toolu_044-1-1",
+      "child_blocks": [
+       {
+        "elements": [
+         {
+          "elements": [
+           {
+            "text": "    1 export const add = (a, b) => a + b;\n+🟩 2 export const subtract = (a, b) => a - b;",
+            "type": "text"
+           }
+          ],
+          "language": "diff",
+          "type": "rich_text_preformatted"
+         }
+        ],
+        "type": "rich_text"
+       }
+      ],
+      "default_collapsed": true,
+      "is_collapsible": true,
+      "rich_text_title": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "style": {
+            "code": true
+           },
+           "text": "Update(/home/dev/project/math.js)",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "subtitle": {
+       "text": "Added 1 line",
+       "type": "plain_text"
+      },
+      "title": {
+       "text": "Update(/home/dev/project/math.js)",
+       "type": "plain_text"
+      },
+      "type": "container",
+      "width": "full"
+     },
+     {
+      "text": "I added `subtract` to `math.js`, next to `add`:\n\n```js\nexport const subtract = (a, b) => a - b;\n```\n\nThe file is untracked and I didn't commit anything. Nothing is left to do unless you want it committed or tested.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Read 1 file",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "Here is the final `math.js`:\n\n```js\nexport const add = (a, b) => a + b;\nexport const subtract = (a, b) => a - b;\n```\n\nNothing is left to do.",
+      "type": "markdown"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "It's a toy demo app whose only code is an add(a, b) function exported from math.js, and the README doesn't say more than that.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "blocks": [
+     {
+      "elements": [
+       {
+        "text": "Read 2 files",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "It's a toy demo app whose only code is an `add(a, b)` function exported from `math.js`, and the README doesn't say more than that.",
+      "type": "markdown"
+     },
+     {
+      "block_id": "preview-toolu_044-1-1",
+      "child_blocks": [
+       {
+        "elements": [
+         {
+          "elements": [
+           {
+            "text": "    1 export const add = (a, b) => a + b;\n+🟩 2 export const subtract = (a, b) => a - b;",
+            "type": "text"
+           }
+          ],
+          "language": "diff",
+          "type": "rich_text_preformatted"
+         }
+        ],
+        "type": "rich_text"
+       }
+      ],
+      "default_collapsed": true,
+      "is_collapsible": true,
+      "rich_text_title": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "style": {
+            "code": true
+           },
+           "text": "Update(/home/dev/project/math.js)",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "subtitle": {
+       "text": "Added 1 line",
+       "type": "plain_text"
+      },
+      "title": {
+       "text": "Update(/home/dev/project/math.js)",
+       "type": "plain_text"
+      },
+      "type": "container",
+      "width": "full"
+     },
+     {
+      "text": "I added `subtract` to `math.js`, next to `add`:\n\n```js\nexport const subtract = (a, b) => a - b;\n```\n\nThe file is untracked and I didn't commit anything. Nothing is left to do unless you want it committed or tested.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "Read 1 file",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "Here is the final `math.js`:\n\n```js\nexport const add = (a, b) => a + b;\nexport const subtract = (a, b) => a - b;\n```\n\nNothing is left to do.",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn",
+        "verbatim": true
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "It's a toy demo app whose only code is an add(a, b) function exported from math.js, and the README doesn't say more than that.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

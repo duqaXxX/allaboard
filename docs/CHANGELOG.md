@@ -38,6 +38,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!next`, typed in a session's thread, shows the prompt the agent suggests after a turn with **Send** and
+  **Cancel**; **Send** sends the shown words as the owner's own prompt, by the path of a typed message.
+  The session is started with the SDK's `promptSuggestions`, `Capabilities.nextPrompts` and the
+  `next_prompt` session event (said after the turn's end) are new on the agent seam, and
+  `ThreadList` and `ListPick` gain a `suggestion` variant. The guess lives in memory only, apart from the
+  session object, and is dropped by a message of the owner's, a turn or a close; an offer made earlier
+  carries a fresh id and is refused when it no longer matches. Probe claim P47 checks that a second turn
+  yields one suggestion (#151).
 - A copy made by `!fork` (#141) starts its thread with the original's last turn: the owner's prompt as a quote
   and the start of the final reply (`FORK_LAST_TURN_LIMIT`), saying the rest is in the original (a turn the owner stopped is marked `(stopped)`). The copy is read, not the original, and a command record such as `/rename` is skipped. Nothing is
   posted when the agent cannot read the record or it holds no turn. New seam member `AgentBackend.lastTurn`,

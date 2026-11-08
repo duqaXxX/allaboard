@@ -14,6 +14,8 @@ import {
   diffBlocks,
   fileValue,
   listBlocks,
+  NEXT_CANCEL_ACTION,
+  NEXT_SEND_ACTION,
   parseValue,
   REWIND_ACTIONS,
   REWIND_POINT_ACTION,
@@ -389,4 +391,46 @@ test("a single file reads as a file", () => {
     files: { count: 1, insertions: 0, deletions: 4 },
   } as ThreadList);
   assert.equal(one[2]?.text.text, `${slackTexts.REWIND_CODE} (1 file, +0 −4)`);
+});
+
+// The agent's suggested next prompt (`!next`): a rich text heading, the words quoted in a markdown
+// block, and Send and Cancel carrying the session and the suggestion's id, never its text.
+
+const SUGGESTION: ThreadList = {
+  type: "suggestion",
+  session: "session-1",
+  id: "id-1",
+  text: "run the *tests*\nthen <!here> look at <@U000ALICE>",
+};
+
+test("a suggestion is a heading, its words as a quote, and two buttons", () => {
+  const [heading, words, actions] = listBlocks(SUGGESTION, "Suggested next prompt:") as Json[];
+  assert.equal(heading?.type, "rich_text");
+  assert.equal(heading?.elements[0].elements[0].text, "Suggested next prompt:");
+  // Markdown in a markdown block, so the owner's formatting lives; every line quoted.
+  assert.equal(words?.type, "markdown");
+  assert.ok(words?.text.startsWith("> run the *tests*\n> then "));
+  assert.deepEqual(
+    actions?.elements.map((button: Json) => [button.action_id, button.text.text, button.style]),
+    [
+      [NEXT_SEND_ACTION, slackTexts.NEXT_SEND, "primary"],
+      [NEXT_CANCEL_ACTION, slackTexts.NEXT_CANCEL, undefined],
+    ],
+  );
+});
+
+test("a mention in a suggestion notifies nobody", () => {
+  const words = (listBlocks(SUGGESTION, "Suggested next prompt:") as Json[])[1]?.text as string;
+  const zero = String.fromCodePoint(0x200b);
+  assert.ok(words.includes(`<${zero}!here>`));
+  assert.ok(words.includes(`<${zero}@U000ALICE>`));
+  assert.ok(!words.includes("<!here>") && !words.includes("<@U000ALICE>"));
+});
+
+test("the buttons of a suggestion carry the session and the id, never the text", () => {
+  const actions = (listBlocks(SUGGESTION, "Suggested next prompt:") as Json[])[2];
+  for (const button of actions?.elements ?? []) {
+    assert.deepEqual(parseValue(button.value, 2), ["session-1", "id-1"]);
+    assert.ok(!button.value.includes("tests"));
+  }
 });

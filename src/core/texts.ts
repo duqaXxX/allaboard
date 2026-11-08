@@ -597,6 +597,17 @@ export const REWIND_DONE = "Went back.";
 // A second pick while an action runs, and a pick of a list whose action already ran.
 export const REWIND_UNDER_WAY = "`!rewind` is already going back; wait for it to finish.";
 export const REWIND_ALREADY = "That rewind is already done.";
+export const NEXT_TOP_LEVEL = "`!next` works inside a session's thread, not in the channel.";
+export const NEXT_UNAVAILABLE = naming(
+  "`!next` is not offered here: {chat} cannot show a list with controls, or {agent} suggests no " +
+    "next prompt.",
+);
+export const NEXT_NONE = naming(
+  "No suggestion yet: {author} suggests a next prompt after a turn ends, and forgets it when " +
+    "the session closes.",
+);
+export const NEXT_TITLE = "Suggested next prompt:";
+export const NEXT_NOT_SENT = "Not sent: this suggestion is out of date.";
 // A cut that waited for a prompt was not kept: the session changed since.
 export const REWIND_DROPPED_TERMINAL =
   "The rewind you made earlier is dropped: a terminal resumes the whole conversation, the turns " +
@@ -799,6 +810,7 @@ export const HELP_WORDS: readonly Named[] = [
   "`!rewind` go back to an earlier prompt of this session, as the terminal's `/rewind` does: " +
     "pick a prompt, then restore the code, the conversation or both; the replies you went back " +
     "over stay in the thread, marked as removed; inside a thread, refused in the channel",
+  "`!next` offer the prompt {agent} suggests after a turn; inside a thread, refused in the channel",
   "`!bind [folder]` the folders {agent} trusts, or bind this channel to one, its path " +
     "relative to the allowed root; in the channel, refused inside a thread",
   "`!bypass on|off` run every tool without asking, until `!bypass off`; it survives a " +
@@ -996,6 +1008,13 @@ export const GUIDE_REWIND = naming(
     "the code to how it was when you sent it, the conversation to before it, or both; the " +
     "replies you went back over stay in the thread, folded under **Removed by rewind**, and the " +
     "prompt is posted again to send. It waits until nothing runs.",
+);
+export const GUIDE_NEXT = naming(
+  "**Next prompt**\n" +
+    "`!next`, sent inside a session's thread, shows the prompt {agent} suggests after a turn, " +
+    "with **Send** and **Cancel**: **Send** sends those words as your own prompt. The suggestion " +
+    "is forgotten when you send a prompt, a `!!` command or a command for {agent}, when a turn " +
+    "starts, or when the session closes.",
 );
 export const GUIDE_BYPASS = naming(
   "**Bypass**\n" +

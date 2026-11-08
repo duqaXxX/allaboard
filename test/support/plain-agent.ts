@@ -146,6 +146,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   foreignTurns: false,
   advisor: false,
   loadedContext: false,
+  nextPrompts: false,
 });
 
 /** The two commands of the agent, run by a prompt `:echo text` and `:count text`. */
@@ -186,6 +187,7 @@ export type PlainStep =
   | { readonly goal: GoalChange }
   | { readonly saved: SavedMessage }
   | { readonly jobs: readonly ScheduledJob[] }
+  | { readonly suggest: string }
   | { readonly hold: true }
   | { readonly die: true };
 
@@ -266,6 +268,15 @@ export function saved(id: string, at: number): PlainStep {
  */
 export function scheduledJobs(jobs: readonly ScheduledJob[]): PlainStep {
   return { jobs };
+}
+
+/**
+ * The agent guesses the owner's next prompt, as an agent that declares `nextPrompts` does:
+ * said after the turn's end (the seam's contract), whatever the step's place in the turn. The
+ * plain agent itself declares none, so only a variant with the option may play it.
+ */
+export function suggest(text: string): PlainStep {
+  return { suggest: text };
 }
 
 /** The turn waits here until `interrupt()` (it ends as `interrupted`) or `release()`. */
@@ -538,6 +549,7 @@ class Turn {
   calls = 0;
   finalText: string | null = null;
   ending: "done" | "interrupted" | "error" = "done";
+  suggestion: string | null = null;
 }
 
 export interface PlainSessionContext {
@@ -747,6 +759,7 @@ export class PlainSession implements AgentSession {
       steps: turn.messages + turn.calls === 0 ? 0 : turn.calls + 1,
       tokens: {},
     });
+    if (turn.suggestion !== null) this.#push({ type: "next_prompt", text: turn.suggestion });
   }
 
   /** The output of a command the prompt names, or null for a prompt that is a turn. */
@@ -799,6 +812,8 @@ export class PlainSession implements AgentSession {
         this.#push({ type: "message_saved", message: step.saved });
       } else if ("jobs" in step) {
         this.#push({ type: "scheduled_jobs", jobs: step.jobs });
+      } else if ("suggest" in step) {
+        turn.suggestion = step.suggest;
       } else if ("hold" in step) {
         await orAborted(
           new Promise<void>((resolve) => {
@@ -954,6 +969,8 @@ export interface PlainAgentOptions {
    * reads the turns another one wrote (`foreignTurns`, from `foreign`), both set by the test.
    */
   readonly terminal?: true;
+  /** The agent declares `nextPrompts`; a turn's `suggest` step then reaches the core. */
+  readonly suggestions?: true;
   /** What each live session has loaded (`loadedContext`), as `!memory` and `!skills` list it. */
   readonly loaded?: LoadedContext;
   /** The agent lists these models (`models`, even an empty list), which a session takes with `setModel`. */
@@ -1067,6 +1084,9 @@ export class PlainAgent implements AgentBackend {
         environment: { PATH: process.env.PATH },
         prompt: plainShellPrompt,
       };
+    }
+    if (options.suggestions) {
+      this.capabilities = Object.freeze({ ...this.capabilities, nextPrompts: true });
     }
     if (options.terminal) {
       this.capabilities = Object.freeze({

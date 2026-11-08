@@ -65,6 +65,9 @@ const CLAUDE_PREVIEWS = new Previews(TOOLS);
 export const PROBE_MODEL = "haiku";
 const RESUME_THREAD = "1700000000.000200";
 const TURN_LIMIT = 180_000;
+// How long a suggestion is waited for after a turn: it came 1.5 to 1.9 s after the result (measured
+// 2026-11-08, Claude Code 2.1.319).
+const SUGGESTION_WAIT = 8000;
 const COUNT_TO = 2000;
 // A turn is over once nothing has been said for this long: the one that follows a stopped task
 // or an interrupt, which no event announces.
@@ -128,6 +131,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "generated title": ["P32"],
   "fork source": ["P43"],
   rewind: ["P44", "P45"],
+  "prompt suggestion": ["P47"],
   "folder trust": ["P34"],
   "stop hooks": ["P42"],
   "settings mode": ["P37"],
@@ -2635,6 +2639,32 @@ async function fileCheckpoints(s: Stage): Promise<Seen> {
 }
 
 /**
+ * P47: a session started as the daemon starts it says no next prompt after its first turn, and one
+ * suggestion after a second turn that changed a file. A model claim: whether Claude Code
+ * makes a suggestion is its own call, so a turn with none proves nothing.
+ */
+async function promptSuggestion(s: Stage): Promise<Seen> {
+  const folder = join(s.root, "prompt-suggestion");
+  await mkdir(folder);
+  const live = await s.open(folder);
+  const suggested = (events: SessionEvent[]) =>
+    events.some((event) => event.type === "next_prompt");
+  // The window of a turn opens at its own end: the lead-in of a turn (`quiet`) is not in it.
+  const endOf = () => live.events.findLastIndex((event) => event.type === "turn_ended");
+  await live.turn("Using the Write tool, create a.txt containing exactly: one");
+  const early = await live.until(endOf(), suggested, SUGGESTION_WAIT);
+  await live.turn("Using the Edit tool, change a.txt so that it contains exactly: two");
+  const later = await live.until(endOf(), suggested, SUGGESTION_WAIT);
+  const held = later && !early;
+  const detail = early
+    ? "a suggestion followed the first turn"
+    : "no suggestion followed the second";
+  return {
+    P47: observation(true, held, held ? "" : detail, { firstTurn: early }),
+  };
+}
+
+/**
  * P45: the cut the back end makes for `rewindTo`. Two turns each give a codeword; the session is
  * closed and started again with `rewindTo` the second prompt (which the back end guards with
  * `resumeDropsTurn`); asked for the codewords it names the first alone, under the same session
@@ -2784,6 +2814,7 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
           ...(await conversationCut(s)),
         })),
       );
+      Object.assign(seen, await attempt("prompt suggestion", s, () => promptSuggestion(s)));
       Object.assign(seen, await attempt("folder trust", s, () => folderTrust(s)));
       Object.assign(seen, await attempt("stop hooks", s, () => stopHooks(s)));
       Object.assign(seen, await attempt("settings mode", s, () => settingsMode(s)));

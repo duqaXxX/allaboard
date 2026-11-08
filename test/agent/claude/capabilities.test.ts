@@ -42,6 +42,7 @@ test("the Claude back end declares what the core adapts to", () => {
     foreignTurns: true,
     advisor: true,
     loadedContext: true,
+    nextPrompts: true,
   });
 });
 

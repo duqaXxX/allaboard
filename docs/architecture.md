@@ -266,6 +266,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never reads the agent's session list. A session index does not check it: the Slack provider's calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
 | `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root (`texts.BIND_LIST_ANY`; the notice of an unbound channel, `texts.UNBOUND_ANY`, and the `!bind` line of `!help`, `texts.HELP_WORDS_ANY`, say nothing of trust either), and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
 | `loadedContext` | `AgentSession.loaded` is absent: `!memory` and `!skills` answer that the agent does not list what a session loaded (`texts.LOADED_UNAVAILABLE`), and neither `!help`, the suggestions nor `!guide` offer them |
+| `nextPrompts` | no `next_prompt` event is read, and `!next` answers that it is not offered (`texts.NEXT_UNAVAILABLE`); neither `!help` nor `!guide` offers it |
 
 | Chat capability | What the core does without it |
 |---|---|
@@ -1844,6 +1845,21 @@ the files or cuts the conversation, the chat draws two lists and folds messages
   only when no prompt follows, since the SDK's guard accepts one turn and refused two (measured
   2026-10-29). Every non-bare session starts with `enableFileCheckpointing`. A start the CLI
   refuses arrives through `initializationResult()` and is `RewindRefused` when a cut was asked.
+
+## The suggested next prompt with `!next`
+
+`!next` is the core's (`src/core/flows/next.ts`); the agent says its guess after a turn (the event
+`next_prompt`, said after the turn's `turn_ended` and before the next turn's first event), the
+chat draws a list with Send and Cancel. The guess is held in memory only, per thread, in
+`Suggestions` (`src/core/suggestions.ts`, owned by `SessionManager`), under a fresh UUID for each.
+It is dropped when a message of the owner's enters a session's thread (`route`, at the ticket it
+takes before any await), when a turn starts, and when the agent's process closes or starts. An event
+that arrives while a turn runs, a prompt is owed (`promptOwed`) or a ticket of the thread is in
+flight (`InFlight.has`) is dropped. Send, checked against the stored session id and the held id,
+takes the suggestion and a ticket and calls `sendPrompt` in one synchronous step, so the prompt has
+its place in the thread's arrival line before a message typed while the offer is rewritten; the
+guards of a typed prompt then apply. The offer is no request: no `Holds` entry, root status or
+`state.json` field.
 
 ## Updating allaboard
 

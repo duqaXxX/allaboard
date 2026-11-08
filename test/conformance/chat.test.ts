@@ -19,9 +19,12 @@ import {
   DIFF_FILE_ACTION,
   DIFF_VIEW_ACTION,
   fileValue,
+  NEXT_CANCEL_ACTION,
+  NEXT_SEND_ACTION,
   pointValue,
   REWIND_POINT_ACTION,
   rewindActionId,
+  suggestionValue,
   viewValue,
 } from "../../src/chat/slack/lists.ts";
 import {
@@ -94,6 +97,12 @@ function actionsList(listed: {
   return listed.list;
 }
 
+/** The id of the suggestion a `ThreadListed` holds. */
+function suggestionId(listed: { list: ThreadList }): string {
+  if (listed.list.type !== "suggestion") throw new Error("not a suggestion");
+  return listed.list.id;
+}
+
 function memoryPerson(
   person: ReturnType<ReturnType<typeof memoryChat>["as"]>,
   who: string,
@@ -121,6 +130,9 @@ function memoryPerson(
     },
     picksAction: async (listed, action) => {
       await person.picksAction(listed.message, action);
+    },
+    picksSuggested: async (listed, send) => {
+      await person.picksSuggested(listed.message, send);
     },
     deletes: async (said) => {
       await person.deletes(said);
@@ -411,6 +423,17 @@ function slackPerson(
         clickIn(
           rewindActionId(action),
           actionValue(listed.list.session, actionsList(listed).point.id, action),
+          listed.ref.channel,
+          listed.ref.thread,
+          { messageTs: listed.message, user: userOf(user, world) },
+        ),
+      );
+    },
+    picksSuggested: async (listed, send): Promise<void> => {
+      await dispatch(
+        clickIn(
+          send ? NEXT_SEND_ACTION : NEXT_CANCEL_ACTION,
+          suggestionValue(listed.list.session, suggestionId(listed)),
           listed.ref.channel,
           listed.ref.thread,
           { messageTs: listed.message, user: userOf(user, world) },

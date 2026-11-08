@@ -571,7 +571,7 @@ the doc comments of the symbols named here.
 
 ## Lists in a thread
 
-`!diff` and `!rewind` post a list in the session's thread, and `!diff` shows a diff under its rows or
+`!diff`, `!rewind` and `!next` post a list in the session's thread, and `!diff` shows a diff under its rows or
 shares a file when one of its controls is used. The core decides what is listed and what a control does
 ([Changed files of `!diff`](architecture.md#changed-files-of-diff),
 [Going back with `!rewind`](architecture.md#going-back-with-rewind));
@@ -606,6 +606,15 @@ the provider declares `threadLists` and draws.
   prompt, action]`, the code one with its counts (`2 files, +3 −1`). `ThreadLists.onRewindPoint`
   and `onRewindAction` acknowledge, check the owner, the workspace and the thread, read the value,
   and refuse an action that is none of the four words, before `ChatInbound.picked` is called.
+- **The suggestion of `!next`.** `lists.listBlocks` draws a `suggestion` list as a `rich_text` heading
+  (the title), the suggested words as a `markdown` block of quoted lines with every mention
+  sequence quieted (`escape.quietMentions`: a raw `<!here>` in a markdown block is a real broadcast),
+  and two buttons, **Send** (primary) and **Cancel**, whose value is `[session, id]` as JSON: the id
+  of the suggestion and never its text. `ThreadLists.onSuggestion` acknowledges, checks the owner, the
+  workspace and the thread, reads the value and calls `ChatInbound.picked` with a `suggestion` pick;
+  a value of another shape reaches nothing. The channel holds the owner and the bot only, so the
+  message is no ephemeral. Send rewrites the message into a notice that quotes the words, and Cancel
+  deletes it.
 - **Folding.** `SlackThread.fold` (`fold.foldMessage`, with `messageFold`) reads the message back
   with `conversations.replies` (`oldest` and `latest` its own ts, `inclusive`, `limit` 1), turns
   its blocks into text (`markdown`, `section`, `header`, `context`, `rich_text` and `task_card`

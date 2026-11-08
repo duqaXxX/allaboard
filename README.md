@@ -99,6 +99,7 @@ Then [docs/setup.md](docs/setup.md) takes you through five steps:
 | `!open` | Shares a file of the session's folder into the thread |
 | `!diff` | Lists the files the session's git repository changed since HEAD, with a Diff button each |
 | `!rewind` | Goes back to an earlier prompt of the session: restores its code, its conversation or both |
+| `!next` | Offers the agent's suggested next prompt to send |
 | `!tag <name>` | Tags the thread's first message and the session |
 | `!untag` | Takes the tag away |
 | `!pin` | Pins the thread's first message |

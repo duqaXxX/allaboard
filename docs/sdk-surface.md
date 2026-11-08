@@ -120,6 +120,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `resume` | option | session.ts: ClaudeSession.#options | reference | P7 |
 | `Options` | `resumeSessionAt` | option | session.ts: ClaudeSession.#options | reference | P45 |
 | `Options` | `resumeDropsTurn` | option | session.ts: ClaudeSession.#options | package | P45 |
+| `Options` | `promptSuggestions` | option | session.ts: ClaudeSession.#options | reference | P47 |
 | `Options` | `settingSources` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `stderr` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `systemPrompt` | option | session.ts: ClaudeSession.#options | reference | none |
@@ -235,6 +236,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKModelRefusalNoFallbackMessage` | `original_model` | field | translate.ts: refusalNoFallback | package | none |
 | `SDKPartialAssistantMessage` | `event` | field | translate.ts: kindOf, messageStart, contentBlockStart, contentBlockDelta | reference | none |
 | `SDKPartialAssistantMessage` | `parent_tool_use_id` | field | translate.ts: parentOf | reference | none |
+| `SDKPromptSuggestionMessage` | `suggestion` | field | translate.ts: promptSuggestion | reference | P47 |
 | `SDKResultMessage` | `is_error` | field | translate.ts: endingOf; session.ts: ClaudeSession.#pump | reference | none |
 | `SDKResultMessage` | `local_command` | field | translate.ts: effortChanged | package | P26 |
 | `SDKResultMessage` | `modelUsage` | field | translate.ts: result | reference | none |
@@ -419,6 +421,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKPartialAssistantMessage.event.type` | `"message_start"` | value | translate.ts: HANDLERS | measured | P20 |
 | `SDKPartialAssistantMessage.event.type` | `"message_stop"` | value | translate.ts: HANDLERS | measured | none |
 | `SDKPartialAssistantMessage.type` | `"stream_event"` | value | translate.ts: kindOf | reference | none |
+| `SDKPromptSuggestionMessage.type` | `"prompt_suggestion"` | value | translate.ts: HANDLERS | reference | P47 |
 | `SDKRateLimitEvent.type` | `"rate_limit_event"` | value | translate.ts: HANDLERS | reference | none |
 | `SDKResultMessage.local_command` | `"effort"` | value | translate.ts: effortChanged | measured | P26 |
 | `SDKResultMessage.local_command` | `"model"` | value | translate.ts: effortChanged | measured | P26 |
@@ -497,7 +500,6 @@ union, none of which any recording carries.
 - `SDKMirrorErrorMessage`
 - `SDKPermissionDeniedMessage`
 - `SDKPluginInstallMessage`
-- `SDKPromptSuggestionMessage`
 - `SDKToolUseSummaryMessage`
 - `SDKWorkerShuttingDownMessage`
 

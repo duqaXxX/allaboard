@@ -21,6 +21,8 @@ allaboard runs Claude Code on the owner's machine on behalf of one Slack user. I
   shell command's confirmation that shows something other than what Run runs;
 - a shell command (`!!`) that runs without the owner's Run, runs again after an edit of its
   message, or runs on an instance whose `ALLABOARD_SHELL` is `off`;
+- a suggested next prompt (`!next`) sent without the owner's Send, or with words other than the
+  ones its offer showed;
 - a reply that notifies anyone: a mention sequence (`<!here>`, `<!channel>`, `<@…>`) in Claude's
   words that reaches Slack as a mention;
 - a session started in a folder the owner has not trusted in Claude Code;

@@ -595,7 +595,7 @@ test("a state Claude Code has no recorded word for gives no event", () => {
   assert.deepEqual(new Translator().translate(record), []);
 });
 
-test("only the four calls that wrote a file carry a change, in every recording", () => {
+test("only the five calls that wrote a file carry a change, in every recording", () => {
   const changed: string[] = [];
   for (const name of sdkRecordings()) {
     for (const event of of(events(name), "call_ended")) {
@@ -606,6 +606,7 @@ test("only the four calls that wrote a file carry a change, in every recording",
     "edit-write: created",
     "edit-write: edited",
     "edit-write: edited",
+    "prompt-suggestion: edited",
     "session-state-approval: created",
   ]);
 });
@@ -1687,4 +1688,31 @@ test("a refusal names no category when the API gave none", () => {
 test("a refusal record with no original model gives no event", () => {
   const { original_model: _, ...wire } = record("model-refusal-no-fallback", NO_FALLBACK_AT);
   assert.deepEqual(translated([wire]), []);
+});
+
+// The agent's guess at the owner's next prompt (`prompt-suggestion`, recorded on 2026-11-08 with
+// `@anthropic-ai/claude-agent-sdk` 0.3.319, Claude Code 2.1.319, `promptSuggestions` on, #151):
+// none after the first turn, one after each later turn, a short time after its `result`.
+
+test("a prompt suggestion is an event of its own, after the end of the turn it follows", () => {
+  const all = events("prompt-suggestion");
+  assert.deepEqual(
+    of(all, "next_prompt").map((event) => event.text),
+    ["commit this", "commit this"],
+  );
+  const kinds = types(all);
+  const ends = kinds.flatMap((kind, at) => (kind === "turn_ended" ? [at] : []));
+  const suggested = kinds.flatMap((kind, at) => (kind === "next_prompt" ? [at] : []));
+  assert.equal(ends.length, 3);
+  // The first turn has none; each later suggestion comes after an end and before the next turn.
+  assert.ok(suggested.every((at) => ends.some((end) => end < at)));
+  assert.ok((ends[1] ?? 0) < (suggested[0] ?? 0) && (suggested[0] ?? 0) < (ends[2] ?? 0));
+  assert.ok((ends[2] ?? 0) < (suggested[1] ?? 0));
+});
+
+test("a prompt suggestion with no text gives no event", () => {
+  const wire = sdkRecords("prompt-suggestion").find((entry) => entry.type === "prompt_suggestion");
+  assert.ok(wire);
+  assert.deepEqual(translated([{ ...wire, suggestion: "" }]), []);
+  assert.deepEqual(translated([{ ...wire, suggestion: "  " }]), []);
 });

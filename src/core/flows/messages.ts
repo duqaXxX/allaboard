@@ -35,6 +35,7 @@ import { askOwner } from "./ask-owner.ts";
 import type { MessagesFlow, OtherFlows } from "./contract.ts";
 import { forkFlow } from "./fork.ts";
 import type { InFlight, Ticket } from "./in-flight.ts";
+import { nextFlow } from "./next.ts";
 import { type FlowDeps, logger, type Report, type Talk } from "./talk.ts";
 import { unservedWords, wordFlow } from "./words.ts";
 
@@ -72,7 +73,8 @@ export function messages(
   inFlight: InFlight,
 ): MessagesFlow {
   const { chat, agent, sessions, state, names } = deps;
-  const word = wordFlow(deps, talk, others, forkFlow(deps, talk, sendPrompt, inFlight));
+  const next = nextFlow(deps, talk, sendPrompt, inFlight);
+  const word = wordFlow(deps, talk, others, forkFlow(deps, talk, sendPrompt, inFlight), next);
   const unserved = unservedWords(deps, others);
   // One lock per thread, alive only while someone holds or waits on it (a channel keeps
   // opening new threads for as long as it runs; a lock kept forever would leak).
@@ -368,6 +370,7 @@ export function messages(
             // The title is what the owner typed, as the chat's plain text, for a prompt alone: a word
             // sent as the agent's command, a file with no text or a spoken clip names nothing.
             const title = asCommand ? null : message.plain.trim() || null;
+            sessions.suggestions.clear(ref);
             await session.submit(prompt, null, ticket.signal, title);
             submitted = true;
             return;
@@ -520,11 +523,24 @@ export function messages(
       command === null || ["passthrough", "shell", "fork"].includes(command.kind)
         ? inFlight.take(ref)
         : null;
+    // (sync) What reaches the agent outdates its last guess at the next prompt. A word the core
+    // answers itself does not; one the session does not list yet is cleared at the submit.
+    if (read.session !== null && reachesAgent(command, read.session)) {
+      sessions.suggestions.clear(ref);
+    }
     try {
       await routeRead(message, read, ticket, aborted);
     } finally {
       ticket?.release();
     }
+  }
+
+  /** Whether a message of the owner's, read as `command`, is sent to the agent as it stands. */
+  function reachesAgent(command: Command | null, session: ThreadSession): boolean {
+    if (command === null || command.kind === "shell") return true;
+    if (command.kind !== "passthrough") return false;
+    const word = firstWord(command);
+    return session.commands.some((c) => c.name === word || c.aliases.includes(word));
   }
 
   /** The ticket of a prompt or a command, which `route` takes for every one. */
@@ -671,5 +687,6 @@ export function messages(
     // A failure of a prompt itself (or of the session it starts) lands in that session's
     // thread: it is the turn's one push. A word answers where it was typed instead.
     message: (message) => talk.replyOnFailure(message.ref, () => route(message)),
+    suggestionPicked: next.picked,
   };
 }

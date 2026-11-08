@@ -68,6 +68,8 @@ import {
 import {
   DIFF_FILE_ACTION,
   DIFF_VIEW_ACTION,
+  NEXT_CANCEL_ACTION,
+  NEXT_SEND_ACTION,
   REWIND_ACTIONS,
   REWIND_POINT_ACTION,
   rewindActionId,
@@ -287,7 +289,6 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   const requests = new Requests(parts, answers);
   const open = new Open(parts, answers);
   const resumeBind = new ResumeBind(parts, answers);
-  const threadLists = new ThreadLists(parts, answers);
   const clips = new Clips(parts, answers);
   const home = new HomeControls(parts);
   const deleteThread = new DeleteThread(parts, answers);
@@ -305,6 +306,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
 
   const registered: Registration[] = [];
   const order = new ChannelOrder();
+  const threadLists = new ThreadLists(parts, answers, order);
   // Asked once per new thread, with no retry: an answer worth no wait (see the listener below).
   const rootThere = threadLookup(unretried(options.slack));
   const lookRoot = async (channel: string, thread: string): Promise<string> => {
@@ -533,6 +535,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(DIFF_FILE_ACTION, threadLists.onDiffFile);
   action(DIFF_VIEW_ACTION, threadLists.onDiffView);
   action(REWIND_POINT_ACTION, threadLists.onRewindPoint);
+  action(NEXT_SEND_ACTION, threadLists.onSuggestion(true));
+  action(NEXT_CANCEL_ACTION, threadLists.onSuggestion(false));
   for (const rewind of REWIND_ACTIONS) action(rewindActionId(rewind), threadLists.onRewindAction);
 
   action(NEW_THREAD_ACTION, home.onHomeLink, { acknowledgeOnly: true });

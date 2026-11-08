@@ -228,3 +228,17 @@ test("a process lost on its own keeps the report its stream carried", LIMIT, asy
   for await (const event of session.events) if (event.type === "process_lost") break;
   assert.equal((await session.close()).unsaved?.conversation, true);
 });
+
+test("a prompt suggestion after the last result does not cut the wait", LIMIT, async (t) => {
+  const suggestion = sdkRecords("prompt-suggestion").find(
+    (entry) => entry.type === "prompt_suggestion",
+  ) as JsonObject;
+  const { session, query } = await idle(t);
+  const closing = session.close({ awaitExit: true });
+  await settle();
+  query.inject([suggestion]);
+  await settle();
+  assert.equal(query.closed, false);
+  query.inject([END]);
+  await closing;
+});

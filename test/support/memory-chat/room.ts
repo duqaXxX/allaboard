@@ -184,6 +184,21 @@ export interface Person {
    */
   picksAction(list: MessageId, action: RewindAction): Promise<boolean>;
   /**
+   * Uses Send (`send` true) or Cancel of the open suggestion list `list`, as the controls carry
+   * the suggestion's session and id. Throws when the list is not open or is no suggestion.
+   * Resolves with whether the pick reached the daemon.
+   */
+  picksSuggested(list: MessageId, send: boolean): Promise<boolean>;
+  /**
+   * The same pick with the session and id the test names, as a click on an offer made earlier
+   * carries them: the daemon compares them with what it holds.
+   */
+  picksSuggestedAs(
+    list: MessageId,
+    send: boolean,
+    carried: { readonly session: string; readonly id: string },
+  ): Promise<boolean>;
+  /**
    * Sends `text` from the field of the open suggestion `suggestion`, the way its Enter does: it
    * reaches the daemon as a message of the thread, with the id of the message that typed the
    * word. Throws when no such suggestion is open. Resolves with whether it reached the daemon.
@@ -335,6 +350,8 @@ export class Room {
       picksView: (list, view) => this.#picksView(owns, list, view),
       picksPoint: (list, promptId) => this.#picksPoint(owns, list, promptId),
       picksAction: (list, action) => this.#picksAction(owns, list, action),
+      picksSuggested: (list, send) => this.#picksSuggested(owns, list, send, null),
+      picksSuggestedAs: (list, send, carried) => this.#picksSuggested(owns, list, send, carried),
       types: (suggestion, text) => this.#types(owns, suggestion, text),
       picksOnPage: (version) => this.#picksOnPage(owns, version),
       deletes: (said) => this.#deletes(said, tenant === HOME),
@@ -710,6 +727,27 @@ export class Room {
       session: open.list.session,
       promptId: open.list.point.id,
       action,
+      list: id,
+    });
+    return true;
+  }
+
+  async #picksSuggested(
+    owns: boolean,
+    id: MessageId,
+    send: boolean,
+    carried: { readonly session: string; readonly id: string } | null,
+  ): Promise<boolean> {
+    const open = this.#threadLists.get(id);
+    if (open === undefined) throw new Error(`no open thread list ${id}`);
+    if (open.list.type !== "suggestion") throw new Error(`list ${id} is no suggestion`);
+    if (!owns || this.#inbound === null) return false;
+    await this.#inbound.picked({
+      type: "suggestion",
+      ref: open.ref,
+      session: carried?.session ?? open.list.session,
+      id: carried?.id ?? open.list.id,
+      send,
       list: id,
     });
     return true;

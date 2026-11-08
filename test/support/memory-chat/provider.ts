@@ -315,6 +315,7 @@ function listText(list: ThreadList, title: string): string {
       ...(list.conversation ? ["conversation"] : []),
     ].join("\n");
   }
+  if (list.type === "suggestion") return [title, list.text].join("\n");
   const rows = list.files.map((file) =>
     file.binary ? `${file.path} binary` : `${file.path} +${file.added} -${file.removed}`,
   );

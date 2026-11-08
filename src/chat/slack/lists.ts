@@ -7,14 +7,23 @@
 
 import { fill } from "../../core/port.ts";
 import type { DiffRow, RewindAction, ThreadList } from "../seam.ts";
-import { type ContextBlock, contextBlock, inFence, MESSAGE_LIMIT } from "./reply/blocks.ts";
+import {
+  type ContextBlock,
+  contextBlock,
+  inFence,
+  MESSAGE_LIMIT,
+  type RichText,
+  richText,
+} from "./reply/blocks.ts";
 import { len, take } from "./reply/chars.ts";
-import { shownAsWritten } from "./reply/escape.ts";
+import { quietMentions, shownAsWritten } from "./reply/escape.ts";
 import * as slackTexts from "./texts.ts";
 
 export const DIFF_FILE_ACTION = "diff_file";
 export const DIFF_VIEW_ACTION = "diff_view";
 export const REWIND_POINT_ACTION = "rewind_point";
+export const NEXT_SEND_ACTION = "next_send";
+export const NEXT_CANCEL_ACTION = "next_cancel";
 
 type DiffList = Extract<ThreadList, { type: "diff" }>;
 type RewindPoints = Extract<ThreadList, { type: "rewind-points" }>;
@@ -233,7 +242,7 @@ interface ActionButtons {
   }[];
 }
 
-export type RewindBlock = ContextBlock | PointSelect | ActionButtons;
+export type RewindBlock = ContextBlock | PointSelect | ActionButtons | RichText | ShownDiff;
 
 /** A prompt as one line of an option: its first words, the line breaks gone. */
 function firstWords(text: string): string {
@@ -306,6 +315,43 @@ function actionBlocks(list: RewindActions, title: string): RewindBlock[] {
   ];
 }
 
+export function suggestionValue(session: string, id: string): string {
+  return JSON.stringify([session, id]);
+}
+
+/**
+ * The heading, the words quoted in a markdown block (formatting live; a raw `<!here>` there is a
+ * real broadcast, so mentions are quieted), and Send and Cancel.
+ */
+function suggestionBlocks(
+  list: Extract<ThreadList, { type: "suggestion" }>,
+  title: string,
+): RewindBlock[] {
+  const value = suggestionValue(list.session, list.id);
+  const button = (id: string, label: string, style?: "primary") => ({
+    type: "button" as const,
+    action_id: id,
+    value,
+    ...(style && { style }),
+    text: { type: "plain_text" as const, text: label },
+  });
+  const quote = quietMentions(list.text, true)
+    .split(/\r\n|\r|\n/)
+    .map((line) => `> ${line}`.trimEnd());
+  return [
+    richText(title),
+    { type: "markdown", text: quote.join("\n") },
+    {
+      type: "actions",
+      block_id: "next-actions",
+      elements: [
+        button(NEXT_SEND_ACTION, slackTexts.NEXT_SEND, "primary"),
+        button(NEXT_CANCEL_ACTION, slackTexts.NEXT_CANCEL),
+      ],
+    },
+  ];
+}
+
 /** The blocks of any list a thread offers, under the one line `title`. */
 export function listBlocks(list: ThreadList, title: string): (DiffBlock | RewindBlock)[] {
   switch (list.type) {
@@ -315,5 +361,7 @@ export function listBlocks(list: ThreadList, title: string): (DiffBlock | Rewind
       return pointBlocks(list, title);
     case "rewind-actions":
       return actionBlocks(list, title);
+    case "suggestion":
+      return suggestionBlocks(list, title);
   }
 }
