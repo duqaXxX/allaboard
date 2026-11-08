@@ -51,18 +51,28 @@ export type SessionsChange = (changed: readonly ThreadRef[]) => void;
 export type RequestKind = "question" | "approval" | "setup" | "hold" | "shell";
 
 /**
- * Whether a request of `kind` waits for the owner's answer to a turn's question or approval, the
- * one wait he is told of: the setup form, the hold and a shell command's confirmation answer what
- * he has just written, and an entry with no kind (a file written before the kinds) is neither.
+ * Whether a request of `kind` is a turn's question or approval: the turn stops on it, and a crash
+ * that leaves it open stopped that turn. An entry with no kind (a file written before the kinds)
+ * is not.
  */
-export function asksOwner(kind: RequestKind | undefined): boolean {
+export function asksInTurn(kind: RequestKind | undefined): boolean {
   return kind === "question" || kind === "approval";
 }
 
 /**
+ * Whether a request of `kind` waits for the owner's answer, the waits he is told of: a turn's
+ * question or approval (`asksInTurn`), or a message of his held back, by another session at work
+ * in the folder or by a terminal (`hold`), which he may have sent and left (#163). The setup form
+ * and a shell command's confirmation answer what he has just written.
+ */
+export function asksOwner(kind: RequestKind | undefined): boolean {
+  return asksInTurn(kind) || kind === "hold";
+}
+
+/**
  * Whether a thread waiting on a request of `kind` can go no further until the owner answers it:
- * a turn's question or approval (`asksOwner`), or the setup form, before which no turn runs
- * (#233). The hold and a shell command's confirmation come while a session runs beside them.
+ * a wait he is told of (`asksOwner`), or the setup form, before which no turn runs (#233). A shell
+ * command's confirmation comes while a session runs beside it.
  */
 export function blocksOnOwner(kind: RequestKind | undefined): boolean {
   return asksOwner(kind) || kind === "setup";
@@ -383,9 +393,10 @@ function parseChannels(raw: Raw): Map<string, ChannelRecord> {
  */
 function shown(threads: ReadonlyMap<string, ThreadState>): Map<string, string> {
   return new Map(
-    // Whether the thread blocks on the owner (`blocksOnOwner`) too, which the channel's line
-    // shows: a request can change it while the root's status stays waiting (the setup form
-    // answered, then the same-folder hold), and a turn's request is written after its status.
+    // Whether the thread blocks on the owner (`blocksOnOwner`) and whether it asks him
+    // (`asksOwner`) too, which the channel's line shows: a request can change either while the
+    // root's status stays waiting (the setup form answered, then the same-folder hold), and a
+    // turn's request is written after its status.
     [...threads].map(([id, t]) => [
       id,
       JSON.stringify([
@@ -393,6 +404,7 @@ function shown(threads: ReadonlyMap<string, ThreadState>): Map<string, string> {
         t.status,
         t.ended,
         Object.values(t.requestKinds).some(blocksOnOwner),
+        Object.values(t.requestKinds).some(asksOwner),
       ]),
     ]),
   );

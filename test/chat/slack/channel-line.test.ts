@@ -597,8 +597,8 @@ test("a waiting line keeps the request it opens while it waits, and the root onc
   assert.equal(shown(fake), "Status: ⏳ Working: 1 thread");
 });
 
-// The setup form, a `!!` command's confirmation, a same-folder hold: the root waits, on what the
-// owner has just written; `lineThread` takes it for working.
+// The setup form, a `!!` command's confirmation: the root waits, on what the owner has just
+// written; `lineThread` takes it for working.
 test("a thread on the owner's own form neither counts nor heads the line as waiting", async () => {
   const { fake, lines } = busy({ [ROOT]: "done", [B]: "working" });
   await lines.show(CHANNEL, ROOT, "done");
@@ -805,9 +805,16 @@ test("a thread asks the owner while its root waits with an approval or a questio
     setup: false, // the agent's request is the wait drawn
   });
   assert.equal(lineThread(B, entry("waiting", { "1.1": "approval" })).asks, true);
+  // A held message waits on the owner as an approval does (#163).
+  assert.deepEqual(lineThread(B, entry("waiting", { "1.1": "hold" })), {
+    thread: B,
+    kind: "waiting",
+    asks: true,
+    setup: false,
+  });
   // The owner's own form: the root waits, and the line takes it for working; a setup form is
   // also drawn as a wait (#233).
-  for (const kind of ["setup", "hold", "shell"] as const) {
+  for (const kind of ["setup", "shell"] as const) {
     assert.deepEqual(lineThread(B, entry("waiting", { "1.1": kind })), {
       thread: B,
       kind: "working",

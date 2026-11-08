@@ -116,6 +116,24 @@ function richHeading(template: string, values: Readonly<Record<string, string>> 
   return { type: "rich_text", elements: [{ type: "rich_text_section", elements }] };
 }
 
+/**
+ * A request's heading as rich text, for the requests whose mention must push (`richHeading`):
+ * `template`'s text as written, each `{name}` replaced by the element or elements `fields` holds
+ * for it.
+ */
+export function richSentence(
+  template: string,
+  fields: Readonly<Record<string, Block | readonly Block[]>>,
+): Block {
+  const elements = template
+    .split(/(\{\w+\})/)
+    .filter((part) => part !== "")
+    .flatMap((part) => fields[part.slice(1, -1)] ?? { type: "text", text: part })
+    // A text element with no text is refused: an empty field shows nothing.
+    .filter((element) => element.type !== "text" || element.text !== "");
+  return { type: "rich_text", elements: [{ type: "rich_text_section", elements }] };
+}
+
 function code(chunk: string): Block {
   return {
     type: "section",
@@ -197,33 +215,32 @@ export function shellBlocks(requestId: string, request: ShellRequest): Block[] {
  * the terminal runs is waited out, so its notice has Cancel alone.
  */
 export function terminalBlocks(requestId: string, request: TerminalRequest): Block[] {
-  let sentence: string;
+  // Rich text, as written: the owner's message is held back, and the request's mention pushes
+  // beside a rich text heading alone (#163).
+  const running = { type: "text", text: head(request.running ?? "", SECTION_LIMIT) };
+  let heading: Block;
   let go: string | null;
   if (request.state === "open") {
-    // A code span cannot hold a backtick: such a command is shown as escaped text, as `!status`
-    // shows it.
-    const line = request.command ?? "";
-    const command = line.includes("`") ? shownAsWritten(line) : `\`${line}\``;
-    sentence = texts.fill(texts.TERMINAL_OPEN, { command });
+    const command = {
+      type: "text",
+      text: head(request.command ?? "", SECTION_LIMIT),
+      style: { code: true },
+    };
+    heading = richSentence(texts.TERMINAL_OPEN, { command });
     go = slackTexts.TERMINAL_SEND_BUTTON;
   } else if (request.state === "busy") {
-    sentence = texts.TERMINAL_BUSY;
+    heading = richSentence(texts.TERMINAL_BUSY, {});
     go = null;
   } else if (request.state === "background") {
-    sentence = texts.fill(texts.TERMINAL_BACKGROUND, {
-      running: shownAsWritten(request.running ?? ""),
-    });
+    heading = richSentence(texts.TERMINAL_BACKGROUND, { running });
     go = slackTexts.TERMINAL_STOP_SEND_BUTTON;
   } else {
-    sentence = texts.fill(texts.TERMINAL_MOVE, { running: shownAsWritten(request.running ?? "") });
+    heading = richSentence(texts.TERMINAL_MOVE, { running });
     go = slackTexts.TERMINAL_MOVE_BUTTON;
   }
   const buttons = [button(TERMINAL_CANCEL, slackTexts.TERMINAL_CANCEL_BUTTON, requestId)];
   if (go !== null) buttons.unshift(button(TERMINAL_GO, go, requestId, "primary"));
-  return [
-    { type: "section", text: { type: "mrkdwn", text: head(sentence, SECTION_LIMIT) } },
-    { type: "actions", elements: buttons },
-  ];
+  return [heading, { type: "actions", elements: buttons }];
 }
 
 /**
