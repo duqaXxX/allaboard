@@ -1385,7 +1385,7 @@ whole list; a word that this instance does not offer still gets the whole list.
 | `!unpin` | Refused | Takes the pin away |
 | `!delete-thread` | Refused | Asks you to confirm, then deletes the thread |
 | `!clean-channel` | Asks you to confirm, then deletes the channel's threads and what sits outside them | Refused |
-| `!!<command>` | Refused | Asks you to confirm, runs the command in the session's folder, and Claude answers its output |
+| `!!<command>` | Refused | Asks you to confirm, runs the command in the session's folder, and Claude answers its output. Another session at work in the same folder, or a terminal that holds the session, is asked about first, as for a message, and again after **Run** if it started while you decided |
 | `!resume` | Lists the sessions you can resume, with a **Resume** button each | Refused |
 | `!resume <id or name>` | Resumes that session in the thread of your message | Refused |
 | `!allaboard` | Shows the version, the latest one and the update state | Same, only you see it |

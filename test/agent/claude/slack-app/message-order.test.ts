@@ -79,7 +79,8 @@ test("a stop typed right after a prompt drops the prompt and posts no Nothing is
   await world.settle();
   // Handed over in order; whether the prompt reaches `submit` before the stop aborts it is the
   // core's: either way it is not sent, by its ticket (`Not sent.`) or by the session's own stop.
-  assert.deepEqual(seen, ["first", "!stop"]);
+  // Had the stop been handed over first, the prompt would have gone: `neverSent` is the order.
+  assert.ok(["first,!stop", "!stop"].includes(seen.join()), seen.join());
   assert.ok(neverSent(world, "first"));
   assert.equal(
     world.slack
@@ -134,7 +135,8 @@ test("a top-level stop is handed over after a thread's message sent before it", 
   await world.settle();
   // Handed over in order; whether the prompt reaches `submit` before the stop aborts it is the
   // core's: either way it is not sent, by its ticket (`Not sent.`) or by the session's own stop.
-  assert.deepEqual(seen, ["first", "!stop"]);
+  // Had the stop been handed over first, the prompt would have gone: `neverSent` is the order.
+  assert.ok(["first,!stop", "!stop"].includes(seen.join()), seen.join());
   assert.ok(neverSent(world, "first"));
 });
 

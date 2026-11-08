@@ -282,7 +282,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `threadTitles` | `ChatProvider.titleThread` is absent and the core reads no title for the root, whatever the agent declares |
 | `threadDelete` | `ChatProvider.deleteThread` is absent, `!delete-thread` answers that the chat cannot delete a thread (`texts.DELETE_THREAD_UNAVAILABLE`), and `!help` and `!guide` leave it out |
 | `channelClean` | `ChatProvider.cleanChannel` is absent, `!clean-channel` answers `texts.CLEAN_UNAVAILABLE` and is left out of `!help` and `!guide` |
-| `commandSuggestions` | `ChatProvider.suggestCommands` is absent: a `!word` that is no command goes to the agent as typed, and `!` alone is a prompt. With it, and with the agent's `commands` capability, `submitToSession` stops, inside a session's thread only, a word the session does not list (name or alias) right after `ensureConnected`: before the setup and the same-folder hold when the session is connected or never ran, after the hold when it ran and was closed (so a Cancel starts no process). It ranks the candidates (`commands.commandPool`, `commands.rankCandidates`) and hands them over; nothing reaches the agent. What the owner sends from the suggestion comes back through `ChatInbound.message` as an ordinary message |
+| `commandSuggestions` | `ChatProvider.suggestCommands` is absent: a `!word` that is no command goes to the agent as typed, and `!` alone is a prompt. With it, and with the agent's `commands` capability, `deliver` stops, inside a session's thread only, a word the session does not list (name or alias) right after `ensureConnected`: before the setup and the same-folder hold when the session is connected or never ran, after the hold when it ran and was closed (so a Cancel starts no process). It ranks the candidates (`commands.commandPool`, `commands.rankCandidates`) and hands them over; nothing reaches the agent. What the owner sends from the suggestion comes back through `ChatInbound.message` as an ordinary message |
 
 A chat is required to receive a message, to write a reply it can edit, and to put a request or a
 form to the owner, and a session is a thread: none of these has a capability. Two things a chat
@@ -1275,9 +1275,14 @@ closed when the start returns (`ThreadSession.connect`).
   arrival lock as a prompt is (`messages.messages`), so a later message of the thread waits for
   it. It is refused when `ALLABOARD_SHELL` is off (`Config.shellCommands`), when the agent does not
   declare `shellCommands`, outside a session's thread and in a session that never ran. Otherwise
-  `askOwner` puts a `ShellRequest` to the owner, kept in `hold.Holds` with the kind `shell`, so
+  it passes the guards a typed message passes, in the same function (`deliver`, which runs inside
+  the arrival lock its caller holds): the restart refusal, the same-folder hold and the terminal
+  that holds the session. Then `askOwner` puts a `ShellRequest` to the owner, kept in `hold.Holds` with the kind `shell`, so
   an answer of another kind never resolves it; `Cancel`, `!stop` and a drain end it as `Don't send`
-  ends a hold. `Run` queues a `Turn` that carries the command (`ThreadSession.submit`). The worker
+  ends a hold. After `Run` the hold and the terminal are looked at again, since the owner may
+  have taken minutes to click: a session that started working since, or a terminal turn, is asked
+  about; one the owner already sent beside, or a terminal already allowed, is not. Then `Run`
+  queues a `Turn` that carries the command (`ThreadSession.submit`). The worker
   runs it before it sends anything (`ThreadSession.runShell`, over `shell.runShell`: Bash in the
   session's folder, in the environment and with the timeout of the agent's `ShellMode`, the
   command leading a process group that a stop or the timeout ends whole; its output is kept to a
