@@ -304,7 +304,9 @@ export class ChannelLine {
   /**
    * Links the thread's root instead when the line opens the message `messageTs` of the thread
    * `rootTs`, which was just deleted: Slack answers a deleted message's link with "unable to open
-   * this link". Its word stays. Queued behind the line's moves. Never rejects.
+   * this link". Then reads the threads again, as `refresh` does: a request resolved before its
+   * post returned left no write behind it, and the line it named as waiting would keep the word.
+   * Queued behind the line's moves. Never rejects.
    */
   withdrawn(channel: string, rootTs: string, messageTs: string): Promise<void> {
     return this.#queue(channel, () => this.#withdrawn(channel, rootTs, messageTs), "relink");
@@ -312,11 +314,18 @@ export class ChannelLine {
 
   async #withdrawn(channel: string, rootTs: string, messageTs: string): Promise<void> {
     const line = this.#posted.get(channel);
-    if (line === undefined || line.root !== rootTs || line.opened !== messageTs) return;
-    await this.#apply(channel, line, {
-      opened: rootTs,
-      permalink: await this.#rootLink(channel, rootTs),
-    });
+    // No line in this channel: nothing to relink or correct, and no history read to find one.
+    if (line === undefined) return;
+    if (line.root === rootTs && line.opened === messageTs) {
+      await this.#apply(channel, line, {
+        opened: rootTs,
+        permalink: await this.#rootLink(channel, rootTs),
+      });
+    }
+    // The request may have been the wait the line names or counts, resolved before `ask`
+    // returned, so before the core recorded it (#239): no state write follows to correct the
+    // line, which is edited to the threads' status only when that differs.
+    await this.#sync(channel);
   }
 
   /** Runs `work` after the channel's change in flight; a failure is logged as one to `verb`. */

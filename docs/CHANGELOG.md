@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The channel's line could stay on `✋ Waiting:` after a request was stopped or answered before
+  Slack confirmed its post (#239): nothing recorded the request, so nothing redrew the line.
+  `ChannelLine.withdrawn` now reads the threads again after a request is deleted.
 - A confirmed `!!command` reached its session past the questions a typed message gets (#240): it
   now asks `Send anyway?` beside another session at work in the same folder and `Send here`
   beside a terminal that holds the session, before its own **Run**. A message and a `!!command`
