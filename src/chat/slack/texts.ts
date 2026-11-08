@@ -194,16 +194,9 @@ export const HOME_DELETE = "Delete";
 // Bold, behind the hourglass the other two notes carry: mrkdwn has no colour, and the plain
 // word was missed among the row's details.
 export const HOME_DELETING = ":hourglass_flowing_sand: *deleting…*";
-export const HOME_CHANNEL_DELETING_ONE = ":hourglass_flowing_sand: deleting 1 thread…";
-export const HOME_CHANNEL_DELETING_MANY = ":hourglass_flowing_sand: deleting {count} threads…";
-export const HOME_DELETING_ONE = naming(
-  ":hourglass_flowing_sand: *Deleting 1 thread.* {chat} limits how fast messages are deleted: " +
-    "a thread takes about a minute, and leaves this page when it is gone.",
-);
-export const HOME_DELETING_MANY = naming(
-  ":hourglass_flowing_sand: *Deleting {count} threads, one at a time.* {chat} limits how fast " +
-    "messages are deleted: each takes about a minute, and leaves this page when it is gone.",
-);
+export const HOME_DELETING_ONE = ":hourglass_flowing_sand: Deleting 1 thread, about a minute.";
+export const HOME_DELETING_MANY =
+  ":hourglass_flowing_sand: Deleting {count} threads, one at a time, about a minute each.";
 export const HOME_DELETE_TITLE = "Delete this thread?";
 export const HOME_DELETE_NAMED = "“{title}” in #{channel}, {replies}. ";
 export const HOME_DELETE_NAMED_BARE = "“{title}” in #{channel}. ";

@@ -1193,8 +1193,8 @@ allaboard answers ``This thread holds no session. In the channel, send a new mes
 
 Open allaboard from Slack's sidebar and choose its **Home** tab. It lists the sessions your
 threads hold, one group per bound channel, the channel used last first. A channel shows its five
-newest sessions and, when it has more, a **Show all** button. Each session takes two lines, with
-a blank row before the next:
+newest sessions and, when it has more, a **Show all** button. Each session takes two lines, and
+the next one follows with no blank row:
 
 - the status reaction of the thread's root message and the title Claude Code gives the session;
 - in small text, the status in a word (`working`, `waiting for you`, `ended`, `error`), the
@@ -1259,11 +1259,10 @@ the thread, the first one last, and forgets the thread. The Claude Code session 
 `!resume` lists it again.
 
 A delete is not immediate: Slack limits how fast messages can be deleted, and a thread takes
-about a minute, more for a long one. From the click on, three places say so. A line under the
-header counts the threads being deleted (`Deleting 2 threads, one at a time.`, and why it takes
-time). The channel's name is followed by `deleting 2 threads…` for its own. The session's small
-line reads `deleting…` in bold behind an hourglass, in place of its status, and has no Delete.
-The session leaves the page, and the counts go down, when its thread is gone. Threads are
+about a minute, more for a long one. From the click on, two places say so. One small line under
+the header counts the threads being deleted (`Deleting 2 threads, one at a time, about a minute each.`). The
+session's small line reads `deleting…` in bold behind an hourglass, in place of its status, and
+has no Delete. The session leaves the page, and the count goes down, when its thread is gone. Threads are
 deleted one at a time, so several chosen in a row go one after the other.
 
 When a delete does not end, a line under the header names the thread and says why. The thread
@@ -1317,7 +1316,7 @@ What stays: every thread that has a reply, with or without a session, a message 
 whose session is still being set up, a message pinned in the channel, and a notice of Slack's (a member
 joining, a rename) that Slack refuses to delete. Do not keep notes of your own in a bound channel outside a thread unless
 you pin them: a clean-up takes the others for leftovers. While it runs the channel's name is followed by `cleaning up…`, a
-line under the header says so, and the button is gone; it runs after any delete already on its
+small line under the header says so, and the button is gone; it runs after any delete already on its
 way. If Slack stops it, a line under the header names the channel and says
 `` Could not clean up that channel (`<Slack's error>`). Messages deleted: 3, refused: 0. Clean it up again to continue. ``
 If Slack refuses some messages, the rest still goes and the line reads

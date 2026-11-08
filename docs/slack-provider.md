@@ -658,8 +658,8 @@ channel at all, nothing is published, so the page that is there stays.
 channel and a **New thread** link button (the `slack://channel` deep link), then two blocks per
 session: a section with the title, and a context line with the status word, the number of replies,
 the time of the last reply as Slack's own `{ago}` date token, which the client renders, so the age
-stays right between two publishes, and an **Open** link to the thread. A context line holding
-`home.SPACER` leaves a blank row between two sessions of a channel. With no filter chosen every
+stays right between two publishes, and an **Open** link to the thread.
+Two sessions of a channel follow each other with no block between them. With no filter chosen every
 bound channel is a group, the ones with sessions first by their newest, each cut to
 `home.PER_CHANNEL` cards with a **Show all** button; with a channel, a status, a tag or a search
 chosen (`home.narrowed`), only the channels with a match, uncut. The period applies either way and
@@ -669,7 +669,7 @@ pinned, whatever the period, and the cut to `home.PER_CHANNEL` counts the others
 counts every session that matches. The channel, the status, the tag and the search still apply to
 a pinned session. The details line of a card starts with `:pushpin:` for a pinned session and the
 tag as an inline-code `[name]` for a tagged one (a name that satisfies `commands.TAG_NAME` holds no
-character mrkdwn reads as markup), then the status word and the rest. A Home view holds 100 blocks and a session takes up to `home.CARD_BLOCKS` of
+character mrkdwn reads as markup), then the status word and the rest. A Home view holds 100 blocks and a session takes `home.CARD_BLOCKS` (2) of
 them: the page stops before the cap, and ends with `texts.HOME_MORE` when that leaves a session out.
 The channel menu holds `All channels` and at most `home.CHANNEL_OPTIONS` (99) channels, so that it stays
 within Slack's 100 options for a select menu. The tag menu (`home.TAG_ACTION`) is built the same way
@@ -746,10 +746,8 @@ names the thread, cut to the dialog's 300 characters. Slack sends the click only
 confirmed. The listener checks the owner and the workspace, like every Home control, and
 `Home.delete` acts only in edit mode. It publishes at once with the thread marked
 (`HomeRow.deleting`): the row reads `texts.HOME_DELETING` in place of its status and has no button,
-a section under the header counts the threads on their way (`texts.HOME_DELETING_ONE` or
-`texts.HOME_DELETING_MANY`), and the channel's header counts its own
-(`texts.HOME_CHANNEL_DELETING_ONE` or `texts.HOME_CHANNEL_DELETING_MANY`), since such a row can be
-one a channel does not show. A second click on a thread already being deleted does nothing, and the
+a context line under the header counts the threads on their way (`texts.HOME_DELETING_ONE` or
+`texts.HOME_DELETING_MANY`); the channel's header says nothing of them. A second click on a thread already being deleted does nothing, and the
 page is published again when the delete ended. What a delete or a clean-up that did not end has to
 say is kept per thread or channel (`Home.notices`), so one's result does not erase another's: each
 is a context line under the header that names its thread or channel, the latest `home.NOTICES_SHOWN`
@@ -787,7 +785,7 @@ are not touched.
 
 In edit mode a channel's header carries a button (`home.CLEAN_ACTION`) with a `confirm` dialog that
 says what it deletes; `Home.clean` acts only in edit mode and on a bound channel, marks the channel
-(its header reads `texts.HOME_CHANNEL_CLEANING`, a section under the page's header
+(its header reads `texts.HOME_CHANNEL_CLEANING`, a small line under the page's header
 `texts.HOME_CLEANING_ONE`), and publishes before and after. `!clean-channel` runs `ThreadDeleter.purge` through `app/clean-channel.ts`, after an ephemeral question that `ThreadDeleter.survey` counts: each thread as a delete does, those `state.json` no longer holds included, then this clean-up. `ThreadDeleter.clean` reads the channel
 page by page (`conversations.history`, cursor pagination) and takes the owner's and the bot's
 messages that carry no `subtype`, Slack's `channel_*` and `group_*` notices whoever they name, all
