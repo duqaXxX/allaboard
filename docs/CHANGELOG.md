@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The `Send anyway?` question linked the busy session as `Session`: its link now carries that
+  session's title, as `!status` names it, and keeps `Session` while the session has none.
 - The channel's line could stay on `✋ Waiting:` after a request was stopped or answered before
   Slack confirmed its post (#239): nothing recorded the request, so nothing redrew the line.
   `ChannelLine.withdrawn` now reads the threads again after a request is deleted.
