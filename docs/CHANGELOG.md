@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `agents.sessions.setStatus` names the owner as the session's initiator (#234), so a session on a
+  root the bot posted, as a `!fork` copy, enters his Agents & tools list. Sent again without it
+  when Slack refuses the user, with the channel remembered; a transient failure retries with it.
 - The Home tab is denser (#224): no blank row between two sessions (`home.SPACER` is gone and
   `home.CARD_BLOCKS` is 2, so about 45 sessions fit under Slack's 100 blocks where 32 did), the notice
   of threads being deleted is one small line (`Deleting 2 threads, one at a time, about a minute each.`), and a

@@ -1604,6 +1604,14 @@ Failures are logged with the channel, the ts and the code, once per code in a ro
 the queue ignores the provider's `stopped` signal (the sessions' end statuses are drawn after the
 daemon aborts it), and `SlackChat.close` cancels the timers, then waits for the queues.
 
+A session is created attributed to the owner: `setStatus` carries `initiator_user_id` = the owner
+(docs.slack.dev, read 2026-11-08), which puts a session on a root the bot posted, as a `!fork` copy,
+in his Agents & tools list. A call that carried it and was refused by an error code Slack answered
+is sent again at once without it, and the channel is remembered as initiator-less for the process
+when that second call passes. A transient failure (a rate limit, `internal_error`, `fatal_error`,
+`service_unavailable`, `request_timeout`, an HTTP or network failure) takes the ordinary retry, with
+the initiator.
+
 The Stop control arrives as `agent_session_stopped`. Its listener checks the user, the workspace
 (the envelope's `team_id`, taken only when `is_ext_shared_channel` is `false`), that the core keeps
 the thread, and the channel, then calls `ChatInbound.stop`, which does what `!stop` does in the
