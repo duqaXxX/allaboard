@@ -985,23 +985,30 @@ test("the observer hears a prune that removed something", () => {
   assert.deepEqual(heard, [[{ channel: CHANNEL, thread: OTHER_THREAD }]]);
 });
 
-// #88: whether a thread asks the owner (an approval or a question open) changes with its
-// requests, and the channel's line reads it; the status is written before the request is.
-test("a request is announced when it changes whether the thread asks the owner", () => {
+// #88, #233: whether a thread blocks on the owner (an approval, a question or the setup form open)
+// changes with its requests, and the channel's line reads it; it can change while the root's
+// status stays waiting, as when the setup form is answered and the same-folder hold opens.
+test("a request is announced when it changes whether the thread blocks on the owner", () => {
   const dir = scratch();
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD, SESSION);
   const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
-  // The owner's own form: whether the thread asks him does not change.
-  store.addRequest(CHANNEL, THREAD, "msg-7", "setup");
-  assert.deepEqual(heard, []);
-  store.addRequest(CHANNEL, THREAD, "msg-8", "question");
-  store.addRequest(CHANNEL, THREAD, "msg-9", "approval"); // asks already
-  store.removeRequest(CHANNEL, THREAD, "msg-8");
-  store.removeRequest(CHANNEL, THREAD, "msg-9");
   const ref = { channel: CHANNEL, thread: THREAD };
+  store.addRequest(CHANNEL, THREAD, "msg-7", "setup");
+  assert.deepEqual(heard, [[ref]]);
+  store.addRequest(CHANNEL, THREAD, "msg-8", "hold"); // blocks already
+  store.removeRequest(CHANNEL, THREAD, "msg-7"); // the hold alone: the owner set it off
+  assert.deepEqual(heard, [[ref], [ref]]);
+  store.removeRequest(CHANNEL, THREAD, "msg-8");
+  store.addRequest(CHANNEL, THREAD, "msg-9", "shell");
+  assert.deepEqual(heard, [[ref], [ref]]);
+  heard.length = 0;
+  store.addRequest(CHANNEL, THREAD, "msg-10", "question");
+  store.addRequest(CHANNEL, THREAD, "msg-11", "approval"); // blocks already
+  store.removeRequest(CHANNEL, THREAD, "msg-10");
+  store.removeRequest(CHANNEL, THREAD, "msg-11");
   assert.deepEqual(heard, [[ref], [ref]]);
 });
 

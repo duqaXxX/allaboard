@@ -445,11 +445,17 @@ const TITLES: Record<string, string> = {
 const rootLink = (ts: string) =>
   `https://example.slack.com/archives/C000PROJECT/p${ts.replace(".", "")}`;
 
-/** What a thread is in `state.json`: its word, or "asks" for a root waiting on an approval. */
-type Seen = LineKind | "asks" | null;
+/**
+ * What a thread is in `state.json`: its word, "asks" for a root waiting on an approval, or "setup"
+ * for a root waiting on its setup form.
+ */
+type Seen = LineKind | "asks" | "setup" | null;
 
-/** A channel whose threads' status `status` holds, as `state.json` would. */
-function busy(status: Record<string, Seen>, logger?: never) {
+/**
+ * A channel whose threads' status `status` holds, as `state.json` would. With `drawSetup` false a
+ * setup form is read as main read it before #233: work, never drawn.
+ */
+function busy(status: Record<string, Seen>, logger?: never, drawSetup = true) {
   const fake = new FakeSlack();
   fake.responses["conversations.replies"] = (args: JsonObject) => ({
     ok: true,
@@ -469,8 +475,9 @@ function busy(status: Record<string, Seen>, logger?: never) {
       channel === CHANNEL
         ? Object.entries(status).map(([thread, seen]) => ({
             thread,
-            kind: seen === "asks" ? "waiting" : seen,
+            kind: seen === "asks" ? "waiting" : seen === "setup" ? "working" : seen,
             asks: seen === "asks",
+            setup: seen === "setup" && drawSetup,
           }))
         : [],
   };
@@ -795,22 +802,31 @@ test("a thread asks the owner while its root waits with an approval or a questio
     thread: B,
     kind: "waiting",
     asks: true,
+    setup: false, // the agent's request is the wait drawn
   });
   assert.equal(lineThread(B, entry("waiting", { "1.1": "approval" })).asks, true);
-  // The owner's own form: the root waits, and the line takes it for working.
+  // The owner's own form: the root waits, and the line takes it for working; a setup form is
+  // also drawn as a wait (#233).
   for (const kind of ["setup", "hold", "shell"] as const) {
     assert.deepEqual(lineThread(B, entry("waiting", { "1.1": kind })), {
       thread: B,
       kind: "working",
       asks: false,
+      setup: kind === "setup",
     });
   }
+  // A setup request beside a root that works or ended draws nothing.
+  assert.equal(lineThread(B, entry("working", { "1.1": "setup" })).setup, false);
+  assert.equal(
+    lineThread(B, { status: "waiting", ended: "done", requestKinds: { "1.1": "setup" } }).setup,
+    false,
+  );
   // A request left open by an ended turn, until the repair takes it.
   assert.equal(lineThread(B, entry("working", { "1.1": "question" })).asks, false);
   // An answer that never reached the chat: the root shows ❌, nothing waits.
   assert.deepEqual(
     lineThread(B, { status: "waiting", ended: "error", requestKinds: { "1.1": "question" } }),
-    { thread: B, kind: "failed", asks: false },
+    { thread: B, kind: "failed", asks: false, setup: false },
   );
 });
 
@@ -856,4 +872,160 @@ test("the line reads a root with include_all_metadata and names a fork by its ti
   await new ChannelLine(fake, { botUserId: BOT }).show(CHANNEL, ROOT, "done");
   assert.equal(fake.callsTo("conversations.replies")[0]?.include_all_metadata, true);
   assert.equal(fake.callsTo("chat.postMessage")[0]?.text, "Status: Done: Fix the login page");
+});
+
+// #233: a setup form is drawn as a wait over the line main keeps, and nothing else changes. Each
+// sequence runs twice, the form drawn and the form read as main read it (work), and the two must
+// post, delete, say and record the same at every step, and draw the same once no form waits.
+interface Step {
+  readonly set?: Record<string, Seen>;
+  readonly show?: readonly [string, LineKind];
+  readonly changed?: readonly string[];
+}
+
+async function againstMain(
+  start: Record<string, Seen>,
+  steps: readonly Step[],
+  breakSlack: (fake: FakeSlack) => void = () => {},
+) {
+  const runs = [busy({ ...start }), busy({ ...start }, undefined, false)];
+  for (const run of runs) breakSlack(run.fake);
+  const record = (fake: FakeSlack) => ({
+    posts: fake.callsTo("chat.postMessage").map((call) => [call.text, call.metadata]),
+    deletes: fake.callsTo("chat.delete").map((call) => call.ts),
+    metadata: fake
+      .callsTo("chat.update")
+      .filter((call) => call.metadata !== undefined)
+      .map((call) => call.metadata),
+  });
+  for (const [i, step] of steps.entries()) {
+    for (const run of runs) {
+      Object.assign(run.status, step.set ?? {});
+      if (step.show !== undefined) await run.lines.show(CHANNEL, ...step.show);
+      if (step.changed !== undefined) await run.changed(...step.changed);
+    }
+    const [drawn, main] = runs as [(typeof runs)[0], (typeof runs)[0]];
+    assert.deepEqual(record(drawn.fake), record(main.fake), `step ${i}`);
+    if (!Object.values(drawn.status).includes("setup")) {
+      assert.equal(shown(drawn.fake), shown(main.fake), `step ${i}`);
+    }
+  }
+  return runs[0] as (typeof runs)[0];
+}
+
+test("a setup form drawn as a wait leaves the line main keeps, in every sequence the reviews found", async () => {
+  const setupC: Step = { set: { [C]: "setup" }, changed: [C] };
+  const cancelC: Step = { set: { [C]: null }, changed: [C] };
+  const bEnds: Step = { show: [B, "done"] };
+  // F1: an end, a form, the form cancelled.
+  let run = await againstMain({ [B]: "done", [C]: null }, [bEnds, setupC, cancelC]);
+  assert.equal(shown(run.fake), `Status: ✅ Done: <${rootLink(B)}|Thread B>`);
+  // I1: B ends while A works; a form; A stopped by the owner; the form cancelled.
+  run = await againstMain({ [ROOT]: "working", [B]: "done", [C]: null }, [
+    bEnds,
+    setupC,
+    { set: { [ROOT]: "done" }, changed: [ROOT] },
+    cancelC,
+  ]);
+  // I2: an end; B prompted again; a form; the form cancelled; B stopped by the owner.
+  run = await againstMain({ [B]: "done", [C]: null }, [
+    bEnds,
+    { set: { [B]: "working" }, changed: [B] },
+    setupC,
+    cancelC,
+    { set: { [B]: "done" }, changed: [B] },
+  ]);
+  assert.equal(shown(run.fake), `Status: ✅ Done: <${rootLink(B)}|Thread B>`);
+  // C1: an approval in A, answered; a form; A stopped by the owner; the form cancelled.
+  run = await againstMain({ [ROOT]: null, [B]: "done", [C]: null }, [
+    bEnds,
+    { set: { [ROOT]: "asks" }, show: [ROOT, "waiting"] },
+    { set: { [ROOT]: "working" }, changed: [ROOT] },
+    setupC,
+    { set: { [ROOT]: "done" }, changed: [ROOT] },
+    cancelC,
+  ]);
+  assert.equal(shown(run.fake), `Status: ✅ Done: <${rootLink(ROOT)}|Thread A>`);
+  // A form started, its work told; a form started, then refused at the hold.
+  await againstMain({ [B]: "done", [C]: null }, [
+    bEnds,
+    setupC,
+    { set: { [C]: "working" }, changed: [C] },
+    { set: { [C]: "done" }, show: [C, "done"] },
+  ]);
+  await againstMain({ [B]: "done", [C]: null }, [
+    bEnds,
+    setupC,
+    { set: { [C]: "working" }, changed: [C] },
+    cancelC,
+  ]);
+  // Two forms, then an approval while they wait, answered.
+  await againstMain({ [ROOT]: null, [B]: null, [C]: "done" }, [
+    { show: [C, "done"] },
+    { set: { [ROOT]: "setup", [B]: "setup" }, changed: [ROOT, B] },
+    { set: { [C]: "asks" }, show: [C, "waiting"] },
+    { set: { [C]: "working" }, changed: [C] },
+    { set: { [ROOT]: null, [B]: null }, changed: [ROOT, B] },
+  ]);
+});
+
+test("a setup form whose root Slack refuses to link costs the line nothing", async () => {
+  const said: string[] = [];
+  // N1 of the design review: B's end is posted though the form's link is refused.
+  await againstMain(
+    { [B]: "done", [C]: null },
+    [
+      { show: [B, "done"] },
+      { set: { [B]: "working" }, changed: [B] },
+      { set: { [C]: "setup" }, changed: [C] },
+      { set: { [B]: "done" }, show: [B, "done"] },
+    ],
+    (fake) => {
+      const links = fake.responses["chat.getPermalink"] as (args: JsonObject) => JsonObject;
+      fake.responses["chat.getPermalink"] = (args: JsonObject) =>
+        args.message_ts === C ? rejected("ratelimited") : links(args);
+    },
+  );
+  const { fake, lines, status, changed } = busy({ [B]: "done", [C]: null }, {
+    warning: (text: string) => said.push(text),
+  } as never);
+  const links = fake.responses["chat.getPermalink"] as (args: JsonObject) => JsonObject;
+  fake.responses["chat.getPermalink"] = (args: JsonObject) =>
+    args.message_ts === C ? rejected("ratelimited") : links(args);
+  await lines.show(CHANNEL, B, "done");
+  status[C] = "setup";
+  await changed(C);
+  assert.equal(shown(fake), "Status: ⏳ Working: 1 thread");
+  assert.ok(
+    said.some((text) => text.includes("setup form") && text.includes("ratelimited")),
+    said.join("\n"),
+  );
+});
+
+test("a setup form is drawn as a wait by an edit, the oldest named, an agent's request first", async () => {
+  const { fake, lines, status, changed } = busy({ [ROOT]: null, [B]: null, [C]: "done" });
+  await lines.show(CHANNEL, C, "done");
+  status[B] = "setup";
+  await changed(B);
+  assert.equal(shown(fake), `Status: ✋ Waiting: <${rootLink(B)}|Thread B>`);
+  assert.equal(last(fake)?.text, "Status: Waiting: Thread B");
+  status[ROOT] = "setup";
+  await changed(ROOT);
+  assert.equal(shown(fake), `Status: ✋ Waiting: <${rootLink(ROOT)}|Thread A> · +1`);
+  // The form's thread is renamed: the drawn wait follows.
+  await lines.retitle(CHANNEL, ROOT, "*Login fix*");
+  assert.equal(shown(fake), `Status: ✋ Waiting: <${rootLink(ROOT)}|Login fix> · +1`);
+  // An agent's request wins over the forms.
+  status[C] = "asks";
+  await changed(C);
+  assert.equal(shown(fake), `Status: ✋ Waiting: <${rootLink(C)}|Thread C>`);
+  status[C] = "done";
+  await changed(C);
+  assert.equal(shown(fake), `Status: ✋ Waiting: <${rootLink(ROOT)}|Login fix> · +1`);
+  // Both forms answered with Start: main's count again.
+  status[ROOT] = "working";
+  status[B] = "working";
+  await changed(ROOT, B);
+  assert.equal(shown(fake), "Status: ⏳ Working: 2 threads");
+  assert.equal(fake.callsTo("chat.postMessage").length, 1); // edits push nothing
 });

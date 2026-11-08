@@ -15,6 +15,11 @@
  * whose work ended last. Between its posts the line follows the threads' status in `state.json`
  * (`refresh`), by edits, which ring nothing (measured 2026-09-27).
  *
+ * A thread waiting on its setup form counts as work in all of this and is only drawn (#233):
+ * while no approval or question is drawn, the line reads `Waiting:` for the oldest such thread
+ * (`SetupWait`), and the thread it names, its word, its posts and its metadata stay what they
+ * would be without the form, so a form cancelled before Start leaves the line as it was.
+ *
  * The line is a context block, small and grey, and mentions nobody: it makes the channel unread,
  * and the thread itself tells the owner (`SlackThread.ask`, `SlackThread.tellEnd`), since a push
  * from the channel opens the channel and one from the thread opens the thread (measured
@@ -33,7 +38,7 @@
  */
 
 import type { WebClient } from "@slack/web-api";
-import { asksOwner, type RequestKind } from "../../core/port.ts";
+import { asksOwner, blocksOnOwner, type RequestKind } from "../../core/port.ts";
 import { getLogger, type Logger } from "../../log.ts";
 import { slackUnescape } from "./app/messages.ts";
 import { isTombstone } from "./channels.ts";
@@ -96,20 +101,23 @@ export function rootKind(status: string | null, ended: string | null): LineKind 
 }
 
 /**
- * A thread of a channel as the line reads it: its root's `ts`, the word of its status, and
- * whether it waits for the owner's answer to the agent (`asks`).
+ * A thread of a channel as the line reads it: its root's `ts`, the word of its status, whether it
+ * waits for the owner's answer to the agent (`asks`), and whether its root waits on its setup
+ * form (`setup`), which the line draws as a wait and otherwise counts as work.
  */
 export interface LineThread {
   readonly thread: string;
   readonly kind: LineKind | null;
   readonly asks: boolean;
+  readonly setup: boolean;
 }
 
 /**
  * The thread whose root is `thread` as the line reads its entry of `state.json`: it asks the
  * owner while its root waits with an approval or a question open (`asksOwner`). A root that waits
  * on a request the owner just set off (the setup form, the hold, a shell command's confirmation)
- * is taken for working: he is there.
+ * is taken for working: he is there. A root waiting on its setup form is also `setup`: no turn
+ * runs before his Start, and the line draws it as a wait (#233).
  */
 export function lineThread(
   thread: string,
@@ -120,8 +128,11 @@ export function lineThread(
   },
 ): LineThread {
   const kind = rootKind(entry.status, entry.ended);
-  const asks = kind === "waiting" && Object.values(entry.requestKinds).some(asksOwner);
-  return { thread, kind: kind === "waiting" && !asks ? "working" : kind, asks };
+  const kinds = Object.values(entry.requestKinds);
+  const asks = kind === "waiting" && kinds.some(asksOwner);
+  // What blocks on the owner and is not the agent's request: the setup form (`blocksOnOwner`).
+  const setup = kind === "waiting" && !asks && kinds.some(blocksOnOwner);
+  return { thread, kind: kind === "waiting" && !asks ? "working" : kind, asks, setup };
 }
 
 /** Where the line reads the channels' threads: `state.json`, as the session index does. */
@@ -154,6 +165,20 @@ interface Line {
   count: number;
   // The content last written, so a change that leaves it the same writes nothing.
   shown: string;
+  // The setup form the line draws as a wait over what it shows, never stored in its metadata.
+  setup: SetupWait | null;
+}
+
+/**
+ * A thread whose root waits on its setup form, drawn by the line as a wait while no agent's
+ * request waits (#233): the one that has waited longest, and how many others do. Only drawn:
+ * the thread the line names, its word and its metadata stay what they are without it.
+ */
+interface SetupWait {
+  readonly root: string;
+  readonly permalink: string;
+  readonly label: string;
+  readonly count: number;
 }
 
 /**
@@ -177,15 +202,22 @@ function lineContent(line: Omit<Line, "ts" | "shown">, told?: Told) {
   const plus = (n: number) => (n > 0 ? ` · +${n}` : "");
   const threads = `${line.count} ${line.count === 1 ? "thread" : "threads"}`;
   const event = told ?? { kind: line.kind, label: line.label, waiting: line.count };
+  // A setup form is drawn as a wait unless an agent's request already is.
+  const setup = line.kind === "waiting" ? null : line.setup;
+  const [waitMark, waitWord] = WORDS.waiting;
   const said =
-    !told && line.kind === "working"
-      ? `${PREFIX} ${word}: ${threads}`
-      : `${PREFIX} ${WORDS[event.kind][1]}: ${mrkdwnEscape(event.label)}${plus(event.kind === "working" ? 0 : event.waiting)}`;
+    !told && setup !== null
+      ? `${PREFIX} ${waitWord}: ${mrkdwnEscape(setup.label)}${plus(setup.count)}`
+      : !told && line.kind === "working"
+        ? `${PREFIX} ${word}: ${threads}`
+        : `${PREFIX} ${WORDS[event.kind][1]}: ${mrkdwnEscape(event.label)}${plus(event.kind === "working" ? 0 : event.waiting)}`;
   // A reply's permalink carries a query (`?thread_ts=…&cid=…`), and mrkdwn reads `&` as markup.
   const shown =
-    line.kind === "working"
-      ? `${PREFIX} ${mark} ${word}: ${threads}`
-      : `${PREFIX} ${mark} ${word}: <${mrkdwnEscape(line.permalink)}|${mrkdwnEscape(line.label)}>${plus(line.count)}`;
+    setup !== null
+      ? `${PREFIX} ${waitMark} ${waitWord}: <${mrkdwnEscape(setup.permalink)}|${mrkdwnEscape(setup.label)}>${plus(setup.count)}`
+      : line.kind === "working"
+        ? `${PREFIX} ${mark} ${word}: ${threads}`
+        : `${PREFIX} ${mark} ${word}: <${mrkdwnEscape(line.permalink)}|${mrkdwnEscape(line.label)}>${plus(line.count)}`;
   return {
     text: said,
     blocks: [{ type: "context", elements: [{ type: "mrkdwn", text: shown }] }],
@@ -314,7 +346,12 @@ export class ChannelLine {
     const label = lineLabel({ text });
     this.#labels.set(`${channel}/${rootTs}`, label);
     const line = this.#posted.get(channel);
-    if (line !== undefined && line.root === rootTs) await this.#apply(channel, line, { label });
+    if (line === undefined) return;
+    const setup = line.setup?.root === rootTs ? { setup: { ...line.setup, label } } : {};
+    const own = line.root === rootTs ? { label } : {};
+    if (Object.keys({ ...own, ...setup }).length > 0) {
+      await this.#apply(channel, line, { ...own, ...setup });
+    }
   }
 
   /** The line of `channel` brought to its threads' status in `state.json`. */
@@ -325,6 +362,8 @@ export class ChannelLine {
     const all = threads.of(channel);
     this.#forget(channel, all);
     const waiting = await this.#waiting(channel, all, null);
+    // An agent's request is drawn over a setup form: the form is read only when none waits.
+    const setup = waiting.length === 0 ? await this.#setupWait(channel, all) : null;
     const first = waiting[0];
     if (first !== undefined) {
       // A waiting line keeps the request it opens until that request is deleted (`withdrawn`).
@@ -336,6 +375,7 @@ export class ChannelLine {
         permalink: same ? line.permalink : await this.#rootLink(channel, first),
         label: await this.#label(channel, first),
         count: waiting.length - 1,
+        setup,
       });
       return;
     }
@@ -347,7 +387,7 @@ export class ChannelLine {
     const working = all.filter((t) => t.kind === "working").length;
     if (working > 0) {
       // Several may work: the line names none, and keeps its thread for when they are done.
-      await this.#apply(channel, line, { kind: "working", count: working, ...relink });
+      await this.#apply(channel, line, { kind: "working", count: working, ...relink, setup });
       return;
     }
     const own = all.find((t) => t.thread === line.root);
@@ -361,7 +401,7 @@ export class ChannelLine {
       await this.#remove(channel, line);
       return;
     }
-    await this.#apply(channel, line, { kind: own.kind, count: 0, ...relink });
+    await this.#apply(channel, line, { kind: own.kind, count: 0, ...relink, setup });
   }
 
   /**
@@ -396,6 +436,7 @@ export class ChannelLine {
       label: await this.#label(channel, root),
       count: 0,
       shown: "",
+      setup: null,
     };
     this.#posted.set(channel, line);
     return line;
@@ -451,6 +492,33 @@ export class ChannelLine {
       for (const key of cache.keys()) {
         if (key.startsWith(`${channel}/`) && !kept.has(key)) cache.delete(key);
       }
+    }
+  }
+
+  /**
+   * The setup form of `threads` the line draws (`SetupWait`): the oldest root waiting on one, a
+   * root Slack has no more of left out; null when none does. Never throws: a refused read of
+   * Slack is logged and draws nothing, so a setup form never costs the line a post or an edit.
+   */
+  async #setupWait(channel: string, threads: readonly LineThread[]): Promise<SetupWait | null> {
+    const sorted = threads
+      .filter((t) => t.setup)
+      .map((t) => t.thread)
+      .sort((a, b) => Number(a) - Number(b));
+    try {
+      const read = await Promise.all(sorted.map((root) => this.#read(channel, root)));
+      const roots = sorted.filter((_, i) => read[i] !== GONE);
+      const first = roots[0];
+      if (first === undefined) return null;
+      return {
+        root: first,
+        permalink: await this.#rootLink(channel, first),
+        label: await this.#label(channel, first),
+        count: roots.length - 1,
+      };
+    } catch (error) {
+      this.#log.warning(`could not draw a setup form of ${channel}: ${describe(error)}`);
+      return null;
     }
   }
 
@@ -586,7 +654,11 @@ export class ChannelLine {
       waiting.length === 0 && working > 0
         ? { kind: "working" as const, count: working }
         : { count: waiting.filter((t) => t !== named.root).length };
-    const shownLine = { ...named, ...counted };
+    const shownLine = {
+      ...named,
+      ...counted,
+      setup: waiting.length === 0 ? await this.#setupWait(channel, all) : null,
+    };
     const content = lineContent(shownLine, {
       kind,
       label,

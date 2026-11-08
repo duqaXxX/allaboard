@@ -1728,9 +1728,12 @@ as you're inactive on desktop, or after an additional delay", Guide to Slack not
 2026-10-26).
 
 The channel's `Status:` line makes the channel unread and mentions nobody. While a thread waits
-for you it names the one that has waited longest and counts the others,
+for your approval or answer it names the one that has waited longest and counts the others,
 `Status: ✋ Waiting: A · +1`, whatever the event; otherwise it counts the threads at work,
 `Status: ⏳ Working: 2 threads`, or names the thread that ended last, by edits that ring nothing.
+While nothing waits for your approval or answer, a new thread whose setup form waits for its
+**Start** is shown the same way, `Status: ✋ Waiting: A`, by an edit; a channel with no line yet
+shows nothing for it, since an edit needs a line to edit.
 
 Any value of
 `SLACK_MENTION_OWNER` other than `on` or `off`, in any case, stops the start with

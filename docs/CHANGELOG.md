@@ -14,6 +14,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The channel's line said `⏳ Working: 1 thread` while a new thread waited on its setup form. The
+  line now draws that thread as `✋ Waiting:`, as its root shows, by an edit that rings nothing,
+  unless an approval or a question waits; what the line names, posts and deletes is unchanged, so
+  a form cancelled before Start leaves the line as it was. A `!!` command's confirmation and the
+  same-folder hold still count as work. `state.json` announces a request that changes whether a
+  thread blocks on the owner (`state.blocksOnOwner`), so the line follows the form (#233).
 - A fork's root shows the copy's title after `Fork of <link>: ` instead of failing with
   `cant_update_message`. The app edits the root it posted with its own token, `!tag` works on it, and
   the channel's line names the fork by its title. The chat seam's `ChannelChat.open` takes a lead and

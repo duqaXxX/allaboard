@@ -59,6 +59,15 @@ export function asksOwner(kind: RequestKind | undefined): boolean {
   return kind === "question" || kind === "approval";
 }
 
+/**
+ * Whether a thread waiting on a request of `kind` can go no further until the owner answers it:
+ * a turn's question or approval (`asksOwner`), or the setup form, before which no turn runs
+ * (#233). The hold and a shell command's confirmation come while a session runs beside them.
+ */
+export function blocksOnOwner(kind: RequestKind | undefined): boolean {
+  return asksOwner(kind) || kind === "setup";
+}
+
 const REQUEST_KINDS: ReadonlySet<unknown> = new Set<RequestKind>([
   "question",
   "approval",
@@ -374,15 +383,16 @@ function parseChannels(raw: Raw): Map<string, ChannelRecord> {
  */
 function shown(threads: ReadonlyMap<string, ThreadState>): Map<string, string> {
   return new Map(
-    // Whether the thread asks the owner (`asksOwner`) too, which the channel's line shows: the
-    // root's status is written before the request it waits on.
+    // Whether the thread blocks on the owner (`blocksOnOwner`) too, which the channel's line
+    // shows: a request can change it while the root's status stays waiting (the setup form
+    // answered, then the same-folder hold), and a turn's request is written after its status.
     [...threads].map(([id, t]) => [
       id,
       JSON.stringify([
         t.sessionId,
         t.status,
         t.ended,
-        Object.values(t.requestKinds).some(asksOwner),
+        Object.values(t.requestKinds).some(blocksOnOwner),
       ]),
     ]),
   );

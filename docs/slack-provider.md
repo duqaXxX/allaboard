@@ -483,7 +483,12 @@ Only a wait names a thread among several, since only a wait asks something of th
 none waiting and threads at work, the line counts them and names none
 (`Status: ⏳ Working: 2 threads`); with none at work either, it names the thread whose work ended last, linked. A root Slack no longer has
 (`thread_not_found`, or the tombstone left over the replies of a deleted root) is left out; one
-Slack did not answer for this time is still counted. Between the posts that tell the owner the
+Slack did not answer for this time is still counted. A thread whose root waits on its setup
+form, where no turn runs until the owner's **Start**, counts as work for all of the above and is
+only drawn: while no approval or question is drawn, the line reads
+`Status: ✋ Waiting: A · +1` for the oldest such thread, and what the line names, posts, deletes
+and keeps in its metadata is what it would be without the form. A Slack read refused for that
+thread draws nothing. Between the posts that tell the owner the
 line follows `state.json`, the source of the session index: each change
 `StateStore.onSessionsChange` announces (a status, an end, an open request, a removed thread)
 reaches `SlackChat.index`, which hands it to the Home tab and to `ChannelLine.refresh`, and each
@@ -721,8 +726,9 @@ does not draw it. The row counts in the 100 blocks.
 
 `StateStore.onSessionsChange` calls `Home.request` after a write that changed what the page shows,
 with the threads the write touched: a channel bound for the first time, a thread added or removed, a
-session id, a root's reaction. A write that changes anything else (a reply's bookkeeping, a request,
-bypass, effort, a rebind) does not. `Home.request` returns at once and publishes after
+session id, a root's reaction, a request that changes whether the thread blocks on the owner
+(`state.blocksOnOwner`, which the channel's line reads). A write that changes anything else (a
+reply's bookkeeping, another request, bypass, effort, a rebind) does not. `Home.request` returns at once and publishes after
 `home.DEBOUNCE_SECONDS`, so the burst of reaction changes one turn makes costs one publish; a change
 that lands during a publish is followed by another. Publishes run one at a time, each built after
 the one before it landed, so a filter just chosen is never replaced by an older page. On a stop,
