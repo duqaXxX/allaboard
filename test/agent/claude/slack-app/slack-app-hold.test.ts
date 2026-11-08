@@ -115,6 +115,26 @@ test("a busy session in the same folder holds the message", async (t) => {
   assert.deepEqual(world.state.thread(CHANNEL, THREAD)?.requests, [world.slack.postedTs.at(-1)]);
 });
 
+test("the hold question names the busy session by its title when the agent lists one", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(message("busy elsewhere", { ts: OTHER_THREAD }));
+  const busyId = "busy-session-1";
+  world.state.setSession(CHANNEL, OTHER_THREAD, busyId);
+  world.backend.listed = [
+    {
+      id: busyId,
+      title: "Fix the footer",
+      customTitle: null,
+      branch: null,
+      size: null,
+      lastModified: 1,
+    },
+  ];
+  await world.dispatch(message("hello", { ts: THREAD }));
+  const heading = postedBlocks(world)[0] as Body;
+  assert.equal(heading.elements[0].elements[1].text, "Fix the footer");
+});
+
 test("a failed state write for a d8 hold still lets it proceed", async (t) => {
   const world = worldOf(t);
   // `state.addRequest` sits outside `askOwner`'s own try/finally on purpose, so a write failure

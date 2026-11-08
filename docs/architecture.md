@@ -1262,7 +1262,9 @@ closed when the start returns (`ThreadSession.connect`).
   live session of any other thread, of any channel, whose resolved folder is the same and is not
   idle (`SessionManager.workingIn`) makes the daemon ask first:
   `Another session is working in this folder: <link>. Send anyway?`, with the buttons `Send anyway`
-  and `Don't send` (`hold.holdFlow`, which puts it to the owner as a `HoldRequest`; the wait is kept
+  and `Don't send`; the link is labelled with the busy session's title as the agent lists it
+  (`SessionManager.sessionsIn`), `Session` while it has none (`hold.holdFlow`, which puts it to the
+  owner as a `HoldRequest`; the wait is kept
   in `hold.Holds`, memory only). The wait runs
   inside the thread's own arrival lock (`messages.messages`), so a later message of the same thread
   queues behind it and opens no second hold. `!stop` inside the held thread or a top-level `!stop`
