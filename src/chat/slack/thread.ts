@@ -581,6 +581,7 @@ function agentSessionsOf(options: SlackChatOptions): AgentSessions {
   if (sessions === undefined) {
     sessions = new AgentSessions(options.slack, {
       clock: options.steady ?? options.clock ?? monotonicClock,
+      initiator: options.identity.ownerUserId,
     });
     agentSessions.set(options, sessions);
   }

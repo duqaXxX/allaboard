@@ -4,6 +4,7 @@ import type { RootStatus } from "../../../../src/chat/seam.ts";
 import {
   AgentSessions,
   SESSION_REFRESH_SECONDS,
+  SESSION_RETRY_SECONDS,
   wantedStatus,
 } from "../../../../src/chat/slack/reply/agent-session.ts";
 import type { Logger } from "../../../../src/log.ts";
@@ -12,6 +13,10 @@ import {
   CHANNEL,
   FakeClock,
   FakeSlack,
+  httpError,
+  networkDown,
+  OWNER,
+  rateLimited,
   rejected,
   THREAD,
 } from "../../../support/fake-slack.ts";
@@ -687,4 +692,80 @@ test("a thread failing with the same code logs once, whatever other threads do",
   );
   assert.equal(log.warnings.length, 1);
   await sessions.close();
+});
+
+function withInitiator() {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sessions = new AgentSessions(slack, {
+    clock,
+    logger: new Lines(),
+    initiator: OWNER,
+  });
+  return { slack, clock, sessions };
+}
+
+const calls = (slack: FakeSlack) => slack.callsTo("agents.sessions.setStatus");
+
+test("setStatus names the owner as the initiator", async () => {
+  const { slack, sessions } = withInitiator();
+  sessions.root(REF, "working");
+  await sessions.close();
+  assert.deepEqual(calls(slack), [
+    { channel_id: CHANNEL, thread_ts: THREAD, status: "processing", initiator_user_id: OWNER },
+  ]);
+});
+
+test("a platform refusal of the initiator is sent again at once without it, and remembered", async () => {
+  const { slack, sessions } = withInitiator();
+  slack.responses["agents.sessions.setStatus"] = [rejected("user_not_in_channel"), { ok: true }];
+  sessions.root(REF, "working");
+  await sessions.close();
+  assert.deepEqual(
+    calls(slack).map((call) => call.initiator_user_id),
+    [OWNER, undefined],
+  );
+  sessions.root(REF, "waiting");
+  await sessions.close();
+  assert.equal(calls(slack).at(-1)?.initiator_user_id, undefined);
+  assert.equal(calls(slack).length, 3);
+});
+
+test("a bot outside the channel marks nothing: both calls fail and the ordinary retry follows", async () => {
+  const { slack, clock, sessions } = withInitiator();
+  slack.responses["agents.sessions.setStatus"] = [
+    rejected("user_not_in_channel"),
+    rejected("not_in_channel"),
+    { ok: true },
+  ];
+  sessions.root(REF, "working");
+  await clock.advance(0);
+  await clock.advance(SESSION_RETRY_SECONDS[0] as number);
+  await sessions.close();
+  assert.deepEqual(
+    calls(slack).map((call) => call.initiator_user_id),
+    [OWNER, undefined, OWNER],
+  );
+});
+
+test("a rate limit or a service error on the creating call is retried with the initiator", async () => {
+  for (const failure of [
+    networkDown(),
+    rateLimited(),
+    rejected("service_unavailable"),
+    rejected("request_timeout"),
+    httpError(),
+  ]) {
+    const { slack, clock, sessions } = withInitiator();
+    slack.responses["agents.sessions.setStatus"] = [failure, { ok: true }];
+    sessions.root(REF, "working");
+    await clock.advance(0);
+    assert.equal(calls(slack).length, 1, "no bare call at once");
+    await clock.advance(SESSION_RETRY_SECONDS[0] as number);
+    await sessions.close();
+    assert.deepEqual(
+      calls(slack).map((call) => call.initiator_user_id),
+      [OWNER, OWNER],
+    );
+  }
 });

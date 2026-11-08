@@ -10,7 +10,7 @@
  * in flight per thread; a bridged clear is a second writer, so it sends the wanted status again.
  * `closed` is never sent: the thread always responds.
  */
-import type { WebClient } from "@slack/web-api";
+import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
 import { getLogger, type Logger } from "../../../log.ts";
 import type { RootStatus, ThreadRef } from "../../seam.ts";
@@ -54,8 +54,19 @@ interface Entry {
   failedCode: string | null; // the code last logged for this entry, until a call succeeds
 }
 
+// Answers about the service, not the call: they say nothing of whether the initiator is accepted.
+const TRANSIENT = [
+  "ratelimited",
+  "internal_error",
+  "fatal_error",
+  "service_unavailable",
+  "request_timeout",
+];
+
 export interface AgentSessionsOptions {
   readonly clock: Clock;
+  /** The user a new session is attributed to (`initiator_user_id`): the owner. Absent: none. */
+  readonly initiator?: string;
   readonly refresh?: number;
   readonly logger?: Logger;
 }
@@ -65,6 +76,9 @@ export class AgentSessions {
   readonly #clock: Clock;
   readonly #refresh: number;
   readonly #log: Logger;
+  readonly #initiator: string | undefined;
+  // Channels whose `initiator_user_id` Slack refused while the call passed without it.
+  readonly #bare = new Set<string>();
   readonly #entries = new Map<string, Entry>();
   // Every drain in flight, entries dropped meanwhile included, for `close`.
   readonly #draining = new Set<Promise<void>>();
@@ -78,6 +92,7 @@ export class AgentSessions {
     this.#clock = options.clock;
     this.#refresh = options.refresh ?? SESSION_REFRESH_SECONDS;
     this.#log = options.logger ?? logger;
+    this.#initiator = options.initiator;
   }
 
   /** The root status of the thread changed (`null`: no status). */
@@ -244,11 +259,7 @@ export class AgentSessions {
   async #send(entry: Entry, status: SessionState): Promise<"sent" | "failed" | "gone"> {
     const { channel, thread } = entry.ref;
     try {
-      await this.#slack.agents.sessions.setStatus({
-        channel_id: channel,
-        thread_ts: thread,
-        status,
-      });
+      await this.#set(entry.ref, status);
       entry.failedCode = null;
       this.#proven = true;
       return "sent";
@@ -260,6 +271,34 @@ export class AgentSessions {
       entry.failedCode = code;
       if (SESSION_REFUSED.includes(code)) this.#refused = true;
       return gone(error) ? "gone" : "failed";
+    }
+  }
+
+  /**
+   * One `setStatus`, attributed to the initiator while Slack takes that: a call that carried
+   * it and was refused by an answer of Slack's (it requires the user to be in the channel) is sent
+   * again at once without it; the channel is remembered as initiator-less when that passes. A
+   * transient failure marks nothing and takes the ordinary retry. Status never depends on it.
+   */
+  async #set(ref: ThreadRef, status: SessionState): Promise<void> {
+    const call = { channel_id: ref.channel, thread_ts: ref.thread, status };
+    const initiator = this.#initiator;
+    if (initiator === undefined || this.#bare.has(ref.channel)) {
+      await this.#slack.agents.sessions.setStatus(call);
+      return;
+    }
+    try {
+      await this.#slack.agents.sessions.setStatus({ ...call, initiator_user_id: initiator });
+    } catch (first) {
+      // A transient failure takes the ordinary retry, which still carries the initiator: only an
+      // answer that refuses the call itself sends it again without.
+      if (!(first instanceof WebAPIPlatformError) || TRANSIENT.includes(describe(first)))
+        throw first;
+      await this.#slack.agents.sessions.setStatus(call);
+      this.#bare.add(ref.channel);
+      this.#log.warning(
+        `agents.sessions.setStatus without initiator on ${ref.channel}: ${describe(first)}`,
+      );
     }
   }
 

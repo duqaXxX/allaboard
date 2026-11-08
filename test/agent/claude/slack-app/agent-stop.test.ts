@@ -58,7 +58,7 @@ test("the owner's Stop asks the core to stop, and a session with nothing to stop
   assert.equal(response.status, 200);
   assert.deepEqual(seen.stops, [REF]);
   assert.deepEqual(sessionCalls(world), [
-    { channel_id: CHANNEL, thread_ts: THREAD, status: "active" },
+    { channel_id: CHANNEL, thread_ts: THREAD, status: "active", initiator_user_id: OWNER },
   ]);
 });
 
