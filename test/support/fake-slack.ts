@@ -373,6 +373,8 @@ export class FakeSlack extends WebClient {
    */
   gate: AsyncEvent | null = null;
   gateMethod = GATE_DEFAULT;
+  /** Narrows the gate to the calls of `gateMethod` whose arguments it accepts; all when absent. */
+  gateWhen: ((args: Record<string, unknown>) => boolean) | null = null;
   /** Roots deleted before a post into their thread: Slack answers `ok` and posts outside it (#221). */
   readonly goneRoots = new Set<string>();
   gated = new AsyncEvent();
@@ -493,9 +495,14 @@ export class FakeSlack extends WebClient {
     // Bound to `filesUploadV2` by the client itself: its inner calls come back through here.
     if (method === "files.uploadV2") return super.apiCall(method, options);
     if (this.delay) await sleep(this.delay * 1000);
-    if (this.gate !== null && method === this.gateMethod) {
+    const gate = this.gate;
+    if (
+      gate !== null &&
+      method === this.gateMethod &&
+      (this.gateWhen === null || this.gateWhen(options))
+    ) {
       this.gated.set();
-      await this.gate.wait();
+      await gate.wait();
     }
     const args = normalise(options);
     this.apiCalls.push({ method, args });

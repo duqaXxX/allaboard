@@ -471,7 +471,10 @@ from `SlackThread.ask` once each request is in the thread, its link the permalin
 A request is deleted once it is answered or stale, and Slack answers the link of a deleted
 message with a dialog, "We're unable to open this link". When `SlackThread.withdraw` deletes the
 request a line links, `ChannelLine.withdrawn` edits that line to link the thread's root, its word
-unchanged.
+unchanged. After any deleted request of a channel with a line, `ChannelLine.withdrawn` also reads
+the threads again and edits the line to their status when it differs: a request answered or
+stopped before its post returned is never recorded in `state.json`, so no other write would take
+its `✋ Waiting:` back.
 
 The line starts with `Status:`. While a thread of the channel waits for the owner's answer to
 the agent (its root waits with an approval or a question open, `channel-line.lineThread` through

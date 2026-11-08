@@ -40,6 +40,7 @@ import type { ChatInbound } from "../../src/chat/seam.ts";
 import type { AppConfig } from "../../src/chat/slack/app/answers.ts";
 import { type BuiltApp, buildApp } from "../../src/chat/slack/app/app.ts";
 import { ChannelGuard, type Identity } from "../../src/chat/slack/app/guards.ts";
+import { ChannelLine, lineThread } from "../../src/chat/slack/channel-line.ts";
 import type { DeleteRefusal, PinnedRefusal } from "../../src/chat/slack/delete.ts";
 import { HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
 import { Home } from "../../src/chat/slack/home.ts";
@@ -203,6 +204,8 @@ export interface WorldOptions {
   readonly listings?: Listings;
   /** The update of the daemon, when the test is about it; none otherwise. */
   readonly updates?: Updates;
+  /** The channel's line, wired to the state as the Slack module wires it; none otherwise. */
+  readonly line?: true;
 }
 
 export class World {
@@ -305,6 +308,18 @@ export class World {
       limiter: this.limiter,
       clock: this.slackClock,
       ...(options.channelReader !== undefined && { channelReader: options.channelReader }),
+      ...(options.line === true && {
+        line: new ChannelLine(slack, {
+          botUserId: this.identity.botUserId,
+          threads: {
+            channels: () => this.state.channels(),
+            of: (channel) =>
+              [...(this.state.channel(channel)?.threads ?? [])].map(([thread, entry]) =>
+                lineThread(thread, entry),
+              ),
+          },
+        }),
+      }),
     });
     this.sessions = new SessionManager({
       chat: this.chat,
@@ -593,6 +608,11 @@ export function worldFor(t: TestContext): ((options?: WorldOptions) => World) & 
 /** One bound world for the test. */
 export function worldOf(t: TestContext): World {
   return worldFor(t)();
+}
+
+/** A bound world whose Slack provider draws the channel's line. */
+export function lineWorld(t: TestContext): World {
+  return worldFor(t)({ line: true });
 }
 
 /**
