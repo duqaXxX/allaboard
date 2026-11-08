@@ -128,11 +128,8 @@ export const FILTER_ACTIONS = [
   TAG_ACTION,
   SEARCH_ACTION,
 ] as const;
-// A blank row between two sessions: a context line that holds a zero-width space, since Slack
-// sets the distance between blocks itself and takes no empty text.
-export const SPACER = "​";
-// A session is a title, a line of details and the blank row above it.
-export const CARD_BLOCKS = 3;
+// A session is a title and a line of details; Slack sets the distance between blocks itself.
+export const CARD_BLOCKS = 2;
 export const ALL = "all";
 export const SEARCH_LIMIT = 80;
 // A select option's text holds 75 characters (option object reference).
@@ -511,10 +508,10 @@ function context(text: string): Block {
   return { ...contextBlock(text) };
 }
 
-function deletingLine(count: number, names: Names): string {
+function deletingLine(count: number): string {
   return count === 1
-    ? named(slackTexts.HOME_DELETING_ONE, names)
-    : texts.fill(named(slackTexts.HOME_DELETING_MANY, names), { count });
+    ? slackTexts.HOME_DELETING_ONE
+    : texts.fill(slackTexts.HOME_DELETING_MANY, { count });
 }
 
 function cleaningLine(count: number, names: Names): string {
@@ -621,25 +618,19 @@ function cleanButton(channelId: string, channelName: string): Block {
 
 interface ChannelHeaderOptions {
   editing: boolean;
-  deleting?: number;
   name?: string;
   canClean?: boolean;
   cleaning?: boolean;
 }
 
 /**
- * A channel's name, with how many of its threads are being deleted beside it: the rows that say
- * so can be among those the channel does not show. Its button is New thread, and in edit mode
+ * A channel's name. Its button is New thread, and in edit mode
  * Clean up, which gives way to a note while the channel is being cleaned.
  */
 function channelHeader(teamId: string, channelId: string, options: ChannelHeaderOptions): Block {
-  const { editing, deleting = 0, name = "", canClean = false, cleaning = false } = options;
+  const { editing, name = "", canClean = false, cleaning = false } = options;
   let text = `*<#${channelId}>*`;
   if (cleaning) text += `   ${slackTexts.HOME_CHANNEL_CLEANING}`;
-  if (deleting === 1) text += `   ${slackTexts.HOME_CHANNEL_DELETING_ONE}`;
-  else if (deleting) {
-    text += `   ${texts.fill(slackTexts.HOME_CHANNEL_DELETING_MANY, { count: deleting })}`;
-  }
   const head: Block = { type: "section", text: { type: "mrkdwn", text } };
   if (!editing) {
     head.accessory = linkButton(
@@ -760,7 +751,7 @@ export interface HomeViewOptions {
  * `canRefresh` Refresh beside it; in `editing` each session
  * that is not in use carries Delete and no channel carries New thread. `notices` are the lines
  * the deletes that did not end and the clean-ups left, under the header; `deleting` is how many
- * threads are being deleted or wait for it, said in a line of full size under the header, since a
+ * threads are being deleted or wait for it, said in one small line under the header, since a
  * row that says so can be one of those a channel does not show.
  */
 export function homeView(
@@ -778,8 +769,8 @@ export function homeView(
     header(dateToken(Math.trunc(now.getTime() / 1000), "time"), canEdit || canRefresh),
     ...controlsRow(editing, canEdit, canRefresh),
     ...(options.update ? [updateLine(options.update)] : []),
-    ...(deleting ? [section(deletingLine(deleting, names))] : []),
-    ...(cleaning.size > 0 ? [section(cleaningLine(cleaning.size, names))] : []),
+    ...(deleting ? [context(deletingLine(deleting))] : []),
+    ...(cleaning.size > 0 ? [context(cleaningLine(cleaning.size, names))] : []),
     ...[...(options.notices ?? [])].slice(0, NOTICES_SHOWN).map(context),
   ];
   if (channels.size === 0)
@@ -802,11 +793,6 @@ export function homeView(
   }
   if (groups.size === 0) blocks.push(context(slackTexts.HOME_NO_MATCH));
   const withSessions = new Set(rows.map((row) => row.channelId));
-  // Counted over every session of the channel, shown or not, whatever the filters.
-  const going = new Map<string, number>();
-  for (const row of rows) {
-    if (row.deleting) going.set(row.channelId, (going.get(row.channelId) ?? 0) + 1);
-  }
   // Pinned sessions first, each kind newest first (the rows are): a channel with no filter but the
   // period shows every pinned session and the newest `PER_CHANNEL` of the others.
   const wanted = new Map<string, HomeRow[]>();
@@ -828,16 +814,12 @@ export function homeView(
       { type: "divider" },
       channelHeader(teamId, channelId, {
         editing,
-        deleting: going.get(channelId) ?? 0,
         name,
         canClean,
         cleaning: cleaning.has(channelId),
       }),
     );
-    cards.slice(0, room).forEach((row, index) => {
-      if (index) blocks.push(context(SPACER));
-      blocks.push(...card(row, name, editing, names));
-    });
+    for (const row of cards.slice(0, room)) blocks.push(...card(row, name, editing, names));
     shown += Math.min(cards.length, room);
     if (cards.length > room) break;
     if (found.length === 0) {

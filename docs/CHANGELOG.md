@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- The Home tab is denser (#224): no blank row between two sessions (`home.SPACER` is gone and
+  `home.CARD_BLOCKS` is 2, so about 45 sessions fit under Slack's 100 blocks where 32 did), the notice
+  of threads being deleted is one small line (`Deleting 2 threads, one at a time, about a minute each.`), and a
+  channel's header no longer carries a deleting count. A row still reads `deleting…`.
+
 ### Fixed
 
 - The tests no longer leave their scratch folders in the temp directory (about 100,000 had piled up).
