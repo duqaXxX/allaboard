@@ -36,6 +36,9 @@ const FULL_GUIDE = [
   "**Going back**",
   "`!rewind`, sent inside a session's thread, lists the session's prompts. Pick one to restore the code to how it was when you sent it, the conversation to before it, or both; the replies you went back over stay in the thread, folded under **Removed by rewind**, and the prompt is posted again to send. It waits until nothing runs.",
   "",
+  "**Next prompt**",
+  "`!next`, sent inside a session's thread, shows the prompt Plain suggests after a turn, with **Send** and **Cancel**: **Send** sends those words as your own prompt. The suggestion is forgotten when you send a prompt, a `!!` command or a command for Plain, when a turn starts, or when the session closes.",
+  "",
   "**Bypass**",
   "`!bypass on`, sent inside a session's thread, lets Plain run every tool without asking in that session, until `!bypass off`; a restart of allaboard keeps it. The footer shows ⚡ bypass while it is on.",
   "",
@@ -95,6 +98,7 @@ const SESSIONS = line("`!status` typed in the channel");
 const FILES = ["**Files**", line("`!open`, sent inside")];
 const CHANGES = ["**Changes**", line("`!diff`, sent inside")];
 const REWIND = ["**Going back**", line("`!rewind`, sent inside")];
+const NEXT = ["**Next prompt**", line("`!next`, sent inside")];
 const BYPASS = ["**Bypass**", line("`!bypass on`")];
 const PLAN = ["**Plan mode**", line("`!plan`, sent inside")];
 const TAGS = ["**Tags**", line("`!tag <name>`, sent inside")];
@@ -235,6 +239,12 @@ test("without diff the Changes section is gone", () => {
 test("without rewind the Going back section is gone", () => {
   const { removed, added } = difference(linesOf({ rewind: false }));
   assert.deepEqual(removed, REWIND);
+  assert.deepEqual(added, []);
+});
+
+test("without next the Next prompt section is gone", () => {
+  const { removed, added } = difference(linesOf({ next: false }));
+  assert.deepEqual(removed, NEXT);
   assert.deepEqual(added, []);
 });
 

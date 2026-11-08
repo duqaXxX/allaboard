@@ -531,6 +531,18 @@ export const CLAIMS: readonly Claim[] = [
       "starts a turn. Read `docs/sdk-surface.md` for the rows that name it",
   ),
   claim(
+    "P47",
+    "model",
+    "a session started as the daemon starts it (`promptSuggestions` on) says no next prompt " +
+      "after its first turn and, after a second one that changed a file, yields a " +
+      "`prompt_suggestion` record with text a few seconds at most after the turn's `result`",
+    "src/agent/claude/session.ts#ClaudeSession",
+    "in a thread ask Claude to create a file, then to change it, and send `!next` after the " +
+      "second reply: it offers the words Claude Code shows grey in the terminal. If it says no " +
+      "suggestion yet, look for `promptSuggestions` in `ClaudeSession.#options` and read " +
+      "`docs/limits.md` for the row on the suggested next prompt",
+  ),
+  claim(
     "L1",
     "limit",
     "the Bash tool of a session started as the daemon starts it, with no `BASH_DEFAULT_TIMEOUT_MS`, " +

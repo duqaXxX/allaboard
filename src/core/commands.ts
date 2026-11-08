@@ -68,6 +68,11 @@ export interface Rewind {
   readonly kind: "rewind";
 }
 
+/** `!next`: the agent's suggested next prompt, offered to send. */
+export interface Next {
+  readonly kind: "next";
+}
+
 /** `!terminal`: the session moves to a terminal on the host, a running turn with it. */
 export interface Terminal {
   readonly kind: "terminal";
@@ -158,6 +163,7 @@ export type Word =
   | Fork
   | Diff
   | Rewind
+  | Next
   | Resume
   | Open
   | Tag
@@ -186,6 +192,7 @@ export const WORD = {
   fork: "fork",
   diff: "diff",
   rewind: "rewind",
+  next: "next",
   resume: "resume",
   open: "open",
   tag: "tag",
@@ -293,6 +300,8 @@ export function parseBang(text: string, bare: string = text): Command | null {
     case "rewind":
       // The terminal's `/rewind` takes no argument either.
       return rest === "" ? { kind: "rewind" } : invalid(word);
+    case "next":
+      return rest === "" ? { kind: "next" } : invalid(word);
     case "resume":
       return { kind: "resume", target: named };
     case "open":

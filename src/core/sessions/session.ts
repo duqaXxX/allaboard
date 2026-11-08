@@ -78,6 +78,7 @@ import type {
   RunningList,
   SessionStatus,
   ThreadChat,
+  ThreadRef,
 } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
 import { blank, strip } from "../../text.ts";
@@ -108,6 +109,7 @@ import { type Choice, DEFAULT } from "../setup.ts";
 import { runShell, shellHead } from "../shell.ts";
 import type { PendingCut } from "../state.ts";
 import { endsWork } from "../status.ts";
+import type { Suggestions } from "../suggestions.ts";
 import * as texts from "../texts.ts";
 import { TurnChanges, type TurnEdits } from "./changes.ts";
 import {
@@ -570,6 +572,8 @@ export class ThreadSession {
   private readonly names: texts.Names;
   /** The agent's tools the terminal shows in words of its own. */
   private readonly previews: Previews;
+  /** The agent's last guess at the next prompt (`!next`): the manager's, or the session's own. */
+  private readonly suggestions: Suggestions;
   // Tasks whose start the agent had no capability for, by the capability: their later events
   // are ignored with them.
   private readonly refusedTasks = new Map<string, string>();
@@ -583,7 +587,9 @@ export class ThreadSession {
       readonly predecessor?: Event | null;
       /** True once the manager is closed: a stop has begun. */
       readonly stopped?: () => boolean;
-    } = {},
+      /** The store the thread's suggestion is held in; the manager's, shared with the flows. */
+      readonly suggestions: Suggestions;
+    },
   ) {
     this.channelId = channelId;
     this.threadId = threadId;
@@ -595,6 +601,7 @@ export class ThreadSession {
     this.previews = new Previews(deps.agent.tools);
     this.thread = deps.chat.thread({ channel: channelId, thread: threadId });
     this.predecessor = options.predecessor ?? null;
+    this.suggestions = options.suggestions;
     this.settled.set();
     this.noTurn.set();
     this.nativeMode = deps.agent.capabilities.permissionModes.default;
@@ -603,6 +610,10 @@ export class ThreadSession {
 
   private get where(): string {
     return `${this.channelId}/${this.threadId}`;
+  }
+
+  private get ref(): ThreadRef {
+    return { channel: this.channelId, thread: this.threadId };
   }
 
   /** False for a bare `!fork` copy in which no turn of any kind has started (`fork_of.ran`). */
@@ -2437,6 +2448,7 @@ export class ThreadSession {
    * let its process exit on its own first (`AgentSession.close`). Never throws.
    */
   private async disconnect(client: AgentSession, awaitExit: boolean): Promise<void> {
+    this.suggestions.clear(this.ref);
     try {
       const { unsaved } = await client.close({ awaitExit });
       if (unsaved !== null && !this.reportedClients.has(client)) {
@@ -2805,6 +2817,8 @@ export class ThreadSession {
         return declared.declaredState ? null : "declaredState";
       case "limits_changed":
         return declared.usageLimits ? null : "usageLimits";
+      case "next_prompt":
+        return declared.nextPrompts ? null : "nextPrompts";
       case "message_saved":
         return declared.foreignTurns ? null : "foreignTurns";
       case "model_changed":
@@ -2841,6 +2855,10 @@ export class ThreadSession {
     switch (event.type) {
       case "limits_changed":
         this.usage?.invalidate();
+        return;
+      case "next_prompt":
+        // Held only while no turn runs and no prompt is owed: else it belongs to a turn before.
+        if (!this.busy && !this.promptOwed()) this.suggestions.hold(this.ref, event.text);
         return;
       case "prompt_taken":
         // Known or not (a prompt a guess already settled is no longer sent): the turn it
@@ -4028,6 +4046,8 @@ export class ThreadSession {
   }
 
   private async startTurn(worded: boolean, run = false): Promise<ActiveTurn> {
+    // A turn of any kind, the agent's own included, outdates the last guess.
+    this.suggestions.clear(this.ref);
     // Skipped while `stop()` is still winding an interrupt down (`finish` clears the flag once
     // that very turn's own end says so): this can be that turn's own trailing events, not a
     // new one, and `stop()`'s own ✅ must stand. `read` raises it too, while it settles a lost

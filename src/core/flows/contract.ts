@@ -159,10 +159,19 @@ export interface PicksFlow {
   picked(pick: Extract<ListPick, { type: "folder" | "session" }>): Promise<void>;
 }
 
+/** `!next`. */
+export interface NextFlow {
+  /** `!next` typed in the thread of `session`: offers the held suggestion, or says there is none. */
+  word(ref: ThreadRef, session: ThreadSession): Promise<void>;
+  /** Cancel removes the offer; Send sends the held text as a typed prompt if the ids match, else says so. */
+  picked(pick: Extract<ListPick, { type: "suggestion" }>): Promise<void>;
+}
+
 /** A message the owner wrote. */
 export interface MessagesFlow {
   /** As `ChatInbound.message`. */
   message(message: InboundMessage): Promise<void>;
+  suggestionPicked: NextFlow["picked"];
 }
 
 /** What the message flow calls of the others. */

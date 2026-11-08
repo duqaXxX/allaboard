@@ -387,6 +387,8 @@ export interface WorldOptions {
   readonly suggests?: boolean;
   /** The chat posts lists in a thread and shares files into it (`threadLists`, `ThreadChat.share`). */
   readonly diff?: boolean;
+  /** The chat posts lists in a thread (`threadLists`): what `!next` offers its suggestion in. */
+  readonly lists?: boolean;
   /** The chat posts lists in a thread and folds a message into its title (`threadLists`, `messageFold`). */
   readonly rewind?: boolean;
   /** With `rewind`: the chat folds no message (`messageFold` false). */
@@ -525,7 +527,7 @@ export class MessagesWorld {
       earlier?.chat ??
       memoryChat({
         suggestions: options.suggests ?? false,
-        lists: (options.diff ?? false) || (options.rewind ?? false),
+        lists: (options.diff ?? false) || (options.rewind ?? false) || (options.lists ?? false),
         files: options.diff ?? false,
         folds: (options.rewind ?? false) && options.noFold !== true,
         ...(options.fileLimit !== undefined && { fileLimit: options.fileLimit }),

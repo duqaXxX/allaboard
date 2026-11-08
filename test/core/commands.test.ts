@@ -244,6 +244,7 @@ test("the guide and the help explain every word of the daemon", () => {
     "open",
     "diff",
     "rewind",
+    "next",
     "tag",
     "untag",
     "delete-thread",
@@ -273,6 +274,9 @@ test("rewind parses alone and refuses a request after it", () => {
   assert.deepEqual(parseBang("!rewind"), { kind: "rewind" });
   assert.deepEqual(parseBang("!REWIND"), { kind: "rewind" });
   assert.deepEqual(parseBang("!rewind 3"), invalidOf("rewind"));
+  assert.deepEqual(parseBang("!next"), { kind: "next" });
+  assert.deepEqual(parseBang("!NEXT"), { kind: "next" });
+  assert.deepEqual(parseBang("!next now"), invalidOf("next"));
 });
 
 test("guide parses", () => {

@@ -37,6 +37,8 @@ export function buildFlows(deps: FlowDeps): Built {
   };
   const inFlight = new InFlight();
   const all = messages(deps, talk, flows, inFlight);
+  // A suggestion that arrives while a prompt of the thread is on its way belongs to the turn before.
+  deps.sessions.suggestions.promptOnItsWay = (ref) => inFlight.has(ref);
   // A failure after the provider's checks reaches the owner in the channel of the offer; a click
   // on the chat's own page has none, and that page shows the state.
   const updatePicked = (pick: Extract<ListPick, { type: "update" }>): Promise<void> => {
@@ -60,6 +62,7 @@ export function buildFlows(deps: FlowDeps): Built {
       picked: (pick) => {
         if (pick.type === "update") return updatePicked(pick);
         if (pick.type === "diff-file" || pick.type === "diff-view") return diff.picked(pick);
+        if (pick.type === "suggestion") return all.suggestionPicked(pick);
         if (pick.type === "rewind-point" || pick.type === "rewind-action") {
           return rewind.picked(pick);
         }

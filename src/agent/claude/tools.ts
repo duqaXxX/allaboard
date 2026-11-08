@@ -49,6 +49,7 @@ export const TOOL_NAMES: readonly string[] = Object.freeze([
   "TaskStop",
   "TaskUpdate",
   "TodoWrite",
+  "ToolSearch",
   "WebFetch",
   "WebSearch",
   "Workflow",

@@ -16,6 +16,7 @@ export const EVERYTHING_OFFERED: GuideOffer = {
   fileUpload: true,
   diff: true,
   rewind: true,
+  next: true,
   threadTags: true,
   threadPins: true,
   threadDelete: true,

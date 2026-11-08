@@ -32,6 +32,8 @@ export interface GuideOffer {
   readonly diff: boolean;
   /** The agent goes back to a prompt and the chat shows lists in a thread (`!rewind`). */
   readonly rewind: boolean;
+  /** The agent suggests a next prompt and the chat shows lists in a thread (`!next`). */
+  readonly next: boolean;
   /** The chat tags a thread (`threadTags`). */
   readonly threadTags: boolean;
   /** The chat pins a thread (`threadPins`). */
@@ -99,6 +101,7 @@ export function guideText(names: Names, offered: GuideOffer): string {
     ...(offered.fileUpload ? [say(texts.GUIDE_FILES)] : []),
     ...(offered.diff ? [say(texts.GUIDE_DIFF)] : []),
     ...(offered.rewind ? [say(texts.GUIDE_REWIND)] : []),
+    ...(offered.next ? [say(texts.GUIDE_NEXT)] : []),
     ...(offered.bypass ? [say(texts.GUIDE_BYPASS)] : []),
     ...(offered.plan ? [say(texts.GUIDE_PLAN)] : []),
     ...(offered.threadTags ? [say(texts.GUIDE_TAGS)] : []),

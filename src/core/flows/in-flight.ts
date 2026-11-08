@@ -49,6 +49,14 @@ export class InFlight {
     return entry.ticket;
   }
 
+  /** Whether a prompt of `ref`'s thread is on its way (synchronous). */
+  has(ref: ThreadRef): boolean {
+    return [...this.#tickets].some(
+      ({ ticket, channelOnly }) =>
+        !channelOnly && ticket.ref.channel === ref.channel && ticket.ref.thread === ref.thread,
+    );
+  }
+
   /** Aborts every ticket of one thread, now; returns how many it aborted. */
   abortThread(ref: ThreadRef): number {
     return this.#abort(

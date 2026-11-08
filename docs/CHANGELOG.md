@@ -32,6 +32,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `!next`, typed in a session's thread, shows the prompt the agent suggests after a turn with **Send** and
+  **Cancel**; **Send** sends the shown words as the owner's own prompt, by the path of a typed message.
+  The session is started with the SDK's `promptSuggestions`, `Capabilities.nextPrompts` and the
+  `next_prompt` session event (said after the turn's end) are new on the agent seam, and
+  `ThreadList` and `ListPick` gain a `suggestion` variant. The guess lives in memory only, apart from the
+  session object, and is dropped by a message of the owner's, a turn or a close; an offer made earlier
+  carries a fresh id and is refused when it no longer matches. Probe claim P47 checks that a second turn
+  yields one suggestion (#151).
 - Saved copies of attached files older than 3 days are also removed every 6 hours while the daemon runs (`attachments.sweepEvery`, `SWEEP_EVERY_SECONDS`), not only at start, under the same rules: a private folder only, by mtime, errors per file ignored.
 - A `!fork` with no prompt no longer starts the copy's process: the first message with text sent in
   the copy's thread names it through the live session (`AgentSession.rename`, `Capabilities.sessionRename`;

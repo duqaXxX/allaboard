@@ -7,6 +7,7 @@ import type { ListedSession, Repository, SavedMessage } from "../../agent/seam.t
 import type { ThreadChat, ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import { bindableFolders } from "../folders.ts";
+import { Suggestions } from "../suggestions.ts";
 import * as texts from "../texts.ts";
 import { DRAIN_POLL_SECONDS } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
@@ -30,6 +31,7 @@ export class SessionManager {
   private readonly deps: SessionDeps;
   private readonly names: texts.Names;
   private readonly sessions = new Map<string, ThreadSession>();
+  readonly suggestions = new Suggestions();
   // The goal of a thread whose session object closed and left: the agent keeps a goal across a
   // close and the resume that follows, and says nothing of it until its next check, so the
   // object built next is handed it.
@@ -151,6 +153,7 @@ export class SessionManager {
       const built = new ThreadSession(channelId, threadId, directory, this.deps, {
         predecessor,
         stopped: () => this.closed,
+        suggestions: this.suggestions,
       });
       built.draining = this.draining;
       built.goal = goal;

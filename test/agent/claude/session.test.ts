@@ -168,6 +168,8 @@ test(
     assert.equal(options.allowDangerouslySkipPermissions, true);
     // The checkpoints `!rewind` restores the files from.
     assert.equal(options.enableFileCheckpointing, true);
+    // The agent's guess at the next prompt, which `!next` offers (#151).
+    assert.equal(options.promptSuggestions, true);
     assert.deepEqual(options.extraArgs, { "replay-user-messages": null });
     assert.deepEqual(Object.keys(options).sort(), [
       "allowDangerouslySkipPermissions",
@@ -178,6 +180,7 @@ test(
       "extraArgs",
       "hooks",
       "includePartialMessages",
+      "promptSuggestions",
       // No `sessionStore`: the SDK refuses one beside `enableFileCheckpointing` at `query()`
       // (SDK 0.3.312), which failed every start; the transcript is read instead.
       "settingSources",

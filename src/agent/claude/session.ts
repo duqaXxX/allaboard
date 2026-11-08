@@ -407,6 +407,9 @@ export class ClaudeSession implements AgentSession {
         // A checkpoint of the files at each prompt, which `!rewind` puts back (a session started
         // without it has none to restore). Every session of a thread is started with it.
         enableFileCheckpointing: true,
+        // The agent's guess at the next prompt after each turn, which `!next` offers (#151). The
+        // owner's `promptSuggestionEnabled: false` setting still switches it off.
+        promptSuggestions: true,
         allowDangerouslySkipPermissions: true,
         systemPrompt: SYSTEM_PROMPT,
         toolConfig: TOOL_CONFIG,
@@ -571,6 +574,8 @@ export class ClaudeSession implements AgentSession {
    * a hook, a replay or a stream event may come before the `running` of a turn that opens.
    */
   #observe(record: unknown): void {
+    // A suggestion opens no turn: it comes after the `result`, and the close may be waiting.
+    if (isRecord(record) && record.type === "prompt_suggestion") return;
     if (!isRecord(record) || record.type !== "system") {
       this.#cutWait?.();
       return;

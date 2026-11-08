@@ -57,4 +57,6 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   advisor: true,
   // `memoryFiles` and `skills` of `getContextUsage`.
   loadedContext: true,
+  // The SDK's `promptSuggestions` option and its `prompt_suggestion` message.
+  nextPrompts: true,
 });

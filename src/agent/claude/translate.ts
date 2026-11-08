@@ -457,6 +457,12 @@ function sessionState(_memory: Memory, record: WireRecord): SessionEvent[] {
   return state === undefined ? [] : [{ type: "state_changed", state }];
 }
 
+/** The agent's guess at the next prompt; one with no text shows nothing. */
+function promptSuggestion(_memory: Memory, record: WireRecord): SessionEvent[] {
+  const text = strip(string(record.suggestion) ?? "");
+  return text === "" ? [] : [{ type: "next_prompt", text }];
+}
+
 function compactBoundary(_memory: Memory, record: WireRecord): SessionEvent[] {
   const metadata = isRecord(record.compact_metadata) ? record.compact_metadata : {};
   return [
@@ -648,6 +654,7 @@ function result(memory: Memory, record: WireRecord): SessionEvent[] {
 
 const HANDLERS = {
   assistant,
+  prompt_suggestion: promptSuggestion,
   rate_limit_event: rateLimit,
   result,
   "stream_event:content_block_delta": contentBlockDelta,

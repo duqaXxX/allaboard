@@ -178,6 +178,8 @@ export interface Capabilities {
    * refused.
    */
   readonly loadedContext: boolean;
+  /** `next_prompt`: the agent guesses the next prompt after a turn. Without it `!next` is not offered. */
+  readonly nextPrompts: boolean;
 }
 
 /** A process that holds a session open, as `AgentBackend.sessionHolders` lists it. */
@@ -797,6 +799,11 @@ export type SessionEvent =
   | { readonly type: "folder_changed"; readonly folder: string }
   /** The cached usage limits are stale. */
   | { readonly type: "limits_changed" }
+  /**
+   * The agent's guess at the owner's next prompt, non-empty. Said after the `turn_ended` of the
+   * turn it follows and before the next turn's first event, once per turn at most (the core relies on it).
+   */
+  | { readonly type: "next_prompt"; readonly text: string }
   /**
    * The goal of the session: set, checked and not met yet (the agent goes on working for it),
    * achieved, or cleared by the owner. A set goal outlives a stopped turn and a restart; the

@@ -42,10 +42,13 @@ import {
   DIFF_FILE_ACTION,
   DIFF_VIEW_ACTION,
   fileValue,
+  NEXT_CANCEL_ACTION,
+  NEXT_SEND_ACTION,
   pointValue,
   REWIND_ACTIONS,
   REWIND_POINT_ACTION,
   rewindActionId,
+  suggestionValue,
   viewValue,
 } from "../../../../src/chat/slack/lists.ts";
 import { OPEN_FILE_ACTIONS } from "../../../../src/chat/slack/openfile/search.ts";
@@ -539,6 +542,36 @@ const CASES: readonly Case[] = [
       };
     },
   })),
+  {
+    listener: `action ${NEXT_SEND_ACTION}`,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          clickIn(NEXT_SEND_ACTION, suggestionValue("other-session", "id-1"), CHANNEL, THREAD, {
+            messageTs: THREAD,
+          }),
+          sender,
+        ),
+        acted: () => JSON.stringify(world.slack.apiCalls).includes(coreTexts.NEXT_NOT_SENT),
+      };
+    },
+  },
+  {
+    listener: `action ${NEXT_CANCEL_ACTION}`,
+    arrange: async (world, sender) => {
+      world.state.openThread(CHANNEL, THREAD, SESSION_A);
+      return {
+        body: sentBy(
+          clickIn(NEXT_CANCEL_ACTION, suggestionValue("other-session", "id-1"), CHANNEL, THREAD, {
+            messageTs: THREAD,
+          }),
+          sender,
+        ),
+        acted: () => world.slack.callsTo("chat.delete").length > 0,
+      };
+    },
+  },
   {
     listener: `action ${UPDATE_ACTION}`,
     updating: true,

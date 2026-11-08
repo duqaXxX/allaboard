@@ -15,7 +15,7 @@ import { BypassUnavailable, PlanUnavailable } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
-import type { ForkFlow, OtherFlows } from "./contract.ts";
+import type { ForkFlow, NextFlow, OtherFlows } from "./contract.ts";
 import type { InFlight, Ticket } from "./in-flight.ts";
 import { channelStatus } from "./status.ts";
 import { type FlowDeps, logger, type Talk } from "./talk.ts";
@@ -95,6 +95,9 @@ export function unservedWords(deps: FlowDeps, others: OtherFlows): ReadonlySet<s
   ) {
     unserved.add(WORD.rewind);
   }
+  if (!chat.capabilities.threadLists || !agent.capabilities.nextPrompts) {
+    unserved.add(WORD.next);
+  }
   if (!chat.capabilities.threadTags) {
     unserved.add(WORD.tag);
     unserved.add(WORD.untag);
@@ -173,7 +176,13 @@ export function inboundStop(
   };
 }
 
-export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: ForkFlow): WordFlow {
+export function wordFlow(
+  deps: FlowDeps,
+  talk: Talk,
+  others: OtherFlows,
+  fork: ForkFlow,
+  next: NextFlow,
+): WordFlow {
   const { chat, agent, sessions, state, names } = deps;
   const status = channelStatus(deps, talk);
   const stopThread = threadStop(deps, talk);
@@ -258,6 +267,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           fileUpload: chat.capabilities.fileUpload,
           diff: !unserved.has(WORD.diff),
           rewind: !unserved.has(WORD.rewind),
+          next: !unserved.has(WORD.next),
           threadTags: chat.capabilities.threadTags,
           threadPins: chat.capabilities.threadPins,
           threadDelete: chat.capabilities.threadDelete,
@@ -389,6 +399,13 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows, fork: F
           await talk.inChannel(channel, texts.REWIND_TOP_LEVEL);
         } else {
           await others.rewind.word(ref, session);
+        }
+        return;
+      case "next":
+        if (session === null) {
+          await talk.inChannel(channel, texts.NEXT_TOP_LEVEL);
+        } else {
+          await next.word(ref, session);
         }
         return;
       case "terminal":

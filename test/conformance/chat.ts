@@ -122,6 +122,8 @@ export interface Person {
   picksPoint(listed: ThreadListed, promptId: string): Promise<void>;
   /** Uses the control of `action` in the actions of a rewind list offered in a thread. */
   picksAction(listed: ThreadListed, action: RewindAction): Promise<void>;
+  /** Uses Send (`send` true) or Cancel of a suggestion offered in a thread (`!next`). */
+  picksSuggested(listed: ThreadListed, send: boolean): Promise<void>;
   /**
    * Deletes the message `said` (the first message of a thread when its id is the thread's own),
    * the way the chat lets a person delete one.
@@ -395,6 +397,13 @@ const REWIND_ACTIONS: ThreadList = {
   point: { id: "prompt-2", text: "fix the second bug" },
   files: { count: 2, insertions: 3, deletions: 1 },
   conversation: true,
+};
+
+const SUGGESTION: ThreadList = {
+  type: "suggestion",
+  session: "session-1",
+  id: "suggestion-1",
+  text: "commit this",
 };
 
 /** Offers `list` in the check's thread and finds the message that shows it. */
@@ -2005,6 +2014,41 @@ export function chatConformance(
             assert.ok(s.inbound.empty);
           }
           await s.rig.owner.picksAction(actions, "code");
+          assert.equal(s.inbound.picks.length, 1, "the owner's does, on the same control");
+        },
+      );
+
+      gated(
+        "Send and Cancel of a suggestion arrive with the session and the suggestion's id, never its text",
+        "threadLists",
+        async (s) => {
+          const offered = await offerList(s, SUGGESTION, "Suggested next prompt:");
+          await s.rig.owner.picksSuggested(offered, true);
+          await s.rig.owner.picksSuggested(offered, false);
+          assert.deepEqual(s.inbound.picks, [
+            ...[true, false].map((send) => ({
+              type: "suggestion" as const,
+              ref: s.ref,
+              session: "session-1",
+              id: "suggestion-1",
+              send,
+              list: offered.message,
+            })),
+          ]);
+        },
+      );
+
+      gated(
+        "a control of a suggestion from somebody else never arrives",
+        "threadLists",
+        async (s) => {
+          const offered = await offerList(s, SUGGESTION, "Suggested next prompt:");
+          for (const person of strangers(s.rig)) {
+            await person.picksSuggested(offered, true);
+            await person.picksSuggested(offered, false);
+            assert.ok(s.inbound.empty);
+          }
+          await s.rig.owner.picksSuggested(offered, true);
           assert.equal(s.inbound.picks.length, 1, "the owner's does, on the same control");
         },
       );
