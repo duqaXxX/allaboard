@@ -11,7 +11,7 @@ import type { ChatProvider, MessageId, SessionStatus, ThreadChat } from "../../c
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { ThreadsState } from "../port/threads.ts";
-import { asksOwner } from "../state.ts";
+import { asksInTurn } from "../state.ts";
 import { endsWork } from "../status.ts";
 import * as texts from "../texts.ts";
 
@@ -62,7 +62,7 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
       // One stopped line per thread: the first request rewritten says it, the others go.
       let lined = hadReply;
       for (const messageId of thread.requests) {
-        const asksForLine = !lined && asksOwner(thread.requestKinds[messageId]);
+        const asksForLine = !lined && asksInTurn(thread.requestKinds[messageId]);
         const outcome = await settleRequest(chatThread, messageId, asksForLine);
         if (outcome === "kept") left(channelId, threadId, "a request");
         else {

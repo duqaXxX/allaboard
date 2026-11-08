@@ -1721,18 +1721,23 @@ Then a push comes from the thread, and a tap on it opens the thread:
   done end with no reply to edit, or whose last write Slack refused, gives no push, and the root's
   mark says it);
 - for each approval request and each question of Claude's: the request mentions you;
+- when a message of yours is held back, because another session works in the same folder or the
+  session is open in a terminal: the question about it mentions you, since you may have sent the
+  message and left; while the terminal runs a turn the message waits with no question and no
+  push, and the question that may follow the turn rings once;
+- when `!terminal` asks whether to stop the work that still runs here: the question mentions you;
 - when a restart or a stop of allaboard cuts a session's work short, and when a crash did, at the
   next start: the reply's last message, or a `❌ Failed` line of its own when there is none.
 
-Nothing else in a thread rings: not the replies, the setup form, a `!!` command's confirmation, a
-same-folder question, `!stop` or `Stopped.`, which answer what you have just written. The mention
+Nothing else in a thread rings: not the replies, the setup form, a `!!` command's confirmation,
+`!stop` or `Stopped.`, which answer what you have just written. The mention
 is in the message's `text` alone, so no `@` shows in the thread or in the push, whose banner shows
 the message's words. Slack holds a phone's pushes while you are active on Slack desktop ("as soon
 as you're inactive on desktop, or after an additional delay", Guide to Slack notifications, read
 2026-10-26).
 
 The channel's `Status:` line makes the channel unread and mentions nobody. While a thread waits
-for your approval or answer it names the one that has waited longest and counts the others,
+for your approval or answer, or holds back a message of yours, it names the one that has waited longest and counts the others,
 `Status: ✋ Waiting: A · +1`, whatever the event; otherwise it counts the threads at work,
 `Status: ⏳ Working: 2 threads`, or names the thread that ended last, by edits that ring nothing.
 While nothing waits for your approval or answer, a new thread whose setup form waits for its
