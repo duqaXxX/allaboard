@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.14.0] - 2026-11-09
+
 ### Changed
 
 - `agents.sessions.setStatus` names the owner as the session's initiator (#234), so a session on a
