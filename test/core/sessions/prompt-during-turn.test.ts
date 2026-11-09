@@ -16,6 +16,9 @@ async function until(what: string, test: () => boolean): Promise<void> {
   assert.ok(test(), what);
 }
 
+// The command touches a file, which Windows has no `touch` for.
+const POSIX_SHELL = { skip: process.platform === "win32" && "the command needs a POSIX shell" };
+
 const sent = (agent: PlainAgent): string[] =>
   agent.sessions.flatMap((s: PlainSession) =>
     s.prompts.map((p) => (typeof p.content === "string" ? p.content : "")),
@@ -79,7 +82,7 @@ test("a prompt the turn does not reach gets its own turn", async (t) => {
   assert.ok(world.shown(ref).some((line) => line.includes("answer two")));
 });
 
-test("a !!command waits for the prompts sent before it", async (t) => {
+test("a !!command waits for the prompts sent before it", POSIX_SHELL, async (t) => {
   const agent = new PlainAgent({ promptDuringTurn: true, shell: {} });
   const world = await AskingWorld.make(t, { agent });
   const { session } = world.thread();
@@ -279,26 +282,30 @@ test("a command waiting behind a turn whose process dies goes to the new process
   assert.deepEqual(sent(agent), ["first", ":echo hello"]);
 });
 
-test("a send the agent refuses as closed leaves nothing sent: a !!command still runs", async (t) => {
-  const agent = new PlainAgent({ promptDuringTurn: true, shell: {} });
-  const world = await AskingWorld.make(t, { agent });
-  const { session } = world.thread();
-  const marker = join(world.folder, "ran-after-refusal");
-  agent.next(say("a"));
-  await session.submit("first");
-  await until("the first ran", () => sent(agent).length === 1);
-  await until("idle", () => !session.busy);
-  const [plain] = agent.sessions;
-  assert.ok(plain);
-  plain.send = async () => {
-    throw new SessionClosed();
-  };
-  await session.submit("second");
-  await until("the refused prompt left", () => !session.busy);
-  await session.submit("", `touch ${marker}`);
-  const { existsSync } = await import("node:fs");
-  await until("the command ran", () => existsSync(marker));
-});
+test(
+  "a send the agent refuses as closed leaves nothing sent: a !!command still runs",
+  POSIX_SHELL,
+  async (t) => {
+    const agent = new PlainAgent({ promptDuringTurn: true, shell: {} });
+    const world = await AskingWorld.make(t, { agent });
+    const { session } = world.thread();
+    const marker = join(world.folder, "ran-after-refusal");
+    agent.next(say("a"));
+    await session.submit("first");
+    await until("the first ran", () => sent(agent).length === 1);
+    await until("idle", () => !session.busy);
+    const [plain] = agent.sessions;
+    assert.ok(plain);
+    plain.send = async () => {
+      throw new SessionClosed();
+    };
+    await session.submit("second");
+    await until("the refused prompt left", () => !session.busy);
+    await session.submit("", `touch ${marker}`);
+    const { existsSync } = await import("node:fs");
+    await until("the command ran", () => existsSync(marker));
+  },
+);
 
 test("nothing is sent behind a command until its turn has ended", async (t) => {
   const agent = new PlainAgent({ promptDuringTurn: true });
