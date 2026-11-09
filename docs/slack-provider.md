@@ -1620,6 +1620,30 @@ status; when it found nothing to stop, `active` is sent. The manifest's `message
 app's Messages tab) are dropped by the message listeners before anything else, and
 `app_home_opened` has no listener: Bolt acknowledges an event nobody listens for.
 
+### The session's title
+
+`AgentTitles` (`src/chat/slack/reply/agent-titles.ts`) titles each session `<channel> - <title>`,
+whatever the instance. `<title>` is
+the root's first line uncut (`channel-line.rootFirstLine`; the channel's line cuts the same words
+to 40). `setStatus` takes a title only when it creates the session, so a title is only ever set by
+`agents.sessions.rename` (docs.slack.dev, read 2026-11-08). On a thread session `rename` applies
+the rules of a channel name, where its reference says 1 to 200 characters (measured 2026-11-09): a
+title past 80 characters and any of `[ ] : / # @ * + % $ < > \ ~ ^ { } ;` or a backtick answer
+`invalid_name`. Each of those characters becomes a space, the spaces collapse, and the whole is cut
+to 80 UTF-16 units with `…`, never inside a surrogate pair.
+
+One record per thread outlives the status entry and holds the title wanted, the last one accepted,
+the last one refused and whether a `setStatus` succeeded. A rename is sent only after one did. The
+title arrives from `SlackChat.titleThread`; with none yet, the sender reads the root once with
+`conversations.replies`, and a title that arrives meanwhile wins. One sender runs per thread and
+sends the latest title only. `session_not_found` makes the next successful `setStatus` rename
+again; `invalid_arguments` and `invalid_name` refuse that title for that thread until it changes;
+`channel_not_found`, `message_not_found` and `thread_not_found` drop the record, as do a root the
+read does not return and a tombstone; a code that names
+the token or the app stops renames for the process; any other failure retries on the status
+backoff. The channel's name is read once per channel per process, so a channel renamed while the daemon
+runs keeps its old name in titles until the next start. `SlackChat.close` waits for the senders.
+
 ## Repairing a reply
 
 The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's stream, reads the

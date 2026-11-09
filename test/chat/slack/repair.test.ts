@@ -48,7 +48,8 @@ function repairCrash(
     limiter,
     ...(line !== undefined && { line }),
   });
-  return repair(chat, state);
+  // Closed after: the repair's status calls make agent sessions, whose title reads would retry.
+  return repair(chat, state).finally(() => chat.close());
 }
 
 after(() => {
