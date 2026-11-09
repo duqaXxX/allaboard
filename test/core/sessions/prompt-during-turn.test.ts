@@ -355,6 +355,20 @@ test("a channel !stop during a turn with a prompt sent sends no goal command int
   await until("idle", () => !session.busy);
 });
 
+/** Every status the session sets, with whether the owner's own act made it (no push then). */
+function statuses(session: object): [string | null, boolean][] {
+  const seen: [string | null, boolean][] = [];
+  const spied = session as {
+    setStatus(state: string | null, change?: { byOwner?: boolean }): Promise<unknown>;
+  };
+  const original = spied.setStatus.bind(session);
+  spied.setStatus = (state, change = {}) => {
+    seen.push([state, change.byOwner === true]);
+    return original(state, change);
+  };
+  return seen;
+}
+
 /** Two prompts sent in the gap of a session that is idle, a `!stop` in it, the gate then opened. */
 async function twoInTheGap(
   t: Parameters<typeof AskingWorld.make>[0],
@@ -371,7 +385,7 @@ async function twoInTheGap(
   const { ref, session } = world.thread();
   agent.next(say("a"));
   agent.next(say("b"));
-  agent.next(say("c"));
+  agent.next(say("third answer"));
   await session.submit("first");
   await until("the first ran", () => sent(agent).length === 1);
   await until("idle", () => !session.busy);
@@ -397,7 +411,7 @@ test("!stop in the gap of two prompts: the cut leaves the second, which runs as 
   await until("idle", () => !session.busy);
   await settledTurn();
   assert.ok(
-    world.shown(ref).some((line) => line.includes("c")),
+    world.shown(ref).some((line) => line.split("\n")[0] === "third answer"),
     "the third prompt answered",
   );
   assert.equal(root(world, ref), "done");
@@ -405,6 +419,7 @@ test("!stop in the gap of two prompts: the cut leaves the second, which runs as 
 
 test("!stop in the gap of two prompts: a cut that took both leaves nothing stuck in sent", async (t) => {
   const { world, session, ref, open } = await twoInTheGap(t, false);
+  const seen = statuses(session);
   open();
   await settledTurn();
   await world.clock.advance(INJECTED_TURN_WAIT);
@@ -415,4 +430,139 @@ test("!stop in the gap of two prompts: a cut that took both leaves nothing stuck
     "the prompt the cut took is said not to be sent",
   );
   assert.equal(root(world, ref), "done");
+  assert.deepEqual(seen.at(-1), ["done", true], "the owner's stop ended the work: no push");
+});
+
+test("!stop in the gap of two prompts: a prompt the cut took is dropped even when a later turn runs at the wait's end", async (t) => {
+  const agent = new PlainAgent({ promptDuringTurn: true });
+  const world = await AskingWorld.make(t, { agent });
+  const { ref, session } = world.thread();
+  agent.next(say("a"));
+  agent.next(say("b"));
+  agent.next(say("fourth answer"), hold());
+  await session.submit("first");
+  await until("the first ran", () => sent(agent).length === 1);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  let open!: () => void;
+  const [plain] = agent.sessions;
+  assert.ok(plain);
+  plain.playGate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  await session.submit("second");
+  await until("second sent", () => sent(agent).length === 2);
+  await session.submit("third");
+  await until("third sent", () => sent(agent).length === 3);
+  assert.equal(await session.stop(), true);
+  const seen = statuses(session);
+  open();
+  await settledTurn();
+  // A new prompt's turn is still running when the wait for the cut prompts ends.
+  await session.submit("fourth");
+  await until("fourth sent", () => sent(agent).length === 4);
+  await settledTurn();
+  await world.clock.advance(INJECTED_TURN_WAIT);
+  await settledTurn();
+  // The cut turn's own prompt is told at once; the one it took with it only when the wait ends.
+  const notSent = (line: string) =>
+    line.includes("was not sent because you stopped it") && line.includes('"third"');
+  assert.ok(!world.shown(ref).some(notSent), "nothing is dropped while the later turn runs");
+  plain.release();
+  await settledTurn();
+  await world.clock.advance(INJECTED_TURN_WAIT);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some(notSent), "the prompt the cut took is said not to be sent");
+  assert.ok(
+    world.shown(ref).some((line) => line.split("\n")[0] === "fourth answer"),
+    "the fourth prompt answered",
+  );
+  assert.equal(root(world, ref), "done");
+  // The fourth prompt's work ended while the cut prompt held the status back: the owner is told.
+  assert.deepEqual(seen.at(-1), ["done", false]);
+});
+
+test("!stop in the gap of two prompts: a turn the agent starts behind the cut prompt tells the owner of its end", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false);
+  const seen = statuses(session);
+  open();
+  await settledTurn();
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.emit({ type: "peer_message", text: "a note" });
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "agent",
+    finalText: "Noted.",
+    ending: "done",
+    steps: 1,
+    tokens: {},
+  });
+  await settledTurn();
+  await world.clock.advance(INJECTED_TURN_WAIT);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(root(world, ref), "done");
+  // The agent's turn ended while the cut prompt held the status back: the owner is told.
+  assert.deepEqual(seen.at(-1), ["done", false]);
+});
+
+test("!stop in the gap of two prompts: an empty turn of the agent behind the cut prompt does not tell the owner", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false);
+  const seen = statuses(session);
+  open();
+  await settledTurn();
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "agent",
+    finalText: "",
+    ending: "done",
+    steps: 0,
+    tokens: {},
+  });
+  await settledTurn();
+  await world.clock.advance(INJECTED_TURN_WAIT);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(root(world, ref), "done");
+  // No work started after the stop: the done is the owner's own act, and pushes nothing.
+  assert.deepEqual(seen.at(-1), ["done", true]);
+});
+
+test("!stop in the gap of two prompts: a hold cancelled behind the cut prompt does not tell the owner", async (t) => {
+  const { world, session, ref, open } = await twoInTheGap(t, false);
+  const seen = statuses(session);
+  open();
+  await settledTurn();
+  // A `!!command`'s confirmation, or a terminal's `Send here`, that the owner cancels.
+  session.holdStart();
+  await session.holdEnd({ continued: false });
+  await settledTurn();
+  await world.clock.advance(INJECTED_TURN_WAIT);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(root(world, ref), "done");
+  // A status written is no work: his stop and his cancel are the last acts.
+  assert.deepEqual(seen.at(-1), ["done", true]);
+});
+
+test("!stop in the gap of two prompts: a hold continued behind the cut prompt tells the owner once its work ends", async (t) => {
+  const { world, session, ref, open } = await twoInTheGap(t, false);
+  const seen = statuses(session);
+  open();
+  await settledTurn();
+  session.holdStart();
+  await session.holdEnd({ continued: true });
+  await session.submit("fourth");
+  await settledTurn();
+  await world.clock.advance(INJECTED_TURN_WAIT);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(root(world, ref), "done");
+  assert.deepEqual(seen.at(-1), ["done", false]);
 });

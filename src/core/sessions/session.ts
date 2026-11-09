@@ -302,6 +302,12 @@ export class ThreadSession {
   /** A rewind's start of the agent is running: its refusal is the rewind's to tell. */
   private rewinding = false;
   private sent: Turn[] = [];
+  /**
+   * How many turns of new work started (`startTurn`, for a turn that is neither a stop's tail nor
+   * a run): tells `expectCutPrompts` whether work started after a cut, whoever started it. A
+   * status written is no work: a hold writes waiting and its cancel working.
+   */
+  private workStarts = 0;
   private active: ActiveTurn | null = null;
   private readonly connectLock = new Mutex();
   /** What clients reported they could not save, kept until `announceUnsaved` posts it. */
@@ -4135,6 +4141,7 @@ export class ThreadSession {
     // process's requests, for the same reason.
     if (!this.interrupting && !run) {
       this.markRan();
+      this.workStarts += 1;
       this.errorStanding = false; // a turn is sent, or a report turn starts: new work
       // A background task's own report turn can start while a hold waits on this very
       // session; ✋ must stand through it, not be overwritten by ⏳ (`waitingForOwner` covers a
@@ -4666,19 +4673,28 @@ export class ThreadSession {
    * measured 2026-11-09), and prompts sent behind it are still waiting: the agent either runs
    * each as a turn of its own (the terminal does, M3) or the cut took them with it, and nothing
    * tells the two apart at this end. Those that no turn has claimed after `INJECTED_TURN_WAIT`
-   * were taken: they are said not to be sent, and the session is idle again.
+   * were taken: they are said not to be sent, and the session is idle again. A turn running when
+   * the wait ends may still claim them, so the wait starts again while one runs (#252). The done
+   * status is the owner's own act only when no work started after the cut (`workStarts`): the
+   * root still reads working then only because these held the stop's done back. Work that did
+   * start (a later prompt's, or a turn the agent started) ended behind these, and its end tells
+   * him as any other does.
    */
   private expectCutPrompts(active: ActiveTurn, result: TurnEnded): void {
     if (!this.cutAtStart(active, result) || this.closedFlag) return;
     const waiting = this.sent.filter((turn) => !active.taken.includes(turn));
     if (waiting.length === 0) return;
+    const workAtCut = this.workStarts;
     const expiry: Task = new Task(async (signal) => {
-      await this.deps.clock.sleep(INJECTED_TURN_WAIT, signal);
-      const left = waiting.filter((turn) => this.sent.includes(turn));
-      if (this.active !== null || left.length === 0) return;
+      let left = waiting;
+      do {
+        await this.deps.clock.sleep(INJECTED_TURN_WAIT, signal);
+        left = left.filter((turn) => this.sent.includes(turn));
+      } while (this.active !== null && left.length > 0);
+      if (left.length === 0) return;
       this.sent = this.sent.filter((turn) => !left.includes(turn));
       await this.dropStopped(left);
-      await this.reactDoneIfIdle(signal, { byOwner: true });
+      await this.reactDoneIfIdle(signal, { byOwner: this.workStarts === workAtCut });
     });
     this.expiring.add(expiry);
     expiry.settled().then(() => this.expiring.delete(expiry));
