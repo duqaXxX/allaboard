@@ -122,8 +122,9 @@ One message's way from the chat to the agent and back, with Slack and Claude Cod
    (`SessionManager.get`), rebuilt when a restart or an idle close dropped it. Before the prompt is
    sent, it can wait for the owner: a first prompt for the session's setup, and a prompt that would
    wake an idle session for the same-folder hold, when another session is working in that folder.
-4. `ThreadSession.submit` queues the prompt. The session sends one at a time to its `AgentSession`
-   (`ClaudeSession.send`), and one reader task follows `AgentSession.events`.
+4. `ThreadSession.submit` queues the prompt. The session's worker sends each to its `AgentSession`
+   (`ClaudeSession.send`) at once for an agent that declares `promptDuringTurn`, and one at a time,
+   after the previous turn ended, for one that does not. One reader task follows `AgentSession.events`.
 5. In the back end, `Translator.translate` makes session events of each record the SDK's stream
    yields. The reader gives each event to a `TurnRenderer`, which keeps the model of the reply. The
    `ReplySink` the session got from `ThreadChat.openReply` writes that model into the thread and
@@ -262,7 +263,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `goals` | a `goal_changed` event is ignored, with a warning in the log: a reply shows no goal line, `!stop` never says a goal is still set, and a channel's `!stop` drops no goal (`AgentSession.clearGoal` is never called) |
 | `models` | `AgentInfo.models` is ignored: the setup has no Model select and `AgentSession.setModel` is never called |
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
-| `promptDuringTurn` | the next prompt is sent once the running turn has ended |
+| `promptDuringTurn` | every prompt is sent at once: the agent takes it into the running turn or runs it next (the contract is on the seam) |
 | `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never reads the agent's session list. A session index does not check it: the Slack provider's calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
 | `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root (`texts.BIND_LIST_ANY`; the notice of an unbound channel, `texts.UNBOUND_ANY`, and the `!bind` line of `!help`, `texts.HELP_WORDS_ANY`, say nothing of trust either), and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
 | `loadedContext` | `AgentSession.loaded` is absent: `!memory` and `!skills` answer that the agent does not list what a session loaded (`texts.LOADED_UNAVAILABLE`), and neither `!help`, the suggestions nor `!guide` offer them |
@@ -1253,7 +1254,7 @@ closed when the start returns (`ThreadSession.connect`).
   A failure of the chat while a reply is written never stops the session or the running turn.
 ### Messages, the same-folder hold and the setup
 
-- Messages are queued and run one at a time; each gets its own reply in the thread. `!stop`
+- Messages are sent to the agent at once when it declares `promptDuringTurn` (it takes them into the running turn or runs them next), else queued and run one at a time; each turn gets its own reply in the thread. A `!!command` waits until no turn runs and nothing is sent (`ThreadSession.untilIdle`). `!stop`
   interrupts the running turn, denies its pending approvals and stops the thread's background tasks
   (`AgentSession.stopTask`); an interrupt or a stop of one task that the agent refuses is logged by
   the error's name and the others go on. It then shows `✅` on the root through `ThreadSession.react`, which clears
@@ -1456,7 +1457,7 @@ closed when the start returns (`ThreadSession.connect`).
   (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
   that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
   report renders into the thread's last reply when that one is at rest (tracked, not ended, and
-  last: `ThreadSession.restingLast`), also when the turn names no task; with no such reply it gets a reply of its own at the bottom. The next queued message waits for it to finish.
+  last: `ThreadSession.restingLast`), also when the turn names no task; with no such reply it gets a reply of its own at the bottom. A message sent meanwhile is not held back (an agent without `promptDuringTurn` still waits for the report turn).
   With no task end seen, no line opens it (`ThreadSession.openingTarget`). A background
   subagent's end also gives its words a card under its end line, as the terminal's message
   from it that `ctrl+o` opens: titled `Message from <type>`, the words its body, up to
@@ -1537,24 +1538,37 @@ closed when the start returns (`ThreadSession.connect`).
 ### A prompt taken into a running turn
 
 Claude Code can take a prompt sent during a turn into that turn: the turn ends with one result
-for both and the prompt gets no reply of its own.
+for both and the prompt gets no reply of its own. The core sends every prompt at once
+(`promptDuringTurn`), so the replays below are how it learns which turn answers which prompt.
 
 - Every prompt goes out under a uuid of the daemon's own, and Claude Code replays it with that
   uuid (`--replay-user-messages`); the back end turns the replay into `prompt_taken`
   (`ThreadSession.acknowledge`).
 - A replay after a turn's `init` and before its first stream event names the prompt that turn
-  answers; a replay inside a running turn means the agent took the prompt into it
+  answers. Several can come between turns (measured 2026-11-09, two prompts sent during the last
+  words of a turn): `ThreadSession.announced` is an ordered list, the first is the turn's own and
+  the others are taken into it. A replay inside a running turn means the agent took the prompt into it
   (`ThreadSession.whoseTurn`; measured: "Prompt replay", "Prompt sent before a notification").
 - A prompt taken in is released (out of the queue, its wait over) and answered by the turn's
-  reply, which ends with the note `texts.TAKEN_INTO_REPLY_ONE` (`ThreadSession.finish`).
+  reply, an owner's turn included (the turn's own prompt is not counted), which ends with the note `texts.TAKEN_INTO_REPLY_ONE` (`ThreadSession.finish`).
 - Where no recording covers the turn (it opens with a compaction, a command, a prompt with an
   image, a failure before its first word) the session takes the first waiting prompt's and
   corrects the guess at the turn's end (`ThreadSession.settle`).
 - `AgentSession.interrupt` with such a prompt queued ends the report turn with
   `error_during_execution`, and the prompt then runs as a turn of its own. What Claude Code does
   with a prompt taken in when `!stop` interrupts is not measured.
-- A session abandoned first (a lost process, a close, a restart) lists the prompt among the
-  messages not sent, whether or not Claude Code had taken it in.
+- A session abandoned first (a lost process, a close, a restart) gives a prompt taken in the same
+  note as at a normal end, and lists among the messages not sent only those not taken in (a
+  prompt dropped with the process is not in the transcript a resume reads, measured 2026-11-09).
+- `!stop` with prompts sent and no turn running still interrupts, but leaves `interrupting`
+  down: the turn that starts afterwards reacts `⏳` as any turn does, and its stopped end puts
+  the root back on `✅` (`ActiveTurn.afterStop`). The channel's stop drops the goal after that turn's
+  end, as after any stopped turn (`stopTail`). An interrupt 50 to 300 ms after a send from idle
+  cuts the turn before the model: `init`, then `error_during_execution` with `num_turns` 0 and no
+  replay (measured 2026-11-09). The prompt then gets the note that it was not sent, in place of an
+  empty `Stopped the current turn.` (`ActiveTurn.replayed`); an interrupt at 0 ms is ignored and
+  the prompt runs. A command of the agent is never sent into a running turn: it waits for
+  `ThreadSession.untilIdle` like a `!!command`.
 
 The order of replays, the cases above and what is released when are in the doc comments of
 `ThreadSession.acknowledge`, `ThreadSession.whoseTurn` and `ActiveTurn.taken`.

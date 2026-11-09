@@ -1399,8 +1399,20 @@ whole list; a word that this instance does not offer still gets the whole list.
 
 A stop (`!stop` at either level, or the Stop control in Agents & tools) also drops every message sent before it, in the same thread (in the same channel for a top-level `!stop`), that has not reached Claude: one still reading its files, waiting behind another message, connecting its session or asking its setup. Each says `Not sent.`, and the stop adds no `Nothing is running in this session.`. A message sent after the stop runs. A `!fork` waiting for a busy thread is cancelled by a stop of that thread. A `!fork <prompt>` whose copy is being made when a top-level `!stop` arrives still makes the copy, and the copy's prompt says `Not sent.` in the copy's thread; a stop of the original thread at that point does not drop it.
 
-A stop also drops the messages of that session that have not reached the agent: those queued
-behind the running turn, and the one taken while the agent's process starts. One note names
+A message you send while a turn runs goes to Claude Code at once, which takes it into the running
+turn or runs it next. When it takes the message in, the reply stays where it is, above your message,
+and its end is posted as a new message below it: the words written after the reply's last call, the
+line `Claude Code took your message into this turn.` and the
+footer. Calls made after the take stay in the reply above. The stream stops at that point without
+its footer, so the reply costs two notifications when you are away, the stop and the new message,
+as a reply that runs past 280 seconds does.
+
+A stop also drops the messages of that session that have not reached the agent: those still in the
+daemon's queue (a `!!command` waiting for the running turn, a message waiting for the agent's
+process to start) and the one taken while the process starts. A message already sent to the agent
+is the agent's: one it had taken into the turn the stop cut gets the note that Claude Code took it
+in, and one sent just before the stop, which the stop reached before Claude Code took it in, is
+listed as not sent, with no `Stopped the current turn.` above it. One note names
 them in the order you sent them, `N messages were not sent because you stopped it: send them
 again.`: at the end of the reply that was running, or a message of its own when nothing runs. A
 stop that only drops messages answers with that note and adds no `Stopped.`. A `!!command` that
@@ -1433,7 +1445,7 @@ command the agent does not list is not offered.
   - At the top level, in small text: The channel's directory, then every thread of it that holds a session, live or closed, newest first and ten at most, each linked to its thread and led by its root's mark (⏳ working, ✋ waiting for you, ✅ or ❌ at rest, with how long ago when at rest), its bypass and running tasks, and its folder when it moved elsewhere
   - In a thread: That session's directory, session id, the command that continues it in the terminal, its title when Claude Code has one, its mode, the folder it works in when it moved elsewhere, then the footer's values one per line and, last, `Prompt:` and the text the thread's first message had before allaboard replaced it with the title, in the form the agent receives a message, as a quote (a long line is wrapped, a long text is split into several messages), in an ephemeral message; a thread not titled yet, or whose first message had no words, has none
 - `!stop`
-  - At the top level: Stops every running session of the channel and its background tasks, and denies its pending approvals, then drops the goal (`!goal`) of every session of the channel whose Claude Code process is still open; the answer is `Stopped what was running in this channel.`, or `Nothing is running in this channel.`, once that is done; each stopped session's root shows ✅. A session closed after an hour with nothing to do keeps its goal, which resumes with your next message there
+  - At the top level: Stops every running session of the channel and its background tasks, and denies its pending approvals, then drops the goal (`!goal`) of every session of the channel whose Claude Code process is still open; the answer is `Stopped what was running in this channel.`, or `Nothing is running in this channel.`, once that is done; each stopped session's root shows ✅. A session closed after an hour with nothing to do keeps its goal, which resumes with your next message there, and so does one whose message already sent to Claude Code runs after the stop, its turn under way or starting after it (#251)
   - In a thread: Stops that session the same way; the answer is `Stopped.`, or `Nothing is running in this session.`, in a message that stays in the thread; ✅ on the session's root. A stop ends the turn, not a goal set with `!goal`: the answer then adds ``◎ Goal still active: <condition> · `!goal clear` drops it``, and your next message resumes the goal. A stop you gave is not an error, so it never shows ❌
 - `!memory`
   - At the top level: Answers ``!memory` and `!skills` list what a session loaded, inside its thread.``
@@ -1598,7 +1610,11 @@ question does; once you decide, it disappears and the tool's line in the reply r
 If Slack does not accept the request, Claude Code is told it was denied because it could not be
 shown.
 
-Messages sent to a thread while its turn is running wait their turn; each gets its own reply. When
+A message sent to a thread while its turn is running goes to Claude Code at once, as in the
+terminal: Claude Code takes it into the running turn (one reply, which ends with `Claude Code took
+your message into this turn.`) or runs it as the next
+turn, with a reply of its own. A `!!command` waits until nothing runs, since the terminal runs one
+typed while busy after the turn too. When
 a background task finishes while nothing runs, Claude Code starts a turn of its own to report it,
 as it does in the terminal: that reply opens with Claude Code's own line for the task's end, such
 as `✓ Agent "review" finished · 3m 59s`, or `✗ Agent "review" failed: ` and the reason. An agent

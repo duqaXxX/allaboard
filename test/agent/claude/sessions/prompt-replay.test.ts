@@ -43,7 +43,6 @@ import {
   send,
   toolUseOf,
   withResult,
-  workerHolds,
 } from "./helpers.ts";
 
 const PROMPT = "Reply with the single word PINEAPPLE.";
@@ -166,9 +165,9 @@ for (const name of ["at-init", "after-tools"]) {
   test(`a prompt not taken in gets its own turn and reply [${name}]`, async (t) => {
     // `at-init`: the prompt reached Claude Code at the report turn's `init`. `after-tools`: the
     // report turn had no tool result left and was writing its text. Both report turns end with
-    // their own result and Claude Code then starts a turn for the prompt. The daemon holds the
-    // prompt until the report turn ends, so it sends it after that result and the replay comes
-    // with no turn running: nothing is released early and no note says the prompt was taken.
+    // their own result and Claude Code then starts a turn for the prompt. The daemon sent the
+    // prompt at once, so the replay comes with no turn running: nothing is released early and
+    // no note says the prompt was taken.
     const r = scene(name);
     const h = harnessFor(t)({});
     const session = h.session();
@@ -178,10 +177,9 @@ for (const name of ["at-init", "after-tools"]) {
     h.clients[0]?.inject([...r.head, ...r.rest.slice(0, -1)]);
     await h.until(() => inside(session).active !== null);
     const prompt = await session.submit(PROMPT);
-    await workerHolds(h, session, prompt);
-    assert.equal(h.clients[0]?.sent.length, 1);
-    h.clients[0]?.inject(r.rest.slice(-1));
+    // Sent at once, inside the report turn, which does not take it in.
     await h.until(() => h.clients[0]?.sent.length === 2);
+    h.clients[0]?.inject(r.rest.slice(-1));
     assert.ok(!prompt.done.isSet);
     play(h, r.own);
     await prompt.done.wait();
@@ -320,7 +318,7 @@ test("a replay naming no sent prompt acknowledges nothing", async (t) => {
   assertNothingRuns(h, session);
 });
 
-test("a prompt taken in when the client ends is noted as not sent", async (t) => {
+test("a prompt taken in when the client ends is noted as taken, not as unsent", async (t) => {
   const r = scene("during-tool");
   const h = harnessFor(t)({});
   const session = h.session();
@@ -331,11 +329,9 @@ test("a prompt taken in when the client ends is noted as not sent", async (t) =>
   await prompt.done.wait();
   await h.until(() => !session.busy);
   assert.equal(inside(session).sent.length, 0);
-  const note = texts.fill(texts.NOT_SENT_ONE, {
-    count: 1,
-    because: texts.named(texts.BECAUSE_STOPPED, NAMES),
-  });
-  assert.ok(said(h).includes(note));
+  // The agent had the prompt: the note of a taken prompt, never the not-sent one.
+  assert.ok(said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
+  assert.ok(!said(h).includes("was not sent"));
 });
 
 // the result that releases the prompt arrived, and a close then cut the reply's
@@ -461,18 +457,15 @@ test("a close that lands in the reply's last write says once that the prompt was
 test("the note counts the prompts taken in", () => {
   // The worker sends one prompt at a time, so a turn takes in one today; the note reads `taken`.
   assert.equal(takenNote(1, NAMES), texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES));
-  assert.equal(
-    takenNote(2, NAMES),
-    "Claude Code took 2 messages into this reply: " +
-      "send them again if they are not answered here.",
-  );
+  assert.equal(takenNote(2, NAMES), "Claude Code took 2 messages into this turn.");
 });
 
 test("every prompt goes out with a uuid of the daemons own", async (t) => {
   const h = harnessFor(t)({ turns: [[], [], []] });
   const session = h.session();
   const blocks: PromptContent = [{ type: "text", text: "look at this" }];
-  for (const prompt of ["first", "/usage", blocks]) {
+  // (A command of the agent is not sent into a running turn: `test/core/sessions/prompt-during-turn.test.ts`.)
+  for (const prompt of ["first", "second", blocks]) {
     const turn = await send(h, session, prompt);
     turn.done.set();
   }
@@ -483,13 +476,13 @@ test("every prompt goes out with a uuid of the daemons own", async (t) => {
   // seam.
   assert.deepEqual(
     client.sent.map((prompt) => prompt.content),
-    ["first", "/usage", blocks],
+    ["first", "second", blocks],
   );
   const uuids = client.sent.map((prompt) => prompt.id);
   assert.ok(uuids.every((uuid) => typeof uuid === "string" && uuid !== ""));
   assert.equal(new Set(uuids).size, 3);
   // a string prompt keeps its string content
-  assert.deepEqual(client.queries.slice(0, 2), ["first", "/usage"]);
+  assert.deepEqual(client.queries.slice(0, 2), ["first", "second"]);
 });
 
 // --- Whose turn starts, known from the replay ---------------------------------------
@@ -649,4 +642,107 @@ test("a turn with no replay and no notification waiting is the prompt s", async 
     "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background\n\nSTARTED",
     "PINEAPPLE",
   ]);
+});
+
+/** The replay of a prompt as the CLI writes it: a `user` record of the text under the sent id. */
+function replayOf(turn: Turn, text: string): Item {
+  return {
+    record: {
+      type: "user",
+      message: { role: "user", content: text },
+      parent_tool_use_id: null,
+      uuid: turn.uuid,
+    },
+  };
+}
+
+test("two prompts sent during a turn's last words: one is announced, the other taken in", async (t) => {
+  // M6 (2026-11-09, SDK 0.3.319): the first turn ended; the replay of BRAVO came right after its
+  // result, before the next `init`, and that of CHARLIE inside the turn that answered both.
+  const messages = sdkMessages("tools");
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const first = await send(h, session, "ALPHA");
+  play(h, messages.slice(0, -1));
+  await h.until(() => inside(session).active !== null);
+  const bravo = await send(h, session, "BRAVO");
+  const charlie = await send(h, session, "CHARLIE");
+  const result = messages.at(-1);
+  assert.ok(result !== undefined);
+  h.clients[0]?.inject([result, replayOf(bravo, "BRAVO")]);
+  // The replay comes after the turn's `init` and before its first words.
+  const init = messages.findIndex((item) => isSystem(item, "init"));
+  h.clients[0]?.inject([
+    ...messages.slice(0, init + 1),
+    replayOf(charlie, "CHARLIE"),
+    ...messages.slice(init + 1),
+  ]);
+  await Promise.all([first.done.wait(), bravo.done.wait(), charlie.done.wait()]);
+  await h.until(() => inside(session).active === null);
+  assertNothingRuns(h, session);
+  assert.equal(inside(session).sent.length, 0);
+  // CHARLIE was taken into BRAVO's turn: that reply says so once, and BRAVO has its own reply.
+  assert.equal(count(said(h), texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)), 1);
+  assert.equal(h.slack.callsTo("chat.startStream").length, 2);
+});
+
+test("a report turn that ends as the owner's takes the prompt in and answers it", async (t) => {
+  // S4: the turn was guessed to be a report's (a notification waited), the prompt was replayed
+  // inside it and the result carries no injected origin: the prompt is the turn's own and the
+  // reply answers it, with nothing sent to a background reply by mistake.
+  const r = scene("during-tool");
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const prompt = await promptDuringTheReportTurn(h, session, r);
+  const owned = r.rest.map((item) => {
+    const record = recordOf(item);
+    if (record === null || !isResult(item)) return item;
+    const { origin: _origin, ...plain } = record;
+    return { record: plain };
+  });
+  const later = await send(h, session, "and later?");
+  h.clients[0]?.inject(acknowledged(owned, prompt.uuid));
+  await prompt.done.wait();
+  await h.until(() => inside(session).active === null);
+  assert.deepEqual(inside(session).sent, [later], "the later prompt still waits for its turn");
+  assert.ok(!later.done.isSet);
+  assert.equal(inside(session).injectedExpected, false);
+});
+
+test("an agent-started turn guessed as the prompt's, prompt replayed inside, ends as the prompt's", async (t) => {
+  // S3: the prompt was sent, the turn that starts is taken for its own, and the replay arrives
+  // inside it: the result's injected origin must not hide that this turn answers the prompt.
+  // Without `injected ||` in `finish`'s released set the prompt is never settled and the session
+  // stays busy (checked by removing it, 2026-11-09).
+  const r = scene("during-tool");
+  const h = harnessFor(t)({});
+  const session = h.session();
+  await firstTurn(h, session, r);
+  const prompt = await send(h, session, PROMPT);
+  play(h, r.head);
+  await h.until(() => inside(session).active !== null);
+  play(h, acknowledged(r.rest, prompt.uuid));
+  await h.until(() => prompt.done.isSet);
+  await h.until(() => inside(session).active === null);
+  assert.equal(session.busy, false);
+});
+
+test("a command waiting on an owed report, then !stop, starts no new process", async (t) => {
+  const m = sdkMessages("prompt-replay-stop-queued");
+  const first = m.findIndex((i) => isResult(i));
+  const notified = m.findIndex((i) => isSystem(i, "task_notification"));
+  const report = m.findIndex((i, n) => n >= notified && isSystem(i, "init"));
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const turn = await send(h, session, "start a background command");
+  play(h, m.slice(0, first + 1));
+  await turn.done.wait();
+  h.clients[0]?.inject(m.slice(first + 1, report));
+  await h.until(() => inside(session).injectedExpected === true);
+  const command = await session.submit("/context");
+  await h.until(() => inside(session).taken === command);
+  await session.stop();
+  await command.done.wait();
+  for (let round = 0; round < 30; round += 1) await new Promise((r) => setImmediate(r));
+  assert.equal(h.clients.length, 1, "no process is started for a stopped command");
 });

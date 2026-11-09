@@ -151,7 +151,16 @@ export interface ReplySink {
    */
   text(
     markdown: string,
-    options?: { readonly notice?: boolean; readonly ending?: boolean; readonly aside?: boolean },
+    options?: {
+      readonly notice?: boolean;
+      readonly ending?: boolean;
+      readonly aside?: boolean;
+      /**
+       * The owner's messages the reply's end answers, by id: a chat that has one of them below
+       * the reply's last message ends the reply there, below it.
+       */
+      readonly answers?: readonly MessageId[];
+    },
   ): Promise<void>;
   task(update: TaskUpdate): Promise<void>;
   /**

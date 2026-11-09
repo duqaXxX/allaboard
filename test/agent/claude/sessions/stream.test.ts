@@ -340,22 +340,27 @@ test("stop ends the stream, shows the checkmark, and the footer follows", async 
   assert.ok(reply?.blocks.some((block) => block.type === "divider"));
 });
 
-test("a restart with queued messages ends the running reply with one note", async (t) => {
+test("a restart with a queued message ends the running reply with its note", async (t) => {
   const ask = canUseToolCall("Bash", { command: "ls" });
   const h = harness(t, [{ turns: [withAsk(ask)] }]);
   const session = h.session();
   const first = await session.submit("first question");
+  await h.until(() => pending(h.approvals).length > 0 && session.busy);
+  // The worker is held at the process (a start, a command's run), so the two stay in the daemon.
+  const free = await inside(session).connectLock.acquire();
   await session.submit("second question");
   await session.submit("third question");
-  await h.until(() => pending(h.approvals).length > 0 && session.busy);
+  await h.until(() => inside(session).taken !== null);
   await session.dropQueued({ error: true });
+  session.draining = true; // as a restart's drain: the worker drops the one it holds, too
+  free();
   approve(h);
   await first.done.wait();
   // The request stopped the stream (#25): the note lands in the message by update or in the ending.
-  const note = "2 messages were not sent because allaboard restarted: send them again.";
+  const note = "1 message was not sent because allaboard restarted: send it again.";
   const reply = JSON.stringify([...h.slack.messages.values()].map((message) => message.blocks));
   assert.ok(reply.includes(note));
-  assert.ok(/second question/.test(reply) && /third question/.test(reply));
+  assert.ok(/third question/.test(reply));
   assert.equal(h.slack.streamTs.length, 1); // the dropped messages get no reply of their own
   assert.equal(h.slack.pushes(), 3); // the approval request, the stop before it, and the ending
   // the reply that says it is the thread's latest: the footer is under it
@@ -808,10 +813,12 @@ test("a task that outlives its turn is not counted by the thread status", async 
 });
 
 test("stop clears the thread status", async (t) => {
-  const h = harness(t, [{}]); // a turn that never answers: nothing waits on the owner
+  const h = harness(t, [{}]); // a turn that never ends: nothing waits on the owner
   const session = h.session();
   await session.submit("hello");
   await h.until(() => h.clients.length > 0 && h.clients.at(-1)?.queries.join() === "hello");
+  h.clients.at(-1)?.answer(sdkMessages("tools").slice(0, 13)); // the turn has started
+  await h.until(() => inside(session).active !== null);
   await h.until(() => statuses(h).join() === slackTexts.THREAD_WORKING_STATUS);
   assert.equal(await session.stop(), true);
   await h.until(() => statuses(h).at(-1) === ""); // while the interrupt still winds down

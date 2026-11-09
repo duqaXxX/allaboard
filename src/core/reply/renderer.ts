@@ -9,7 +9,7 @@
  * whole, and a call's result arrives as its text and as what it did to a file.
  */
 import type { Question, SessionEvent, TaskOutcome } from "../../agent/seam.ts";
-import type { Preview, ReplySink, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
+import type { MessageId, Preview, ReplySink, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
 import { monotonicClock } from "../../clock.ts";
 import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
@@ -621,8 +621,11 @@ export class TurnRenderer {
   }
 
   /** A note of the daemon's after what the reply holds: what was not sent, what a restart dropped. */
-  async feedError(text: string): Promise<void> {
-    await this.#text(`\n\n${text}`, { notice: true });
+  async feedError(
+    text: string,
+    options: { readonly answers?: readonly MessageId[] } = {},
+  ): Promise<void> {
+    await this.#text(`\n\n${text}`, { notice: true, ...options });
   }
 
   /**
@@ -1052,10 +1055,15 @@ export class TurnRenderer {
   /** `piece`: the next piece of a text being written, which a chat with no streaming waits to have whole. */
   async #text(
     markdown: string,
-    options: { notice?: boolean; ending?: boolean; piece?: boolean } = {},
+    options: {
+      notice?: boolean;
+      ending?: boolean;
+      piece?: boolean;
+      answers?: readonly MessageId[];
+    } = {},
   ): Promise<void> {
     if (markdown === "") return;
-    const { notice = false, ending = false, piece = false } = options;
+    const { notice = false, ending = false, piece = false, answers = [] } = options;
     await this.#writeLaunches();
     if (this.#breakOwed && !markdown.startsWith("\n")) markdown = `\n\n${markdown}`;
     this.#breakOwed = false;
@@ -1066,6 +1074,6 @@ export class TurnRenderer {
       return;
     }
     await this.#handOver();
-    await this.#sink.text(markdown, { notice, ending });
+    await this.#sink.text(markdown, { notice, ending, ...(answers.length > 0 && { answers }) });
   }
 }

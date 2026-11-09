@@ -107,6 +107,17 @@ describe("ThreadPlaces", () => {
     assert.equal(places.overtaken(second), false);
   });
 
+  test("anyBelow: a listed message under the reply's last message, never for a reply with none", () => {
+    const places = new ThreadPlaces();
+    const empty = joined(places, null);
+    const reply = joined(places, "1760000002.000001");
+    places.ownerPosted("1760000003.000001");
+    assert.equal(places.anyBelow(reply, ["1760000003.000001"]), true);
+    assert.equal(places.anyBelow(reply, ["1760000001.000001"]), false); // above it
+    assert.equal(places.anyBelow(reply, []), false);
+    assert.equal(places.anyBelow(empty, ["1760000003.000001"]), false);
+  });
+
   test("an owner message that arrives before a reply has a message counts by its position", () => {
     const below = new ThreadPlaces();
     const early = joined(below, null);

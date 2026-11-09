@@ -255,6 +255,13 @@ export class ThreadPlaces {
     return isLast(reply.lastAt, this.others(reply), this.marks);
   }
 
+  /** Whether one of the messages `ids` sits below the reply's last message; false while it has none. */
+  anyBelow(reply: Placed, ids: readonly string[]): boolean {
+    const at = reply.lastAt;
+    if (at === null || !this.replies.has(reply)) return false;
+    return ids.some((id) => (positionOf(id) ?? 0) > at);
+  }
+
   /** Whether another reply has a message below the reply; a reply let go of keeps its answer. */
   overtaken(reply: Placed): boolean {
     if (reply.lastAt === null) return false;

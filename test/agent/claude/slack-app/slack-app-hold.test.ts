@@ -218,10 +218,10 @@ test("no hold when the target itself is busy", async (t) => {
   const questionTs = world.slack.postedTs.at(-1) as string;
   const holdId = buttonValue(postedBlocks(world), HOLD_CONTINUE);
   await world.dispatch(clickIn(HOLD_CONTINUE, holdId, CHANNEL, THREAD, { messageTs: questionTs }));
-  await world.dispatch(reply("again", THREAD)); // THREAD is busy now: queues, asks nothing
+  await world.dispatch(reply("again", THREAD)); // THREAD is busy now: sent at once, asks nothing
   assert.deepEqual(
     world.clients.map((client) => client.queries),
-    [["busy elsewhere"], ["hello"]],
+    [["busy elsewhere"], ["hello", "again"]],
   );
   assert.equal(holdQuestions(world).length, 1); // only the first message was ever held
 });

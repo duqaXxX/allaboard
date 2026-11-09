@@ -304,15 +304,6 @@ export async function commandRuns(
   await h.until(() => inside(session).active?.renderer.owns(callId) ?? false);
 }
 
-/**
- * Until the session's worker has taken the turn and is waiting to send it, then a moment more:
- * a worker that sends it does so in the next few steps of the loop.
- */
-export async function workerHolds(h: Harness, session: ThreadSession, turn: Turn): Promise<void> {
-  await h.until(() => inside(session).taken === turn || inside(session).sent.includes(turn));
-  await h.sleep(0.1);
-}
-
 export function assertNothingRuns(h: Harness, session: ThreadSession): void {
   assert.equal(session.busy, false);
   assert.equal(inside(session).sent.length, 0);

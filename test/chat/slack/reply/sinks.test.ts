@@ -6408,3 +6408,144 @@ test("a stop refused with a known error reports nothing", async () => {
   assert.equal(slack.callsTo("chat.stopStream").length >= 1, true);
   assert.deepEqual(writes, ["processing"]); // the start only
 });
+
+// An owner message the agent took into the turn sits below the open stream (#185): the reply stays
+// where it is and its end goes in a new message below.
+
+/** A ts one second after `ts`. */
+function below(ts: string | undefined): string {
+  assert.ok(ts !== undefined);
+  const [seconds = "0", fraction = "0"] = ts.split(".");
+  return `${Number(seconds) + 1}.${fraction}`;
+}
+
+async function takenReply(slack: FakeSlack, places: ThreadPlaces): Promise<ReplySink> {
+  const sink = reply(slack, { places });
+  await sink.text("Let me run it.");
+  await sink.task(tool("t1", "run", "complete"));
+  await sink.text("All green.");
+  await settled();
+  return sink;
+}
+
+/** The note the core writes at the end of a reply that answers a message taken into its turn. */
+async function noteTaken(sink: ReplySink, answers: string[]): Promise<void> {
+  await sink.text("\n\nTaken.", { notice: true, answers });
+}
+
+test("an owner message below an open stream moves the reply's end to a new message below", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = await takenReply(slack, places);
+  const taken = below(slack.streamTs[0]);
+  places.ownerPosted(taken);
+  await noteTaken(sink, [taken]);
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  await sink.showFooterFormatted("footer");
+  assert.equal(slack.callsTo("chat.stopStream").length, 1);
+  assert.ok(!("blocks" in only(slack.callsTo("chat.stopStream")))); // no footer in the stopped stream
+  assert.equal(slack.postedTs.length, 1);
+  assert.match(slack.messageTexts().at(-1) ?? "", /All green\./);
+  assert.match(JSON.stringify(slack.messages.get(slack.postedTs[0] ?? "")?.blocks), /Taken\./);
+  assert.match(JSON.stringify(slack.messages.get(slack.postedTs[0] ?? "")?.blocks), /footer/);
+  const first = slack.messages.get(slack.streamTs[0] ?? "");
+  assert.match(JSON.stringify(first?.blocks), /Let me run it\./);
+  assert.match(JSON.stringify(first?.blocks), /Executed 1 job/); // the call stays in the streamed message
+  assert.equal(slack.pushes(), 2); // the stop and the new message, as a reply past 280 s
+});
+
+test("an owner message below that the end does not answer (a stop) splits nothing", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = await takenReply(slack, places);
+  places.ownerPosted(below(slack.streamTs[0]));
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(slack.postedTs.length, 0);
+  assert.equal(slack.pushes(), 1);
+});
+
+test("with nothing below the open stream the reply ends as before", async () => {
+  const slack = new FakeSlack();
+  const sink = await takenReply(slack, new ThreadPlaces());
+  await noteTaken(sink, ["1.000001"]);
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(slack.postedTs.length, 0);
+  assert.equal(slack.pushes(), 1);
+});
+
+test("an owner message above the reply's last message splits nothing", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = await takenReply(slack, places);
+  places.ownerPosted("1.000001");
+  await noteTaken(sink, ["1.000001"]);
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(slack.postedTs.length, 0);
+});
+
+test("a reply past 280 seconds with an owner message below posts one new message, not two", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = await longReply(slack, { places });
+  const taken = below(slack.streamTs[0]);
+  places.ownerPosted(taken);
+  await noteTaken(sink, [taken]);
+  await sink.closeOut();
+  assert.equal(slack.postedTs.length, 1);
+  assert.equal(slack.pushes(), 2); // the 280 s stop and the one new message
+});
+
+test("a taken message above the stream and a stop below it split nothing", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  places.ownerPosted("1.000001"); // sent before the reply showed anything, then taken in
+  const sink = await takenReply(slack, places);
+  places.ownerPosted(below(slack.streamTs[0])); // a `!stop` or a queued prompt, not taken in
+  await noteTaken(sink, ["1.000001"]);
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(slack.postedTs.length, 0);
+  assert.equal(slack.pushes(), 1);
+});
+
+test("a text-only reply with a taken message below posts no footer-only message", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = reply(slack, { places });
+  await sink.text("The answer is 42.");
+  await settled();
+  const taken = below(slack.streamTs[0]);
+  places.ownerPosted(taken);
+  await noteTaken(sink, [taken]);
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  await sink.showFooterFormatted("footer");
+  assert.equal(slack.postedTs.length, 0);
+  assert.equal(slack.pushes(), 1);
+});
+
+test("a reply that split its end does not split a second end on the same answers", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = await takenReply(slack, places);
+  const taken = below(slack.streamTs[0]);
+  places.ownerPosted(taken);
+  await noteTaken(sink, [taken]);
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(slack.postedTs.length, 1);
+  // A report turn's words reach the same reply, which ends again with nothing new answered.
+  await sink.text("Then a report.");
+  await sink.task(tool("t2", "run", "complete"));
+  await sink.text("Report done.");
+  await settled();
+  await sink.finish([]);
+  assert.equal(await sink.closeOut(), true);
+  assert.equal(slack.postedTs.length, 1); // the later text edits the ending, it does not split again
+  const stops = slack.callsTo("chat.stopStream");
+  assert.equal(stops.filter((call) => !("blocks" in call)).length, 1);
+});

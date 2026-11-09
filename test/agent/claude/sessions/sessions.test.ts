@@ -414,15 +414,15 @@ test("plan mode is session only: a reconnect does not reapply it, and a bypass w
   await restarted?.close();
 });
 
-test("queue waits while approval pending", async (t) => {
+test("a prompt sent while an approval is pending is sent at once", async (t) => {
   const ask = canUseToolCall("Bash", { command: "ls" });
   const h = harnessFor(t)({ turns: [[ask, ...sdkMessages("tools")], sdkMessages("tools")] });
   const session = h.session();
   const first = await session.submit("first");
   const second = await session.submit("second");
   await h.until(() => h.slack.callsTo("chat.postMessage").some((args) => "blocks" in args));
-  await h.sleep(0.05);
-  assert.deepEqual(h.clients[0]?.queries, ["first"]);
+  await h.until(() => h.clients[0]?.queries.length === 2);
+  assert.deepEqual(h.clients[0]?.queries, ["first", "second"]);
   assert.ok(session.busy);
   resolve(h, APPROVE);
   await second.done.wait();
@@ -1551,7 +1551,7 @@ function twoBackgrounds(t: TestContext): [Harness, ThreadSession] {
   return [h, h.session()];
 }
 
-test("a notification during the expiry s standalone write waits for its own turn", async (t) => {
+test("a notification during the expiry s standalone write waits for its own turn, the prompt goes out", async (t) => {
   // The expiry posts a background update (a task of no tracked reply) and a second notification
   // arrives while that write is out. Its wait starts when the write ends, not never: the
   // session keeps reading as waiting for the report turn, and the owner's prompt stays behind
@@ -1573,7 +1573,7 @@ test("a notification during the expiry s standalone write waits for its own turn
   assert.ok(inside(session).injectedExpected && !inside(session).settled.isSet && !session.idle);
   await session.submit("and now?");
   await h.sleep(0.1);
-  assert.deepEqual(h.clients[0]?.queries, ["start A", "start B"]); // held behind the report turn
+  assert.deepEqual(h.clients[0]?.queries, ["start A", "start B", "and now?"]); // sent at once
   assert.ok(!h.reactions().slice(2).includes(Status.DONE));
   h.clients[0]?.inject(injected);
   await h.until(() => b.closedOut && inside(session).settled.isSet, 3.0);
@@ -1675,7 +1675,7 @@ test("a sweep that fails still arms the wait of a notification that came during 
   assert.ok(inside(session).injectedExpected && !inside(session).settled.isSet);
 });
 
-test("owner query waits for an expected background turn", async (t) => {
+test("an owner query is sent at once while a background turn is expected", async (t) => {
   const [first, notice, injected] = splitBackground();
   assert.ok(notice.some((item) => isSystem(item, "task_notification")));
   const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
@@ -1684,15 +1684,15 @@ test("owner query waits for an expected background turn", async (t) => {
   h.clients[0]?.inject(notice);
   await h.sleep(0.05);
   const second = await session.submit("next");
-  await h.sleep(0.05);
-  assert.deepEqual(h.clients[0]?.queries, ["start it"]);
+  await h.until(() => h.clients[0]?.queries.length === 2);
+  assert.deepEqual(h.clients[0]?.queries, ["start it", "next"]);
   h.clients[0]?.inject(injected);
   await second.done.wait();
   assert.deepEqual(h.clients[0]?.queries, ["start it", "next"]);
   const background = h.bodies().map(isReport);
-  // The owner's message sits below the reply that started the task, so the report opens a reply
-  // of its own at the bottom and the answer to the message follows it.
-  assert.deepEqual(background, [false, true, false]);
+  // The prompt went out at once, so its turn ran before the report turn: the notification's end
+  // line opens the answer, and the thread holds the first reply and that one.
+  assert.deepEqual(background, [false, true]);
 });
 
 /** The title of the list of what still runs that a message shows, if any. */
@@ -3209,9 +3209,12 @@ test("a stop lets the running turn finish and ends the queued one", async (t) =>
   const h = harnessFor(t)({ turns: [running, sdkMessages("tools")] });
   const session = h.session();
   const first = await session.submit("first");
-  const second = await session.submit("second");
   await h.until(() => h.clients.length > 0 && h.clients[0]?.queries.join() === "first");
+  const free = await inside(session).connectLock.acquire(); // the worker waits for the process
+  const second = await session.submit("second");
+  await h.until(() => inside(session).taken !== null);
   const drain = startDrain(h);
+  free();
   await second.done.wait();
   assert.ok(!drain.done() && !first.done.isSet);
   h.clients[0]?.inject([result]);
@@ -4773,11 +4776,11 @@ test("work drain path leaves hourglass", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   const session = h.session();
   await (await session.submit("first")).done.wait();
-  inside(session).settled.clear(); // a report turn still in flight: the worker waits on it
+  const free = await inside(session).connectLock.acquire(); // the worker waits for the process
   const second = await session.submit("second");
   await h.until(() => inside(session).taken !== null);
   session.draining = true;
-  inside(session).settled.set();
+  free();
   await second.done.wait();
   await session.close();
   await session.doneClosing.wait();
@@ -4906,9 +4909,12 @@ test("a turn that finishes after a restart drain dropped a queued one ends on do
   const h = harnessFor(t)({ turns: [[...messages.slice(0, 13), ask, ...messages.slice(13)]] });
   const session = h.session();
   const first = await session.submit("first");
-  const second = await session.submit("second");
   await h.until(() => pending(h.approvals).length > 0);
+  const free = await inside(session).connectLock.acquire(); // the worker waits for the process
+  const second = await session.submit("second");
+  await h.until(() => inside(session).taken !== null);
   const drain = startDrain(h);
+  free();
   await second.done.wait();
   resolve(h, APPROVE);
   await first.done.wait();

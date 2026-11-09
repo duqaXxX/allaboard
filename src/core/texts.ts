@@ -217,13 +217,8 @@ export const NOT_SENT_ONE = "1 message was not sent because {because}: send it a
 export const NOT_SENT_MANY = "{count} messages were not sent because {because}: send them again.";
 // Prompts Claude Code took into a running turn of its own (a report of a background task): no
 // result of their own follows, so the reply of that turn says so at its end.
-export const TAKEN_INTO_REPLY_ONE = naming(
-  "{agent} took your message into this reply: send it again if it is not answered here.",
-);
-export const TAKEN_INTO_REPLY_MANY = naming(
-  "{agent} took {count} messages into this reply: " +
-    "send them again if they are not answered here.",
-);
+export const TAKEN_INTO_REPLY_ONE = naming("{agent} took your message into this turn.");
+export const TAKEN_INTO_REPLY_MANY = naming("{agent} took {count} messages into this turn.");
 export const BECAUSE_RESTARTED = "allaboard restarted";
 export const BECAUSE_SHUTDOWN = "allaboard stopped";
 export const BECAUSE_STOPPED = naming("{agent} stopped");

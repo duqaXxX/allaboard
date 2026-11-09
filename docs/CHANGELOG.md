@@ -5,6 +5,25 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- A message sent while a turn runs goes to the agent at once (#185), as in the terminal, for an
+  agent that declares `promptDuringTurn` (Claude Code): it takes the message into the running turn,
+  which ends with the taken note, or runs it as the next turn. Several messages can be announced
+  before one turn (`ThreadSession.announced` is a list). A `!!command` waits until nothing runs
+  and nothing is sent, and the message that names a `!fork` copy waits for every message sent
+  before it. A restart that drops a session lists a message the agent took in as taken, not as
+  not sent. `!stop` with messages sent and no turn yet still interrupts and leaves the root on
+  `✅` once the turn it cut ends; a message that interrupt reached before the agent took it in is
+  listed as not sent. A command of the agent waits like a `!!command`. An agent without the
+  capability keeps one message at a time.
+- A reply whose stream is still open when it ends, with a message of yours below it (one the agent
+  took into the turn), stays where it is, and its end (the words after its last call, the note and
+  the footer) is posted as a new message below your message, as the end of a reply past 280 seconds
+  is (`ThreadPlaces.anyBelow`). A reply with no end to move (no words after its last call, or an
+  answer that is text alone, and no line on how it was cut short) stays whole above your message. The taken note reads `Claude Code took your message into this
+  turn.` (`took N messages`).
+
 ## [0.14.0] - 2026-11-09
 
 ### Changed
