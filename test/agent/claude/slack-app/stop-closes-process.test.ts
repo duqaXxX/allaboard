@@ -147,7 +147,12 @@ test("a process resumed with no prompt waiting tells of the lost task and nothin
     .map((call) => call.method)
     .filter(
       (method) =>
-        method !== "assistant.threads.setStatus" && method !== "agents.sessions.setStatus",
+        method !== "assistant.threads.setStatus" &&
+        method !== "agents.sessions.setStatus" &&
+        // The session's title: read from the root, named by a rename.
+        method !== "conversations.replies" &&
+        method !== "conversations.info" &&
+        method !== "agents.sessions.rename",
     );
   assert.deepEqual(written, []);
   assert.equal(session.restartReady, true);

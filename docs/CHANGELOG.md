@@ -10,6 +10,11 @@ All notable changes to this project are documented here. The format follows
 - `agents.sessions.setStatus` names the owner as the session's initiator (#234), so a session on a
   root the bot posted, as a `!fork` copy, enters his Agents & tools list. Sent again without it
   when Slack refuses the user, with the channel remembered; a transient failure retries with it.
+- A thread's entry in Slack's Agents & tools list is titled `<channel> - <title>` (#234), each
+  character Slack refuses in a title made a space and the whole cut to 80 characters.
+  `AgentTitles` (`reply/agent-titles.ts`) renames the session with `agents.sessions.rename` at each
+  title change and once per thread per process; `channel-line.rootFirstLine` is the uncut first line
+  that `lineLabel` cuts to 40.
 - The Home tab is denser (#224): no blank row between two sessions (`home.SPACER` is gone and
   `home.CARD_BLOCKS` is 2, so about 45 sessions fit under Slack's 100 blocks where 32 did), the notice
   of threads being deleted is one small line (`Deleting 2 threads, one at a time, about a minute each.`), and a

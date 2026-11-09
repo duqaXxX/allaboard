@@ -4021,7 +4021,14 @@ test("an idle session closes itself after the delay and posts nothing", async (t
   await h.sleep(0.02);
   // Every kind but the thread's agent session: the turn's `active` dropped its entry, and the
   // close's settling of the root rebuilds it and sends `active` again.
-  const written = () => h.slack.apiCalls.filter((c) => c.method !== "agents.sessions.setStatus");
+  const written = () =>
+    h.slack.apiCalls.filter(
+      (c) =>
+        c.method !== "agents.sessions.setStatus" &&
+        c.method !== "agents.sessions.rename" &&
+        c.method !== "conversations.replies" &&
+        c.method !== "conversations.info",
+    );
   const callsBefore = written().length; // postMessage, update, delete
   await idleDelayPasses(h, session);
   await h.until(() => h.clients[0]?.connected === false, 1);
@@ -4044,7 +4051,14 @@ test("release closes an idle session silently and refuses one in use", async (t)
   await turn.done.wait();
   await h.until(() => session.idle);
   await h.sleep(0.02); // the thread status's last write lands
-  const written = () => h.slack.apiCalls.filter((c) => c.method !== "agents.sessions.setStatus");
+  const written = () =>
+    h.slack.apiCalls.filter(
+      (c) =>
+        c.method !== "agents.sessions.setStatus" &&
+        c.method !== "agents.sessions.rename" &&
+        c.method !== "conversations.replies" &&
+        c.method !== "conversations.info",
+    );
   const callsBefore = written().length;
   assert.ok(await h.manager.release(CHANNEL, THREAD));
   assert.ok(session.closed && session.doneClosing.isSet);
@@ -5202,7 +5216,11 @@ test("a background subagent s api error is the reason in its end line", async (t
   assert.deepEqual(toolCards(h.slack.messageCards().flat()), []);
   assert.ok(!h.reactions().includes(Status.ERROR)); // the main turn and its report both succeeded
   assert.deepEqual(
-    log.entries.filter((entry) => entry.level === "WARNING").map((entry) => entry.message),
+    log.entries
+      .filter(
+        (entry) => entry.level === "WARNING" && !entry.message.includes("agents.sessions.rename"),
+      )
+      .map((entry) => entry.message),
     [`Claude Code reported a subagent's error in ${CHANNEL}/${THREAD}: server_error`],
   );
 });

@@ -67,6 +67,7 @@ import { crossing, deliver, deliverNotice, postInThread } from "./notice.ts";
 import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
 import { AgentSessions } from "./reply/agent-session.ts";
+import { AgentTitles } from "./reply/agent-titles.ts";
 import { contextBlock, footerBlock, noticeText, split } from "./reply/blocks.ts";
 import { crossedError, deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape, quietMentions } from "./reply/escape.ts";
@@ -327,7 +328,9 @@ export class SlackChat implements ChatProvider {
         if (this.stopped.aborted) return;
         const text = await rereading(ref, () => roots.title(ref.channel, ref.thread, title, keep));
         // The channel's line may have read the root before this title reached it.
-        if (!this.stopped.aborted) void options.line?.retitle(ref.channel, ref.thread, text);
+        if (this.stopped.aborted) return;
+        void options.line?.retitle(ref.channel, ref.thread, text);
+        agentTitlesOf(options).title(ref, text);
       };
     }
     if (options.app?.deletion !== undefined) {
@@ -556,7 +559,11 @@ export class SlackChat implements ChatProvider {
   }
 
   async close(): Promise<void> {
+    // Titles first marked closed: a status success draining meanwhile starts no sender.
+    const titles = agentTitlesOf(this.options);
+    titles.halt();
     await agentSessionsOf(this.options).close();
+    await titles.close();
     await this.options.app?.home.close();
   }
 }
@@ -579,13 +586,29 @@ const agentSessions = new WeakMap<SlackChatOptions, AgentSessions>();
 function agentSessionsOf(options: SlackChatOptions): AgentSessions {
   let sessions = agentSessions.get(options);
   if (sessions === undefined) {
+    const titles = agentTitlesOf(options);
     sessions = new AgentSessions(options.slack, {
       clock: options.steady ?? options.clock ?? monotonicClock,
       initiator: options.identity.ownerUserId,
+      created: (ref) => titles.exists(ref),
     });
     agentSessions.set(options, sessions);
   }
   return sessions;
+}
+
+// The titles of those sessions, per provider (`reply/agent-titles.ts`).
+const agentTitles = new WeakMap<SlackChatOptions, AgentTitles>();
+
+function agentTitlesOf(options: SlackChatOptions): AgentTitles {
+  let titles = agentTitles.get(options);
+  if (titles === undefined) {
+    titles = new AgentTitles(options.slack, {
+      clock: options.steady ?? options.clock ?? monotonicClock,
+    });
+    agentTitles.set(options, titles);
+  }
+  return titles;
 }
 
 /** How a thread object holds its thread's places: taken at its first reply, given back at its close. */

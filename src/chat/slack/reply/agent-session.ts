@@ -67,6 +67,8 @@ export interface AgentSessionsOptions {
   readonly clock: Clock;
   /** The user a new session is attributed to (`initiator_user_id`): the owner. Absent: none. */
   readonly initiator?: string;
+  /** A `setStatus` succeeded for the thread: its session exists. */
+  readonly created?: (ref: ThreadRef) => void;
   readonly refresh?: number;
   readonly logger?: Logger;
 }
@@ -77,6 +79,7 @@ export class AgentSessions {
   readonly #refresh: number;
   readonly #log: Logger;
   readonly #initiator: string | undefined;
+  readonly #created: ((ref: ThreadRef) => void) | undefined;
   // Channels whose `initiator_user_id` Slack refused while the call passed without it.
   readonly #bare = new Set<string>();
   readonly #entries = new Map<string, Entry>();
@@ -93,6 +96,7 @@ export class AgentSessions {
     this.#refresh = options.refresh ?? SESSION_REFRESH_SECONDS;
     this.#log = options.logger ?? logger;
     this.#initiator = options.initiator;
+    this.#created = options.created;
   }
 
   /** The root status of the thread changed (`null`: no status). */
@@ -262,6 +266,7 @@ export class AgentSessions {
       await this.#set(entry.ref, status);
       entry.failedCode = null;
       this.#proven = true;
+      this.#created?.(entry.ref);
       return "sent";
     } catch (error) {
       const code = describe(error);

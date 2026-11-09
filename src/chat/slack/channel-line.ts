@@ -64,8 +64,8 @@ const NO_LABEL = "a thread";
 
 type Message = Readonly<Record<string, unknown>>;
 
-/** The thread's root as one short line of plain words: its title, or its first words. */
-export function lineLabel(root: Message | undefined): string {
+/** The thread's root as one line of plain words, uncut: its title, or its first non-empty line. */
+export function rootFirstLine(root: Message | undefined): string {
   // A root opened with a lead is named by its title once it has one; its `text` is never read.
   const title = root === undefined ? null : (rootLead(root)?.title ?? null);
   // The title goes through the same text form `retitle` is handed (`retitledText`), so both paths
@@ -76,7 +76,12 @@ export function lineLabel(root: Message | undefined): string {
     .split("\n")
     .map((line) => line.trim())
     .find((line) => line !== "");
-  if (words === undefined) return NO_LABEL;
+  return words ?? NO_LABEL;
+}
+
+/** The thread's root as one short line of plain words: `rootFirstLine` cut to `LABEL_LIMIT`. */
+export function lineLabel(root: Message | undefined): string {
+  const words = rootFirstLine(root);
   // By code point, so no character is cut in half.
   const chars = Array.from(words);
   return chars.length > LABEL_LIMIT ? `${chars.slice(0, LABEL_LIMIT - 1).join("")}…` : words;

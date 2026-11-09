@@ -697,27 +697,30 @@ test("a thread failing with the same code logs once, whatever other threads do",
 function withInitiator() {
   const slack = new FakeSlack();
   const clock = new FakeClock();
+  const created: string[] = [];
   const sessions = new AgentSessions(slack, {
     clock,
     logger: new Lines(),
     initiator: OWNER,
+    created: (ref) => void created.push(ref.thread),
   });
-  return { slack, clock, sessions };
+  return { slack, clock, sessions, created };
 }
 
 const calls = (slack: FakeSlack) => slack.callsTo("agents.sessions.setStatus");
 
-test("setStatus names the owner as the initiator", async () => {
-  const { slack, sessions } = withInitiator();
+test("setStatus names the owner as the initiator and reports the session made", async () => {
+  const { slack, sessions, created } = withInitiator();
   sessions.root(REF, "working");
   await sessions.close();
   assert.deepEqual(calls(slack), [
     { channel_id: CHANNEL, thread_ts: THREAD, status: "processing", initiator_user_id: OWNER },
   ]);
+  assert.deepEqual(created, [THREAD]);
 });
 
 test("a platform refusal of the initiator is sent again at once without it, and remembered", async () => {
-  const { slack, sessions } = withInitiator();
+  const { slack, sessions, created } = withInitiator();
   slack.responses["agents.sessions.setStatus"] = [rejected("user_not_in_channel"), { ok: true }];
   sessions.root(REF, "working");
   await sessions.close();
@@ -725,6 +728,7 @@ test("a platform refusal of the initiator is sent again at once without it, and 
     calls(slack).map((call) => call.initiator_user_id),
     [OWNER, undefined],
   );
+  assert.deepEqual(created, [THREAD]);
   sessions.root(REF, "waiting");
   await sessions.close();
   assert.equal(calls(slack).at(-1)?.initiator_user_id, undefined);
@@ -732,7 +736,7 @@ test("a platform refusal of the initiator is sent again at once without it, and 
 });
 
 test("a bot outside the channel marks nothing: both calls fail and the ordinary retry follows", async () => {
-  const { slack, clock, sessions } = withInitiator();
+  const { slack, clock, sessions, created } = withInitiator();
   slack.responses["agents.sessions.setStatus"] = [
     rejected("user_not_in_channel"),
     rejected("not_in_channel"),
@@ -740,12 +744,14 @@ test("a bot outside the channel marks nothing: both calls fail and the ordinary 
   ];
   sessions.root(REF, "working");
   await clock.advance(0);
+  assert.deepEqual(created, []);
   await clock.advance(SESSION_RETRY_SECONDS[0] as number);
   await sessions.close();
   assert.deepEqual(
     calls(slack).map((call) => call.initiator_user_id),
     [OWNER, undefined, OWNER],
   );
+  assert.deepEqual(created, [THREAD]);
 });
 
 test("a rate limit or a service error on the creating call is retried with the initiator", async () => {
@@ -768,4 +774,18 @@ test("a rate limit or a service error on the creating call is retried with the i
       [OWNER, OWNER],
     );
   }
+});
+
+test("SlackChat.close halts the titles before the sessions drain: a late setStatus starts no read", async () => {
+  const { slack, chat } = madeChat();
+  slack.gate = new AsyncEvent();
+  slack.gateMethod = "agents.sessions.setStatus";
+  chat.agentSessions.root(REF, "working");
+  await slack.gated.wait();
+  const closing = chat.close();
+  slack.gate.set();
+  await closing;
+  assert.equal(calls(slack).length, 1);
+  assert.deepEqual(slack.callsTo("conversations.replies"), []);
+  assert.deepEqual(slack.callsTo("agents.sessions.rename"), []);
 });
