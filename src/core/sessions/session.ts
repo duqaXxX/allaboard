@@ -356,6 +356,8 @@ export class ThreadSession {
   // What the running turn's reply says when it ends: how many queued messages a restart
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
+  /** The owner's messages the end notes answer (`takenNote`). */
+  private takenIds: MessageId[] = [];
   // Tasks a subagent started and left running (a command in the background). Their end is told
   // to the subagent, which reports it: the terminal prints no line for it in the conversation
   // (captured 2026-10-14, Claude Code 2.1.296), and neither does a reply.
@@ -427,9 +429,12 @@ export class ThreadSession {
   // Set while no turn is active; `nameCopy` waits on it for a turn the agent opened.
   private readonly noTurn = new Event();
   private injectedExpected = false;
-  // The prompt whose replay arrived with no turn running: the turn that starts next is its
-  // own (`acknowledge`, `whoseTurn`).
-  private announced: Turn | null = null;
+  // The prompts whose replay arrived with no turn running, in order: the turn that starts next
+  // is the first one's own and takes the others in (`acknowledge`, `whoseTurn`).
+  private announced: Turn[] = [];
+  // Set by a `!stop` that found prompts sent and no turn: the turn that starts next is not
+  // covered by the stop's own status (`ActiveTurn.afterStop`).
+  private stopInGap = false;
   // A report turn was awaited when a prompt's own turn started in its place: it is awaited
   // again once that turn ends (`settle`).
   private reportDue = false;
@@ -652,11 +657,9 @@ export class ThreadSession {
     // The lock is taken after the wait, not during it: a turn that runs needs the process.
     let release: () => void;
     for (;;) {
-      // Idle and settled: no turn runs and none is expected (a task's notification is).
-      await this.noTurn.wait(signal);
-      await this.settled.wait(signal);
+      await this.untilIdle(signal);
       release = await this.connectLock.acquire(signal);
-      if (this.active === null && this.settled.isSet) break;
+      if (this.isIdle()) break;
       release();
     }
     // A stop or a drain may have come during the wait: the prompt goes no further, nor its name.
@@ -678,6 +681,35 @@ export class ThreadSession {
     } catch (error) {
       logger.warning(`could not record that ${this.where} is named: ${errorName(error)}`);
     }
+  }
+
+  /**
+   * Nothing runs, nothing is sent and none is expected (a task's notification is). The title's
+   * prompt waits for this: the agent hides the records of prompts sent before a rename.
+   */
+  private isIdle(): boolean {
+    return this.active === null && this.pending.length === 0 && this.settled.isSet;
+  }
+
+  /** The turns sent whose end is still awaited: one with `done` set is gone, whatever `sent` holds. */
+  private get pending(): Turn[] {
+    return this.sent.filter((turn) => !turn.done.isSet);
+  }
+
+  /** Waits, cancellable, until `isIdle` may hold; the caller re-checks it where it matters. */
+  private async untilIdle(signal: AbortSignal): Promise<void> {
+    while (!this.isIdle()) {
+      await this.noTurn.wait(signal);
+      await this.settled.wait(signal);
+      await Promise.all(this.pending.map((turn) => turn.done.wait(signal)));
+    }
+  }
+
+  /** The prompt runs one of the agent's own commands (`AgentWords.commandPrefix`). */
+  private isCommand(prompt: Turn["prompt"]): boolean {
+    return (
+      typeof prompt === "string" && strip(prompt).startsWith(this.deps.agent.words.commandPrefix)
+    );
   }
 
   /** The agent's own name for the mode that skips permission requests; null when it has none. */
@@ -1108,16 +1140,23 @@ export class ThreadSession {
     }
   }
 
+  /** End note: the agent took `count` prompts into the turn, and the reply answers them. */
+  private noteTaken(prompts: readonly Turn[]): void {
+    this.endNotes.push(takenNote(prompts.length, this.names));
+    for (const { messageId } of prompts) if (messageId !== null) this.takenIds.push(messageId);
+  }
+
   /** Say, at the end of the reply that just ran, what a restart dropped meanwhile. */
   private async feedEndNotes(renderer: TurnRenderer): Promise<void> {
     // A note pushed while one is fed (a stop landing meanwhile) is fed in the same pass.
     while (this.endNotes.length > 0) {
       const notes = this.endNotes;
       this.endNotes = [];
-      for (const note of notes) await renderer.feedError(note);
+      for (const note of notes) await renderer.feedError(note, { answers: this.takenIds });
     }
     // (sync) Right after the last check: from here `drop` posts its note itself.
     this.endNotesRead = true;
+    this.takenIds = [];
   }
 
   /**
@@ -1134,6 +1173,7 @@ export class ThreadSession {
     shell: string | null = null,
     signal?: AbortSignal,
     title: string | null = null,
+    messageId: MessageId | null = null,
   ): Promise<Turn> {
     signal?.throwIfAborted();
     if (this.closedFlag) throw new SessionClosed();
@@ -1150,7 +1190,7 @@ export class ThreadSession {
       // reader had not read yet. So the reply is awaited here only when making it does wait,
       // which is what the check below is for.
       const made = this.sink();
-      turn = new Turn(prompt, made instanceof Promise ? await made : made, shell, title);
+      turn = new Turn(prompt, made instanceof Promise ? await made : made, shell, title, messageId);
       if (this.closedFlag) {
         // The session closed (an idle close or a restart, or `ensureConnected`'s SessionGone
         // branch, which already drained the queue) while the reply was made: no worker will
@@ -1867,7 +1907,18 @@ export class ThreadSession {
     // A denial `denyAll` triggers below resolves `askOwner`'s own wait, whose `finally`
     // would otherwise race this method's own closing ✅ back to working; this flag makes it
     // skip that instead. `finish` or `abandon` clears it once this turn's own tail ends.
-    this.interrupting = true;
+    // With prompts sent and no turn yet, the next turn is not the one this stop cut (it may not
+    // even exist): it reacts working as any turn does, and its end owes the root a ✅.
+    // (An open request means a turn runs, whatever `active` says yet.)
+    const gap =
+      this.deps.agent.capabilities.promptDuringTurn &&
+      this.active === null &&
+      this.pending.length > 0 &&
+      !this.waitingForOwner;
+    // The channel's stop drops the goal once the turn it ended is over: in the gap that is the
+    // turn that starts next.
+    if (gap) this.stopInGap = true;
+    else this.interrupting = true;
     this.stopTail = this.stopTail ?? new Event();
     for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
       await this.deleteRequest(pending.messageId);
@@ -1889,8 +1940,9 @@ export class ThreadSession {
     }
     // A stop the owner gave is not an error, and he is not told of it: he has just given it.
     // `react` clears `errorStanding`, so a later idle sweep shows the same ✅ and `setStatus`
-    // drops the persisted ⏳.
-    this.react("done", { byOwner: true });
+    // drops the persisted ⏳. A turn that began meanwhile after a stop in the gap owns the root's
+    // status now, and its end sets the ✅.
+    if (!(gap && this.active !== null)) this.react("done", { byOwner: true });
     return true;
   }
 
@@ -2120,7 +2172,8 @@ export class ThreadSession {
       return false;
     }
     await this.stopLanded();
-    // The owner's next message may already run, or the stop closed the process meanwhile.
+    // A message runs, or the stop closed the process meanwhile: the agent's command would
+    // reach a session at work. A prompt sent before the stop keeps the goal (#185, docs/limits.md).
     if (this.busy || this.closed || this.client !== client) return false;
     try {
       await client.clearGoal();
@@ -2616,6 +2669,8 @@ export class ThreadSession {
   private async work(signal: AbortSignal): Promise<void> {
     // Closed (the SessionGone branch of `ensureConnected`, most likely) ends the loop instead
     // of looping back to an empty queue nothing will ever fill again.
+    // An agent that takes a prompt into a running turn is sent every prompt at once.
+    const atOnce = this.deps.agent.capabilities.promptDuringTurn;
     while (!this.closedFlag) {
       const turn = await this.queue.get(signal);
       // No `await` may come between the two lines: `stop()` relies on a turn out of the queue
@@ -2625,6 +2680,9 @@ export class ThreadSession {
         let client = await this.ensureConnected(signal);
         this.refreshUsage();
         if (turn.shell !== null) {
+          // A command runs only when nothing does, as the terminal runs one typed while busy;
+          // a stop or a drain that comes meanwhile drops it below.
+          if (atOnce) await this.untilIdle(signal);
           // A drain that has begun runs no command; one that begins while it runs drops it below.
           if (this.draining) {
             await this.dropForDrain(turn);
@@ -2648,8 +2706,23 @@ export class ThreadSession {
           // The run can take minutes: the process may have been lost meanwhile.
           client = await this.ensureConnected(signal);
         }
-        if (!this.settled.isSet) await this.settled.wait(signal);
+        if (!atOnce && !this.settled.isSet) await this.settled.wait(signal);
         await this.nameCopy(client, turn, signal);
+        // The agent runs a command after the turn, never folded into it, and its replay can come
+        // after its own text (measured 2026-11-09): it waits like a `!!`, and the checks below
+        // follow the wait.
+        if (atOnce && this.isCommand(turn.prompt)) await this.untilIdle(signal);
+        // A stop or a drain during either wait starts no process for a turn it ends.
+        if (this.draining) {
+          await this.dropForDrain(turn);
+          continue;
+        }
+        if (turn === this.stopTaken) {
+          await this.endStopped(turn, signal);
+          continue;
+        }
+        // Either wait may have outlived the process: the prompt goes to the one alive now.
+        client = await this.ensureConnected(signal);
         // (sync) from the check to the send: a drain raises every flag before its first
         // await, so no turn is sent in between.
         if (this.draining) {
@@ -2666,7 +2739,9 @@ export class ThreadSession {
         await cancellable(client.send({ id: turn.uuid, content: turn.prompt }), signal);
         // A prompt written after a cut is what makes the agent keep it.
         this.dropCut();
-        await turn.done.wait(signal);
+        // Nothing is sent behind a command until its turn has ended: its replay can come after
+        // its own text (measured 2026-11-09), so a prompt sent now could take its turn.
+        if (!atOnce || this.isCommand(turn.prompt)) await turn.done.wait(signal);
       } catch (error) {
         if (error instanceof Cancelled) throw error;
         this.taken = null;
@@ -2679,6 +2754,8 @@ export class ThreadSession {
           error instanceof SessionClosed ||
           error instanceof StartsBlocked
         ) {
+          const at = this.sent.indexOf(turn);
+          if (at !== -1) this.sent.splice(at, 1);
           await this.fail(turn, error.message, { error: true });
           this.idleTimerCheck(); // a no-op if this also closed the session
         } else {
@@ -2781,15 +2858,17 @@ export class ThreadSession {
    * whose uuid it sent, and an id that names no prompt still held as sent (in `sent`, or the
    * active turn's own) is ignored. A replay with no turn running names the prompt of the turn
    * that starts next (`whoseTurn`), whatever the session was waiting for. The worker sends one
-   * prompt at a time, so a turn takes in at most one.
+   * prompt at a time unless the agent declares `promptDuringTurn`; a turn then takes in as many
+   * as were sent.
    */
   private acknowledge(promptId: string): boolean {
     const active = this.active;
     const sent = [...this.sent, ...(active?.turn ? [active.turn] : [])];
     const turn = sent.find((candidate) => candidate.uuid === promptId);
     if (turn === undefined) return false;
-    if (active === null) this.announced = turn;
-    else if (!active.taken.includes(turn)) active.taken.push(turn);
+    if (active === null) {
+      if (!this.announced.includes(turn)) this.announced.push(turn);
+    } else if (!active.taken.includes(turn)) active.taken.push(turn);
     return true;
   }
 
@@ -3204,7 +3283,8 @@ export class ThreadSession {
         // asked for an approval left the root at work, which its end settles.
         const ownerTurn = !active.run || active.taken.length > 0;
         const moved = this.lastStatus === "working" || this.lastStatus === "waiting";
-        if (turnStopped) await this.showFooterIfEnded(signal);
+        if (turnStopped && !active.afterStop) await this.showFooterIfEnded(signal);
+        else if (turnStopped) await this.reactDoneIfIdle(signal, { byOwner: true });
         else if (ownerTurn || moved) await this.reactDoneIfIdle(signal);
         // The loop may have ended with this turn, the owner's or a run's.
         await this.endLoopIfOver();
@@ -3950,11 +4030,13 @@ export class ThreadSession {
    * a turn that fails before its first word (a logged-out CLI, a limit reached) and a turn with
    * no notification waiting were never recorded without their replay.
    */
-  private whoseTurn(worded: boolean): Turn | null {
-    const announced = this.announced;
-    this.announced = null;
-    if (announced !== null && this.sent.includes(announced)) {
+  private whoseTurn(worded: boolean, behind: Turn[]): Turn | null {
+    const [announced, ...others] = this.announced.filter((turn) => this.sent.includes(turn));
+    this.announced = [];
+    if (announced !== undefined) {
       this.sent.splice(this.sent.indexOf(announced), 1);
+      // The others were replayed behind it: the turn takes them in (`finish` releases them).
+      behind.push(...others);
       this.reportDue = this.injectedExpected;
       return announced;
     }
@@ -3963,8 +4045,7 @@ export class ThreadSession {
     const first = this.sent[0];
     if (this.injectedExpected || first === undefined) return null;
     const head = first.prompt;
-    const plain =
-      typeof head === "string" && !strip(head).startsWith(this.deps.agent.words.commandPrefix);
+    const plain = typeof head === "string" && !this.isCommand(head);
     if (worded && this.notificationWaits && plain) return null;
     this.sent.shift();
     return first;
@@ -3988,7 +4069,7 @@ export class ThreadSession {
       !this.reportGivenUp &&
       this.runningKindsOf() === "" &&
       !this.injectedExpected &&
-      this.announced === null &&
+      this.announced.length === 0 &&
       this.reportOf === null &&
       this.ended.length === 0 &&
       this.opening === null &&
@@ -4062,7 +4143,9 @@ export class ThreadSession {
     }
     this.promptReplayed = false;
     this.reportGivenUp = false;
-    const turn = run ? null : this.whoseTurn(worded);
+    const behind: Turn[] = [];
+    const replayed = this.announced.some((announced) => this.sent.includes(announced));
+    const turn = run ? null : this.whoseTurn(worded, behind);
     // An agent that takes no prompt into a running turn is sent the next one once this turn has
     // ended: `work` waits on `settled`, as it does for a report turn that was expected.
     if (turn === null && !this.deps.agent.capabilities.promptDuringTurn) this.settled.clear();
@@ -4104,7 +4187,9 @@ export class ThreadSession {
     const active: ActiveTurn = {
       turn,
       renderer,
-      taken: [],
+      taken: behind,
+      afterStop: this.stopInGap,
+      replayed,
       cut: false,
       released: [],
       takenNoted: false,
@@ -4113,8 +4198,10 @@ export class ThreadSession {
       startedAt: this.now(),
     };
     this.active = active;
+    this.stopInGap = false;
     this.noTurn.clear();
     this.endNotesRead = false;
+    this.takenIds = [];
     if (turn !== null) this.turnChanges.begin(turn.uuid);
     const reply = this.reply(renderer);
     if (!(reply instanceof LoopReply)) {
@@ -4491,7 +4578,9 @@ export class ThreadSession {
     const injected = result.startedBy === "agent";
     // The agent ends a turn it took prompts into with one result of its own for all of them. A
     // run it took a prompt into is that prompt's turn from then on.
-    const released = injected || active.run ? active.taken : [];
+    // An owner's turn answers its own prompt itself: only the others it took in are released.
+    const released =
+      injected || active.run ? active.taken : active.taken.filter((turn) => turn !== active.turn);
     const handedOver = active.run && released.length > 0;
     try {
       if (result.sessionId) {
@@ -4506,8 +4595,13 @@ export class ThreadSession {
       if (result.ending !== "done") this.unfolded.clear();
       this.interrupting = false; // this turn's own tail, whichever way it ended
       if (released.length > 0) {
-        this.endNotes.push(takenNote(released.length, this.names));
+        this.noteTaken(released);
         takenNoted = true;
+      }
+      // The stop cut the turn the moment it began: the agent never took the prompt in, and the
+      // note stands in the reply where the turn's own empty `Stopped.` would.
+      if (this.cutAtStart(active, result) && active.turn !== null) {
+        this.endNotes.push(notSent([active.turn], texts.BECAUSE_OWNER_STOPPED));
       }
       // What a restart dropped meanwhile is said where the running turn ends.
       await this.feedEndNotes(active.renderer);
@@ -4540,6 +4634,7 @@ export class ThreadSession {
         // that waits behind it is not its.
         if (active.run) this.releaseTaken(released);
         else this.settle(active.turn, result, released);
+        this.expectCutPrompts(active, result);
         this.expectUnfoldedReports();
         // A report turn's own reply is `closeReply`'s concern above; this catches every other
         // reply a joint one left stranded.
@@ -4548,6 +4643,45 @@ export class ThreadSession {
       }
     }
     return stopped;
+  }
+
+  /**
+   * The stop cut the turn the moment it began: it took no step, was not a replay, is not a command
+   * (whose turn takes no step and whose replay is not measured under a stop: never told unsent
+   * when it may have run) and no turn had taken it in.
+   */
+  private cutAtStart(active: ActiveTurn, result: TurnEnded): boolean {
+    return (
+      active.afterStop &&
+      !active.replayed &&
+      active.turn !== null &&
+      !this.isCommand(active.turn.prompt) &&
+      !active.taken.includes(active.turn) &&
+      result.steps === 0
+    );
+  }
+
+  /**
+   * A `!stop` in the gap cut a turn the moment it began (`init`, then an error with no replay,
+   * measured 2026-11-09), and prompts sent behind it are still waiting: the agent either runs
+   * each as a turn of its own (the terminal does, M3) or the cut took them with it, and nothing
+   * tells the two apart at this end. Those that no turn has claimed after `INJECTED_TURN_WAIT`
+   * were taken: they are said not to be sent, and the session is idle again.
+   */
+  private expectCutPrompts(active: ActiveTurn, result: TurnEnded): void {
+    if (!this.cutAtStart(active, result) || this.closedFlag) return;
+    const waiting = this.sent.filter((turn) => !active.taken.includes(turn));
+    if (waiting.length === 0) return;
+    const expiry: Task = new Task(async (signal) => {
+      await this.deps.clock.sleep(INJECTED_TURN_WAIT, signal);
+      const left = waiting.filter((turn) => this.sent.includes(turn));
+      if (this.active !== null || left.length === 0) return;
+      this.sent = this.sent.filter((turn) => !left.includes(turn));
+      await this.dropStopped(left);
+      await this.reactDoneIfIdle(signal, { byOwner: true });
+    });
+    this.expiring.add(expiry);
+    expiry.settled().then(() => this.expiring.delete(expiry));
   }
 
   /**
@@ -4630,7 +4764,7 @@ export class ThreadSession {
       taken.done.set();
     }
     const waiting = this.sent[0];
-    if (turn === null && !injected && waiting !== undefined) {
+    if (turn === null && !injected && waiting !== undefined && released.length === 0) {
       logger.warning(`an owner reply in ${this.where} went to a background reply`);
       // Only misrouted, not failed, so no ❌. Its answer is already in the reply that was
       // guessed to be the report: the owner turn's own reply is never written.
@@ -4692,16 +4826,23 @@ export class ThreadSession {
     const whole = ended !== null;
     const released = ended?.released ?? [];
     if (ended !== null && released.length > 0 && !ended.takenNoted) {
-      this.endNotes.push(takenNote(released.length, this.names));
+      this.noteTaken(released);
     }
     const unanswered = ended?.unanswered ?? null;
+    // Prompts the agent took into the running turn were received: they get the taken note, not
+    // the not-sent one (a cut turn's are in `released` and noted above).
+    const takenIn =
+      active !== null && !active.cut ? active.taken.filter((turn) => turn !== active.turn) : [];
+    if (takenIn.length > 0) this.noteTaken(takenIn);
     const dropped = [
       ...(unanswered === null ? [] : [unanswered]),
-      ...this.sent.filter((turn) => !released.includes(turn) && turn !== unanswered),
+      ...this.sent.filter(
+        (turn) => !released.includes(turn) && !takenIn.includes(turn) && turn !== unanswered,
+      ),
       ...more,
     ];
     this.sent = [];
-    const waiting = [...(active?.turn ? [active.turn] : []), ...released, ...dropped];
+    const waiting = [...(active?.turn ? [active.turn] : []), ...released, ...takenIn, ...dropped];
     // What `reactDoneIfIdle` reads at a normal end, before anything below changes it: an error
     // that stands (a restart dropped prompts) and a task of any reply's that still runs keep the
     // root from the status of a turn that ended.
@@ -4712,7 +4853,8 @@ export class ThreadSession {
       ended.renderer.runningTasks.length === 0 &&
       !this.runningKindsOf();
     this.injectedExpected = false;
-    this.announced = null;
+    this.announced = [];
+    this.stopInGap = false;
     this.reportDue = false;
     this.notificationWaits = false;
     this.unfolded.clear();

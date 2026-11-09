@@ -5,7 +5,8 @@
  *
  * It declares two effort levels that cannot change on a live session, one permission mode,
  * questions, two commands of its own and session listing. It lacks subagents, background tasks,
- * compaction, usage limits, a model list, a prompt during a turn and folder trust. A session is
+ * compaction, usage limits, a model list, a prompt during a turn (unless `promptDuringTurn`) and
+ * folder trust. A session is
  * named (`session_started`) with its first prompt, as Claude's is: until then it has no id the
  * core could resume; `namedAtStart` names it at the start instead, as an agent that allots an id
  * before any prompt does.
@@ -567,6 +568,8 @@ export interface PlainSessionContext {
   readonly rewinds: boolean;
   /** The conversation cannot be cut before a session's first prompt. */
   readonly firstUncuttable: boolean;
+  /** The agent takes prompts into a running turn and announces the others (`promptDuringTurn`). */
+  readonly promptDuringTurn: boolean;
 }
 
 export class PlainSession implements AgentSession {
@@ -581,6 +584,12 @@ export class PlainSession implements AgentSession {
   readonly renames: string[] = [];
   /** A rename waits for this to resolve; a test holds it to keep a rename in flight. */
   renameGate: Promise<void> | null = null;
+  /**
+   * A prompt's turn waits for this before it plays, the gap between a send and the first event:
+   * an interrupt that comes meanwhile cuts the turn the moment it starts, as the CLI's does.
+   */
+  playGate: Promise<void> | null = null;
+  #interruptedInGap = false;
   /** Every request put to the owner with the answer it got. */
   readonly answers: PlainAnswered[] = [];
   closed = false;
@@ -593,6 +602,19 @@ export class PlainSession implements AgentSession {
   #sequence = 0;
   #cut = false;
   #interruptRename: (() => void) | null = null;
+  /** With `promptDuringTurn`: prompts sent while a turn plays, not yet taken into it. */
+  #waiting: string[] = [];
+  /** With `promptDuringTurn`: prompts a turn took in, which play no turn of their own. */
+  readonly #folded = new Set<string>();
+  /** With `promptDuringTurn` and a `playGate`: a turn's start is awaited, and more prompts may come. */
+  #gapOpen = false;
+  /** The prompts sent in that gap, announced right after the first. */
+  #gapped: string[] = [];
+  /**
+   * With `promptDuringTurn`: a cut in the gap leaves the prompts sent in it to run as turns of their
+   * own (M3), where the default is that the cut took them all (the plain agent's folding).
+   */
+  gapCutLeavesRest = false;
 
   constructor(context: PlainSessionContext) {
     this.#context = context;
@@ -636,7 +658,15 @@ export class PlainSession implements AgentSession {
         conversation: !(first && this.#context.firstUncuttable),
       });
     }
-    this.#chain = this.#chain.then(() => this.#play(text));
+    if (this.#context.promptDuringTurn && this.#command(text) === null) {
+      if (this.#turn !== null) this.#waiting.push(prompt.id);
+      else if (this.#gapOpen) {
+        // Sent between a send and its turn: replayed with the first, and taken into its turn.
+        this.#gapped.push(prompt.id);
+        this.#folded.add(prompt.id);
+      }
+    }
+    this.#chain = this.#chain.then(() => this.#play(text, prompt.id));
   }
 
   /** Lets a turn waiting at `hold()` go on. */
@@ -660,6 +690,7 @@ export class PlainSession implements AgentSession {
 
   async interrupt(): Promise<void> {
     this.#interruptRename?.();
+    if (this.#turn === null && this.playGate !== null) this.#interruptedInGap = true;
     this.#turn?.abort();
   }
 
@@ -730,16 +761,38 @@ export class PlainSession implements AgentSession {
     if (!this.lost) this.#queue.push(event);
   }
 
-  async #play(text: string): Promise<void> {
+  async #play(text: string, promptId: string): Promise<void> {
     if (this.closed || this.lost) return;
+    if (this.#folded.delete(promptId)) return;
+    const gate = this.playGate;
+    if (gate !== null) {
+      this.#gapOpen = true;
+      await gate;
+      this.#gapOpen = false;
+    }
+    // An interrupt in the gap cuts the prompt before the model sees it, as Claude Code's does
+    // (2026-11-09: `init`, then an error with no turn and no replay of the prompt). It is read
+    // and lowered for a command too, which an interrupt does not cut.
     const command = this.#command(text);
+    const cutInGap = this.#interruptedInGap && command === null;
+    this.#interruptedInGap = false;
+    if (this.#context.promptDuringTurn && !cutInGap) {
+      this.#push({ type: "prompt_taken", promptId });
+      for (const id of this.#gapped) this.#push({ type: "prompt_taken", promptId: id });
+    }
+    if (cutInGap && this.gapCutLeavesRest) {
+      for (const id of this.#gapped) this.#folded.delete(id);
+    }
+    this.#gapped = [];
     const turn = new Turn();
     if (command !== null) {
       this.#push({ type: "text", text: command });
       turn.finalText = command;
     } else {
       this.#turn = new AbortController();
+      if (cutInGap) this.#turn.abort();
       await this.#steps(this.#context.takeTurn(), turn, this.#turn.signal);
+      this.#waiting = [];
       if (this.#turn.signal.aborted && !this.closed && !this.lost) turn.ending = "interrupted";
       this.#turn = null;
     }
@@ -779,6 +832,11 @@ export class PlainSession implements AgentSession {
   async #steps(steps: readonly PlainStep[], turn: Turn, signal: AbortSignal): Promise<void> {
     for (const step of steps) {
       if (signal.aborted || this.closed || this.lost) return;
+      for (const promptId of this.#waiting) {
+        this.#folded.add(promptId);
+        this.#push({ type: "prompt_taken", promptId });
+      }
+      this.#waiting = [];
       if ("say" in step) {
         this.#say(step.say, turn);
       } else if ("whole" in step) {
@@ -980,6 +1038,12 @@ export interface PlainAgentOptions {
   /** Each session is named when it starts, not with its first prompt. */
   readonly namedAtStart?: true;
   /**
+   * The agent declares `promptDuringTurn`: a prompt sent while a turn plays is taken into it at
+   * the turn's next step (`prompt_taken`, no turn of its own); one the turn does not reach is
+   * announced (`prompt_taken`) right before the turn it gets of its own.
+   */
+  readonly promptDuringTurn?: true;
+  /**
    * The agent keeps a record of trust (`folderTrust`): every folder may hold a session, and the
    * repository of a folder is what `repository` answers while `trusted` says the folder is
    * trusted. Its line to ask for trust is `trust {directory}`.
@@ -1063,6 +1127,9 @@ export class PlainAgent implements AgentBackend {
         conversationRewind: options.rewind.conversation === true,
       });
       this.prompts = async (folder, session) => this.store.prompts(folder, session);
+    }
+    if (options.promptDuringTurn === true) {
+      this.capabilities = Object.freeze({ ...this.capabilities, promptDuringTurn: true });
     }
     if (options.models !== undefined) {
       this.capabilities = Object.freeze({ ...this.capabilities, models: true });
@@ -1149,6 +1216,7 @@ export class PlainAgent implements AgentBackend {
       namedAtStart: this.#namedAtStart,
       rewinds: this.#rewind !== undefined,
       firstUncuttable: this.#rewind?.firstUncuttable === true,
+      promptDuringTurn: this.capabilities.promptDuringTurn,
     });
     if (this.#rewind?.files === true) {
       session.restoreFiles = async (promptId, preview) =>

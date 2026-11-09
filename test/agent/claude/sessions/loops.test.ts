@@ -594,7 +594,9 @@ test("a run's report that comes after a message of the owner's is an ordinary re
   const report = withResult(injected, "THE REPORT");
   h.clients[0]?.inject([...report.slice(0, -1), replay(id, "and now this"), ...report.slice(-1)]);
   await h.until(() => asked.done.isSet);
-  await h.until(() => h.replies().some((text) => text.includes("took your message")));
+  await h.until(() =>
+    h.replies().some((text) => text.includes("took your message into this turn")),
+  );
   await h.idle();
   assert.equal(card(h), shown, "the card keeps the run's words");
   await session.close();

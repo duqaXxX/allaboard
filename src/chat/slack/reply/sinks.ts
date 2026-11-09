@@ -582,6 +582,8 @@ export class ReplySink implements Sink {
   private finished = false;
   /** `rest` was called: the reply's messages are no longer streams. */
   private restRequested = false;
+  /** The owner's messages the core said the end answers (`text`'s `answers`). */
+  private readonly answered: string[] = [];
   /** The agent's own words were written after the reply rested: a report turn's text. */
   private reportedSinceRest = false;
   /**
@@ -750,8 +752,10 @@ export class ReplySink implements Sink {
       readonly notice?: boolean;
       readonly ending?: boolean;
       readonly aside?: boolean;
+      readonly answers?: readonly string[];
     } = {},
   ): Promise<void> {
+    this.answered.push(...(options.answers ?? []));
     const ending = options.ending ?? false;
     const notice = (options.notice ?? false) || ending;
     const aside = options.aside ?? false;
@@ -2496,10 +2500,21 @@ export class ReplySink implements Sink {
       // does: a later change edits that message (`syncMessages`).
       return true;
     }
+    // A message the end answers sits below the stream (one the agent took into the turn; any
+    // other owner message, a `!stop` or a queued prompt, splits nothing) and there is an ending
+    // to move: the stream stops with no footer, as past STREAM_SECONDS, and the text after its
+    // last call, the end lines and the footer follow as a new message below it (the second push).
+    const split =
+      message.streaming &&
+      this.places.anyBelow(this, this.answered) &&
+      this.endingCursor(message) !== null;
     if (message.streaming) {
-      const result = await this.stop(message, this.footerBlocks(), null);
+      const result = await this.stop(message, split ? null : this.footerBlocks(), null);
       if (result === "failed") return false;
-      if (result === "stopped") this.endMode = "inline";
+      // The ids answered an end that has now used them: a later end of this reply (a report
+      // turn's text after a rest) is not split by them.
+      this.answered.length = 0;
+      if (result === "stopped" && !split) this.endMode = "inline";
       // A stream cannot fold its cards: the update that follows its stop does, silently. The
       // reply has ended whatever becomes of that write: one that fails is tried once more with
       // the next pass, and the cards stay if that fails too.
@@ -2507,7 +2522,7 @@ export class ReplySink implements Sink {
         this.version += 1;
         this.schedule();
       }
-      if (result === "stopped") return true;
+      if (result === "stopped" && !split) return true;
     }
     // Everything below may create a message, and is decided with the thread's places held.
     const free = await this.creating();

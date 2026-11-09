@@ -186,6 +186,17 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   posts the ending as a new message. The stop is a notification of its own: a request under a
   streaming reply costs two pushes when the owner is away from the thread (the stop, the request)
   where it cost one, plus the ending; one when he is watching.
+- **An owner message sits below the open stream.** A message the agent took into the turn is
+  posted below the reply's last message, and `ThreadPlaces.ownerPosted` records it
+  (`ThreadPlaces.anyBelow`). When one of the messages the reply's end answers (the core passes
+  their ids with the taken note, `text`'s `answers`; a `!stop` or a queued prompt below splits
+  nothing) sits below the reply's last message, the reply has an ending to move
+  (`ReplySink.endingCursor`) and its stream is still open, `ReplySink.end`
+  stops the stream with no footer and goes on as after the 280 seconds: the text written after the
+  last call, the end lines and the footer are posted as a new message below the owner's. Two
+  pushes when the owner is away (the stop, the new message) where an end with nothing below costs
+  one. A reply with no message yet, or whose end `endCreating` skips (another reply below it), is
+  not split.
 - **280 seconds pass first.** `ReplySink.expire` stops the stream (Slack pushes on the stop, the
   first notification) and the same message keeps growing with `chat.update`, which never notifies
   (measured: "Update after stop is silent"). Each update writes the whole message from the

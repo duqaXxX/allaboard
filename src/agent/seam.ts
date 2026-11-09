@@ -113,7 +113,14 @@ export interface Capabilities {
   readonly models: boolean;
   /** `AgentInfo.commands` lists commands of the agent's own, which a prompt can run. */
   readonly commands: boolean;
-  /** A prompt sent while a turn runs is taken into that turn (`prompt_taken`). */
+  /**
+   * The agent accepts a prompt while a turn runs, and the core sends every prompt at once. A
+   * prompt sent while a turn runs, or between turns, is named by exactly one `prompt_taken`,
+   * before the first event of the turn that answers it or inside that turn (which then ends with
+   * one result for all it took in). Prompts not taken in run in the order they were sent. A
+   * command (`AgentWords.commandPrefix`) is never taken into a turn. Without it the core sends
+   * one prompt, waits for its turn to end, then sends the next.
+   */
   readonly promptDuringTurn: boolean;
   /** `listSessions` and `datedSessions`. */
   readonly sessionListing: boolean;

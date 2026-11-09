@@ -27,7 +27,6 @@ import {
   inside,
   isTopLevelCall,
   toolUseOf,
-  workerHolds,
 } from "./helpers.ts";
 
 /**
@@ -122,12 +121,10 @@ async function playTheContinuedAgent(
   client.inject([...agentWorks, ...r.head]);
   await commandRuns(h, session, r.callId);
   const prompt = await session.submit("what did it find?");
-  await workerHolds(h, session, prompt);
-  // The report turn would take the prompt into itself and end it with its own one result.
-  assert.equal(client.queries.length, sentSoFar);
-  client.inject(r.rest);
+  // Sent at once; the report turn does not take it in and ends with its own one result.
   await h.until(() => client.queries.length === sentSoFar + 1);
-  assert.equal(inside(session).active, null);
+  client.inject(r.rest);
+  await h.until(() => inside(session).active === null);
   client.answer(m.slice(at(r.results, -2) + 1, answered + 1));
   await prompt.done.wait();
   await h.until(() => inside(session).active === null);

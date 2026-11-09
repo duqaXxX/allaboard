@@ -136,6 +136,42 @@ test("a message with files and no text names nothing; the next text prompt does"
   assert.deepEqual(renames(agent), ["read it"]);
 });
 
+test("the prompt that names the copy waits until every prompt sent before it is answered", async (t) => {
+  // An agent that takes a prompt in at once hides the records of a prompt sent before a rename,
+  // and the prompt may be sent while its turn has not begun.
+  const agent = new PlainAgent({ promptDuringTurn: true });
+  const { world, ref } = await bareCopy(t, agent);
+  await world.says("!status", ref.thread); // connects the copy
+  await world.settle();
+  const copy = agent.sessions.at(-1);
+  assert.ok(copy);
+  let begin!: () => void;
+  copy.playGate = new Promise<void>((resolve) => {
+    begin = resolve;
+  });
+  agent.next(say("Seen."));
+  await world.send({
+    ref,
+    id: "msg-files",
+    text: "",
+    plain: "",
+    literal: true,
+    content: async () => "Attached files: /tmp/a.txt",
+  });
+  await world.settle();
+  assert.equal(copy.prompts.length, 1, "the first prompt is sent, its turn not begun");
+
+  await world.says("read it", ref.thread);
+  await world.settle();
+  assert.deepEqual(renames(agent), [], "no rename behind a prompt that is not answered");
+  assert.equal(copy.prompts.length, 1, "nor the prompt that carries the title");
+
+  begin();
+  await world.settle();
+  assert.deepEqual(renames(agent), ["read it"]);
+  assert.equal(copy.prompts.length, 2);
+});
+
 test("a hold cancelled before any turn leaves the root with no status", async (t) => {
   const { world, ref } = await bareCopy(t);
   const session = world.sessions.get(ref.channel, ref.thread);

@@ -20,7 +20,6 @@ import {
   renamedBackground,
   splitBackground,
   splitNestedBackground,
-  workerHolds,
 } from "./helpers.ts";
 
 const LIST_ID = "running-list";
@@ -212,15 +211,18 @@ test("a report turn opened below the owner's message: the list sits under the pr
   // message that started B, B's reply, the prompt, R, then the prompt's reply.
   const [first, notice, injected] = splitBackground();
   const [firstB] = renamedBackground();
-  const h = harnessFor(t)({ turns: [first, firstB, answer] });
+  const h = harnessFor(t)({ turns: [first, firstB] });
   const session = h.session();
   await (await session.submit("start A")).done.wait();
   await (await session.submit("start B")).done.wait();
   h.clients[0]?.inject(notice);
   await h.idle();
   const prompt = await session.submit("and now?");
-  await workerHolds(h, session, prompt);
+  // Sent at once; the report turn comes first and the agent answers the prompt after it.
+  await h.until(() => h.clients[0]?.queries.length === 3);
   h.clients[0]?.inject(injected);
+  await h.until(() => inside(session).active === null && inside(session).sent.length === 1);
+  h.clients[0]?.answer(answer);
   await prompt.done.wait();
   await h.until(() => inside(session).active === null);
   await h.idle();

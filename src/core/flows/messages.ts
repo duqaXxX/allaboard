@@ -464,7 +464,7 @@ export function messages(
             // nothing.
             const title = asCommand ? null : outgoing.message.plain.trim() || null;
             sessions.suggestions.clear(ref);
-            await session.submit(prompt, null, ticket.signal, title);
+            await session.submit(prompt, null, ticket.signal, title, outgoing.message.id ?? null);
           }
           submitted = true;
           return;

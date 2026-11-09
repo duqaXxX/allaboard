@@ -1,7 +1,7 @@
 /** One prompt and its reply, the turn that is running, and the notes about prompts that never ran. */
 import { randomUUID } from "node:crypto";
 import type { PromptContent } from "../../agent/seam.ts";
-import type { Reply } from "../../chat/seam.ts";
+import type { MessageId, Reply } from "../../chat/seam.ts";
 import { blank } from "../../text.ts";
 import type { TurnRenderer } from "../reply/renderer.ts";
 import { oneLine } from "../reply/words.ts";
@@ -32,13 +32,18 @@ export class Turn {
    */
   readonly title: string | null;
 
+  /** The owner's message this prompt came in; null for a prompt of the daemon's or a `!!command`. */
+  readonly messageId: MessageId | null;
+
   constructor(
     prompt: PromptContent,
     sink: Reply,
     shell: string | null = null,
     title: string | null = null,
+    messageId: MessageId | null = null,
   ) {
     this.title = title;
+    this.messageId = messageId;
     this.prompt = prompt;
     this.sink = sink;
     this.shell = shell;
@@ -51,7 +56,8 @@ export interface ActiveTurn {
   readonly renderer: TurnRenderer;
   /**
    * Prompts whose replay arrived while this turn ran: the agent took them into it. When the
-   * turn's `turn_ended` says the agent started it, `ThreadSession.finish` releases them
+   * turn's `turn_ended` says the agent started it, or this turn is the owner's own prompt's,
+   * `ThreadSession.finish` releases them
    * (`ThreadSession.settle`: out of `sent`, `Turn.done` set) and adds the note
    * `texts.TAKEN_INTO_REPLY_ONE` to the reply, through the same end notes as a restart's
    * `N messages were not sent`. A prompt whose replay did not come during the turn waits for its
@@ -64,6 +70,17 @@ export interface ActiveTurn {
    * its replay is not kept.
    */
   readonly taken: Turn[];
+  /**
+   * The turn began after a `!stop` that found prompts sent and no turn: that stop reacted ✅ before
+   * it began, so its stopped end still owes the root the status of a turn that ended.
+   */
+  readonly afterStop: boolean;
+  /**
+   * The replay of the turn's own prompt came before the turn began (`ThreadSession.whoseTurn`);
+   * one that comes inside it is in `taken`. A turn after a stop with neither, which did nothing,
+   * never reached the model: its prompt was not sent.
+   */
+  readonly replayed: boolean;
   /**
    * Set by `ThreadSession.finish` when a close cancelled it before the reply was closed out: the
    * turn is then left unsettled, for `abandon` to end. The turn's result had arrived by then: its
