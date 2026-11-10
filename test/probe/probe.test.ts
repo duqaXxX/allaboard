@@ -210,6 +210,24 @@ test("every claim belongs to exactly one scene", async () => {
   assert.deepEqual([...owned].sort(), CLAIMS.map((c) => c.id).sort());
 });
 
+test("a run of named scenes adds the scenes they need, in no particular order", async () => {
+  const { scenesFor } = await import("../../probe/scenes.ts");
+  assert.deepEqual([...scenesFor(["resume"])].sort(), ["first turn", "resume"]);
+  assert.deepEqual([...scenesFor(["interrupt"])], ["interrupt"]);
+});
+
+test("a run of named scenes refuses a name that is no scene, naming the scenes", async () => {
+  const { scenesFor } = await import("../../probe/scenes.ts");
+  assert.throws(() => scenesFor(["interupt"]), /no scene 'interupt'.*interrupt/);
+});
+
+test("every scene can run alone", async () => {
+  const { SCENES, scenesFor } = await import("../../probe/scenes.ts");
+  for (const name of Object.keys(SCENES)) {
+    for (const needed of scenesFor([name])) assert.ok(needed in SCENES, needed);
+  }
+});
+
 test("a model claim cannot be made broken by hand", () => {
   assert.throws(() => result(MODEL, "BROKEN", ""));
 });

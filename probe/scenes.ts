@@ -2853,10 +2853,38 @@ export async function forgetSessions(root: string, log: Log): Promise<void> {
 }
 
 /**
- * Runs every scene on a fresh back end and returns what each claim's scene saw. Every record
- * Claude Code wrote is appended to `records`.
+ * The scenes a named scene needs run before it: `resume` resumes the first turn's session, and
+ * `/compact` needs a conversation to compact.
  */
-export async function runScenes(log: Log, records: Records = []): Promise<Seen> {
+const NEEDS: Readonly<Record<string, readonly string[]>> = {
+  resume: ["first turn"],
+  compact: ["first turn"],
+};
+
+/**
+ * The scenes a run of `names` alone runs: those names and what they need. Throws on a name that
+ * is no scene, with the list of names, before anything starts.
+ */
+export function scenesFor(names: readonly string[]): Set<string> {
+  const unknown = names.filter((name) => !(name in SCENES));
+  if (unknown.length > 0) {
+    throw new RangeError(
+      `no scene ${unknown.map((name) => `'${name}'`).join(", ")}; the scenes are: ` +
+        Object.keys(SCENES).join(", "),
+    );
+  }
+  return new Set(names.flatMap((name) => [...(NEEDS[name] ?? []), name]));
+}
+
+/**
+ * Runs the scenes on a fresh back end, every one or only those `only` names, and returns what
+ * each claim's scene saw. Every record Claude Code wrote is appended to `records`.
+ */
+export async function runScenes(
+  log: Log,
+  records: Records = [],
+  only: ReadonlySet<string> | null = null,
+): Promise<Seen> {
   const seen: Seen = {};
   const root = await realpath(await mkdtemp(join(tmpdir(), "allaboard-probe-")));
   try {
@@ -2867,59 +2895,63 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
     const s = new Stage(log, root, home, records);
     for (const folder of [s.workdir, s.models, s.uploads]) await mkdir(folder);
     const word = randomBytes(3).toString("hex");
+    // Set right after the first turn: `resume` resumes that session.
+    let sessionId: string | null = null;
+    const steps: readonly (readonly [string, () => Promise<Seen>])[] = [
+      ["plain session", () => plainSession(s)],
+      [
+        "first turn",
+        async () => {
+          // Also when the scene raises: its turn may have ended first, and `resume` needs it.
+          try {
+            return await firstTurn(s, word);
+          } finally {
+            sessionId = sessionIdOf(s.main.events);
+          }
+        },
+      ],
+      ["image", () => imageTurn(s)],
+      ["file", () => fileTurn(s)],
+      ["bash and approval", () => bashTurn(s)],
+      ["previews", () => previews(s)],
+      ["background and stop", () => backgroundStop(s)],
+      ["interrupt", () => interrupt(s)],
+      ["resume", () => resume(s, word, sessionId)],
+      ["model and effort resume", () => modelEffortResume(s)],
+      ["setup model resume", () => setupModelResume(s)],
+      ["model command after setModel", () => modelCommandAfterSetModel(s)],
+      ["rename command", () => renameCommand(s)],
+      ["bypass", () => bypass(s)],
+      ["working folder", () => workingFolder(s)],
+      ["replay", () => replay(s)],
+      ["effort commands", () => effortCommands(s)],
+      ["goal", () => goal(s)],
+      ["compact", () => compact(s)],
+      ["commands not offered", () => commandsNotOffered(s)],
+      ["computer use", () => computerUse(s)],
+      ["background wake", () => backgroundWake(s)],
+      ["config folder listing", () => configFolderListing(s.root)],
+      ["terminal form", () => terminalForm(s)],
+      ["session tag", () => sessionTag(s.root)],
+      ["generated title", () => generatedTitle(s)],
+      ["fork source", () => forkSourceAlive(s)],
+      ["rewind", async () => ({ ...(await fileCheckpoints(s)), ...(await conversationCut(s)) })],
+      ["prompt suggestion", () => promptSuggestion(s)],
+      ["idle after a gap stop", () => idleAfterGap(s)],
+      ["folder trust", () => folderTrust(s)],
+      ["stop hooks", () => stopHooks(s)],
+      ["settings mode", () => settingsMode(s)],
+      ["logged out", () => loggedOut(s)],
+      ["api error", () => apiError(s)],
+      ["question", () => question(s)],
+      ["ended subagent", () => endedSubagent(s)],
+      ["subagent hand-back", () => subagentHandback(s)],
+    ];
     try {
       s.main = await s.open(s.workdir);
-      Object.assign(seen, await attempt("plain session", s, () => plainSession(s)));
-      Object.assign(seen, await attempt("first turn", s, () => firstTurn(s, word)));
-      const sessionId = sessionIdOf(s.main.events);
-      Object.assign(seen, await attempt("image", s, () => imageTurn(s)));
-      Object.assign(seen, await attempt("file", s, () => fileTurn(s)));
-      Object.assign(seen, await attempt("bash and approval", s, () => bashTurn(s)));
-      Object.assign(seen, await attempt("previews", s, () => previews(s)));
-      Object.assign(seen, await attempt("background and stop", s, () => backgroundStop(s)));
-      Object.assign(seen, await attempt("interrupt", s, () => interrupt(s)));
-      Object.assign(seen, await attempt("resume", s, () => resume(s, word, sessionId)));
-      Object.assign(seen, await attempt("model and effort resume", s, () => modelEffortResume(s)));
-      Object.assign(seen, await attempt("setup model resume", s, () => setupModelResume(s)));
-      Object.assign(
-        seen,
-        await attempt("model command after setModel", s, () => modelCommandAfterSetModel(s)),
-      );
-      Object.assign(seen, await attempt("rename command", s, () => renameCommand(s)));
-      Object.assign(seen, await attempt("bypass", s, () => bypass(s)));
-      Object.assign(seen, await attempt("working folder", s, () => workingFolder(s)));
-      Object.assign(seen, await attempt("replay", s, () => replay(s)));
-      Object.assign(seen, await attempt("effort commands", s, () => effortCommands(s)));
-      Object.assign(seen, await attempt("goal", s, () => goal(s)));
-      Object.assign(seen, await attempt("compact", s, () => compact(s)));
-      Object.assign(seen, await attempt("commands not offered", s, () => commandsNotOffered(s)));
-      Object.assign(seen, await attempt("computer use", s, () => computerUse(s)));
-      Object.assign(seen, await attempt("background wake", s, () => backgroundWake(s)));
-      Object.assign(
-        seen,
-        await attempt("config folder listing", s, () => configFolderListing(s.root)),
-      );
-      Object.assign(seen, await attempt("terminal form", s, () => terminalForm(s)));
-      Object.assign(seen, await attempt("session tag", s, () => sessionTag(s.root)));
-      Object.assign(seen, await attempt("generated title", s, () => generatedTitle(s)));
-      Object.assign(seen, await attempt("fork source", s, () => forkSourceAlive(s)));
-      Object.assign(
-        seen,
-        await attempt("rewind", s, async () => ({
-          ...(await fileCheckpoints(s)),
-          ...(await conversationCut(s)),
-        })),
-      );
-      Object.assign(seen, await attempt("prompt suggestion", s, () => promptSuggestion(s)));
-      Object.assign(seen, await attempt("idle after a gap stop", s, () => idleAfterGap(s)));
-      Object.assign(seen, await attempt("folder trust", s, () => folderTrust(s)));
-      Object.assign(seen, await attempt("stop hooks", s, () => stopHooks(s)));
-      Object.assign(seen, await attempt("settings mode", s, () => settingsMode(s)));
-      Object.assign(seen, await attempt("logged out", s, () => loggedOut(s)));
-      Object.assign(seen, await attempt("api error", s, () => apiError(s)));
-      Object.assign(seen, await attempt("question", s, () => question(s)));
-      Object.assign(seen, await attempt("ended subagent", s, () => endedSubagent(s)));
-      Object.assign(seen, await attempt("subagent hand-back", s, () => subagentHandback(s)));
+      for (const [name, scene] of steps) {
+        if (only === null || only.has(name)) Object.assign(seen, await attempt(name, s, scene));
+      }
     } finally {
       await Promise.allSettled(s.lives.map((live) => live.session.close()));
       await forgetSessions(root, log);

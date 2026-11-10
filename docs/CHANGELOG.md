@@ -11,6 +11,8 @@ All notable changes to this project are documented here. The format follows
   release probe certified it on 2026-11-10 against 0.3.319: the SDK surface table holds, no claim
   changed, the session is offered the same commands, and the one new stream field,
   `first_request_cache_read_input_tokens` on a turn's result, is left unread (#256).
+- `node probe/main.ts --scene <name>` runs the named probe scenes alone, with the scenes they need
+  (`scenesFor`), and prints their claims' outcomes without storing or certifying anything (#258).
 - A channel `!stop` now drops the goal of a session whose message sent before the stop still runs, once
   that turn has ended (#251). Until then no message reaches the agent, so none runs with the goal.
   The stop answers at once for such a session.
