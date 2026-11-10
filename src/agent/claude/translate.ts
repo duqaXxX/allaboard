@@ -24,7 +24,7 @@ import type {
   TaskOutcome,
   TurnEnding,
 } from "../seam.ts";
-import { integer, number, string, type WireRecord, words } from "./wire.ts";
+import { integer, number, string, strings, type WireRecord, words } from "./wire.ts";
 
 // Each task_type (measured on Claude Code 2.1.280: `local_bash` for a background command,
 // `local_agent` for a subagent). A type not listed is a task of no kind the daemon names.
@@ -595,6 +595,20 @@ function tokensOf(usage: unknown): Record<string, ModelTokens> {
   return tokens;
 }
 
+/**
+ * The uuids of the prompts a result answered: `user_message_uuids`, else `user_message_uuid`
+ * (`sdk.d.ts` 0.3.321: the list is absent from older producers, and the one uuid names only the
+ * last prompt of several the turn ran together). Measured on 2.1.321 (2026-11-10): a prompt's
+ * turn, a command's (`/compact`) and one an interrupt cut before its first step echo the prompt's
+ * uuid; a scheduled job's run echoes none.
+ */
+function answersOf(record: WireRecord): string[] {
+  const list = strings(record.user_message_uuids);
+  if (list.length > 0) return list;
+  const one = string(record.user_message_uuid);
+  return one === null ? [] : [one];
+}
+
 function endingOf(record: WireRecord): TurnEnding {
   const reason = string(record.terminal_reason);
   if (reason !== null && INTERRUPTED.has(reason)) return "interrupted";
@@ -647,6 +661,7 @@ function result(memory: Memory, record: WireRecord): SessionEvent[] {
       ending: endingOf(record),
       // 0 for the turn a task's notification gets once its report was already handed back.
       steps: typeof record.num_turns === "number" ? record.num_turns : null,
+      answers: answersOf(record),
       tokens: tokensOf(record.modelUsage),
     },
   ];

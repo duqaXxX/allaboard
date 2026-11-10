@@ -171,6 +171,7 @@ async function commandAfterQueued(t: Parameters<typeof AskingWorld.make>[0], she
     finalText: "Noted.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   if (shell) await until("the command ran", () => existsSync(marker));

@@ -801,6 +801,8 @@ export class PlainSession implements AgentSession {
     if (cutInGap && this.gapCutLeavesRest) {
       for (const id of this.#gapped) this.#folded.delete(id);
     }
+    // The prompts the turn answers, as Claude Code echoes them: a cut one too (2026-11-10).
+    const answers = cutInGap && this.gapCutLeavesRest ? [promptId] : [promptId, ...this.#gapped];
     this.#gapped = [];
     const turn = new Turn();
     if (command !== null) {
@@ -828,6 +830,7 @@ export class PlainSession implements AgentSession {
       ending: turn.ending,
       // Each call goes back to the model once; a turn that did nothing never went to it.
       steps: turn.messages + turn.calls === 0 ? 0 : turn.calls + 1,
+      answers,
       tokens: {},
     });
     if (turn.suggestion !== null) this.#push({ type: "next_prompt", text: turn.suggestion });

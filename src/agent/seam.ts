@@ -884,6 +884,13 @@ export type SessionEvent =
        * no reply in the chat; null opens one.
        */
       readonly steps: number | null;
+      /**
+       * The ids of the prompts (`Prompt.id`) the agent says the turn answered, a turn its stop cut
+       * before its first step included; none for a turn no prompt started (a scheduled run). A
+       * turn that ends with no step after a stop goes to a prompt the core holds in doubt only
+       * when this names it.
+       */
+      readonly answers: readonly string[];
       /** By model. Empty when the turn used none (a command the agent ran itself). */
       readonly tokens: Readonly<Record<string, ModelTokens>>;
     }

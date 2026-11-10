@@ -27,3 +27,8 @@ export function integer(value: unknown): number | null {
 export function number(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
+
+/** The strings of `value` when it is an array, else none. */
+export function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
+}

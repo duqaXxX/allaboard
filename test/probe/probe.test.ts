@@ -809,6 +809,7 @@ test("P48 judges the order of idle after a gap stop, and fails a stream that bre
       finalText: "",
       ending: "interrupted",
       steps,
+      answers: [],
       tokens: {},
     }) as const;
   const idle = { type: "state_changed", state: "idle" } as const;

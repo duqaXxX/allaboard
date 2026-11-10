@@ -503,6 +503,7 @@ test("!stop in the gap of two prompts: a turn the agent starts behind the cut pr
     finalText: "Noted.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await settledTurn();
@@ -528,6 +529,7 @@ test("!stop in the gap of two prompts: an empty turn of the agent behind the cut
     finalText: "",
     ending: "done",
     steps: 0,
+    answers: [],
     tokens: {},
   });
   await settledTurn();
@@ -655,6 +657,7 @@ test("!stop in the gap, an agent that says idle: work that ran before the idle m
     finalText: "Noted.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await settledTurn();
@@ -793,6 +796,7 @@ test("!stop in the gap, an agent that says idle: a turn the agent opens with a c
     finalText: "On my own.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await settledTurn();
@@ -829,6 +833,7 @@ test("!stop in the gap, an agent that says idle: a prompt in doubt whose turn co
     finalText: "third answer",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await settledTurn();
@@ -859,6 +864,7 @@ for (const startedBy of ["agent", "owner"] as const) {
         finalText: "Report words.",
         ending: "done",
         steps: 1,
+        answers: [],
         tokens: {},
       });
       await settledTurn();
@@ -918,6 +924,7 @@ test("!stop twice in the gap: a turn the agent starts that ends with no step nev
     finalText: "",
     ending: "error",
     steps: 0,
+    answers: [],
     tokens: {},
   });
   await settledTurn();
@@ -925,6 +932,37 @@ test("!stop twice in the gap: a turn the agent starts that ends with no step nev
   await until("idle", () => !session.busy);
   await settledTurn();
   assert.equal(world.shown(ref).filter(notSentOf("third")).length, 1, "told once");
+});
+
+test("!stop twice in the gap: a turn that names no prompt and ends with no step never takes the prompt in doubt", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  await settledTurn();
+  plain.playGate = null;
+  await session.stop();
+  await settledTurn();
+  // A scheduled run that fails before its first word: the agent marks it as the owner's.
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "owner",
+    finalText: "",
+    ending: "error",
+    steps: 0,
+    answers: [],
+    tokens: {},
+  });
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  const told = world.shown(ref).filter(notSentOf("third"));
+  assert.equal(told.length, 1, "told once");
+  // The run's reply carries the footer: the prompt is told on a message of its own.
+  assert.ok(!told[0]?.includes("worked"), "not told on the run's reply");
 });
 
 test("!stop in the gap, an agent that says idle: a prompt replayed before the idle, whose turn opens after it, is not dropped", async (t) => {
@@ -949,6 +987,7 @@ test("!stop in the gap, an agent that says idle: a prompt replayed before the id
     finalText: "third answer",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await until("idle", () => !session.busy);
@@ -1037,6 +1076,7 @@ async function endedBehindARejectedSend(
     finalText: "On my own.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await until("the own turn is shown", () =>

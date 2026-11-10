@@ -3332,12 +3332,19 @@ export class ThreadSession {
       // A turn a stop in the gap cut at its start shows nothing before its end, which says a
       // prompt started it: it is the turn of the prompt at the head of `sent`, in doubt or not,
       // since the agent runs its prompts in the order sent (a second stop can cut a prompt the
-      // first cut left in doubt). One the agent started itself never takes a prompt in doubt.
+      // first cut left in doubt). One the agent started itself never takes a prompt in doubt, nor
+      // one whose end does not name that prompt among those it answered: a scheduled run reads as
+      // the owner's and names none. With no name the prompt stays in doubt for the wait to drop,
+      // and the turn goes to the next prompt owed: a real cut that names none (no such result was
+      // seen, 2026-11-10) then tells that prompt not sent, which no thread is left stuck for.
+      const head = this.sent[0];
       const cutShaped =
         event.type === "turn_ended" &&
         event.startedBy === "owner" &&
         event.steps === 0 &&
-        this.stopInGap;
+        this.stopInGap &&
+        head !== undefined &&
+        event.answers.includes(head.uuid);
       await this.startTurn(worded, run, cutShaped);
       // A report turn has no prompt behind it: only now does `threadActivity` read it.
       this.showThreadStatus();
