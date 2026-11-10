@@ -31,6 +31,9 @@ All notable changes to this project are documented here. The format follows
   listed. The agent seam states the order as a contract (`idle` only when no message it was sent
   will still run, after the turn's end), the plain agent and probe claim P48 check it. An agent
   that does not say its state keeps the 30-second wait.
+- The end line of a background task that ended while a message waited is no longer lost when a
+  second `!stop` in the gap cuts that message and the wait drops it (#266): it is written where
+  the task started, or on the `was not sent` note when that reply is finished.
 - A reply whose stream is still open when it ends, with a message of yours below it (one the agent
   took into the turn), stays where it is, and its end (the words after its last call, the note and
   the footer) is posted as a new message below your message, as the end of a reply past 280 seconds

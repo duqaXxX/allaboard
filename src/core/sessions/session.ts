@@ -384,8 +384,12 @@ export class ThreadSession {
   private readonly messages = new Map<string, string>();
   /** The cards of subagents' words made so far: each gets an id of its own. */
   private cardsMade = 0;
-  /** End lines of agents with no card that ended while a message waited for its turn. */
-  private endedAhead: EndLine[] = [];
+  /**
+   * End lines of agents with no card that ended while a message waited for its turn, each with
+   * its task id. That message's reply says them; when a cut drops every message that waited, the
+   * drop writes them where their tasks started (`dropCutPrompts`).
+   */
+  private endedAhead: Array<readonly [taskId: string, line: EndLine]> = [];
   // Each task's type and description, for the list of what still runs and the task's end line.
   private readonly tasks = new Map<
     string,
@@ -1157,9 +1161,9 @@ export class ThreadSession {
    * `drop` for a stop: a note that cannot be posted is logged (no content) and never turns the
    * stop, or the worker's turn, into a failure.
    */
-  private async dropStopped(turns: readonly Turn[]): Promise<void> {
+  private async dropStopped(turns: readonly Turn[], lines: readonly EndLine[] = []): Promise<void> {
     try {
-      await this.drop(turns, texts.BECAUSE_OWNER_STOPPED);
+      await this.drop(turns, texts.BECAUSE_OWNER_STOPPED, { lines });
     } catch (error) {
       logger.warning(`could not post the note of a stop in ${this.where}: ${errorName(error)}`);
     }
@@ -1169,12 +1173,15 @@ export class ThreadSession {
   private async drop(
     turns: readonly Turn[],
     because: string,
-    options: { readonly error?: boolean } = {},
+    options: { readonly error?: boolean; readonly lines?: readonly EndLine[] } = {},
   ): Promise<void> {
     if (turns.length === 0) return;
     try {
       if (options.error) this.reactError();
-      const note = notSent(turns, because);
+      // End lines with no reply left to say them ride on the note, as plain text: a note holds no card.
+      const note = [notSent(turns, because), ...(options.lines ?? []).map((end) => end.text)].join(
+        "\n",
+      );
       if (this.busy && !this.endNotesRead) this.endNotes.push(note);
       else await this.post(note);
     } finally {
@@ -3195,7 +3202,8 @@ export class ThreadSession {
           this.unfolded.set(event.taskId, reply);
         }
         if (writing !== null) await this.writeEnds(writing, [this.endedLine(event)]);
-        else if (this.owed().length > 0) this.endedAhead.push(this.endedLine(event));
+        else if (this.owed().length > 0)
+          this.endedAhead.push([event.taskId, this.endedLine(event)]);
       }
     }
     if (
@@ -3744,7 +3752,7 @@ export class ThreadSession {
         await this.writeEnds(target, unsaid);
       } else if (said && this.promptOwed({ certain: true })) {
         // A message of the owner's waits below that reply: its own reply says the line.
-        this.endedAhead.push(...unsaid);
+        this.endedAhead.push(...pending);
       } else if (said && holder !== null && !holder.closedOut) {
         // Something sits below that reply and nothing is coming: the line is written where the
         // task started, by an edit that notifies nobody, as its card ended in place before.
@@ -4283,7 +4291,7 @@ export class ThreadSession {
       turn.head = null;
       // The ends told since the last turn and not reported: the agent takes their notifications
       // into this turn, and the terminal prints their lines before its answer.
-      const unsaid = [...(this.opening ?? []), ...this.ended].map(([, line]) => line);
+      const unsaid = [...(this.opening ?? []), ...this.ended];
       this.opening = null;
       this.ended = [];
       this.endedAhead.unshift(...unsaid);
@@ -4325,7 +4333,10 @@ export class ThreadSession {
     await writeEnds(renderer, openingEnds, (text) => renderer.feedOpening(text, openingAside));
     const ahead = this.endedAhead;
     this.endedAhead = [];
-    await this.writeEnds(renderer, ahead);
+    await this.writeEnds(
+      renderer,
+      ahead.map(([, line]) => line),
+    );
     if (this.notice !== null) {
       const notice = this.notice;
       this.notice = null;
@@ -4838,8 +4849,49 @@ export class ThreadSession {
   ): Promise<void> {
     if (left.length === 0) return;
     for (const turn of left) this.unsend(turn);
-    await this.dropStopped(left);
+    const [inPlace, stranded] = this.partitionEndedAhead();
+    // The turns are released first: a write cancelled after them leaves nobody waiting.
+    await this.dropStopped(left, stranded);
+    await this.writeInPlace(inPlace, signal);
     await this.reactDoneIfIdle(signal, { byOwner: this.workStarts === workAtCut });
+  }
+
+  /**
+   * With no prompt of the owner's left to say them, the end lines kept for a dropped message are
+   * taken out of `endedAhead`: those whose task has a reply to write into (by an edit that
+   * notifies nobody) grouped by reply, and the others, whose reply is gone or closed out, for the
+   * note of the drop. Both empty while a prompt still waits: its reply says the lines.
+   */
+  private partitionEndedAhead(): [Map<TurnRenderer, EndLine[]>, EndLine[]] {
+    const inPlace = new Map<TurnRenderer, EndLine[]>();
+    const stranded: EndLine[] = [];
+    if (this.promptOwed({ certain: true }) || this.endedAhead.length === 0)
+      return [inPlace, stranded];
+    const ahead = this.endedAhead;
+    this.endedAhead = [];
+    for (const [taskId, line] of ahead) {
+      const reply = this.taskReplies.get(taskId) ?? this.showing(taskId);
+      if (reply === null || reply.closedOut) stranded.push(line);
+      else inPlace.set(reply, [...(inPlace.get(reply) ?? []), line]);
+    }
+    return [inPlace, stranded];
+  }
+
+  /** Write `lines` into their replies, then end the ones that rest, as `reportNotComing` does. */
+  private async writeInPlace(
+    inPlace: ReadonlyMap<TurnRenderer, readonly EndLine[]>,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (inPlace.size === 0) return;
+    for (const [reply, lines] of inPlace) {
+      try {
+        await this.writeEnds(reply, lines);
+      } catch (error) {
+        if (error instanceof Cancelled) throw error;
+        logger.warning(`could not write an end line in ${this.where}: ${errorName(error)}`);
+      }
+    }
+    await this.sweepClosedOut(live(signal), { unreported: true });
   }
 
   /**
