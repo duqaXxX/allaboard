@@ -1497,7 +1497,11 @@ closed when the start returns (`ThreadSession.connect`).
   cross, the prompt's replay tells whose turn starts, before its first word
   (`ThreadSession.whoseTurn`). Where no replay settles it, `turn_ended` tells who started the turn,
   and the queue is put back in order (`ThreadSession.settle`, which logs it); that one reply can
-  then carry the other's label.
+  then carry the other's label. A message a `!stop` in the gap may have cut with its turn is in
+  doubt (`Turn.inDoubt`) until its replay shows it runs or the wait drops it: no turn that shows
+  something before its end, no compaction, refusal or task end is put on its account
+  (`ThreadSession.owed`), while the thread's status still counts it. A turn that a further stop
+  cuts at its start is still the turn of the first message sent, in doubt or not.
 - A task a subagent started and left running (`ThreadSession.ownedBySubagent`, a command
   promoted through `TurnRenderer.takePromoted`, or one whose `parentTaskId` is a subagent the
   session knows) gets no end line: its end is told to the subagent, whose own end is the one the

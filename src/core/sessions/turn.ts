@@ -25,6 +25,11 @@ export class Turn {
   head: string | null = null;
   /** Set when the worker enters the shell command's run: past it, a stop no longer drops the turn. */
   shellStarted = false;
+  /**
+   * Set at the end of a cut at start that may have taken this prompt with it; cleared by its
+   * replay, which proves it runs. While set, it is not owed (`ThreadSession.owed`).
+   */
+  inDoubt = false;
 
   /**
    * What the owner typed, in the chat's plain text, for a prompt that may name a bare `!fork`
