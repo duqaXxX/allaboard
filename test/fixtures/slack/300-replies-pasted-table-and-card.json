@@ -1,0 +1,311 @@
+{
+  "_source": "conversations.replies, read 2026-11-10 (#120): three messages the owner sent, one with a reply's table pasted from the desktop composer, one with a reply's card, one with a table of an emoji, a link, inline code and bold (pasted after the first fix). Shapes as read; footer and ids scrubbed.",
+  "table": {
+    "type": "message",
+    "user": "U000ALICE",
+    "ts": "1794348469.351609",
+    "text": "a pasted table, with interactive elements",
+    "blocks": [
+      {
+        "type": "table",
+        "block_id": "ll5QU",
+        "rows": [
+          [
+            {
+              "type": "rich_text",
+              "block_id": "MccA3w",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "Word"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rich_text",
+              "block_id": "e7rRSc",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "With space"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "rich_text",
+              "block_id": "ppKXjs",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "one,two"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rich_text",
+              "block_id": "xcXiKj",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "code",
+                      "style": {
+                        "code": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ],
+        "column_settings": []
+      },
+      {
+        "type": "rich_text",
+        "block_id": "Ab1Cd",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "a pasted table"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "card": {
+    "type": "message",
+    "user": "U000ALICE",
+    "ts": "1794348887.712039",
+    "text": "Ran 1 shell command",
+    "blocks": [
+      {
+        "type": "task_card",
+        "block_id": "task-fold:toolu_000000000000000000000001",
+        "task_id": "fold:toolu_000000000000000000000001",
+        "title": "Ran 1 shell command",
+        "details": {
+          "type": "rich_text",
+          "block_id": "IwruU",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "text",
+                  "text": "$ echo \"task_card sample\""
+                }
+              ]
+            }
+          ]
+        },
+        "status": "complete"
+      }
+    ]
+  },
+  "styled": {
+    "type": "message",
+    "user": "U000ALICE",
+    "ts": "1794349900.000100",
+    "text": "`test120`, with interactive elements",
+    "blocks": [
+      {
+        "type": "table",
+        "block_id": "Tb1Aa",
+        "rows": [
+          [
+            {
+              "type": "rich_text",
+              "block_id": "c1",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "Case"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rich_text",
+              "block_id": "c2",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "Value"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "rich_text",
+              "block_id": "c3",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "emoji"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rich_text",
+              "block_id": "c4",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "✅"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "rich_text",
+              "block_id": "c5",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "link"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rich_text",
+              "block_id": "c6",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "link",
+                      "url": "https://example.com",
+                      "text": "example"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "rich_text",
+              "block_id": "c7",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "code"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rich_text",
+              "block_id": "c8",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "npm test",
+                      "style": {
+                        "code": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "rich_text",
+              "block_id": "c9",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "bold"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rich_text",
+              "block_id": "c10",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "strong",
+                      "style": {
+                        "bold": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  }
+}

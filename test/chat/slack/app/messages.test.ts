@@ -1,7 +1,9 @@
 /** How a message's composer blocks are read into the text a word is read in (`unformatted`). */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { bareText, inboundMessage, unformatted } from "../../../../src/chat/slack/app/messages.ts";
+import { unwrittenText } from "../../../../src/chat/slack/app/pasted.ts";
 
 // A composer message's blocks, as Slack stores them. Read back on 2026-10-07: a section with a
 // `text` element in inline code, and a `rich_text_preformatted` part. The `bold` style and the
@@ -142,4 +144,51 @@ test("a name in italic blocks is read from the typed text", () => {
     richText(part([leaf("!open "), leaf("__init__.py", { italic: true })])),
   );
   assert.equal(message.bare, message.text);
+});
+
+// Messages the owner sent with a reply's table and a reply's card pasted in, read back with
+// `conversations.replies` on 2026-11-10 (#120): the fallback `text` drops the cells and the
+// card's details.
+const pasted = JSON.parse(
+  readFileSync(
+    new URL("../../../fixtures/slack/300-replies-pasted-table-and-card.json", import.meta.url),
+    "utf8",
+  ),
+);
+
+test("a pasted table reaches the agent as a markdown table after the text", async () => {
+  const { text, blocks } = pasted.table;
+  const message = inbound(text, blocks);
+  assert.equal(message.text, text);
+  assert.equal(
+    await message.content(),
+    `${text}\n\n| Word | With space |\n| --- | --- |\n| one,two | \`code\` |`,
+  );
+});
+
+test("a pasted table keeps a cell's link address and its code and bold marks", async () => {
+  const { text, blocks } = pasted.styled;
+  assert.equal(
+    await inbound(text, blocks).content(),
+    `${text}\n\n| Case | Value |\n| --- | --- |\n| emoji | ✅ |\n| link | example (https://example.com) |\n| code | \`npm test\` |\n| bold | **strong** |`,
+  );
+});
+
+test("a pasted card reaches the agent with its details", async () => {
+  const { text, blocks } = pasted.card;
+  assert.equal(
+    await inbound(text, blocks).content(),
+    'Ran 1 shell command\n\n$ echo "task_card sample"',
+  );
+});
+
+test("a message with no table or card is sent as typed", async () => {
+  const message = inbound("hello", richText(part([leaf("hello")])));
+  assert.equal(await message.content(), "hello");
+});
+
+test("unwrittenText keeps a table's columns when a cell holds a pipe or a line break", () => {
+  const cell = (text: string) => ({ type: "raw_text", text });
+  const table = { type: "table", rows: [[cell("a|b"), cell("c\nd")], [cell("1")]] };
+  assert.equal(unwrittenText([table]), "| a\\|b | c d |\n| --- | --- |\n| 1 |");
 });

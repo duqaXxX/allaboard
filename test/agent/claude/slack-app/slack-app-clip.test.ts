@@ -9,6 +9,7 @@
  * clock.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { type TestContext, test } from "node:test";
 import { logger } from "../../../../src/chat/slack/app/answers.ts";
 import { DownloadFailed } from "../../../../src/chat/slack/attachments.ts";
@@ -341,6 +342,24 @@ test("text typed with a clip comes before its transcript", async (t) => {
   body.event.text = "!status";
   await world.dispatch(body);
   assert.deepEqual(world.queries(), ["!status\n\nWhat day is it today?"]);
+});
+
+test("a table pasted beside a clip comes before its transcript", async (t) => {
+  // A reply's table pasted into the composer, as read back on 2026-11-10 (#120).
+  const { table } = JSON.parse(
+    readFileSync(
+      new URL("../../../fixtures/slack/300-replies-pasted-table-and-card.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const world = worldOf(t);
+  const body = clipMessage(true);
+  body.event.text = table.text;
+  body.event.blocks = table.blocks;
+  await world.dispatch(body);
+  assert.deepEqual(world.queries(), [
+    `${table.text}\n\n| Word | With space |\n| --- | --- |\n| one,two | \`code\` |\n\nWhat day is it today?`,
+  ]);
 });
 
 test("a clip in an unbound channel explains how to bind and does not wait", async (t) => {
