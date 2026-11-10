@@ -36,6 +36,7 @@ const OWNER_TURN_ENDED: SessionEvent = {
   finalText: null,
   ending: "done",
   steps: 1,
+  answers: [],
   tokens: {},
 };
 

@@ -245,6 +245,8 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKResultMessage` | `result` | field | translate.ts: result, effortChanged | reference | none |
 | `SDKResultMessage` | `session_id` | field | translate.ts: result | reference | P3 |
 | `SDKResultMessage` | `terminal_reason` | field | translate.ts: endingOf | reference | none |
+| `SDKResultMessage` | `user_message_uuid` | field | translate.ts: answersOf | reference | none |
+| `SDKResultMessage` | `user_message_uuids` | field | translate.ts: answersOf | reference | none |
 | `SDKSessionInfo` | `customTitle` | field | info.ts: listedSession; backend.ts: ClaudeBackend.sessionTitle | reference | P32 |
 | `SDKSessionInfo` | `fileSize` | field | info.ts: listedSession | reference | none |
 | `SDKSessionInfo` | `gitBranch` | field | info.ts: listedSession | reference | none |

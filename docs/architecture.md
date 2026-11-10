@@ -1501,7 +1501,10 @@ closed when the start returns (`ThreadSession.connect`).
   doubt (`Turn.inDoubt`) until its replay shows it runs or the wait drops it: no turn that shows
   something before its end, no compaction, refusal or task end is put on its account
   (`ThreadSession.owed`), while the thread's status still counts it. A turn that a further stop
-  cuts at its start is still the turn of the first message sent, in doubt or not.
+  cuts at its start is still the turn of the first message sent, in doubt or not, when its end
+  names that message among those it answered (`turn_ended.answers`): a scheduled run that fails
+  before its first step names none, and the message stays in doubt for the wait to drop. Such a
+  turn goes to the next message owed, if any, which its end then tells not sent.
 - A task a subagent started and left running (`ThreadSession.ownedBySubagent`, a command
   promoted through `TurnRenderer.takePromoted`, or one whose `parentTaskId` is a subagent the
   session knows) gets no end line: its end is told to the subagent, whose own end is the one the

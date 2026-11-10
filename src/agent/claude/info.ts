@@ -18,11 +18,7 @@ import type {
   LoadedContext,
   ModelInfo,
 } from "../seam.ts";
-import { number, string, type WireRecord, words } from "./wire.ts";
-
-function strings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
-}
+import { number, string, strings, type WireRecord, words } from "./wire.ts";
 
 function modelOf(entry: WireRecord): ModelInfo | null {
   // The setup keys every option on `value`: an entry without one is left out here, so a CLI

@@ -198,6 +198,7 @@ test("a turn the agent opens in a copy that never ran ends with its status", asy
     finalText: "Noted.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await world.settle();
@@ -307,6 +308,7 @@ test("the rename waits for a turn the agent opened, and runs on an idle session"
     finalText: "Noted.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   });
   await world.settle();
@@ -343,6 +345,7 @@ const agentTurnEnd = (sessionId: string | null) =>
     finalText: "Noted.",
     ending: "done",
     steps: 1,
+    answers: [],
     tokens: {},
   }) as const;
 

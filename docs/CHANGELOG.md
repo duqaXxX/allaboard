@@ -48,6 +48,11 @@ All notable changes to this project are documented here. The format follows
   agent starts in the wait opens nothing on its account, and it is always told `was not sent
   because you stopped it` if it never runs. Before, a refusal in the wait opened a turn no result
   ended, and the thread stayed working.
+- After a second `!stop` in the gap, a scheduled run that fails before its first step no longer
+  takes the message in doubt (#265): the turn's end names the messages it answered
+  (`turn_ended.answers`, which the Claude back end reads from the result's `user_message_uuids`),
+  and only a turn that names it is put on its account. Before, the message was told not sent on
+  the run's reply.
 
 ## [0.14.0] - 2026-11-09
 

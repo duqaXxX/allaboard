@@ -140,11 +140,34 @@ test("a turn's end carries its last text, who started it and the tokens of each 
       finalText: 'The notes.txt file contains two entries: "alpha" and "beta".',
       ending: "done",
       steps: 3,
+      // Recorded on 2.1.286, before results echoed their prompt.
+      answers: [],
       tokens: {
         [HAIKU]: { input: 936, output: 328, cacheRead: 26480, cacheCreation: 4645 },
       },
     },
   ]);
+});
+
+test("a turn's end names the prompt it answered, a command's with no step too", () => {
+  const replayed = sdkRecords("effort-model-commands")
+    .filter((wire) => wire.type === "user" && wire.isReplay === true)
+    .map((wire) => [wire.uuid]);
+  const ended = of(events("effort-model-commands"), "turn_ended");
+  assert.deepEqual(
+    ended.map((event) => event.steps),
+    [0, 0, 0, 1],
+  );
+  assert.deepEqual(
+    ended.map((event) => event.answers),
+    replayed,
+  );
+});
+
+test("a turn's end falls back to the one prompt uuid a result without the list echoes", () => {
+  const { user_message_uuids: _, ...older } = record("effort-model-commands", 2);
+  const [ended] = new Translator().translate(older).filter((event) => event.type === "turn_ended");
+  assert.deepEqual(ended?.type === "turn_ended" ? ended.answers : null, [older.user_message_uuid]);
 });
 
 test("a turn that ran no model has no tokens", () => {
