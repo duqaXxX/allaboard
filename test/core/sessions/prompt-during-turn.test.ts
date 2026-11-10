@@ -353,6 +353,7 @@ test("a channel !stop during a turn with a prompt sent sends no goal command int
   assert.equal(agent.cleared, 0, "no goal command reaches a session at work");
   agent.sessions[0]?.release();
   await until("idle", () => !session.busy);
+  await until("the goal is dropped after the queued turn", () => agent.cleared === 1);
 });
 
 /** Every status the session sets, with whether the owner's own act made it (no push then). */

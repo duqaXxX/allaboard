@@ -434,6 +434,10 @@ export class ThreadSession {
   private readonly settled = new Event();
   // Set while no turn is active; `nameCopy` waits on it for a turn the agent opened.
   private readonly noTurn = new Event();
+  // Clear while a channel `!stop` owes the goal's drop (`oweGoalDrop`): no prompt reaches the
+  // agent until `payGoal` has run, or a close has settled the debt (`settleGoalDebt`).
+  private readonly goalCleared = new Event();
+  private goalDrop: Task | null = null;
   private injectedExpected = false;
   // The prompts whose replay arrived with no turn running, in order: the turn that starts next
   // is the first one's own and takes the others in (`acknowledge`, `whoseTurn`).
@@ -615,6 +619,7 @@ export class ThreadSession {
     this.suggestions = options.suggestions;
     this.settled.set();
     this.noTurn.set();
+    this.goalCleared.set();
     this.nativeMode = deps.agent.capabilities.permissionModes.default;
     this.mode = this.nativeMode;
   }
@@ -660,14 +665,7 @@ export class ThreadSession {
     ) {
       return;
     }
-    // The lock is taken after the wait, not during it: a turn that runs needs the process.
-    let release: () => void;
-    for (;;) {
-      await this.untilIdle(signal);
-      release = await this.connectLock.acquire(signal);
-      if (this.isIdle()) break;
-      release();
-    }
+    const release = await this.idleUnderLock(signal);
     // A stop or a drain may have come during the wait: the prompt goes no further, nor its name.
     if (this.client !== client || turn === this.stopTaken || this.draining) {
       release();
@@ -686,6 +684,19 @@ export class ThreadSession {
       this.deps.state.markForkNamed(this.channelId, this.threadId);
     } catch (error) {
       logger.warning(`could not record that ${this.where} is named: ${errorName(error)}`);
+    }
+  }
+
+  /**
+   * Waits for an idle session and takes the connect lock with it still idle; the caller releases.
+   * The lock is taken after the wait, not during it: a turn that runs needs the process.
+   */
+  private async idleUnderLock(signal: AbortSignal): Promise<() => void> {
+    for (;;) {
+      await this.untilIdle(signal);
+      const release = await this.connectLock.acquire(signal);
+      if (this.isIdle()) return release;
+      release();
     }
   }
 
@@ -1794,6 +1805,7 @@ export class ThreadSession {
    * save is kept: the caller posts it with `announceUnsaved` once it let go of the lock.
    */
   private async dropClientLocked(awaitExit: boolean): Promise<void> {
+    this.settleGoalDebt();
     const reader = this.reader;
     this.reader = null;
     const client = this.client;
@@ -1921,8 +1933,6 @@ export class ThreadSession {
       this.active === null &&
       this.pending.length > 0 &&
       !this.waitingForOwner;
-    // The channel's stop drops the goal once the turn it ended is over: in the gap that is the
-    // turn that starts next.
     if (gap) this.stopInGap = true;
     else this.interrupting = true;
     this.stopTail = this.stopTail ?? new Event();
@@ -2167,28 +2177,65 @@ export class ThreadSession {
 
   /**
    * A channel's stop ends the goals too, which a thread's stop leaves set, as the terminal's Esc
-   * does (the maintainer, 2026-10-21): the goal of a session whose agent process is still open is
-   * dropped once the turn the stop ended is over. A closed process is not started again for it;
-   * its goal resumes with the next message. Whether there was a goal is not asked: one set before
-   * a restart is not known here. True when the agent dropped one or had none to drop.
+   * does (the maintainer, 2026-10-21). Called in the stop's synchronous start: from here no
+   * prompt reaches the agent before the goal is dropped (`payGoal`), whatever the stop awaits.
+   * The prompts sent before the stop still run, extended by the goal (docs/limits.md).
    */
-  async dropGoal(): Promise<boolean> {
+  oweGoalDrop(): void {
     const client = this.client;
-    if (client === null || client.clearGoal === undefined || !this.deps.agent.capabilities.goals) {
-      return false;
+    if (
+      client === null ||
+      client.clearGoal === undefined ||
+      !this.deps.agent.capabilities.goals ||
+      !this.goalCleared.isSet
+    ) {
+      return;
     }
+    this.goalCleared.clear();
+    this.goalDrop = new Task((signal) => this.payGoal(client, signal));
+  }
+
+  /**
+   * The channel stop's answer: returns once the goal is dropped when the session is idle after
+   * the stop, and at once when a turn is still to run, which pays the debt when it ends.
+   */
+  async dropGoal(): Promise<void> {
+    const drop = this.goalDrop;
+    if (drop === null) return;
     await this.stopLanded();
-    // A message runs, or the stop closed the process meanwhile: the agent's command would
-    // reach a session at work. A prompt sent before the stop keeps the goal (#185, docs/limits.md).
-    if (this.busy || this.closed || this.client !== client) return false;
+    if (this.isIdle()) await drop.settled();
+  }
+
+  /**
+   * Drops the goal of a session whose agent process is still open, on an idle session under the
+   * connect lock (as `nameCopy`): a command sent into a turn would hide its records. Whether
+   * there was a goal is not asked: one set before a restart is not known here. A closed process
+   * is not started again for it; the debt is settled and its goal resumes with the next message.
+   */
+  private async payGoal(client: AgentSession, signal: AbortSignal): Promise<void> {
     try {
-      await client.clearGoal();
-    } catch (error) {
-      logger.warning(`could not drop the goal of ${this.where}: ${errorName(error)}`);
-      return false;
+      await this.stopLanded();
+      const release = await this.idleUnderLock(signal);
+      try {
+        if (client.clearGoal === undefined || this.closed || this.client !== client) return;
+        await cancellable(client.clearGoal(), signal);
+        this.goal = null;
+      } catch (error) {
+        if (error instanceof Cancelled) throw error;
+        logger.warning(`could not drop the goal of ${this.where}: ${errorName(error)}`);
+      } finally {
+        release();
+      }
+    } finally {
+      this.goalCleared.set();
     }
-    this.goal = null;
-    return true;
+  }
+
+  /** A closed process is not started again for the goal: the debt ends, the goal resumes later. */
+  private settleGoalDebt(): void {
+    this.goalDrop?.cancel();
+    this.goalDrop = null;
+    this.goalCleared.set();
   }
 
   private stopTailEnded(): void {
@@ -2417,6 +2464,7 @@ export class ThreadSession {
       if (this.client !== null) {
         const client = this.client;
         this.client = null;
+        this.settleGoalDebt();
         // The caller says whether the process may exit on its own: a shutdown keeps its time,
         // since closes are sequential and launchd kills the job 60 s after `bootout`.
         await this.disconnect(client, awaitExit);
@@ -2688,6 +2736,8 @@ export class ThreadSession {
         if (turn.shell !== null) {
           // A command runs only when nothing does, as the terminal runs one typed while busy;
           // a stop or a drain that comes meanwhile drops it below.
+          // The debt first: the idle check must follow the clear, which a report turn may open into.
+          await this.goalCleared.wait(signal);
           if (atOnce) await this.untilIdle(signal);
           // A drain that has begun runs no command; one that begins while it runs drops it below.
           if (this.draining) {
@@ -2717,6 +2767,8 @@ export class ThreadSession {
         // The agent runs a command after the turn, never folded into it, and its replay can come
         // after its own text (measured 2026-11-09): it waits like a `!!`, and the checks below
         // follow the wait.
+        // A channel stop's goal is dropped before any prompt after it reaches the agent.
+        await this.goalCleared.wait(signal);
         if (atOnce && this.isCommand(turn.prompt)) await this.untilIdle(signal);
         // A stop or a drain during either wait starts no process for a turn it ends.
         if (this.draining) {
@@ -2819,6 +2871,7 @@ export class ThreadSession {
     }
     logger.error(`session reader stopped in ${this.where}: ${reason}`);
     if (this.client === client) this.client = null;
+    this.settleGoalDebt();
     try {
       // Nobody is left to take an answer: the requests of the lost process go as `close` sends
       // them, with `interrupting` up so no handler's `finally` shows working again over the ❌
