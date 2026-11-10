@@ -630,6 +630,16 @@ export const CLAIMS: readonly Claim[] = [
       "becomes of a goal in its stream: the row on a goal still active after a stop changes, " +
       "and issue 113 can use it",
   ),
+  claim(
+    "L10",
+    "limit",
+    "a session that declares the `peer_inbound_approval` dialog kind, holding a message another " +
+      "session sent, is asked no dialog for it, as `docs/limits.md` says",
+    "src/agent/claude/session.ts#ClaudeSession",
+    "the scene holds a message from a sender in bypass at a receiver that asks, and waits for a " +
+      "dialog. If one comes, Slack could offer the terminal's approval: the row on a message " +
+      "from another session changes, and the dialog's payload is the starting point",
+  ),
 ];
 
 if (new Set(CLAIMS.map((c) => c.id)).size !== CLAIMS.length) {

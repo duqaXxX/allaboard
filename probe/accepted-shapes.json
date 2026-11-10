@@ -1,7 +1,9 @@
 {
   "kinds": {
     "system/session_title_changed": "2.1.312",
-    "system/hook_response": "2.1.319"
+    "system/hook_response": "2.1.319",
+    "system/informational": "2.1.319",
+    "system/peer_message_hold": "2.1.319"
   },
   "paths": {
     "assistant": {
@@ -118,7 +120,17 @@
       "tool_use_result.file.originalSize:number": "2.1.304",
       "tool_use_result.file.type:string": "2.1.304",
       "tool_use_result.revivedAgentId:string": "2.1.304",
-      "tool_use_result.toolsUsedLine:string": "2.1.312"
+      "tool_use_result.toolsUsedLine:string": "2.1.312",
+      "tool_use_result.listing:string": "2.1.319",
+      "tool_use_result.notes:array": "2.1.319",
+      "tool_use_result.sections:array": "2.1.319",
+      "tool_use_result.sections[].kind:string": "2.1.319",
+      "tool_use_result.sections[].rows:array": "2.1.319",
+      "tool_use_result.sections[].rows[].name:string": "2.1.319",
+      "tool_use_result.sections[].rows[].ref:string": "2.1.319",
+      "tool_use_result.sections[].rows[].status:string": "2.1.319",
+      "tool_use_result.sections[].rows[].type:string": "2.1.319",
+      "tool_use_result.sections[].total:number": "2.1.319"
     },
     "stream_event/message_start": {
       "event.message.input_transformations[].path:string": "2.1.318",

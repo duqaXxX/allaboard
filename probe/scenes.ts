@@ -141,6 +141,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   question: ["P36"],
   "ended subagent": ["P35"],
   "subagent hand-back": ["P41"],
+  "held message": ["L10"],
 };
 
 /** `text` without any path of this machine, one line, cut to `limit` characters. */
@@ -2863,6 +2864,108 @@ export async function forgetSessions(root: string, log: Log): Promise<void> {
   log(`removed ${removed} transcript folders`);
 }
 
+// How long the receiver waits for the sender's message to be held, and then for a dialog. The
+// hold came 75 s after the sender's prompt on 2026-10-29 (Claude Code 2.1.312), Haiku listing the
+// sessions first.
+const HOLD_LIMIT = 150_000;
+const DIALOG_WAIT = 20_000;
+
+/**
+ * L10: a message another session sends to one that asks before running tools is held (their
+ * permission modes differ), and Claude Code asks no dialog for it of an SDK host, even one that
+ * declares the terminal's kind. Caused when the hold of the probe's own sender is seen.
+ */
+async function heldMessage(s: Stage): Promise<Seen> {
+  const tag = randomBytes(3).toString("hex");
+  const receiverFolder = join(s.root, `held-recv-${tag}`);
+  const senderFolder = join(s.root, `held-send-${tag}`);
+  await mkdir(receiverFolder);
+  await mkdir(senderFolder);
+  const dialogs: string[] = [];
+  const receiverRecords: unknown[] = [];
+  const receiverInput = new AsyncQueue<SDKUserMessage>();
+  const receiver = s.query({
+    prompt: receiverInput,
+    options: {
+      cwd: receiverFolder,
+      settingSources: [],
+      model: PROBE_MODEL,
+      permissionMode: "default",
+      supportedDialogKinds: ["peer_inbound_approval"],
+      onUserDialog: async (request) => {
+        dialogs.push(request.dialogKind);
+        return null;
+      },
+    },
+  });
+  const senderInput = new AsyncQueue<SDKUserMessage>();
+  const sender = s.query({
+    prompt: senderInput,
+    options: {
+      cwd: senderFolder,
+      settingSources: [],
+      model: PROBE_MODEL,
+      // In bypass, so that the modes differ and the receiver holds the message; with the two
+      // tools it needs alone, so that bypass lets nothing else run.
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      tools: ["ListAgents", "SendMessage"],
+    },
+  });
+  const say = (input: AsyncQueue<SDKUserMessage>, content: string) =>
+    input.push({
+      type: "user",
+      message: { role: "user", content },
+      parent_tool_use_id: null,
+      session_id: "",
+    });
+  const held = () =>
+    receiverRecords.some(
+      (record) =>
+        isRecord(record) &&
+        record.type === "system" &&
+        record.subtype === "peer_message_hold" &&
+        record.state === "held" &&
+        typeof record.from_name === "string" &&
+        record.from_name.startsWith(`held-send-${tag}`),
+    );
+  const drain = (async () => {
+    for await (const record of receiver) receiverRecords.push(record);
+  })().catch(() => {});
+  const drainSender = (async () => {
+    for await (const _ of sender) {
+      // Read to its end, so the sender's turn runs.
+    }
+  })().catch(() => {});
+  try {
+    say(receiverInput, "Reply with the single word: ready");
+    say(
+      senderInput,
+      `Use the ListAgents tool, then the SendMessage tool to send the text 'ping' to the ` +
+        `session whose name starts with held-recv-${tag}. Then reply: sent`,
+    );
+    const deadline = Date.now() + HOLD_LIMIT;
+    while (!held() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 500));
+    if (!held()) {
+      return { L10: observation(false, false, "the sender's message was not held in time") };
+    }
+    await new Promise((r) => setTimeout(r, DIALOG_WAIT));
+    return {
+      L10: observation(
+        true,
+        dialogs.length === 0,
+        dialogs.length === 0 ? "" : `dialogs asked: ${dialogs.join(", ")}`,
+      ),
+    };
+  } finally {
+    receiverInput.end();
+    senderInput.end();
+    receiver.close();
+    sender.close();
+    await Promise.allSettled([drain, drainSender]);
+  }
+}
+
 /**
  * The scenes a named scene needs run before it: `resume` resumes the first turn's session, and
  * `/compact` needs a conversation to compact.
@@ -2957,6 +3060,7 @@ export async function runScenes(
       ["question", () => question(s)],
       ["ended subagent", () => endedSubagent(s)],
       ["subagent hand-back", () => subagentHandback(s)],
+      ["held message", () => heldMessage(s)],
     ];
     try {
       s.main = await s.open(s.workdir);
