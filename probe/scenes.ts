@@ -132,6 +132,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "fork source": ["P43"],
   rewind: ["P44", "P45"],
   "prompt suggestion": ["P47"],
+  "idle after a gap stop": ["P48"],
   "folder trust": ["P34"],
   "stop hooks": ["P42"],
   "settings mode": ["P37"],
@@ -2665,6 +2666,101 @@ async function promptSuggestion(s: Stage): Promise<Seen> {
 }
 
 /**
+ * What P48 reads of one round: the interrupt cut the first turn at its start, with no step and
+ * no replay of a prompt before its end (`caused`); the order holds when an `idle` came, a turn had
+ * ended before it, and no prompt was taken and no turn ended after it. The core drops the prompts
+ * a cut may have taken at the first `idle` after it, so an `idle` ahead of a sent prompt that
+ * still runs would drop a prompt that runs (#252). Pure, so a stream that breaks the order is
+ * tested without a session.
+ */
+export function judgeIdleOrder(events: readonly SessionEvent[]): {
+  caused: boolean;
+  holds: boolean;
+} {
+  const firstEndAt = events.findIndex((event) => event.type === "turn_ended");
+  const firstEnd = events[firstEndAt];
+  const idleAt = events.findIndex(
+    (event) => event.type === "state_changed" && event.state === "idle",
+  );
+  const caused =
+    firstEnd?.type === "turn_ended" &&
+    firstEnd.steps === 0 &&
+    !events.slice(0, firstEndAt).some((event) => event.type === "prompt_taken");
+  if (idleAt === -1) return { caused, holds: false };
+  const before = events.slice(0, idleAt).some((event) => event.type === "turn_ended");
+  const after = events
+    .slice(idleAt + 1)
+    .some((event) => event.type === "turn_ended" || event.type === "prompt_taken");
+  return { caused, holds: before && !after };
+}
+
+/**
+ * P48: the order of `idle` after an interrupt in the gap between a send and its turn (#252,
+ * measured by hand 2026-11-10: with one prompt sent, `idle` with the cut's result; with two, the
+ * second replays and runs, and `idle` follows its end). The gap is made wide on purpose: the
+ * scratch folder's own `UserPromptSubmit` hook sleeps a second before each turn begins, as the
+ * owner's hooks delay it in a daemon's session, so the interrupt lands before the turn does.
+ */
+async function idleAfterGap(s: Stage): Promise<Seen> {
+  const attempt = async (count: number, tried: number) => {
+    const folder = join(s.root, `idle-after-gap-${count}-${tried}`);
+    await mkdir(join(folder, ".claude"), { recursive: true });
+    const hook = { type: "command", command: "sleep 1" };
+    await writeFile(
+      join(folder, ".claude", "settings.json"),
+      JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [hook] }] } }),
+    );
+    const live = await s.open(folder, { settingsSources: ["project"] });
+    for (let sent = 0; sent < count; sent += 1) {
+      await live.session.send({ id: randomUUID(), content: "Reply with just the word OK." });
+    }
+    await live.session.interrupt();
+    const idled = (events: SessionEvent[]) =>
+      events.some((event) => event.type === "state_changed" && event.state === "idle");
+    await live.until(0, idled, 60_000);
+    // A turn or a replay that comes after the first idle breaks the order: wait for it.
+    await live.quiet();
+    const order = live.events
+      .filter((event) => ["turn_ended", "prompt_taken", "state_changed"].includes(event.type))
+      .map((event) =>
+        event.type === "turn_ended"
+          ? `end:${event.steps}`
+          : event.type === "state_changed"
+            ? event.state
+            : "taken",
+      )
+      .join(",");
+    await live.session.close();
+    return { ...judgeIdleOrder(live.events), order };
+  };
+  // The hook's delay does not always win the race with the turn's start: a round tries up to three
+  // fresh processes and keeps the first that cut the turn at its start.
+  const round = async (count: number) => {
+    let seen = await attempt(count, 1);
+    for (let tried = 2; tried <= 3 && !seen.caused; tried += 1) seen = await attempt(count, tried);
+    return seen;
+  };
+  // Two prompts is the round the claim stands on: an `idle` ahead of the second, which still runs,
+  // is what would make the core drop a prompt that runs. One prompt is recorded when its cut is
+  // seen: through the back end it seldom is (0 of 3 tries per run, 2026-11-10), and `idle` with the
+  // cut's result when nothing else was sent stays measured by hand (2 of 2, 2026-11-10).
+  const two = await round(2);
+  const one = await attempt(1, 1);
+  const caused = two.caused;
+  const holds = caused && two.holds;
+  const detail = !caused
+    ? `the interrupt did not cut the first of two prompts at its start (${two.order})`
+    : `a turn ran or a prompt was taken after the first idle of two prompts (${two.order})`;
+  return {
+    P48: observation(caused, holds, holds ? "" : detail, {
+      twoIdleAfterAllEnds: two.holds,
+      oneCut: one.caused,
+      oneIdleAfterCut: one.caused && one.holds,
+    }),
+  };
+}
+
+/**
  * P45: the cut the back end makes for `rewindTo`. Two turns each give a codeword; the session is
  * closed and started again with `rewindTo` the second prompt (which the back end guards with
  * `resumeDropsTurn`); asked for the codewords it names the first alone, under the same session
@@ -2815,6 +2911,7 @@ export async function runScenes(log: Log, records: Records = []): Promise<Seen> 
         })),
       );
       Object.assign(seen, await attempt("prompt suggestion", s, () => promptSuggestion(s)));
+      Object.assign(seen, await attempt("idle after a gap stop", s, () => idleAfterGap(s)));
       Object.assign(seen, await attempt("folder trust", s, () => folderTrust(s)));
       Object.assign(seen, await attempt("stop hooks", s, () => stopHooks(s)));
       Object.assign(seen, await attempt("settings mode", s, () => settingsMode(s)));

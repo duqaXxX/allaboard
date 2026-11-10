@@ -780,3 +780,34 @@ test("the plain-session scene puts back the variables it removed when it throws"
     });
   }
 });
+
+test("P48 judges the order of idle after a gap stop, and fails a stream that breaks it", async () => {
+  const { judgeIdleOrder } = await import("../../probe/scenes.ts");
+  const ended = (steps: number) =>
+    ({
+      type: "turn_ended",
+      sessionId: "s",
+      startedBy: "owner",
+      finalText: "",
+      ending: "interrupted",
+      steps,
+      tokens: {},
+    }) as const;
+  const idle = { type: "state_changed", state: "idle" } as const;
+  const taken = { type: "prompt_taken", promptId: "p" } as const;
+  assert.deepEqual(judgeIdleOrder([ended(0), idle]), { caused: true, holds: true });
+  assert.deepEqual(judgeIdleOrder([ended(0), taken, ended(1), idle]), {
+    caused: true,
+    holds: true,
+  });
+  // The contract broken: an idle before the second prompt, which then runs.
+  assert.deepEqual(judgeIdleOrder([ended(0), idle, taken, ended(1), idle]), {
+    caused: true,
+    holds: false,
+  });
+  assert.equal(judgeIdleOrder([ended(0), idle, ended(1)]).holds, false);
+  assert.equal(judgeIdleOrder([ended(0)]).holds, false);
+  assert.equal(judgeIdleOrder([ended(2), idle]).caused, false, "the turn had begun");
+  assert.equal(judgeIdleOrder([taken, ended(0), idle]).caused, false, "the prompt was replayed");
+  assert.equal(judgeIdleOrder([idle]).caused, false, "no turn ended");
+});

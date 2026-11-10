@@ -328,6 +328,16 @@ function assertDeclared(events: readonly SessionEvent[], caps: Capabilities): vo
     if (!caps.usageLimits) assert.notEqual(event.type, "limits_changed");
     if (!caps.models) assert.notEqual(event.type, "model_changed");
     if (!caps.declaredState) assert.notEqual(event.type, "state_changed");
+    // The contract of `declaredState`: an idle never comes in the middle of a turn, after its
+    // first word and before its end (an idle with no turn behind it, a command's, is fine).
+    if (caps.declaredState && event.type === "state_changed" && event.state === "idle") {
+      const before = events.slice(0, events.indexOf(event));
+      const open = before.findLastIndex(
+        (e) => e.type === "message_started" || e.type === "call_started",
+      );
+      const closed = before.findLastIndex((e) => e.type === "turn_ended");
+      assert.ok(open <= closed, "an idle comes after the end of the turn it follows");
+    }
     if (!caps.goals) assert.notEqual(event.type, "goal_changed");
     if (!caps.scheduledJobs) assert.notEqual(event.type, "scheduled_jobs");
     if (

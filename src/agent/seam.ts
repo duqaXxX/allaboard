@@ -99,6 +99,11 @@ export interface Capabilities {
   /**
    * The agent says whether it works, rests or waits for the owner (`state_changed`). Without it
    * the core knows a turn of the agent's own only from that turn's first event.
+   *
+   * The order is a contract (#252): the agent says `idle` only when no prompt it has been sent
+   * will still run, and a turn's end comes before the `idle` that follows it. The core drops the
+   * prompts a stop in the gap may have cut at the first `idle` after the cut, with no timer. Its
+   * own background work is not promised: an agent may say `idle` while a task runs.
    */
   readonly declaredState: boolean;
   /**

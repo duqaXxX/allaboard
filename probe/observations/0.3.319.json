@@ -1,6 +1,6 @@
 {
   "cli": "2.1.319",
-  "date": "2026-11-07",
+  "date": "2026-11-10",
   "claims": {
     "P1": {
       "versionReported": true
@@ -115,6 +115,11 @@
       "sameId": true
     },
     "P46": {},
+    "P48": {
+      "oneCut": false,
+      "oneIdleAfterCut": false,
+      "twoIdleAfterAllEnds": true
+    },
     "L1": {},
     "L2": {},
     "L3": {},

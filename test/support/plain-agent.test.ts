@@ -400,3 +400,37 @@ test("a refused rewind leaves a session that starts plainly", LIMIT, async () =>
   assert.equal((await agent.prompts?.(FOLDER, session.id))?.length, 1);
   await plain.close();
 });
+
+test(
+  "with declaredState the agent says idle after a turn's end, once nothing it was sent is left",
+  LIMIT,
+  async () => {
+    const agent = new PlainAgent({ declaredState: true });
+    assert.equal(agent.capabilities.declaredState, true);
+    const { session, events } = await started(agent);
+    await session.send(prompt("one"));
+    await session.send(prompt("two"));
+    const seen: SessionEvent[] = [];
+    let idles = 0;
+    while (idles < 1) {
+      const next = await events.next();
+      assert.equal(next.done, false);
+      if (next.done) break;
+      seen.push(next.value);
+      if (next.value.type === "state_changed") idles += 1;
+    }
+    const kinds = types(seen);
+    const ends = kinds.flatMap((kind, at) => (kind === "turn_ended" ? [at] : []));
+    assert.equal(ends.length, 2, "both turns ended before the idle");
+    assert.equal(kinds.at(-1), "state_changed", "the idle is the last word");
+    assert.deepEqual(seen.at(-1), { type: "state_changed", state: "idle" });
+  },
+);
+
+test("without declaredState the plain agent says nothing of its state", LIMIT, async () => {
+  const agent = new PlainAgent();
+  const { session, events } = await started(agent);
+  await session.send(prompt("one"));
+  const turn = await turnOf(events);
+  assert.ok(!types(turn).includes("state_changed"));
+});

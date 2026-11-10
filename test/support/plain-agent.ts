@@ -570,6 +570,8 @@ export interface PlainSessionContext {
   readonly firstUncuttable: boolean;
   /** The agent takes prompts into a running turn and announces the others (`promptDuringTurn`). */
   readonly promptDuringTurn: boolean;
+  /** The agent says `idle` by the seam's contract (`declaredState`). */
+  readonly declaredState: boolean;
 }
 
 export class PlainSession implements AgentSession {
@@ -610,11 +612,15 @@ export class PlainSession implements AgentSession {
   #gapOpen = false;
   /** The prompts sent in that gap, announced right after the first. */
   #gapped: string[] = [];
+  /** Prompts sent whose play has not ended: `idle` is said only when none is left (`declaredState`). */
+  #owed = 0;
   /**
    * With `promptDuringTurn`: a cut in the gap leaves the prompts sent in it to run as turns of their
    * own (M3), where the default is that the cut took them all (the plain agent's folding).
    */
   gapCutLeavesRest = false;
+  /** With `declaredState`: `idle` follows a turn by the contract; a test lowers it to say `idle` by hand. */
+  autoIdle = true;
 
   constructor(context: PlainSessionContext) {
     this.#context = context;
@@ -666,7 +672,19 @@ export class PlainSession implements AgentSession {
         this.#folded.add(prompt.id);
       }
     }
-    this.#chain = this.#chain.then(() => this.#play(text, prompt.id));
+    this.#owed += 1;
+    this.#chain = this.#chain.then(async () => {
+      try {
+        await this.#play(text, prompt.id);
+      } finally {
+        this.#owed -= 1;
+        // After the turn's end, and only when nothing it was sent is left to play: a prompt the
+        // cut took is settled by its own (empty) play, a prompt that will replay is still owed.
+        if (this.#context.declaredState && this.autoIdle && this.#owed === 0) {
+          this.#push({ type: "state_changed", state: "idle" });
+        }
+      }
+    });
   }
 
   /** Lets a turn waiting at `hold()` go on. */
@@ -1044,6 +1062,11 @@ export interface PlainAgentOptions {
    */
   readonly promptDuringTurn?: true;
   /**
+   * The agent declares `declaredState`: it says `idle` after a turn's end once no prompt it was
+   * sent is left to play (the seam's contract), and says nothing else of its state.
+   */
+  readonly declaredState?: true;
+  /**
    * The agent keeps a record of trust (`folderTrust`): every folder may hold a session, and the
    * repository of a folder is what `repository` answers while `trusted` says the folder is
    * trusted. Its line to ask for trust is `trust {directory}`.
@@ -1131,6 +1154,9 @@ export class PlainAgent implements AgentBackend {
     if (options.promptDuringTurn === true) {
       this.capabilities = Object.freeze({ ...this.capabilities, promptDuringTurn: true });
     }
+    if (options.declaredState === true) {
+      this.capabilities = Object.freeze({ ...this.capabilities, declaredState: true });
+    }
     if (options.models !== undefined) {
       this.capabilities = Object.freeze({ ...this.capabilities, models: true });
     }
@@ -1217,6 +1243,7 @@ export class PlainAgent implements AgentBackend {
       rewinds: this.#rewind !== undefined,
       firstUncuttable: this.#rewind?.firstUncuttable === true,
       promptDuringTurn: this.capabilities.promptDuringTurn,
+      declaredState: this.capabilities.declaredState,
     });
     if (this.#rewind?.files === true) {
       session.restoreFiles = async (promptId, preview) =>
