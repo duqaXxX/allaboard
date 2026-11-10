@@ -627,10 +627,21 @@ async function interrupt(s: Stage): Promise<Seen> {
     id: randomUUID(),
     content: `Without using any tool, reply with the numbers from 1 to ${COUNT_TO}, one per line, and nothing else.`,
   });
-  const reached = await s.main.until(from, (events) => counted(writtenIn(events)).has(20), 60_000);
-  if (!reached) {
-    const start = s.scrubbed(writtenIn(s.main.events.slice(from)), 80);
-    return { P8: observation(false, false, `the reply never reached 20: ${start}`) };
+  // Haiku sometimes calls a tool against the prompt (2 of 6 runs on 2026-11-10, Claude Code
+  // 2.1.319): a started call shows the turn running just as well, so it is stopped there.
+  const running = (events: readonly SessionEvent[]) =>
+    counted(writtenIn(events)).has(20) || events.some((event) => event.type === "call_started");
+  const reached = await s.main.until(
+    from,
+    (events) => running(events) || events.some((event) => event.type === "turn_ended"),
+    60_000,
+  );
+  const before = s.main.events.slice(from);
+  if (!reached || !running(before) || before.some((event) => event.type === "turn_ended")) {
+    const start = s.scrubbed(writtenIn(before), 80);
+    return {
+      P8: observation(false, false, `the turn was not seen running before its end: ${start}`),
+    };
   }
   await s.main.session.interrupt();
   const ended = await s.main.until(
