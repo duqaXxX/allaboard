@@ -212,7 +212,12 @@ node probe/main.ts            # the pinned SDK, if it is not certified yet; if i
 node probe/main.ts --latest   # the newest release on npm, in a temporary git worktree
 node probe/main.ts --force    # run even if already certified
 node probe/main.ts --surface --from <sdk.d.ts>   # what the installed release adds to that file: no token
+node probe/main.ts --scene interrupt   # one scene alone (repeat --scene for more), with the scenes it needs
 ```
+
+`--scene` is for developing a claim: it runs the named scenes on the installed release, prints
+each of their claims' outcome and the stream shapes no fixture has, and stores and certifies
+nothing. The full run certifies.
 
 `--latest` works on a worktree of `HEAD`, so commit a change to the probe before using it. Each
 claim in `probe/claims.ts` ends in one of five outcomes:

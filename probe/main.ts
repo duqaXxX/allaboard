@@ -10,6 +10,10 @@
  *     node probe/main.ts --surface  check docs/sdk-surface.md and the bundled CLI's variables
  *                                   (CLI_VARIABLES), and list the table's rows: no tokens
  *     node probe/main.ts --commands list the commands that are new or gone on this release: no tokens
+ *     node probe/main.ts --scene <name> [--scene <name>...]
+ *                                   run the named scenes alone, with the scenes they need, on
+ *                                   the installed release, and print what their claims saw: for
+ *                                   developing a claim, never certifies or stores anything
  *     node probe/main.ts --surface --from <sdk.d.ts>
  *                                   also list what this release adds to or removes from the
  *                                   declarations in that file, and the rows that rest on it
@@ -59,7 +63,7 @@ import { report as diffReport, diffSurface, matches, readSurface } from "./diff.
 import { familiesReport, runFamilies } from "./families.ts";
 import { byHand, features } from "./features.ts";
 import { readLimits } from "./limits.ts";
-import { runScenes } from "./scenes.ts";
+import { runScenes, SCENES, scenesFor } from "./scenes.ts";
 import { differences, fixtureRecords, loadAccepted, shapesReport } from "./shapes.ts";
 import {
   check as checkSurface,
@@ -532,6 +536,38 @@ async function run(options: RunOptions): Promise<number> {
 }
 
 /**
+ * The named scenes alone, with the scenes they need, and each of their claims' outcome. A partial
+ * run certifies nothing, so it writes neither the certificate nor the observations. Exit status:
+ * 0 every claim holds, 3 one is BROKEN, 2 one is not proven or a limit fell. The shapes the
+ * scenes' streams carry are reported as the full run reports them, and move no exit status.
+ */
+async function runNamed(names: readonly string[]): Promise<number> {
+  const scenes = scenesFor(names);
+  const { sdk, cli } = installed(REPO);
+  log(`${PACKAGE} ${sdk} (Claude Code ${cli}), scenes alone: ${[...scenes].join(", ")}`);
+  // Read before the scenes, as in the full run: a malformed file costs no token.
+  const fixtures = fixtureRecords();
+  const accepted = loadAccepted();
+  const records: unknown[] = [];
+  const seen = await runScenes(log, records, scenes);
+  const ids = new Set([...scenes].flatMap((name) => SCENES[name] ?? []));
+  const results = CLAIMS.filter((claim) => ids.has(claim.id)).map((claim) =>
+    evaluate(claim, seen[claim.id]),
+  );
+  for (const r of results) {
+    console.log(`${r.claim.id} ${r.claim.kind} ${r.outcome}${r.detail ? `: ${r.detail}` : ""}`);
+    if (r.outcome === "HOLDS" && Object.keys(r.seen).length > 0) {
+      console.log(`  seen ${JSON.stringify(r.seen)}`);
+    }
+  }
+  // The shapes these scenes' streams carry: a new scene can bring one no fixture has.
+  console.log(`\n${shapesReport(differences(records, fixtures, accepted), cli)}`);
+  console.log("\nA run of named scenes certifies nothing: the full run does.");
+  if (broken(results)) return 3;
+  return results.every((r) => r.outcome === "HOLDS" || r.outcome === "RETIRED") ? 0 : 2;
+}
+
+/**
  * The SDK surface map against the installed release and the published reference, with the rows
  * a run only counts. It starts no session, so it spends nothing.
  */
@@ -572,8 +608,10 @@ async function main(): Promise<number> {
       // The older release's sdk.d.ts: a worktree run gets the pinned one, `--surface` any file.
       "pinned-declarations": { type: "string" },
       from: { type: "string" },
+      scene: { type: "string", multiple: true },
     },
   });
+  if (values.scene !== undefined) return runNamed(values.scene);
   if (values.surface) return showSurface(values.from);
   if (values.commands) return showCommands();
   return values.latest
