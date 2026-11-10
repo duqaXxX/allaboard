@@ -367,8 +367,11 @@ export class SessionManager {
   async stopChannel(channelId: string): Promise<boolean | null> {
     // Together: a stop that closes a process takes seconds, and the sessions share nothing.
     const sessions = this.sessionsOf(channelId);
+    // Before the first await: a message written during the stops waits for the goal's drop.
+    for (const session of sessions) session.oweGoalDrop();
     const results = await Promise.all(sessions.map((session) => session.stop()));
-    // Before the answer: once the owner reads it, no goal resumes with the next message.
+    // Before the answer of an idle session: once the owner reads it, no goal resumes with the
+    // next message. A session with a turn still to run pays its debt when that turn ends.
     await Promise.all(sessions.map((session) => session.dropGoal()));
     const stopped = results.some((result) => result);
     const heldOnly = results.some((result) => result === null);

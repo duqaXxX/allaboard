@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A channel `!stop` now drops the goal of a session whose message sent before the stop still runs, once
+  that turn has ended (#251). Until then no message reaches the agent, so none runs with the goal.
+  The stop answers at once for such a session.
 - A message sent while a turn runs goes to the agent at once (#185), as in the terminal, for an
   agent that declares `promptDuringTurn` (Claude Code): it takes the message into the running turn,
   which ends with the taken note, or runs it as the next turn. Several messages can be announced
