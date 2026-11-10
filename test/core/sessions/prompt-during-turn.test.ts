@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
+import type { Capabilities, RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
 import { INJECTED_TURN_WAIT } from "../../../src/core/sessions/constants.ts";
 import { SessionClosed } from "../../../src/core/sessions/errors.ts";
 import * as texts from "../../../src/core/texts.ts";
@@ -955,4 +955,157 @@ test("!stop in the gap, an agent that says idle: a prompt replayed before the id
   await settledTurn();
   assert.ok(world.shown(ref).some((line) => line.startsWith("third answer")));
   assert.ok(!world.shown(ref).some(notSentOf("third")), "never told not sent");
+});
+
+/** A plain agent that runs background tasks. */
+class Tasks extends PlainAgent {
+  constructor(options: ConstructorParameters<typeof PlainAgent>[0]) {
+    super(options);
+    (this as { capabilities: Capabilities }).capabilities = Object.freeze({
+      ...this.capabilities,
+      backgroundTasks: true,
+    });
+  }
+}
+
+/**
+ * Two prompts wait in the gap after the first turn and a `!stop` cuts them, the second is left
+ * in doubt. A turn of the agent's own then starts a background command (and a second one when
+ * `alsoRunning`, which keeps that turn's reply open), the owner writes a fifth message, and the
+ * first command ends while the send of the fifth is still going (it rejects): the end line is
+ * kept for a message that never reaches the agent. The agent's `idle` then drops the prompt in
+ * doubt.
+ */
+async function endedBehindARejectedSend(
+  t: Parameters<typeof AskingWorld.make>[0],
+  { alsoRunning = false } = {},
+) {
+  const agent = new Tasks({ promptDuringTurn: true, declaredState: true });
+  const world = await AskingWorld.make(t, { agent });
+  const { ref, session } = world.thread();
+  agent.next(say("first answer"), hold());
+  await session.submit("first");
+  await until("the first runs", () => sent(agent).length === 1);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.release();
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  plain.autoIdle = false;
+  let open!: () => void;
+  plain.playGate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  await session.submit("second");
+  await until("second sent", () => sent(agent).length === 2);
+  await session.submit("third");
+  await until("third sent", () => sent(agent).length === 3);
+  assert.equal(await session.stop(), true);
+  open();
+  await settledTurn();
+  plain.playGate = null;
+  // A turn of the agent's own after the cut starts a background task.
+  plain.emit({ type: "text", text: "On my own." });
+  plain.emit({
+    type: "task_started",
+    taskId: "task-2",
+    kind: "command",
+    taskType: null,
+    description: "watch2",
+    callId: null,
+    agentType: null,
+    background: true,
+    parentTaskId: null,
+  });
+  if (alsoRunning) {
+    plain.emit({
+      type: "task_started",
+      taskId: "task-3",
+      kind: "command",
+      taskType: null,
+      description: "watch3",
+      callId: null,
+      agentType: null,
+      background: true,
+      parentTaskId: null,
+    });
+  }
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "agent",
+    finalText: "On my own.",
+    ending: "done",
+    steps: 1,
+    tokens: {},
+  });
+  await until("the own turn is shown", () =>
+    world.shown(ref).some((l) => l.startsWith("On my own")),
+  );
+  for (let i = 0; i < 10; i += 1) await settledTurn();
+  const realSend = plain.send.bind(plain);
+  let ended = false;
+  plain.send = async (prompt) => {
+    if (prompt.content !== "fifth") return realSend(prompt);
+    plain.emit({
+      type: "task_ended",
+      taskId: "task-2",
+      status: "completed",
+      summary: "",
+      durationMs: null,
+      callId: null,
+      report: null,
+      reportSent: false,
+      foldNamed: false,
+    });
+    for (let i = 0; i < 20; i += 1) await settledTurn();
+    ended = true;
+    throw new Error("transport hiccup");
+  };
+  await session.submit("fifth");
+  await until("the send failed", () => ended);
+  for (let i = 0; i < 10; i += 1) await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  return { world, session, ref, agent };
+}
+
+test("!stop in the gap: an end line kept behind a message the wait drops goes on the not-sent note once its reply is finished (#266)", async (t) => {
+  const { world, session, ref, agent } = await endedBehindARejectedSend(t);
+  const shown = () => world.shown(ref);
+  const mark = shown().findIndex((line) => line.includes("watch2"));
+  assert.ok(mark !== -1, "the end line is said");
+  // On the note of the drop, which names the prompt in doubt, and not in the own turn's reply.
+  assert.ok(shown()[mark]?.includes('"third"'), "on the not-sent note");
+  assert.ok(
+    !shown()
+      .find((line) => line.startsWith("On my own."))
+      ?.includes("watch2"),
+  );
+  // The next reply is the next message's alone.
+  agent.next(say("sixth answer"));
+  await session.submit("sixth");
+  await until("sixth ran", () => shown().some((line) => line.startsWith("sixth answer")));
+  await settledTurn();
+  const lines = shown().filter((line) => line.includes("watch2"));
+  assert.equal(lines.length, 1, "said once");
+  assert.ok(!lines[0]?.startsWith("sixth answer"), "not in the next message's reply");
+});
+
+test("!stop in the gap: an end line kept behind a message the wait drops goes into its task's reply while that reply is open (#266)", async (t) => {
+  const { world, session, ref, agent } = await endedBehindARejectedSend(t, { alsoRunning: true });
+  const shown = () => world.shown(ref);
+  // watch3 still runs, so the own turn's reply is open: the line is written there by an edit.
+  const own = shown().find((line) => line.startsWith("On my own."));
+  assert.ok(own?.includes("watch2"), "in the task's own reply");
+  const note = shown().find((line) => line.includes('"third"'));
+  assert.ok(note !== undefined, "the prompt in doubt is told not sent");
+  assert.ok(!note.includes("watch2"), "not on the note");
+  agent.next(say("sixth answer"));
+  await session.submit("sixth");
+  await until("sixth ran", () => shown().some((line) => line.startsWith("sixth answer")));
+  await settledTurn();
+  const lines = shown().filter((line) => line.includes("watch2"));
+  assert.equal(lines.length, 1, "said once");
 });
