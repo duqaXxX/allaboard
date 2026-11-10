@@ -36,6 +36,14 @@ All notable changes to this project are documented here. The format follows
   answer that is text alone, and no line on how it was cut short) stays whole above your message. The taken note reads `Claude Code took your message into this
   turn.` (`took N messages`).
 
+### Fixed
+
+- After a `!stop` between a message's send and its turn, a message the cut may have taken no
+  longer counts as owed to the agent until a replay shows it runs (#252): a refusal or a turn the
+  agent starts in the wait opens nothing on its account, and it is always told `was not sent
+  because you stopped it` if it never runs. Before, a refusal in the wait opened a turn no result
+  ended, and the thread stayed working.
+
 ## [0.14.0] - 2026-11-09
 
 ### Changed

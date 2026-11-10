@@ -731,3 +731,228 @@ test("!stop twice in the gap: an idle between the second stop and its cut leaves
   assert.equal(world.shown(ref).filter(notSentOf("sixth")).length, 1, "sixth told once");
   assert.equal(root(world, ref), "done");
 });
+
+// A prompt the cut may have taken is in doubt until a replay claims it or the wait drops it: no
+// reader that asks whether a prompt of the owner's runs next counts it (#252).
+
+const refusal = {
+  type: "model_refused",
+  text: "refused",
+  originalModel: "model-a",
+  fallbackModel: null,
+  category: null,
+  retracted: false,
+} as const;
+
+test("!stop in the gap, an agent that says idle: a refusal in the wait opens no turn on the prompt in doubt", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  await settledTurn();
+  // A side question or a fork that falls back while the thread waits: no result follows it.
+  plain.emit(refusal);
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some(notSentOf("third")), "the prompt the cut took is told");
+  assert.equal(root(world, ref), "done");
+});
+
+test("!stop in the gap of two prompts: a refusal in the wait opens no turn on the prompt in doubt", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false);
+  open();
+  await settledTurn();
+  agent.sessions[0]?.emit(refusal);
+  await settledTurn();
+  await world.clock.advance(INJECTED_TURN_WAIT);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some(notSentOf("third")), "the prompt the cut took is told");
+  assert.equal(root(world, ref), "done");
+});
+
+test("!stop in the gap, an agent that says idle: a turn the agent opens with a compaction in the wait is not the prompt in doubt", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  await settledTurn();
+  // A report or a peer's message whose turn compacts first: no replay names a prompt.
+  plain.emit({ type: "compaction_started" });
+  plain.emit({ type: "compaction_ended" });
+  plain.emit({ type: "compacted", tokensBefore: 100, tokensAfter: 10 });
+  plain.emit({ type: "text", text: "On my own." });
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "agent",
+    finalText: "On my own.",
+    ending: "done",
+    steps: 1,
+    tokens: {},
+  });
+  await settledTurn();
+  // Taken as the dead prompt's turn, the reply would carry its not-sent note under these words.
+  const own = world.shown(ref).find((line) => line.startsWith("On my own."));
+  assert.ok(own !== undefined && !notSentOf("third")(own), "the agent's turn is its own reply");
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(world.shown(ref).filter(notSentOf("third")).length, 1, "told once");
+  assert.equal(root(world, ref), "done");
+});
+
+test("!stop in the gap, an agent that says idle: a prompt in doubt whose turn compacts before its replay keeps that turn", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  await settledTurn();
+  const third = plain.prompts.find((prompt) => prompt.content === "third");
+  assert.ok(third);
+  // The order of `auto-compact.jsonl`: the compaction starts and ends, then the replay, then the
+  // boundary and the turn.
+  plain.emit({ type: "compaction_started" });
+  plain.emit({ type: "compaction_ended" });
+  plain.emit({ type: "prompt_taken", promptId: third.id });
+  plain.emit({ type: "compacted", tokensBefore: 100, tokensAfter: 10 });
+  plain.emit({ type: "text", text: "third answer" });
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "owner",
+    finalText: "third answer",
+    ending: "done",
+    steps: 1,
+    tokens: {},
+  });
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(!world.shown(ref).some(notSentOf("third")), "a prompt that ran is never told not sent");
+  assert.ok(
+    world.shown(ref).some((line) => line.startsWith("third answer")),
+    "the prompt's turn renders as its own",
+  );
+});
+
+for (const startedBy of ["agent", "owner"] as const) {
+  for (const declaredState of [false, true]) {
+    test(`!stop in the gap: a worded turn in the wait whose end says ${startedBy} never takes the prompt in doubt (${declaredState ? "says idle" : "timer"})`, async (t) => {
+      const { world, session, ref, open, agent } = await twoInTheGap(t, false, declaredState);
+      const plain = agent.sessions[0];
+      assert.ok(plain);
+      plain.autoIdle = false;
+      open();
+      await settledTurn();
+      plain.emit({ type: "text", text: "Report words." });
+      plain.emit({
+        type: "turn_ended",
+        sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+        startedBy,
+        finalText: "Report words.",
+        ending: "done",
+        steps: 1,
+        tokens: {},
+      });
+      await settledTurn();
+      if (declaredState) plain.emit({ type: "state_changed", state: "idle" });
+      else await world.clock.advance(INJECTED_TURN_WAIT);
+      await until("idle", () => !session.busy);
+      await settledTurn();
+      // Before #252's second item, an end that said the owner marked the dead prompt done.
+      assert.ok(world.shown(ref).some(notSentOf("third")), "the prompt the cut took is told");
+    });
+  }
+}
+
+test("!stop twice in the gap: a second stop that cuts the prompt in doubt leaves the next prompt to run", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, true, true);
+  agent.next(say("fifth answer"));
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  // The third's play waits on a new gate: it has not replayed when the second stop comes.
+  let openThird!: () => void;
+  plain.playGate = new Promise<void>((resolve) => {
+    openThird = resolve;
+  });
+  await settledTurn();
+  await session.submit("fifth");
+  await until("fifth sent", () => sent(agent).length === 4);
+  assert.equal(await session.stop(), true);
+  openThird();
+  await settledTurn();
+  await until("fifth ran", () => world.shown(ref).some((line) => line.startsWith("fifth answer")));
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some(notSentOf("third")), "the cut prompt is told");
+  assert.ok(!world.shown(ref).some(notSentOf("fifth")), "the prompt that ran is never told");
+});
+
+test("!stop twice in the gap: a turn the agent starts that ends with no step never takes the prompt in doubt", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  await settledTurn();
+  plain.playGate = null;
+  // A second stop with only the prompt in doubt pending: nothing to cut.
+  await session.stop();
+  await settledTurn();
+  // A turn of the agent's own that fails before its first word.
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "agent",
+    finalText: "",
+    ending: "error",
+    steps: 0,
+    tokens: {},
+  });
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(world.shown(ref).filter(notSentOf("third")).length, 1, "told once");
+});
+
+test("!stop in the gap, an agent that says idle: a prompt replayed before the idle, whose turn opens after it, is not dropped", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  await settledTurn();
+  const third = plain.prompts.find((prompt) => prompt.content === "third");
+  assert.ok(third);
+  plain.emit({ type: "prompt_taken", promptId: third.id });
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await settledTurn();
+  assert.ok(!world.shown(ref).some(notSentOf("third")), "a replayed prompt is not dropped");
+  plain.emit({ type: "text", text: "third answer" });
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "owner",
+    finalText: "third answer",
+    ending: "done",
+    steps: 1,
+    tokens: {},
+  });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some((line) => line.startsWith("third answer")));
+  assert.ok(!world.shown(ref).some(notSentOf("third")), "never told not sent");
+});

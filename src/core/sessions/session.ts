@@ -905,14 +905,30 @@ export class ThreadSession {
    * starts, in the step that sets `active`, so neither alone covers it; `active.turn` is null for
    * a turn the agent started itself.
    */
-  private promptOwed(): boolean {
+  private promptOwed({ certain = false } = {}): boolean {
     return (
       this.pendingSubmits > 0 ||
       !this.queue.empty ||
       this.taken !== null ||
-      this.sent.length > 0 ||
+      (certain ? this.owed().length : this.sent.length) > 0 ||
       this.active?.turn != null
     );
+  }
+
+  /**
+   * The prompts in `sent` the agent will run. One a cut at start may have taken (`Turn.inDoubt`)
+   * is left out from the cut's end until its replay claims it or the wait drops it: it stays in
+   * `sent`, and in `promptOwed` for the status, but no reader that asks whether a prompt of the
+   * owner's runs next counts it.
+   */
+  private owed(): Turn[] {
+    return this.sent.filter((turn) => !turn.inDoubt);
+  }
+
+  /** `turn` leaves `sent`, found by identity: it ran, or nobody waits on it any more. */
+  private unsend(turn: Turn): void {
+    const at = this.sent.indexOf(turn);
+    if (at !== -1) this.sent.splice(at, 1);
   }
 
   /**
@@ -2828,15 +2844,13 @@ export class ThreadSession {
           error instanceof SessionClosed ||
           error instanceof StartsBlocked
         ) {
-          const at = this.sent.indexOf(turn);
-          if (at !== -1) this.sent.splice(at, 1);
+          this.unsend(turn);
           await this.fail(turn, error.message, { error: true });
           this.idleTimerCheck(); // a no-op if this also closed the session
         } else {
           // a failed turn must not stop this thread's queue
           logger.error(`turn failed in ${this.where}: ${errorName(error)}`);
-          const at = this.sent.indexOf(turn);
-          if (at !== -1) this.sent.splice(at, 1);
+          this.unsend(turn);
           await this.fail(
             turn,
             texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: errorName(error) }),
@@ -2941,6 +2955,9 @@ export class ThreadSession {
     const sent = [...this.sent, ...(active?.turn ? [active.turn] : [])];
     const turn = sent.find((candidate) => candidate.uuid === promptId);
     if (turn === undefined) return false;
+    // A replay is proof the prompt runs: it is no longer in doubt, before its turn opens (a
+    // compaction can come first, `auto-compact.jsonl`).
+    turn.inDoubt = false;
     if (active === null) {
       if (!this.announced.includes(turn)) this.announced.push(turn);
     } else if (!active.taken.includes(turn)) active.taken.push(turn);
@@ -3093,7 +3110,7 @@ export class ThreadSession {
           this.deps.state.setSession(this.channelId, this.threadId, event.sessionId);
         }
         // A turn of the agent's own begins: the ends told so far are the ones it reports.
-        if (this.sent.length === 0 && this.opening === null && this.ended.length > 0) {
+        if (this.owed().length === 0 && this.opening === null && this.ended.length > 0) {
           this.opening = this.ended;
           this.ended = [];
         }
@@ -3155,7 +3172,7 @@ export class ThreadSession {
     if (
       event.type === "task_ended" &&
       this.active === null &&
-      this.sent.length === 0 &&
+      this.owed().length === 0 &&
       !stopped &&
       !owned &&
       this.background
@@ -3178,7 +3195,7 @@ export class ThreadSession {
           this.unfolded.set(event.taskId, reply);
         }
         if (writing !== null) await this.writeEnds(writing, [this.endedLine(event)]);
-        else if (this.sent.length > 0) this.endedAhead.push(this.endedLine(event));
+        else if (this.owed().length > 0) this.endedAhead.push(this.endedLine(event));
       }
     }
     if (
@@ -3261,7 +3278,7 @@ export class ThreadSession {
       const startsOwnerTurn =
         event.type === "task_started" &&
         event.callId === null &&
-        this.sent.length > 0 &&
+        this.owed().length > 0 &&
         !this.injectedExpected;
       // Whether the turn opens with its own words: the case in which a prompt's replay is
       // known to come first (`whoseTurn`).
@@ -3283,10 +3300,10 @@ export class ThreadSession {
         // either event would open a reply that no result is known to end.
         const compaction =
           (event.type === "compacted" || event.type === "compaction_started") &&
-          (this.sent.length > 0 || this.injectedExpected);
+          (this.owed().length > 0 || this.injectedExpected);
         // A refusal opens a turn the same way: a fork or a side question that falls back
         // while the thread is idle (`scope: local`) has no result to end a reply it would open.
-        if (event.type === "model_refused" && this.sent.length === 0 && !this.injectedExpected) {
+        if (event.type === "model_refused" && this.owed().length === 0 && !this.injectedExpected) {
           return;
         }
         if (!TURN_EVENTS.has(event.type) && !compaction) return;
@@ -3304,7 +3321,16 @@ export class ThreadSession {
       // subagent's message needs no such test: `report_started` came first, and `opensRun` is
       // false while a report is awaited.
       const run = worded && task === null && event.type !== "peer_message" && this.opensRun();
-      await this.startTurn(worded, run);
+      // A turn a stop in the gap cut at its start shows nothing before its end, which says a
+      // prompt started it: it is the turn of the prompt at the head of `sent`, in doubt or not,
+      // since the agent runs its prompts in the order sent (a second stop can cut a prompt the
+      // first cut left in doubt). One the agent started itself never takes a prompt in doubt.
+      const cutShaped =
+        event.type === "turn_ended" &&
+        event.startedBy === "owner" &&
+        event.steps === 0 &&
+        this.stopInGap;
+      await this.startTurn(worded, run, cutShaped);
       // A report turn has no prompt behind it: only now does `threadActivity` read it.
       this.showThreadStatus();
     }
@@ -3668,7 +3694,7 @@ export class ThreadSession {
    * 2026-09-24, Claude Code 2.1.280), and no turn of its own follows.
    */
   private notified(): void {
-    if (this.background && this.sent.length === 0) this.expectInjectedTurn();
+    if (this.background && this.owed().length === 0) this.expectInjectedTurn();
   }
 
   private expectInjectedTurn(): void {
@@ -3716,7 +3742,7 @@ export class ThreadSession {
         // Into the reply that started the task, which the sweep below then ends. A reply that
         // is no longer the last thing in the thread gets no line: none is posted for it.
         await this.writeEnds(target, unsaid);
-      } else if (said && this.promptOwed()) {
+      } else if (said && this.promptOwed({ certain: true })) {
         // A message of the owner's waits below that reply: its own reply says the line.
         this.endedAhead.push(...unsaid);
       } else if (said && holder !== null && !holder.closedOut) {
@@ -4108,11 +4134,11 @@ export class ThreadSession {
    * a turn that fails before its first word (a logged-out CLI, a limit reached) and a turn with
    * no notification waiting were never recorded without their replay.
    */
-  private whoseTurn(worded: boolean, behind: Turn[]): Turn | null {
+  private whoseTurn(worded: boolean, behind: Turn[], cutShaped = false): Turn | null {
     const [announced, ...others] = this.announced.filter((turn) => this.sent.includes(turn));
     this.announced = [];
     if (announced !== undefined) {
-      this.sent.splice(this.sent.indexOf(announced), 1);
+      this.unsend(announced);
       // The others were replayed behind it: the turn takes them in (`finish` releases them).
       behind.push(...others);
       this.reportDue = this.injectedExpected;
@@ -4120,12 +4146,14 @@ export class ThreadSession {
     }
     // The agent said whose report this turn is: no prompt's, even with one waiting.
     if (this.reportOf !== null) return null;
-    const first = this.sent[0];
+    // Never a prompt a cut may have taken, but for a turn cut at its start: a live one is replayed
+    // before its turn shows anything, a compaction's boundary included (`auto-compact.jsonl`).
+    const first = cutShaped ? this.sent[0] : this.owed()[0];
     if (this.injectedExpected || first === undefined) return null;
     const head = first.prompt;
     const plain = typeof head === "string" && !this.isCommand(head);
     if (worded && this.notificationWaits && plain) return null;
-    this.sent.shift();
+    this.unsend(first);
     return first;
   }
 
@@ -4204,7 +4232,7 @@ export class ThreadSession {
     await this.thread.endLoop?.(line);
   }
 
-  private async startTurn(worded: boolean, run = false): Promise<ActiveTurn> {
+  private async startTurn(worded: boolean, run = false, cutShaped = false): Promise<ActiveTurn> {
     // A turn of any kind, the agent's own included, outdates the last guess.
     this.suggestions.clear(this.ref);
     // Skipped while `stop()` is still winding an interrupt down (`finish` clears the flag once
@@ -4224,7 +4252,7 @@ export class ThreadSession {
     this.reportGivenUp = false;
     const behind: Turn[] = [];
     const replayed = this.announced.some((announced) => this.sent.includes(announced));
-    const turn = run ? null : this.whoseTurn(worded, behind);
+    const turn = run ? null : this.whoseTurn(worded, behind, cutShaped);
     // An agent that takes no prompt into a running turn is sent the next one once this turn has
     // ended: `work` waits on `settled`, as it does for a report turn that was expected.
     if (turn === null && !this.deps.agent.capabilities.promptDuringTurn) this.settled.clear();
@@ -4762,6 +4790,7 @@ export class ThreadSession {
       this.gapSent = this.gapSent.filter((turn) => this.sent.includes(turn));
       const left = waiting.filter((turn) => this.gapSent.includes(turn));
       if (left.length === 0) return;
+      for (const turn of left) turn.inDoubt = true;
       // A second cut before the idle adds its prompts and keeps the first work count.
       this.cutWait = {
         left: [
@@ -4773,12 +4802,13 @@ export class ThreadSession {
       return;
     }
     if (waiting.length === 0) return;
+    for (const turn of waiting) turn.inDoubt = true;
     const workAtCut = this.workStarts;
     const expiry: Task = new Task(async (signal) => {
       let left = waiting;
       do {
         await this.deps.clock.sleep(INJECTED_TURN_WAIT, signal);
-        left = left.filter((turn) => this.sent.includes(turn));
+        left = left.filter((turn) => this.sent.includes(turn) && turn.inDoubt);
       } while (this.active !== null && left.length > 0);
       await this.dropCutPrompts(left, workAtCut, signal);
     });
@@ -4794,7 +4824,7 @@ export class ThreadSession {
     // Only what this wait covered: a later stop's record stays for its own cut.
     this.gapSent = this.gapSent.filter((turn) => !wait.left.includes(turn));
     await this.dropCutPrompts(
-      wait.left.filter((turn) => this.sent.includes(turn)),
+      wait.left.filter((turn) => this.sent.includes(turn) && turn.inDoubt),
       wait.workAtCut,
       signal,
     );
@@ -4807,7 +4837,7 @@ export class ThreadSession {
     signal?: AbortSignal,
   ): Promise<void> {
     if (left.length === 0) return;
-    this.sent = this.sent.filter((turn) => !left.includes(turn));
+    for (const turn of left) this.unsend(turn);
     await this.dropStopped(left);
     await this.reactDoneIfIdle(signal, { byOwner: this.workStarts === workAtCut });
   }
@@ -4853,8 +4883,7 @@ export class ThreadSession {
   /** The prompts a run took into itself are answered: nobody waits on them any more. */
   private releaseTaken(taken: readonly Turn[]): void {
     for (const turn of taken) {
-      const at = this.sent.indexOf(turn);
-      if (at !== -1) this.sent.splice(at, 1);
+      this.unsend(turn);
       turn.done.set();
     }
     this.settled.set();
@@ -4887,16 +4916,15 @@ export class ThreadSession {
     const reportDue = this.reportDue;
     this.reportDue = false;
     for (const taken of released) {
-      const at = this.sent.indexOf(taken);
-      if (at !== -1) this.sent.splice(at, 1);
+      this.unsend(taken);
       taken.done.set();
     }
-    const waiting = this.sent[0];
+    const waiting = this.owed()[0];
     if (turn === null && !injected && waiting !== undefined && released.length === 0) {
       logger.warning(`an owner reply in ${this.where} went to a background reply`);
       // Only misrouted, not failed, so no ❌. Its answer is already in the reply that was
       // guessed to be the report: the owner turn's own reply is never written.
-      this.sent.shift();
+      this.unsend(waiting);
       waiting.done.set();
       this.expectInjectedTurn();
     } else if (turn !== null && injected && !released.includes(turn)) {
