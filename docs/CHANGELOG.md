@@ -43,6 +43,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A table or a card pasted from a reply into a message now reaches Claude Code: Slack sends
+  them as blocks and leaves the table's cells and the card's details out of the message's text,
+  so they are appended after it, the table in markdown (#120).
 - After a `!stop` between a message's send and its turn, a message the cut may have taken no
   longer counts as owed to the agent until a replay shows it runs (#252): a refusal or a turn the
   agent starts in the wait opens nothing on its account, and it is always told `was not sent

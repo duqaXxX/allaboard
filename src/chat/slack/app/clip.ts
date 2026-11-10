@@ -13,6 +13,7 @@ import * as voice from "../voice.ts";
 import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { isOwner } from "./guards.ts";
 import { inboundMessage } from "./messages.ts";
+import { unwrittenText } from "./pasted.ts";
 import { type Payload, record, str, text } from "./wire.ts";
 
 /** An audio clip the owner sent, held until Slack has its transcript. */
@@ -151,7 +152,13 @@ export class Clips {
     const typed = strip(text(waiting.event.text) ?? "");
     // the composer's blocks describe the typed text alone
     const { blocks: _blocks, ...rest } = waiting.event;
-    const said: Payload = { ...rest, text: typed ? `${typed}\n\n${heard}` : heard, files: [] };
+    // A table or a card pasted beside the clip is read from the blocks before they go (#120).
+    const unwritten = unwrittenText(waiting.event.blocks);
+    const said: Payload = {
+      ...rest,
+      text: [typed, unwritten, heard].filter((part) => part !== "").join("\n\n"),
+      files: [],
+    };
     await this.parts.inbound.message(
       inboundMessage(
         this.parts,

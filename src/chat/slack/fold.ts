@@ -19,7 +19,7 @@ import * as slackTexts from "./texts.ts";
 type Json = Record<string, unknown>;
 
 /** The text of the elements of a rich text block, in reading order. */
-function richTextOf(node: unknown): string[] {
+export function richTextOf(node: unknown): string[] {
   if (Array.isArray(node)) return node.flatMap(richTextOf);
   if (!isRecord(node)) return [];
   if (typeof node.text === "string" && node.type !== "rich_text") return [node.text];
