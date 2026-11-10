@@ -374,6 +374,7 @@ function statuses(session: object): [string | null, boolean][] {
 async function twoInTheGap(
   t: Parameters<typeof AskingWorld.make>[0],
   leavesRest: boolean,
+  declaredState = false,
 ): Promise<{
   world: AskingWorld;
   session: ReturnType<AskingWorld["thread"]>["session"];
@@ -381,7 +382,10 @@ async function twoInTheGap(
   open: () => void;
   agent: PlainAgent;
 }> {
-  const agent = new PlainAgent({ promptDuringTurn: true });
+  const agent = new PlainAgent({
+    promptDuringTurn: true,
+    ...(declaredState && { declaredState: true as const }),
+  });
   const world = await AskingWorld.make(t, { agent });
   const { ref, session } = world.thread();
   agent.next(say("a"));
@@ -566,4 +570,164 @@ test("!stop in the gap of two prompts: a hold continued behind the cut prompt te
   await settledTurn();
   assert.equal(root(world, ref), "done");
   assert.deepEqual(seen.at(-1), ["done", false]);
+});
+
+// The agent says its state (#252): the cut's prompts are dropped at its `idle`, with no clock.
+
+const notSentOf = (text: string) => (line: string) =>
+  /messages? w(as|ere) not sent because you stopped it/.test(line) && line.includes(`"${text}"`);
+
+test("!stop in the gap, an agent that says idle: the prompt the cut took is dropped at the idle, with no clock", async (t) => {
+  const { world, session, ref, open } = await twoInTheGap(t, false, true);
+  const seen = statuses(session);
+  open();
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some(notSentOf("third")), "the prompt the cut took is told");
+  assert.equal(root(world, ref), "done");
+  assert.deepEqual(seen.at(-1), ["done", true], "the owner's stop ended the work: no push");
+});
+
+test("!stop in the gap, an agent that says idle: a prompt the cut left runs and nothing is dropped", async (t) => {
+  const { world, session, ref, open } = await twoInTheGap(t, true, true);
+  open();
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(!world.shown(ref).some(notSentOf("third")), "nothing dropped");
+  assert.ok(world.shown(ref).some((line) => line.split("\n")[0] === "third answer"));
+  assert.equal(root(world, ref), "done");
+});
+
+test("!stop in the gap, an agent that says idle: a prompt written after the stop is never dropped by an early idle", async (t) => {
+  const agent = new PlainAgent({ promptDuringTurn: true, declaredState: true });
+  const world = await AskingWorld.make(t, { agent });
+  const { ref, session } = world.thread();
+  agent.next(say("a"));
+  agent.next(say("b"));
+  agent.next(say("after the stop"));
+  await session.submit("first");
+  await until("the first ran", () => sent(agent).length === 1);
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  const [plain] = agent.sessions;
+  assert.ok(plain);
+  plain.gapCutLeavesRest = true;
+  let open!: () => void;
+  plain.playGate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  await session.submit("second");
+  await until("second sent", () => sent(agent).length === 2);
+  assert.equal(await session.stop(), true);
+  await session.submit("third");
+  await until("third sent", () => sent(agent).length === 3);
+  let openThird!: () => void;
+  open();
+  // The third prompt's play waits for this gate: the cut ends first and the agent has not read it.
+  plain.playGate = new Promise<void>((resolve) => {
+    openThird = resolve;
+  });
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await settledTurn();
+  const told = world.shown(ref).some(notSentOf("third"));
+  openThird(); // before asserting: a failure must fail, not leave the gate shut
+  assert.ok(!told, "the third is not told as not sent");
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some((line) => line.split("\n")[0] === "after the stop"));
+  assert.equal(root(world, ref), "done");
+});
+
+test("!stop in the gap, an agent that says idle: work that ran before the idle makes the end push", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  const seen = statuses(session);
+  open();
+  await settledTurn();
+  plain.emit({ type: "peer_message", text: "a note" });
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "agent",
+    finalText: "Noted.",
+    ending: "done",
+    steps: 1,
+    tokens: {},
+  });
+  await settledTurn();
+  assert.ok(!world.shown(ref).some(notSentOf("third")), "nothing is dropped before the idle");
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some(notSentOf("third")));
+  assert.equal(root(world, ref), "done");
+  assert.deepEqual(seen.at(-1), ["done", false]);
+});
+
+test("!stop in the gap, an agent that says idle: an idle already said before the cut still ends the wait", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  plain.emit({ type: "state_changed", state: "idle" });
+  await settledTurn();
+  open();
+  await settledTurn();
+  assert.ok(!world.shown(ref).some(notSentOf("third")));
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(world.shown(ref).some(notSentOf("third")), "dropped at the repeated idle");
+  assert.equal(root(world, ref), "done");
+});
+
+/** The first gap's cut is over (no idle said yet); a second stop in a new gap with two prompts. */
+async function secondGap(t: Parameters<typeof AskingWorld.make>[0]) {
+  const made = await twoInTheGap(t, false, true);
+  const plain = made.agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  made.open();
+  await settledTurn();
+  let openSecond!: () => void;
+  plain.playGate = new Promise<void>((resolve) => {
+    openSecond = resolve;
+  });
+  await made.session.submit("fifth");
+  await until("fifth sent", () => sent(made.agent).length === 4);
+  await made.session.submit("sixth");
+  await until("sixth sent", () => sent(made.agent).length === 5);
+  assert.equal(await made.session.stop(), true);
+  return { ...made, plain, openSecond };
+}
+
+test("!stop twice in the gap before the idle: the second cut's prompt joins the first wait, once", async (t) => {
+  const { world, session, ref, plain, openSecond } = await secondGap(t);
+  const seen = statuses(session);
+  openSecond();
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(world.shown(ref).filter(notSentOf("third")).length, 1, "third told once");
+  assert.equal(world.shown(ref).filter(notSentOf("sixth")).length, 1, "sixth told once");
+  assert.equal(root(world, ref), "done");
+  // The fifth prompt's turn started after the first cut: work, so the end tells the owner.
+  assert.deepEqual(seen.at(-1), ["done", false]);
+});
+
+test("!stop twice in the gap: an idle between the second stop and its cut leaves the second record for the cut", async (t) => {
+  const { world, session, ref, plain, openSecond } = await secondGap(t);
+  plain.emit({ type: "state_changed", state: "idle" });
+  await settledTurn();
+  openSecond();
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.equal(world.shown(ref).filter(notSentOf("sixth")).length, 1, "sixth told once");
+  assert.equal(root(world, ref), "done");
 });

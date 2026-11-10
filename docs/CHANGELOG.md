@@ -20,6 +20,11 @@ All notable changes to this project are documented here. The format follows
   `✅` once the turn it cut ends; a message that interrupt reached before the agent took it in is
   listed as not sent. A command of the agent waits like a `!!command`. An agent without the
   capability keeps one message at a time.
+- A message the stop's cut took with it (#252) is listed as not sent when an agent that declares
+  `declaredState` says `idle`, not at a 30-second mark; a message written after the `!stop` is never
+  listed. The agent seam states the order as a contract (`idle` only when no message it was sent
+  will still run, after the turn's end), the plain agent and probe claim P48 check it. An agent
+  that does not say its state keeps the 30-second wait.
 - A reply whose stream is still open when it ends, with a message of yours below it (one the agent
   took into the turn), stays where it is, and its end (the words after its last call, the note and
   the footer) is posted as a new message below your message, as the end of a reply past 280 seconds

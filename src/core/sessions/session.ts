@@ -303,6 +303,16 @@ export class ThreadSession {
   private rewinding = false;
   private sent: Turn[] = [];
   /**
+   * With an agent that says its state: the prompts in `sent` when a `!stop` took the gap branch.
+   * Only these can have been cut with the turn; one written after the stop never is (#252).
+   */
+  private gapSent: Turn[] = [];
+  /**
+   * With an agent that says its state: the prompts of `gapSent` a cut at start may have taken, and
+   * the work count at the cut. The agent's next `idle` drops those still in `sent` (#252).
+   */
+  private cutWait: { left: Turn[]; workAtCut: number } | null = null;
+  /**
    * How many turns of new work started (`startTurn`, for a turn that is neither a stop's tail nor
    * a run): tells `expectCutPrompts` whether work started after a cut, whoever started it. A
    * status written is no work: a hold writes waiting and its cancel working.
@@ -1933,8 +1943,14 @@ export class ThreadSession {
       this.active === null &&
       this.pending.length > 0 &&
       !this.waitingForOwner;
-    if (gap) this.stopInGap = true;
-    else this.interrupting = true;
+    if (gap) {
+      this.stopInGap = true;
+      // In the same stretch as the interrupt, before any prompt the owner writes after it: only
+      // what the agent was sent before the interrupt can be cut with the turn.
+      if (this.deps.agent.capabilities.declaredState) {
+        this.gapSent.push(...this.sent.filter((turn) => !this.gapSent.includes(turn)));
+      }
+    } else this.interrupting = true;
     this.stopTail = this.stopTail ?? new Event();
     for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
       await this.deleteRequest(pending.messageId);
@@ -3005,10 +3021,13 @@ export class ThreadSession {
         if (this.acknowledge(event.promptId)) await this.headTaken(event.promptId);
         return;
       case "state_changed":
+        // The state first, so the activity line does not read working beside the drop; a
+        // repeated idle still ends the wait.
         if (event.state !== this.agentState) {
           this.agentState = event.state;
           this.showThreadStatus();
         }
+        if (event.state === "idle") await this.endCutWait(signal);
         return;
       case "report_started":
         // Said with no turn running, right before the turn it names. Inside a running turn it
@@ -4736,6 +4755,23 @@ export class ThreadSession {
   private expectCutPrompts(active: ActiveTurn, result: TurnEnded): void {
     if (!this.cutAtStart(active, result) || this.closedFlag) return;
     const waiting = this.sent.filter((turn) => !active.taken.includes(turn));
+    if (this.deps.agent.capabilities.declaredState) {
+      // The agent says when it rests (the seam's contract): no clock. Only the prompts it was
+      // sent before the stop's interrupt count.
+      // A cut settles the record: what left `sent` (taken, dropped) is no longer owed.
+      this.gapSent = this.gapSent.filter((turn) => this.sent.includes(turn));
+      const left = waiting.filter((turn) => this.gapSent.includes(turn));
+      if (left.length === 0) return;
+      // A second cut before the idle adds its prompts and keeps the first work count.
+      this.cutWait = {
+        left: [
+          ...(this.cutWait?.left ?? []),
+          ...left.filter((t) => !this.cutWait?.left.includes(t)),
+        ],
+        workAtCut: this.cutWait?.workAtCut ?? this.workStarts,
+      };
+      return;
+    }
     if (waiting.length === 0) return;
     const workAtCut = this.workStarts;
     const expiry: Task = new Task(async (signal) => {
@@ -4744,13 +4780,36 @@ export class ThreadSession {
         await this.deps.clock.sleep(INJECTED_TURN_WAIT, signal);
         left = left.filter((turn) => this.sent.includes(turn));
       } while (this.active !== null && left.length > 0);
-      if (left.length === 0) return;
-      this.sent = this.sent.filter((turn) => !left.includes(turn));
-      await this.dropStopped(left);
-      await this.reactDoneIfIdle(signal, { byOwner: this.workStarts === workAtCut });
+      await this.dropCutPrompts(left, workAtCut, signal);
     });
     this.expiring.add(expiry);
     expiry.settled().then(() => this.expiring.delete(expiry));
+  }
+
+  /** The agent says `idle`: the prompts a cut at start may have taken and are still in `sent` are dropped. */
+  private async endCutWait(signal?: AbortSignal): Promise<void> {
+    const wait = this.cutWait;
+    if (wait === null) return;
+    this.cutWait = null;
+    // Only what this wait covered: a later stop's record stays for its own cut.
+    this.gapSent = this.gapSent.filter((turn) => !wait.left.includes(turn));
+    await this.dropCutPrompts(
+      wait.left.filter((turn) => this.sent.includes(turn)),
+      wait.workAtCut,
+      signal,
+    );
+  }
+
+  /** Tell `left` not sent and end the work the stop held back; the done status is the owner's act when no work started since. */
+  private async dropCutPrompts(
+    left: readonly Turn[],
+    workAtCut: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (left.length === 0) return;
+    this.sent = this.sent.filter((turn) => !left.includes(turn));
+    await this.dropStopped(left);
+    await this.reactDoneIfIdle(signal, { byOwner: this.workStarts === workAtCut });
   }
 
   /**
@@ -4911,6 +4970,8 @@ export class ThreadSession {
       ...more,
     ];
     this.sent = [];
+    this.gapSent = [];
+    this.cutWait = null;
     const waiting = [...(active?.turn ? [active.turn] : []), ...released, ...takenIn, ...dropped];
     // What `reactDoneIfIdle` reads at a normal end, before anything below changes it: an error
     // that stands (a restart dropped prompts) and a task of any reply's that still runs keep the

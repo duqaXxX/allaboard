@@ -543,6 +543,18 @@ export const CLAIMS: readonly Claim[] = [
       "`docs/limits.md` for the row on the suggested next prompt",
   ),
   claim(
+    "P48",
+    "gesture",
+    "an interrupt sent after two prompts, before the first one's turn began, cuts that turn " +
+      "with no step and no replay, and `session_state_changed` `idle` comes only after the " +
+      "second prompt's turn has ended: no `idle` ahead of a sent prompt that still runs",
+    "src/core/sessions/session.ts#ThreadSession.expectCutPrompts",
+    "in a fresh thread send two messages in a row and `!stop` at once: the second is answered " +
+      "or told `was not sent because you stopped it` (the root says done once either is " +
+      "settled). If the second is told not sent while it ran, or the root stays working, " +
+      "the order of `idle` changed: read the seam's contract on `declaredState`",
+  ),
+  claim(
     "L1",
     "limit",
     "the Bash tool of a session started as the daemon starts it, with no `BASH_DEFAULT_TIMEOUT_MS`, " +
