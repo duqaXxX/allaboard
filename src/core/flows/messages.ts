@@ -311,6 +311,9 @@ export function messages(
         if (read === null) return;
         prompt = read;
       }
+      // What a word the agent does not offer is sent as: the content, which can hold more than
+      // the text (what a chat read from the message's other parts), and is kept for a retry.
+      const content = prompt;
       if (talk.stopped) return;
       // Before the restart refusal: a stopped message says `Not sent.`, never the refusal.
       ticket.signal.throwIfAborted();
@@ -440,9 +443,7 @@ export function messages(
               return;
             const known = new Set(session.commands.map((offered) => offered.name));
             asCommand = known.has(firstWord(command));
-            prompt = asCommand
-              ? `${agent.words.commandPrefix}${command.text}`
-              : message.message.text;
+            prompt = asCommand ? `${agent.words.commandPrefix}${command.text}` : content;
           }
           // (sync) Checked last, with no await before the submit: a stop can start while the
           // files are read. The daemon's words still work meanwhile (`!stop` shortens the

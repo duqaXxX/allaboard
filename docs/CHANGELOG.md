@@ -43,6 +43,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A `!word` the agent does not offer, sent as text, now carries the message's whole content:
+  a table or a card pasted with it reaches the agent, as it does for any other message (#273).
 - A table or a card pasted from a reply into a message now reaches Claude Code: Slack sends
   them as blocks and leaves the table's cells and the card's details out of the message's text,
   so they are appended after it, the table in markdown (#120).
