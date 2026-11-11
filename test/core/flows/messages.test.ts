@@ -168,6 +168,23 @@ test("an agent with no commands of its own gets every !text as text", async (t) 
   assert.ok(!world.shown(ref).includes(texts.CLEAR_IN_THREAD));
 });
 
+test("a !text the agent does not offer is sent with its whole content, not its text alone", async (t) => {
+  // A chat's content can hold more than its text: what a pasted block adds (#273).
+  const world = await MessagesWorld.make(t, { agent: new NoCommands() });
+  const ref = await world.opened();
+  await world.send({
+    ref,
+    id: "msg-pasted",
+    text: "!important: why does row 2 differ?",
+    content: async () =>
+      "!important: why does row 2 differ?\n\n| a | b |\n| --- | --- |\n| 1 | 2 |",
+  });
+  assert.deepEqual(await world.prompts(), [
+    "first",
+    "!important: why does row 2 differ?\n\n| a | b |\n| --- | --- |\n| 1 | 2 |",
+  ]);
+});
+
 test("a command that starts a new session is refused inside a thread", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
