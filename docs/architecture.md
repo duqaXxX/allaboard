@@ -1056,10 +1056,13 @@ or the usage names that id, `ThreadSession.modelSwitched`; a switch inside a tur
 the git branch and the uncommitted changes of the folder the session works in, the session's tokens
 from the turn's `turn_ended` event (the `modelUsage` of the `result` record, summed by
 `footer.sessionTokens`), the context percentage from the same `contextUsage`, the 5-hour and
-weekly limits with the time to each reset, and last the account the agent is logged in to
-(`AgentInfo.account`, for Claude the email of the initialize answer's `account`, read at each
-connect and kept in memory only). `!status` shows the account's plan beside it; the footer does
-not. The folder the session works in is the `cwd` of the
+weekly limits with the time to each reset, and last the account the agent is logged in to.
+With limits, that account is the one they were read for (`UsageLimits.account`), so that a login
+switched since the thread connected never shows one account's limits beside another's name;
+without them it is the account the thread's process reported at its connect (`AgentInfo.account`).
+For Claude both are the email of the initialize answer's `account`, which the SDK reads once, when
+the process starts; both are kept in memory only. `!status` shows the account's plan beside
+it; the footer does not. The folder the session works in is the `cwd` of the
 latest hook input, which follows a `cd` and a worktree (`ThreadSession.workingDirectory`, set by the
 event `folder_changed`): the back end registers a `Stop` hook, and a `PostToolUse` hook after every
 tool, so a turn stopped or failed before its `Stop` still moves it. Until a hook reports it, and
@@ -1106,8 +1109,10 @@ reported that the model takes no effort (`effort_observed` with a null level), t
 or a command changes the effort or the model. An agent with no default word shows the observed level
 alone, left out until reported, unless the daemon itself just set a stored level, and `not supported` once a
 turn reports a model that takes none. The limits come from the agent (`AgentBackend.usageLimits`, present with the
-capability `usageLimits`); for Claude they are Claude Code's `/usage`, sent on a long-lived session
-of its own, started in the home directory with none of the owner's setting sources, without the
+capability `usageLimits`); for Claude they are Claude Code's `/usage`, sent on a session of its own
+that each read starts and closes, never kept on disk (`persistSession` false), so that the limits
+and the account come from one process started for the read,
+started in the home directory with none of the owner's setting sources, without the
 permission to bypass and without the Chrome flag (`UsageProbe`, over `ClaudeBackend.startBare`).
 The core caches them for five minutes (`footer.UsageCache`, `footer.USAGE_TTL`); the event `limits_changed`, which
 the back end makes of the SDK's rate-limit record, invalidates the cache. A probe with no answer

@@ -43,6 +43,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- After a switch of the Claude Code login, a thread's footer no longer shows the old account's
+  email beside the new account's limits. With limits, the footer and `!status` name the account
+  the limits were read for. The usage probe starts and closes a session for each read, and takes
+  the account from that session: the SDK reports the account a process started on, never a later
+  login (#276).
 - A `!word` the agent does not offer, sent as text, now carries the message's whole content:
   a table or a card pasted with it reaches the agent, as it does for any other message (#273).
 - A table or a card pasted from a reply into a message now reaches Claude Code: Slack sends

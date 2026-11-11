@@ -117,6 +117,8 @@ test(
     assert.notEqual(options.allowDangerouslySkipPermissions, true);
     assert.equal("chrome" in (options.extraArgs ?? {}), false);
     assert.deepEqual(options.settingSources, []);
+    // A session per read, never resumed: none is kept on disk.
+    assert.equal(options.persistSession, false);
     assert.equal("resume" in options, false);
     assert.equal("permissionMode" in options, false);
     assert.equal("model" in options, false);
@@ -125,14 +127,28 @@ test(
   },
 );
 
-test("the probe keeps its session for the next read", LIMIT, async () => {
-  const sdk = new FakeSdk({ turns: [sdkRecords("usage"), sdkRecords("usage")] });
+// A process keeps the account it started on (`initializationResult`), while the limits follow
+// the login of the moment: a session of its own per read reads both on the same login (#276).
+test("each read starts a session of its own and closes it", LIMIT, async () => {
+  const sdk = new FakeSdk(() => ({ turns: [sdkRecords("usage")] }));
   const { probe } = probeOn(sdk);
   await probe.read();
   await probe.read();
-  assert.equal(sdk.queries.length, 1);
-  assert.equal(sdk.only.sent.length, 2);
+  assert.equal(sdk.queries.length, 2);
+  assert.ok(sdk.queries.every((query) => query.closed));
   await probe.close();
+});
+
+test("the limits name the account their session started on", LIMIT, async () => {
+  const accounts = ["alice@example.com", "bob@example.com"];
+  const sdk = new FakeSdk((index) => ({
+    turns: [sdkRecords("usage")],
+    init: { account: { email: accounts[index], subscriptionType: "Claude Max" } },
+  }));
+  const { probe } = probeOn(sdk);
+  assert.deepEqual((await probe.read()).account, { name: "alice@example.com", plan: "Claude Max" });
+  // The owner logged in to another account between the two reads.
+  assert.deepEqual((await probe.read()).account, { name: "bob@example.com", plan: "Claude Max" });
 });
 
 test("after a failure the next read starts a clean session", LIMIT, async () => {
@@ -152,7 +168,11 @@ test("an answer that holds no limits reads as none", LIMIT, async () => {
   );
   const sdk = new FakeSdk({ turns: [bare] });
   const { probe } = probeOn(sdk);
-  assert.deepEqual(await probe.read(), { session: null, week: null });
+  assert.deepEqual(await probe.read(), {
+    session: null,
+    week: null,
+    account: { name: "alice@example.com", plan: "Claude Ultra" },
+  });
   await probe.close();
 });
 

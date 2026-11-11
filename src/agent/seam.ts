@@ -1108,6 +1108,11 @@ export interface Repository {
 export interface UsageLimits {
   readonly session: UsageLimit | null;
   readonly week: UsageLimit | null;
+  /**
+   * The account the limits were read for, or null when the agent does not say: the login of the
+   * moment, which a session started before a login switch may no longer report.
+   */
+  readonly account: AgentAccount | null;
 }
 
 export interface UsageLimit {
@@ -1161,8 +1166,8 @@ export interface AgentBackend {
    */
   untrustedRepository?(folder: string): Promise<Repository | null>;
   /**
-   * The account's limits as the agent reports them now; it can take a while, and rejects when
-   * the agent gave none. Present with `usageLimits`.
+   * The account's limits as the agent reports them now, with the account they belong to; it can
+   * take a while, and rejects when the agent gave none. Present with `usageLimits`.
    */
   usageLimits?(): Promise<UsageLimits>;
   /**

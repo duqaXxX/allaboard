@@ -4400,9 +4400,9 @@ test("the footer names the model that answered after a refusal of the session's 
   assert.ok((await session.status()).includes("Model: `Opus 4.8`"));
 });
 
-test("the footer ends on the account the agent reported at connect, and status adds its plan", async (t) => {
+test("with no usage limits the footer ends on the account the agent reported at connect, and status adds its plan", async (t) => {
   const account = { email: "alice@example.com", subscriptionType: "Claude Max" };
-  const h = harnessFor(t)({
+  const h = harnessFor(t, { usage: null })({
     turns: [sdkMessages("tools")],
     info: infoOf({ commands: [], current_permission_mode: "default", account }),
   });
@@ -4411,6 +4411,29 @@ test("the footer ends on the account the agent reported at connect, and status a
   await h.idle();
   assert.ok(statuses(h).at(-1)?.endsWith(" · alice@example.com"), statuses(h).at(-1));
   assert.ok((await session.status()).includes("Account: `alice@example.com (Claude Max)`"));
+});
+
+// The thread's process keeps the account it connected on, while the limits are read for the
+// login of the moment (#276).
+test("after a login switch between two turns the footer names the account of its limits", async (t) => {
+  const account = { email: "alice@example.com", subscriptionType: "Claude Max" };
+  const h = harnessFor(t)({
+    turns: [sdkMessages("tools"), sdkMessages("tools")],
+    info: infoOf({ commands: [], current_permission_mode: "default", account }),
+  });
+  h.usageAccount = { name: "alice@example.com", plan: "Claude Max" };
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.endsWith(" · alice@example.com"), statuses(h).at(-1));
+  h.usageAccount = { name: "bob@example.com", plan: "Claude Pro" };
+  h.usage.invalidate();
+  await (await session.submit("list them again")).done.wait();
+  await h.idle();
+  assert.equal(h.usageFetches, 2);
+  assert.ok(statuses(h).at(-1)?.endsWith(" · bob@example.com"), statuses(h).at(-1));
+  assert.ok(!statuses(h).at(-1)?.includes("alice@example.com"), statuses(h).at(-1));
+  assert.ok((await session.status()).includes("Account: `bob@example.com (Claude Pro)`"));
 });
 
 const REFUSED_LOCAL: SessionEvent = {

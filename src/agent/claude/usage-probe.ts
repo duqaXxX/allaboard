@@ -1,6 +1,9 @@
 /**
  * The account's usage limits, read from `/usage` on a session of their own: the limits belong to
  * the account, and a probe inside a channel's session would add to that session's transcript.
+ * Each read starts its session and closes it: a process reports the account it started on, while
+ * `/usage` answers for the login of the moment, so only a session started for the read names the
+ * account its limits belong to (#276).
  */
 import { randomUUID } from "node:crypto";
 import { type Clock, systemClock } from "../../clock.ts";
@@ -9,9 +12,9 @@ import type {
   PermissionAnswer,
   QuestionAnswer,
   RequestHandler,
-  SessionEvent,
+  UsageLimits,
 } from "../seam.ts";
-import { parseUsage, USAGE_TIMEOUT, type Usage } from "./usage.ts";
+import { parseUsage, USAGE_TIMEOUT } from "./usage.ts";
 
 const REFUSAL = "The usage probe asks for nothing.";
 
@@ -42,7 +45,6 @@ export class UsageProbe {
   readonly #timeout: number;
   readonly #now: () => number;
   #session: AgentSession | null = null;
-  #events: AsyncIterator<SessionEvent> | null = null;
   // Counts the closes, so a session still starting when one happens is closed as it arrives.
   #epoch = 0;
   #stopped = false;
@@ -57,11 +59,11 @@ export class UsageProbe {
   }
 
   /**
-   * The limits `/usage` reports now. One timeout covers the whole call; on any failure, the
-   * timeout included, the session is closed and the failure rethrown: a session left mid-turn
-   * would answer the next call late.
+   * The limits `/usage` reports now, with the account the read's own session started on. One
+   * timeout covers the whole call, and the session is closed whatever the outcome; a failure, the
+   * timeout included, is rethrown.
    */
-  async read(): Promise<Usage> {
+  async read(): Promise<UsageLimits> {
     if (this.#stopped) throw new Error("the usage probe is stopped");
     const limit = new AbortController();
     // Settles only by running out: the sleep's own rejection is its cancellation.
@@ -73,20 +75,17 @@ export class UsageProbe {
     });
     try {
       return await Promise.race([this.#ask(), expiry]);
-    } catch (error) {
-      await this.close();
-      throw error;
     } finally {
       limit.abort();
+      await this.close();
     }
   }
 
-  /** Closes the probe's session, if one is open; the next `read` starts another. */
+  /** Closes the session of a read in flight, if one is open; that read then fails. */
   async close(): Promise<void> {
     this.#epoch += 1;
     const session = this.#session;
     this.#session = null;
-    this.#events = null;
     if (session !== null) await session.close();
   }
 
@@ -100,27 +99,23 @@ export class UsageProbe {
     await this.close();
   }
 
-  async #ask(): Promise<Usage> {
+  async #ask(): Promise<UsageLimits> {
     const epoch = this.#epoch;
-    if (this.#session === null) {
-      const session = await this.#start(this.#folder, NO_ANSWERS);
-      if (epoch !== this.#epoch) {
-        await session.close();
-        throw new Error("the usage probe was closed while it started");
-      }
-      this.#session = session;
-      this.#events = session.events[Symbol.asyncIterator]();
+    const session = await this.#start(this.#folder, NO_ANSWERS);
+    if (epoch !== this.#epoch) {
+      await session.close();
+      throw new Error("the usage probe was closed while it started");
     }
-    const session = this.#session;
-    const events = this.#events;
-    if (events === null) throw new Error("the usage probe was closed");
+    this.#session = session;
+    const events = session.events[Symbol.asyncIterator]();
+    const { account } = await session.info();
     await session.send({ id: randomUUID(), content: "/usage" });
     for (;;) {
       const next = await events.next();
       if (next.done) throw new Error("the usage probe's session ended");
       const event = next.value;
       if (event.type === "turn_ended") {
-        return parseUsage(event.finalText ?? "", this.#now());
+        return { ...parseUsage(event.finalText ?? "", this.#now()), account };
       }
       if (event.type === "process_lost") throw new Error("the usage probe lost its process");
     }

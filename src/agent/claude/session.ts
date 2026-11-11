@@ -403,6 +403,9 @@ export class ClaudeSession implements AgentSession {
       ...(model !== null && { model }),
       settingSources: [...this.#config.settingsSources],
       includePartialMessages: true,
+      // The usage probe starts a session for each read and never resumes one: kept on disk, each
+      // would leave a transcript in the owner's projects.
+      ...(bare && { persistSession: false }),
       ...(!bare && {
         // A checkpoint of the files at each prompt, which `!rewind` puts back (a session started
         // without it has none to restore). Every session of a thread is started with it.

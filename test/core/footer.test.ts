@@ -154,7 +154,7 @@ test("session tokens are unknown when the turn used no model", () => {
 test("cache fetches once per ttl and after invalidate", async () => {
   let calls = 0;
   let now = 0;
-  const usage: Usage = { session: { percent: 5, resetsAt: null }, week: null };
+  const usage: Usage = { session: { percent: 5, resetsAt: null }, week: null, account: null };
   const cache = new UsageCache(
     async () => {
       calls += 1;
@@ -182,14 +182,14 @@ test("a refresh already running is not started twice", async () => {
     await new Promise<void>((resolve) => {
       release = resolve;
     });
-    return { session: null, week: null };
+    return { session: null, week: null, account: null };
   });
   const first = cache.refreshIfStale();
   await cache.refreshIfStale();
   assert.equal(calls, 1);
   release();
   await first;
-  assert.deepEqual(cache.current, { session: null, week: null });
+  assert.deepEqual(cache.current, { session: null, week: null, account: null });
 });
 
 test("a failing fetch keeps the old value and logs no content", async () => {
@@ -200,7 +200,7 @@ test("a failing fetch keeps the old value and logs no content", async () => {
     },
     { ttl: 0, warn: (message) => warnings.push(message) },
   );
-  const kept: Usage = { session: { percent: 1, resetsAt: null }, week: null };
+  const kept: Usage = { session: { percent: 1, resetsAt: null }, week: null, account: null };
   cache.current = kept;
   await cache.refreshIfStale();
   assert.equal(cache.current, kept);
