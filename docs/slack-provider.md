@@ -56,7 +56,11 @@ client's `apiCall`:
 
 For the four creating calls the sink reads the thread back and adopts what landed
 (`ReplySink.adopt`). The library's `files.uploadV2` is passed through untouched: the two Slack
-methods it calls come back through `apiCall` and are retried there, one by one.
+methods it calls come back through `apiCall` and are retried there, one by one. Its POST of the
+file's bytes, which is no Slack method and is never sent again, waits `clients.UPLOAD_TIMEOUT_MS`
+(90 seconds) instead of 30: the library arms every request with its client's timeout, so
+`filesUploadV2` runs on a second client of the same token and options with that timeout, whose
+Slack calls go back to the first.
 
 A write to Slack that has begun always runs to its end. A pass of the sink (`ReplySink.flush`) takes
 the reply's lock, brings every message to the model and ends the reply if it has ended; once asked
@@ -577,8 +581,10 @@ the doc comments of the symbols named here.
 - **A file button.** `Open.onOpenFile` makes the same checks, and takes the message away once it has shared the
   file as `!open <path>` does. The value is untrusted: `readOpenable` holds it to the folder.
 - **Reading and uploading.** The path is untrusted input: `read.readOpenable` of the core
-  resolves it, holds it to the folder, opens it once and reads at most `read.SNIPPET_LIMIT`
-  (1 MB, Slack's limit for a snippet); an empty file is refused (`texts.OPEN_EMPTY`), and any other
+  resolves it, holds it to the folder, opens it once and reads at most `read.SHARE_LIMIT`
+  (30 MB: Slack documents no limit for a file that is no snippet, and took a PNG of 32.7 MB);
+  a `.ts` over `read.SNIPPET_LIMIT` (1 MB, Slack's limit for a snippet) is shared with no
+  snippet type; an empty file is refused (`texts.OPEN_EMPTY`), and any other
   failure is a `read.NotAFile` the owner reads as `texts.OPEN_NOT_A_FILE`. `read.uploadFile` sends
   the bytes with `files.uploadV2` (`files:write`): the basename as the name, the path from the
   folder as the title, and nothing posted on success.
@@ -642,7 +648,7 @@ the provider declares `threadLists` and draws.
 - **Sharing.** `SlackThread.share` uploads the bytes with `files.uploadV2` through
   `read.shareFile`, the name and title the core gave; `uploadFile` of `!open` is the same call with
   the basename and path of a file of the folder. Slack's error code becomes the `ChatError` the
-  core puts in its line (`missing_scope`, for one). The size is held before that: `SlackChat.fileLimit` is `read.SNIPPET_LIMIT`, and the core collects no more than that from git
+  core puts in its line (`missing_scope`, for one). The size is held before that: `SlackChat.fileLimit` is `read.SHARE_LIMIT`, and the core collects no more than that from git
   and shares nothing larger (`texts.DIFF_FILE_TOO_LARGE`).
 
 ## The session index

@@ -72,6 +72,11 @@ export const CREATING_METHODS = [
 // library's default is no timeout at all (`WebClientOptions.timeout`, 0), and a pass of the sink
 // waits for its call to answer.
 export const REQUEST_TIMEOUT_MS = 30_000;
+// What the bytes of a shared file are given instead (#93): the library arms
+// each request with the client's timeout, the file's POST included, and from the maintainer's Mac 27.7 MB
+// took 27.5 s (measured 2026-11-11). A file of `SHARE_LIMIT` (30 MB) uploads in time from about
+// 2.8 Mbit/s. Only that POST waits this long: the two Slack calls around it keep the 30 seconds.
+export const UPLOAD_TIMEOUT_MS = 90_000;
 
 /** The two options that make the library report each failure once, whatever else it is built with. */
 export const SENT_ONCE = {
@@ -138,10 +143,19 @@ class PolicyClient extends WebClient {
   readonly #once: boolean;
   readonly #token: string | undefined;
   readonly #options: ClientOptions;
+  // Set on the client that only uploads a file's bytes: its Slack calls are its parent's.
+  readonly #parent: PolicyClient | undefined;
+  #uploads: PolicyClient | undefined;
 
-  constructor(token: string | undefined, notRetried: readonly string[], options: ClientOptions) {
+  constructor(
+    token: string | undefined,
+    notRetried: readonly string[],
+    options: ClientOptions,
+    parent?: PolicyClient,
+  ) {
     const { clock, random, stopped, traceCalls, once, ...rest } = options;
     super(token, { timeout: REQUEST_TIMEOUT_MS, ...rest, ...SENT_ONCE, logger: silentLogger() });
+    this.#parent = parent;
     this.#notRetried = new Set(notRetried);
     this.#clock = clock ?? systemClock;
     this.#random = random ?? Math.random;
@@ -178,10 +192,30 @@ class PolicyClient extends WebClient {
     return null;
   }
 
+  /**
+   * `files.uploadV2`, which the library binds to this method (`bindFilesUploadV2`), run by a
+   * client of the same token and options whose timeout is `UPLOAD_TIMEOUT_MS`: the library's
+   * POST of the bytes takes that client's timeout, and its Slack calls come back to this one.
+   * A prototype method, so that the binding in the library's constructor finds it.
+   */
+  override async filesUploadV2(
+    options: Parameters<WebClient["filesUploadV2"]>[0],
+  ): ReturnType<WebClient["filesUploadV2"]> {
+    if (this.#parent !== undefined) return super.filesUploadV2(options);
+    this.#uploads ??= new PolicyClient(
+      this.#token,
+      [...this.#notRetried],
+      { ...this.#options, timeout: UPLOAD_TIMEOUT_MS },
+      this,
+    );
+    return this.#uploads.filesUploadV2(options);
+  }
+
   override async apiCall(
     method: string,
     options: Record<string, unknown> = {},
   ): Promise<WebAPICallResult> {
+    if (this.#parent !== undefined) return this.#parent.apiCall(method, options);
     if (method === "files.uploadV2") return super.apiCall(method, options);
     // Temporary, #116: every call with the ids it addresses, never its content. Closing the issue
     // removes it.

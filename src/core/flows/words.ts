@@ -265,6 +265,7 @@ export function wordFlow(
           loadedContext: have.loadedContext,
           forks: !unserved.has(WORD.fork),
           fileUpload: chat.capabilities.fileUpload,
+          ...(chat.fileLimit !== undefined && { fileLimit: chat.fileLimit }),
           diff: !unserved.has(WORD.diff),
           rewind: !unserved.has(WORD.rewind),
           next: !unserved.has(WORD.next),

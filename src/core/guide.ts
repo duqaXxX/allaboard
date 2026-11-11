@@ -28,6 +28,8 @@ export interface GuideOffer {
   readonly loadedContext: boolean;
   /** The chat shows a file (`fileUpload`). */
   readonly fileUpload: boolean;
+  /** With `fileUpload`: the most bytes a shared file holds (`fileLimit`). */
+  readonly fileLimit?: number;
   /** The chat shows lists and files in a thread, and the agent keeps a record of trust (`!diff`). */
   readonly diff: boolean;
   /** The agent goes back to a prompt and the chat shows lists in a thread (`!rewind`). */
@@ -98,7 +100,7 @@ export function guideText(names: Names, offered: GuideOffer): string {
     ...(offered.commands ? [commands] : []),
     `${offered.questions ? texts.GUIDE_APPROVALS_AND_QUESTIONS : texts.GUIDE_APPROVALS}\n${approvals.join(" ")}`,
     sessions,
-    ...(offered.fileUpload ? [say(texts.GUIDE_FILES)] : []),
+    ...(offered.fileUpload ? [say(texts.GUIDE_FILES) + fileLimitLine(offered.fileLimit)] : []),
     ...(offered.diff ? [say(texts.GUIDE_DIFF)] : []),
     ...(offered.rewind ? [say(texts.GUIDE_REWIND)] : []),
     ...(offered.next ? [say(texts.GUIDE_NEXT)] : []),
@@ -114,3 +116,12 @@ export function guideText(names: Names, offered: GuideOffer): string {
   ];
   return sections.join("\n\n");
 }
+
+/** The guide's sentence on the largest file, with a space before it; empty with no limit. */
+function fileLimitLine(limit: number | undefined): string {
+  if (limit === undefined) return "";
+  const size = limit >= MEBIBYTE ? `${Math.floor(limit / MEBIBYTE)} MB` : `${limit} bytes`;
+  return ` ${fill(texts.GUIDE_FILES_LIMIT, { size })}`;
+}
+
+const MEBIBYTE = 1 << 20;

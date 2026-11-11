@@ -19,8 +19,10 @@ import {
   type ClientOptions,
   CREATING_METHODS,
   RATE_LIMIT_WAIT_SECONDS,
+  REQUEST_TIMEOUT_MS,
   repliesClient,
   sharedClient,
+  UPLOAD_TIMEOUT_MS,
   unretried,
 } from "../../../../src/chat/slack/reply/clients.ts";
 import { describe, unknownOutcome } from "../../../../src/chat/slack/reply/errors.ts";
@@ -585,6 +587,52 @@ test("a file upload is retried one Slack call at a time, never as a whole", asyn
     WebAPIRequestError,
   );
   assert.deepEqual(second, ["files.getUploadURLExternal", "bytes"]);
+});
+
+test("only the bytes of a file upload wait 90 seconds, every Slack call 30, sent once too", async (t) => {
+  // `WebClient.timeout` is private: what the library arms each request with is what is read.
+  const armed: number[] = [];
+  const timeout = AbortSignal.timeout;
+  t.after(() => {
+    AbortSignal.timeout = timeout;
+  });
+  AbortSignal.timeout = (ms: number) => {
+    armed.push(ms);
+    return timeout.call(AbortSignal, ms);
+  };
+  const upload = { channel_id: "C000CHAN", filename: "a.txt", content: "b" };
+  for (const client of [replies, shared].flatMap((make) => {
+    const made = make(uploading([], 0, "none"));
+    return [made, unretried(made)];
+  })) {
+    armed.length = 0;
+    await client.files.uploadV2(upload);
+    await client.chat.postMessage({ channel: "C000CHAN", text: "x" });
+    assert.deepEqual(armed, [
+      REQUEST_TIMEOUT_MS,
+      UPLOAD_TIMEOUT_MS,
+      REQUEST_TIMEOUT_MS,
+      REQUEST_TIMEOUT_MS,
+    ]);
+  }
+  assert.equal(UPLOAD_TIMEOUT_MS, 90_000);
+});
+
+test("the small calls of an upload keep the retry policy of the client that sent it", async () => {
+  const upload = { channel_id: "C000CHAN", filename: "a.txt", content: "b" };
+  const requests: string[] = [];
+  await unretried(shared(uploading([], 0, "none"))).files.uploadV2(upload);
+  await assert.rejects(
+    unretried(shared(uploading(requests, 1, "files.completeUploadExternal"))).files.uploadV2(
+      upload,
+    ),
+    WebAPIRequestError,
+  );
+  assert.deepEqual(requests, [
+    "files.getUploadURLExternal",
+    "bytes",
+    "files.completeUploadExternal",
+  ]);
 });
 
 // F2: `@slack/web-api` 8.2.0 writes lines of its own, to standard output and standard error,

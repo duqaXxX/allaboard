@@ -368,7 +368,7 @@ test("a diff over what the chat takes as one file is told and not shared", async
   assert.deepEqual(world.chat.shared(), []);
   assert.equal(
     world.shown(ref).at(-1),
-    "The diff of `src.txt` is over 300 bytes, the most Memory chat takes as one file.",
+    "The diff of `src.txt` is over 300 bytes, the most shared as one file in Memory chat.",
   );
 });
 

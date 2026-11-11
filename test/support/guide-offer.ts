@@ -14,6 +14,7 @@ export const EVERYTHING_OFFERED: GuideOffer = {
   loadedContext: true,
   forks: true,
   fileUpload: true,
+  fileLimit: 1 << 20,
   diff: true,
   rewind: true,
   next: true,
