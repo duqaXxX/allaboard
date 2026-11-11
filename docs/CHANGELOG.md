@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.322, which bundles Claude Code 2.1.322. The
+  release probe certified it on 2026-11-11 against 0.3.321: the SDK surface table holds, no claim
+  changed, the session is offered the same commands and the run produced no new stream shape
+  (#271).
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.321, which bundles Claude Code 2.1.321. The
   release probe certified it on 2026-11-10 against 0.3.319: the SDK surface table holds, no claim
   changed, the session is offered the same commands, and the one new stream field,

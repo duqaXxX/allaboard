@@ -348,6 +348,7 @@ const NO_FACTS = new Set([
   "L6",
   "L8",
   "L9",
+  "L10",
 ]);
 
 test("the pinned release has observations: every claim that is not retired sets facts", () => {
