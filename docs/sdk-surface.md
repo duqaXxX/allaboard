@@ -121,6 +121,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `resumeSessionAt` | option | session.ts: ClaudeSession.#options | reference | P45 |
 | `Options` | `resumeDropsTurn` | option | session.ts: ClaudeSession.#options | package | P45 |
 | `Options` | `promptSuggestions` | option | session.ts: ClaudeSession.#options | reference | P47 |
+| `Options` | `persistSession` | option | session.ts: ClaudeSession.#options | package | none |
 | `Options` | `settingSources` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `stderr` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `systemPrompt` | option | session.ts: ClaudeSession.#options | reference | none |

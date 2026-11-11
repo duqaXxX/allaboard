@@ -498,8 +498,8 @@ export class ThreadSession {
   commands: CommandInfo[] = [];
   /** The agent's own model list, for the setup. */
   models: ModelInfo[] = [];
-  // The account the agent reported at its last connect, for the footer and `!status`: a login
-  // changed meanwhile shows from the next connect.
+  // The account the agent reported at its last connect, which a login switched meanwhile leaves
+  // behind: the footer and `!status` name it only while no usage limits name theirs.
   private account: AgentAccount | null = null;
   // A prompt was ever queued on this object; with no stored session id it tells a thread that
   // never ran a turn from one whose first turn is still starting.
@@ -5207,6 +5207,8 @@ export class ThreadSession {
     const [branch, changes] = reading.state;
     const gitUntrusted = reading.untrusted !== null;
     const usage = this.usage?.current ?? null;
+    // The limits name the account they were read for, never one beside another's (#276).
+    const account = usage === null ? this.account : usage.account;
     // A switch the usage does not name yet is the newer word; once a request has gone to the
     // new model the usage names it, and from then on the usage alone speaks.
     if (context.model === this.modelSwitched) this.modelSwitched = null;
@@ -5226,8 +5228,8 @@ export class ThreadSession {
       contextPercent: context.percentage,
       sessionLimit: usage?.session ?? null,
       weekLimit: usage?.week ?? null,
-      account: this.account?.name ?? null,
-      accountPlan: this.account?.plan ?? null,
+      account: account?.name ?? null,
+      accountPlan: account?.plan ?? null,
       work: null,
     };
     return { fields, untrusted: reading.untrusted };

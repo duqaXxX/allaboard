@@ -33,6 +33,7 @@ import { TOOLS } from "../../src/agent/claude/tools.ts";
 import { Translator } from "../../src/agent/claude/translate.ts";
 import { locate, Unkeyed } from "../../src/agent/claude/trust.ts";
 import type {
+  AgentAccount,
   AgentBackend,
   AgentInfo,
   AgentSession,
@@ -579,6 +580,8 @@ export class Harness {
   readonly deps: SessionDeps;
   manager: SessionManager;
   usageFetches = 0;
+  /** The account the next usage fetch names; a test sets it. */
+  usageAccount: AgentAccount | null = null;
   /** The usage cache of the sessions' deps; throws when the harness was made with none. */
   get usage(): UsageCache {
     if (this.deps.usage === null) throw new Error("the harness has no usage cache");
@@ -634,7 +637,11 @@ export class Harness {
           ? null
           : new UsageCache(async () => {
               this.usageFetches += 1;
-              return { session: { percent: 5, resetsAt: null }, week: null };
+              return {
+                session: { percent: 5, resetsAt: null },
+                week: null,
+                account: this.usageAccount,
+              };
             }),
       holds: this.holds,
       clock: this.clock,

@@ -327,7 +327,7 @@ export class World {
       state: this.state,
       approvals: this.approvals,
       holds: this.holds,
-      usage: new UsageCache(async () => ({ session: null, week: null })),
+      usage: new UsageCache(async () => ({ session: null, week: null, account: null })),
       clock: this.clock,
     });
     this.config = { botToken: `${"xox"}b-fake`, allowedRoot: this.root };

@@ -1,6 +1,6 @@
 /** The context line under every reply as data: git state, usage limits, tokens and the fields. */
 import { spawn } from "node:child_process";
-import type { ModelTokens, Repository } from "../agent/seam.ts";
+import type { AgentAccount, ModelTokens, Repository } from "../agent/seam.ts";
 import type { FooterFields, UsageLimit } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
 import { strip } from "../text.ts";
@@ -19,10 +19,15 @@ const SHORTSTAT_DELETIONS = /(\d+) deletions?\(-\)/;
 const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"];
 const MINUTE_MS = 60_000;
 
-/** The limits `/usage` reports; a limit the account does not have, or the text hid, is null. */
+/**
+ * The account's limits, with the account they were read for; a limit the account does not have,
+ * or the agent hid, is null.
+ */
 export interface Usage {
   readonly session: UsageLimit | null;
   readonly week: UsageLimit | null;
+  /** Null when the agent does not say. */
+  readonly account: AgentAccount | null;
 }
 
 /** The branch and the changes of a folder; each null when unknown. */
