@@ -59,10 +59,10 @@ export async function shareFile(
   // Refused here, not left to whatever the chat answers to an upload of length 0.
   if (content.length === 0) return fill(SHARE_EMPTY, { path });
   if (signal.aborted) return stopped;
-  // From the real folder, never the absolute path the model may have sent.
-  const title = titleOf(
-    relativeTo(await realpathLoose(folder), await realpathLoose(target)) ?? path,
-  );
+  // From the real folder, never the absolute path the model may have sent; with `/` on every
+  // system, as `!open` titles it.
+  const inside = relativeTo(await realpathLoose(folder), await realpathLoose(target));
+  const title = titleOf(inside === null ? path : inside.split(sep).join("/"));
   try {
     await thread.share({ name: basename(title), title, content });
   } catch (error) {
