@@ -26,6 +26,7 @@ import {
   type AgentSession,
   type ClosedReport,
   type ContextUsage,
+  type DaemonActions,
   type FilesRestore,
   type ForkSource,
   type LoadedContext,
@@ -39,6 +40,7 @@ import {
 } from "../seam.ts";
 import { advisorModel, type ResolveSettings, type SettingsSource } from "./advisor.ts";
 import { CAPABILITIES } from "./capabilities.ts";
+import { DAEMON_SERVER, daemonServer } from "./daemon-tools.ts";
 import { GOAL_CLEAR, transcriptEvents } from "./goals.ts";
 import { postModelSwitchHookEvents, postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
 import { agentInfo, contextUsage as contextUsageOf, loadedContext } from "./info.ts";
@@ -142,6 +144,8 @@ export interface SessionConfig extends StartOptions {
    * defaults.
    */
   readonly bare?: boolean;
+  /** What the model may ask the daemon to do; each present member becomes a tool of its own server. */
+  readonly actions?: DaemonActions;
   /**
    * With `resume`: the entry the conversation is kept up to (`resumeSessionAt`), everything after
    * it dropped; the backend resolves it from `rewindTo`.
@@ -355,6 +359,8 @@ export class ClaudeSession implements AgentSession {
   // Set while a close waits for the exit: a record that says the CLI is working again ends the wait.
   #cutWait: (() => void) | null = null;
   readonly #exitGraceMs: number;
+  // Aborted when the session ends: an action the model asked for stops before it does anything.
+  readonly #actionsEnd = new AbortController();
 
   /** The token of the cut this session was started with, else absent. */
   get rewindToken(): string | undefined {
@@ -383,6 +389,7 @@ export class ClaudeSession implements AgentSession {
   #options(requests: RequestHandler): Options {
     const { folder, resume, model, effort, chrome, bare, variables, forkOf } = this.#config;
     const { resumeSessionAt, resumeDropsTurn } = this.#config;
+    const server = bare ? undefined : daemonServer(this.#config.actions, this.#actionsEnd.signal);
     // Makes bypass possible, not active: `setPermissionMode` switches it on the live session.
     // `replay-user-messages` (CLI reference): Claude Code re-emits each prompt with the uuid the
     // daemon sent it under, which tells a prompt it took into a running turn from one that waits
@@ -406,6 +413,7 @@ export class ClaudeSession implements AgentSession {
       // The usage probe starts a session for each read and never resumes one: kept on disk, each
       // would leave a transcript in the owner's projects.
       ...(bare && { persistSession: false }),
+      ...(server !== undefined && { mcpServers: { [DAEMON_SERVER]: server } }),
       ...(!bare && {
         // A checkpoint of the files at each prompt, which `!rewind` puts back (a session started
         // without it has none to restore). Every session of a thread is started with it.
@@ -665,6 +673,7 @@ export class ClaudeSession implements AgentSession {
       reason = lostName(error);
     }
     this.#ended = true;
+    this.#actionsEnd.abort();
     this.#command?.settle(new SessionClosedError());
     await this.#work;
     if (!this.#closing) {
@@ -870,6 +879,7 @@ export class ClaudeSession implements AgentSession {
   async close(options?: { readonly awaitExit?: boolean }): Promise<ClosedReport> {
     if (!this.#closing) {
       this.#closing = true;
+      this.#actionsEnd.abort();
       const wait =
         options?.awaitExit === true &&
         !this.#ended &&

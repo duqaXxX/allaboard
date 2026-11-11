@@ -43,6 +43,7 @@ test("the Claude back end declares what the core adapts to", () => {
     advisor: true,
     loadedContext: true,
     nextPrompts: true,
+    daemonActions: true,
   });
 });
 

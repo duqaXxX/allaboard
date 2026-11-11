@@ -22,7 +22,8 @@ const SRC = join(import.meta.dirname, "..", "src");
  * refused.
  */
 export const LIBRARIES: Readonly<Record<string, readonly string[]>> = {
-  "agent/claude": ["@anthropic-ai/claude-agent-sdk"],
+  // `zod` is what the SDK's `tool()` takes an input shape in (`daemon-tools.ts`).
+  "agent/claude": ["@anthropic-ai/claude-agent-sdk", "zod"],
   "chat/slack": ["@slack/"],
   // `allaboard setup` reads its answers with them (`host/prompter.ts`).
   host: ["@inquirer/input", "@inquirer/password", "@inquirer/select"],

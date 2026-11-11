@@ -397,6 +397,8 @@ export interface WorldOptions {
   readonly fileLimit?: number;
   /** With `diff`: the chat can not delete a shared file (`ThreadChat.unshare` absent). */
   readonly noUnshare?: boolean;
+  /** With `diff`: the thread chat has no `share`, though the chat declares `fileUpload`. */
+  readonly noShare?: boolean;
   /** With `diff`: the chat draws a diff of up to this many characters in the list's own message. */
   readonly fits?: number;
   /** Calls of a thread's chat held until the test lets them go (without `reactions`). */
@@ -533,6 +535,7 @@ export class MessagesWorld {
         ...(options.fileLimit !== undefined && { fileLimit: options.fileLimit }),
         ...(options.fits !== undefined && { fits: options.fits }),
         ...(options.noUnshare === true && { unshare: false }),
+        ...(options.noShare === true && { share: false }),
       });
     const provider = await chat.build({
       variables: {},
