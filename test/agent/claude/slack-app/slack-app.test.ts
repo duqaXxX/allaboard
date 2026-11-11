@@ -28,6 +28,7 @@ import {
   SHOW_ALL_ACTION,
   STATUS_ACTION,
 } from "../../../../src/chat/slack/home.ts";
+import { SHARE_LIMIT } from "../../../../src/chat/slack/openfile/read.ts";
 import { FALLBACK_LIMIT } from "../../../../src/chat/slack/reply/blocks.ts";
 import { take } from "../../../../src/chat/slack/reply/chars.ts";
 import {
@@ -1448,6 +1449,7 @@ test("a failing resume click tells the owner", async (t) => {
 // has neither the updates part nor the tags one nor the delete one.
 const WITHOUT_UPDATES = {
   ...EVERYTHING_OFFERED,
+  fileLimit: SHARE_LIMIT,
   updates: false,
   threadTags: false,
   threadPins: false,

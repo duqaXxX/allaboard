@@ -21,7 +21,7 @@ import {
 } from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
 import { errorCode } from "../../../values.ts";
-import { SNIPPET_LIMIT, uploadFile } from "../openfile/read.ts";
+import { SHARE_LIMIT, uploadFile } from "../openfile/read.ts";
 import { QUERY_LIMIT, searchBlocks } from "../openfile/search.ts";
 import { take } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
@@ -158,7 +158,7 @@ export class Open {
     const shown = shownAsWritten(relative);
     let content: Buffer;
     try {
-      content = await readOpenable(folder, relative, SNIPPET_LIMIT);
+      content = await readOpenable(folder, relative, SHARE_LIMIT);
     } catch (error) {
       if (error instanceof NotAFile) {
         // The owner reads one sentence whatever the cause; the log says whether the daemon could
@@ -200,7 +200,7 @@ export class Open {
       let told: string;
       if (code === "missing_scope") told = slackTexts.OPEN_NO_SCOPE;
       else if (code === "snippet_too_large")
-        told = fill(named(slackTexts.OPEN_TOO_LARGE, this.parts.names), { path: shown });
+        told = fill(named(slackTexts.OPEN_SNIPPET_TOO_LARGE, this.parts.names), { path: shown });
       else told = fill(slackTexts.OPEN_FAILED, { path: shown, error: code });
       await this.answers.tellOwner(channel, threadTs, told);
       return false;

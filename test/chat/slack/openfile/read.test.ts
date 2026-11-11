@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { uploadFile } from "../../../../src/chat/slack/openfile/read.ts";
+import { SNIPPET_LIMIT, uploadFile } from "../../../../src/chat/slack/openfile/read.ts";
 import { FakeSlack } from "../../../support/fake-slack.ts";
 
 test("a file is shared as its bytes, named by its basename and titled by its path", async () => {
@@ -40,4 +40,15 @@ test("a .ts that holds binary bytes is left to Slack, and .mts and .tsx are type
   assert.ok(!("snippet_type" in (asked[0] ?? {})));
   assert.equal(asked[1]?.snippet_type, "typescript");
   assert.equal(asked[2]?.snippet_type, "typescript");
+});
+
+test("a .ts over Slack's snippet limit is left to Slack, which refuses a snippet that large", async () => {
+  const slack = new FakeSlack();
+  const at = Buffer.alloc(SNIPPET_LIMIT, "x");
+  const over = Buffer.alloc(SNIPPET_LIMIT + 1, "x");
+  await uploadFile(slack, "C000CHAN", "1790000000.000001", at, "a.ts");
+  await uploadFile(slack, "C000CHAN", "1790000000.000001", over, "b.ts");
+  const asked = slack.callsTo("files.getUploadURLExternal");
+  assert.equal(asked[0]?.snippet_type, "typescript");
+  assert.ok(!("snippet_type" in (asked[1] ?? {})));
 });

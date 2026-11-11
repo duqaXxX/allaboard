@@ -16,6 +16,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  truncateSync,
   unlinkSync,
   utimesSync,
   writeFileSync,
@@ -26,6 +27,7 @@ import { trustedRepository } from "../../../../src/agent/claude/trust.ts";
 import type { Repository } from "../../../../src/agent/seam.ts";
 import { logger } from "../../../../src/chat/slack/app/answers.ts";
 import { startedAt } from "../../../../src/chat/slack/app/open.ts";
+import { SHARE_LIMIT } from "../../../../src/chat/slack/openfile/read.ts";
 import { FILE_BUTTONS } from "../../../../src/chat/slack/openfile/search.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import {
@@ -913,13 +915,18 @@ test("a cut listing is said under Enter's matches too", async (t) => {
   assert.deepEqual(modal.labels(), [slackTexts.OPEN_ROWS_MATCH_ONE, slackTexts.OPEN_PARTIAL]);
 });
 
-test("a file over one megabyte is refused", async (t) => {
+test("a file over the limit is refused, and one over a megabyte is shared", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
-  writeFileSync(join(project, "big.log"), Buffer.alloc((1 << 20) + 1, "x"));
+  writeFileSync(join(project, "shot.png"), Buffer.alloc((1 << 20) + 1, "x"));
+  await askedOpen(world, "!open shot.png");
+  assert.equal(calls(world, "files.getUploadURLExternal").length, 1);
+  // Sparse: the size is checked before a byte is read.
+  writeFileSync(join(project, "big.log"), "");
+  truncateSync(join(project, "big.log"), SHARE_LIMIT + 1);
   await askedOpen(world, "!open big.log");
-  assert.deepEqual(calls(world, "files.getUploadURLExternal"), []);
+  assert.equal(calls(world, "files.getUploadURLExternal").length, 1);
   assert.deepEqual(world.ephemerals(), [
     fill(named(slackTexts.OPEN_TOO_LARGE, NAMES), { path: "big.log" }),
   ]);
@@ -953,6 +960,19 @@ test("without the files write scope the owner is told what to do", async (t) => 
   assert.deepEqual(world.ephemerals(), [slackTexts.OPEN_NO_SCOPE]);
   assert.ok(slackTexts.OPEN_NO_SCOPE.includes("files:write"));
   assert.ok(slackTexts.OPEN_NO_SCOPE.includes("slack-app-manifest.json"));
+});
+
+test("a snippet Slack refuses as too large is told with the snippet limit", async (t) => {
+  const world = openWorld(t);
+  const project = projectOf(world);
+  await inAThread(world);
+  put(project, "a.ts");
+  world.slack.responses["files.getUploadURLExternal"] = { ok: false, error: "snippet_too_large" };
+  await askedOpen(world, "!open a.ts");
+  assert.deepEqual(world.ephemerals(), [
+    fill(named(slackTexts.OPEN_SNIPPET_TOO_LARGE, NAMES), { path: "a.ts" }),
+  ]);
+  assert.ok(named(slackTexts.OPEN_SNIPPET_TOO_LARGE, NAMES).includes("1 MB"));
 });
 
 test("another slack failure names its code and no file content", async (t) => {

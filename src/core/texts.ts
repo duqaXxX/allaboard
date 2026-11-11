@@ -564,7 +564,7 @@ export const DIFF_STALE = "That list belongs to another session. Send `!diff` ag
 export const DIFF_FILE_GONE = "`{path}` no longer differs from HEAD.";
 export const DIFF_FILE_BINARY = "`{path}` is binary: git shows no text diff for it.";
 export const DIFF_FILE_TOO_LARGE = naming(
-  "The diff of `{path}` is over {limit} bytes, the most {chat} takes as one file.",
+  "The diff of `{path}` is over {limit} bytes, the most shared as one file in {chat}.",
 );
 export const DIFF_FILE_FAILED = "git could not read the diff of `{path}`.";
 export const DIFF_FILE_REFUSED = naming("{chat} did not take the diff of `{path}`: {error}.");
@@ -987,8 +987,10 @@ export const GUIDE_FILES = naming(
     "over the folder's files; choosing one shares it into the thread, where {chat} opens it in its " +
     "file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file " +
     "whose path contains them, or lists the files that do. The search reads the folder from disk and " +
-    "leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
+    "leaves out what `.gitignore` excludes inside a git repository.",
 );
+// `{size}` is the chat's `fileLimit`, as `1 MB` or `300 bytes`.
+export const GUIDE_FILES_LIMIT = "A file over {size} is not opened.";
 export const GUIDE_DIFF = naming(
   "**Changes**\n" +
     "`!diff`, sent inside a session's thread, lists the files that differ from HEAD in its git " +

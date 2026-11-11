@@ -64,7 +64,7 @@ import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
 import { diffFits, listBlocks } from "./lists.ts";
 import { crossing, deliver, deliverNotice, postInThread } from "./notice.ts";
-import { SNIPPET_LIMIT, shareFile } from "./openfile/read.ts";
+import { SHARE_LIMIT, shareFile } from "./openfile/read.ts";
 import { endReply } from "./repair.ts";
 import { AgentSessions } from "./reply/agent-session.ts";
 import { AgentTitles } from "./reply/agent-titles.ts";
@@ -246,8 +246,8 @@ export class SlackChat implements ChatProvider {
   readonly name = "Slack";
   readonly cleanupControl = "Refresh on the Home tab";
   readonly capabilities: ChatCapabilities;
-  /** Slack's limit for a snippet, the most a shared file may hold. */
-  readonly fileLimit = SNIPPET_LIMIT;
+  /** The most a shared file may hold: Slack documents no limit for a file that is no snippet. */
+  readonly fileLimit = SHARE_LIMIT;
   /**
    * The bot of the workspace, and the app-level token of the connection when there is one: the
    * two things a copied `.env` can leave the same, each of which makes Socket Mode spread events

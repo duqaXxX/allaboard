@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `!open` shares a file of up to 30 MB, and `!diff` a diff of up to 30 MB, where both stopped at
+  1 MB, Slack's limit for a snippet. A file shared with no snippet type is no snippet: a PNG of
+  32.7 MB, a JPEG of 27.7 MB, a PDF of 7 MB and a text file of 2.1 MB were taken (measured
+  2026-11-11; `read.SHARE_LIMIT`, #93). A `.ts` over `read.SNIPPET_LIMIT` is shared with no
+  snippet type, and Slack typed one of 1.8 MB as TypeScript by itself. The upload of a shared
+  file's bytes waits 90 seconds (`clients.UPLOAD_TIMEOUT_MS`) where every Slack call waits 30, so
+  that a file of 30 MB uploads in time from about 2.8 Mbit/s.
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.322, which bundles Claude Code 2.1.322. The
   release probe certified it on 2026-11-11 against 0.3.321: the SDK surface table holds, no claim
   changed, the session is offered the same commands and the run produced no new stream shape

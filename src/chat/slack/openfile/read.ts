@@ -7,8 +7,16 @@ import type { WebClient } from "@slack/web-api";
 import { looksBinary, titleOf } from "../../../core/port.ts";
 
 // Slack's documented limit for a snippet: `snippet_too_large` on `files.getUploadURLExternal`
-// (docs.slack.dev/reference/methods/files.getUploadURLExternal, read 2026-10-05).
+// (docs.slack.dev/reference/methods/files.getUploadURLExternal, read 2026-10-05). A file shared
+// with no `snippet_type` is no snippet, so this limit does not hold for it.
 export const SNIPPET_LIMIT = 1 << 20;
+
+// The most a shared file may hold. Slack documents no limit for a file that is not a snippet
+// (the same page and "Working with files", read 2026-11-11); a PNG of 32.7 MB, a JPEG of 27.7 MB,
+// a PDF of 7 MB and text files of 1.8 to 2.4 MB (`.txt`, `.diff`, `.md`, `.json`, `.ts`) were
+// taken as files, and typed by Slack itself (measured 2026-11-11, #93). The
+// file is read whole into memory before it is shared, which is what this cap bounds.
+export const SHARE_LIMIT = 30 << 20;
 
 /**
  * Shares `content`, the bytes `readOpenable` read from `relative`, into the thread: the basename as
@@ -45,8 +53,10 @@ export async function shareFile(
   title: string,
 ): Promise<string | null> {
   // Slack types a `.ts` by its own guess: a file of 256 KB came out `Binary` (seen 2026-10-31).
-  // Video shares these extensions, which is what the bytes rule out.
-  const typescript = /\.[cm]?ts$|\.tsx$/i.test(filename) && !looksBinary(content);
+  // Video shares these extensions, which is what the bytes rule out. A snippet over Slack's limit
+  // is refused, so a larger file is left to Slack's guess.
+  const typescript =
+    /\.[cm]?ts$|\.tsx$/i.test(filename) && content.length <= SNIPPET_LIMIT && !looksBinary(content);
   const done = await client.files.uploadV2({
     channel_id: channel,
     thread_ts: threadTs,

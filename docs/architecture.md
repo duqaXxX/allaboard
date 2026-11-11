@@ -1811,7 +1811,7 @@ agent's own line (`AgentWords.trust`).
   `runGit` reads that as a failure. A pick carries the session and the path and nothing else; the
   patch is read when the control is used, for a path the tree lists at that moment only. The
   bytes collected are bounded by `ChatProvider.fileLimit`, which the chat declares with
-  `fileUpload` (Slack: its 1 MB snippet limit); a larger diff is told, not shared. Both
+  `fileUpload` (Slack: 30 MB, `read.SHARE_LIMIT`); a larger diff is told, not shared. Both
   `diff-index` calls take `--ignore-submodules=dirty`, so no submodule's config or filters run.
 - **What a click does.** `diffFlow` runs the picks of one list (the channel and the list's message)
   one after another, so the last click is the last applied, and a failed pick does not stop the

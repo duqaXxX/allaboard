@@ -5,6 +5,7 @@
  */
 import { Named } from "../../core/port.ts";
 import { setupGuide } from "../../version.ts";
+import { SHARE_LIMIT, SNIPPET_LIMIT } from "./openfile/read.ts";
 
 function naming(template: string): Named {
   return new Named(template);
@@ -56,7 +57,11 @@ export const OPEN_ROWS_MATCH_ONE = "1 file matches";
 export const OPEN_TYPE_A_NAME = "No changed files to show. Type part of a name to find a file.";
 export const OPEN_NOT_A_FILE = "`{path}` is not a file inside this session's folder.";
 export const OPEN_TOO_LARGE = naming(
-  "`{path}` is larger than 1 MB, the most {chat} opens in its file viewer.",
+  `\`{path}\` is larger than ${SHARE_LIMIT >> 20} MB, the most shared as one file in {chat}.`,
+);
+// `snippet_too_large`: Slack's limit for a snippet, which a `.ts` up to it is sent as.
+export const OPEN_SNIPPET_TOO_LARGE = naming(
+  `\`{path}\` is larger than ${SNIPPET_LIMIT >> 20} MB, the most {chat} opens in its file viewer.`,
 );
 export const OPEN_EMPTY = "`{path}` is empty: there is nothing to show.";
 /** The anchor of the setup guide's part on the Slack app, which `version.setupGuide` addresses. */
