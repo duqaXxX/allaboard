@@ -120,8 +120,12 @@ export function guideText(names: Names, offered: GuideOffer): string {
 /** The guide's sentence on the largest file, with a space before it; empty with no limit. */
 function fileLimitLine(limit: number | undefined): string {
   if (limit === undefined) return "";
-  const size = limit >= MEBIBYTE ? `${Math.floor(limit / MEBIBYTE)} MB` : `${limit} bytes`;
-  return ` ${fill(texts.GUIDE_FILES_LIMIT, { size })}`;
+  return ` ${fill(texts.GUIDE_FILES_LIMIT, { size: sizeText(limit) })}`;
+}
+
+/** A file limit as the owner reads it: `30 MB`, or `300 bytes` under a mebibyte. */
+export function sizeText(limit: number): string {
+  return limit >= MEBIBYTE ? `${Math.floor(limit / MEBIBYTE)} MB` : `${limit} bytes`;
 }
 
 const MEBIBYTE = 1 << 20;

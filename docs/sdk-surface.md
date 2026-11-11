@@ -82,6 +82,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 |---|---|---|---|---|---|
 | `@anthropic-ai/claude-agent-sdk` | `CanUseTool` | type | requests.ts: CallContext | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `EffortLevel` | type | session.ts: QueryHandle, effortOf | package | none |
+| `@anthropic-ai/claude-agent-sdk` | `McpSdkServerConfigWithInstance` | type | daemon-tools.ts: daemonServer | package | none |
 | `@anthropic-ai/claude-agent-sdk` | `HookCallback` | type | session.ts: ClaudeSession.#hook | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `Options` | type | session.ts: QueryFunction, ClaudeSession.#options | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `PermissionMode` | type | session.ts: QueryHandle, modeOf | reference | none |
@@ -90,6 +91,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `SDKUserMessage` | type | prompt.ts: Content, userMessage; session.ts: QueryFunction, ClaudeSession | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `RewindFilesResult` | type | rewind.ts: filesRestore; session.ts: QueryHandle | reference | P44 |
 | `@anthropic-ai/claude-agent-sdk` | `SessionMessage` | type | turns.ts: turnsOf | package | none |
+| `@anthropic-ai/claude-agent-sdk` | `createSdkMcpServer` | function | daemon-tools.ts: daemonServer | reference | P49 |
 | `@anthropic-ai/claude-agent-sdk` | `forkSession` | function | backend.ts: ClaudeBackend.forkSession | reference | P43 |
 | `@anthropic-ai/claude-agent-sdk` | `getSessionInfo` | function | backend.ts: ClaudeBackend.sessionTitle | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `getSessionMessages` | function | turns.ts: turnsAfter, lastTurn | reference | none |
@@ -97,6 +99,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `@anthropic-ai/claude-agent-sdk` | `query` | function | session.ts: ClaudeSession.constructor | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `resolveSettings` | function | advisor.ts: advisorModel | reference | none |
 | `@anthropic-ai/claude-agent-sdk` | `tagSession` | function | backend.ts: ClaudeBackend.tagSession | reference | P31 |
+| `@anthropic-ai/claude-agent-sdk` | `tool` | function | daemon-tools.ts: daemonTools | reference | P49 |
 | `Query` | `applyFlagSettings` | method | session.ts: ClaudeSession.setEffort | reference | none |
 | `Query` | `close` | method | session.ts: ClaudeSession.#pump, ClaudeSession.close | reference | none |
 | `Query` | `getContextUsage` | method | session.ts: ClaudeSession.contextUsage | reference | P2 |
@@ -108,6 +111,9 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `HookCallbackMatcher` | `hooks` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `allowDangerouslySkipPermissions` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `canUseTool` | option | session.ts: ClaudeSession.#options | reference | P11 |
+| `Options` | `mcpServers` | option | session.ts: ClaudeSession.#options | reference | P49 |
+| `CallToolResult` | `content` | option | daemon-tools.ts: daemonTools | measured | P49 |
+| `CallToolResult` | `isError` | option | daemon-tools.ts: daemonTools | measured | P49 |
 | `Options` | `cwd` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `effort` | option | session.ts: ClaudeSession.#options | reference | P16 |
 | `Options` | `enableFileCheckpointing` | option | session.ts: ClaudeSession.#options | reference | P44 |

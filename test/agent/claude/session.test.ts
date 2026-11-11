@@ -153,6 +153,25 @@ function types(events: readonly SessionEvent[]): string[] {
   return events.map((event) => event.type);
 }
 
+// The keys of a thread's options, `mcpServers` aside (a session given actions has it too). No
+// `sessionStore`: the SDK refuses one beside `enableFileCheckpointing` at `query()` (SDK 0.3.312),
+// which failed every start; the transcript is read instead.
+const OPTION_KEYS = [
+  "allowDangerouslySkipPermissions",
+  "canUseTool",
+  "cwd",
+  "enableFileCheckpointing",
+  "env",
+  "extraArgs",
+  "hooks",
+  "includePartialMessages",
+  "promptSuggestions",
+  "settingSources",
+  "stderr",
+  "systemPrompt",
+  "toolConfig",
+];
+
 // Options.
 
 test(
@@ -171,23 +190,7 @@ test(
     // The agent's guess at the next prompt, which `!next` offers (#151).
     assert.equal(options.promptSuggestions, true);
     assert.deepEqual(options.extraArgs, { "replay-user-messages": null });
-    assert.deepEqual(Object.keys(options).sort(), [
-      "allowDangerouslySkipPermissions",
-      "canUseTool",
-      "cwd",
-      "enableFileCheckpointing",
-      "env",
-      "extraArgs",
-      "hooks",
-      "includePartialMessages",
-      "promptSuggestions",
-      // No `sessionStore`: the SDK refuses one beside `enableFileCheckpointing` at `query()`
-      // (SDK 0.3.312), which failed every start; the transcript is read instead.
-      "settingSources",
-      "stderr",
-      "systemPrompt",
-      "toolConfig",
-    ]);
+    assert.deepEqual(Object.keys(options).sort(), OPTION_KEYS);
     assert.deepEqual(Object.keys(options.hooks ?? {}).sort(), [
       "PostModelSwitch",
       "PostToolUse",
@@ -195,6 +198,54 @@ test(
     ]);
   },
 );
+
+test("a session given a share action serves it as the allaboard server, a bare one never", async (t) => {
+  const actions = { share: async () => "done" };
+  const { query } = await started(t, {}, { actions });
+  assert.deepEqual(Object.keys(query.options).sort(), [...OPTION_KEYS, "mcpServers"].sort());
+  assert.deepEqual(Object.keys(query.options.mcpServers ?? {}), ["allaboard"]);
+  const bare = await started(t, {}, { actions, bare: true });
+  assert.equal("mcpServers" in bare.query.options, false);
+  const empty = await started(t, {}, { actions: {} });
+  assert.equal("mcpServers" in empty.query.options, false);
+});
+
+/** Calls the share tool's handler through the SDK server's own table. */
+async function callShare(query: { options: { mcpServers?: unknown } }) {
+  const server = (query.options.mcpServers as Record<string, unknown>).allaboard as {
+    instance: {
+      _registeredTools: Record<string, { handler: (...args: unknown[]) => Promise<unknown> }>;
+    };
+  };
+  // `_registeredTools` is the MCP SDK's private table: the handler is not otherwise reachable.
+  await server.instance._registeredTools.share_file?.handler({ path: "a" }, {});
+}
+
+test("the signal an action gets is aborted when the session is closed", LIMIT, async (t) => {
+  const signals: AbortSignal[] = [];
+  const share = async (_path: string, signal: AbortSignal) => {
+    signals.push(signal);
+    return "done";
+  };
+  const { session, query } = await started(t, {}, { actions: { share } });
+  await callShare(query);
+  assert.equal(signals[0]?.aborted, false);
+  await session.close();
+  assert.equal(signals[0]?.aborted, true);
+});
+
+test("the signal an action gets is aborted when the stream ends", LIMIT, async (t) => {
+  t.mock.method(logger, "error", () => undefined);
+  const signals: AbortSignal[] = [];
+  const share = async (_path: string, signal: AbortSignal) => {
+    signals.push(signal);
+    return "done";
+  };
+  const { events, query } = await started(t, { start: [END] }, { actions: { share } });
+  await until(events, "process_lost");
+  await callShare(query);
+  assert.equal(signals[0]?.aborted, true);
+});
 
 // What an interactive session has by default and a session of the SDK does not (measured
 // 2026-10-13 on the first request of both, Claude Code 2.1.296).

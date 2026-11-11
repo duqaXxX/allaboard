@@ -148,6 +148,15 @@ export const OPEN_TOP_LEVEL =
   "Opening a file belongs to one session: send `!open` inside its thread.";
 // Shown only by a chat that cannot share a file into a thread.
 export const OPEN_UNAVAILABLE = naming("{chat} cannot show a file here, so `!open` does nothing.");
+// What the model reads when it asks the daemon to share a file into the thread. `{path}` is the
+// path it sent (`SHARE_DONE`: the file's path from the folder); `{size}` the most the chat takes as one file; `{error}` the chat's own code.
+export const SHARE_DONE = "`{path}` was shared into the thread.";
+export const SHARE_NOT_A_FILE = "`{path}` is not a file inside this session's folder.";
+export const SHARE_TOO_LARGE =
+  "`{path}` is larger than {size}, the most that can be shared as one file.";
+export const SHARE_EMPTY = "`{path}` is empty: there is nothing to share.";
+export const SHARE_STOPPED = "The session was stopped before `{path}` was shared.";
+export const SHARE_REFUSED = "`{path}` could not be shared: {error}.";
 export const TAG_TOP_LEVEL =
   "A tag belongs to one session: send `!tag <name>` or `!untag` inside its thread.";
 // Shown only by a chat that cannot tag a thread.

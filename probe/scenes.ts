@@ -36,6 +36,7 @@ import { Translator } from "../src/agent/claude/translate.ts";
 import { locate } from "../src/agent/claude/trust.ts";
 import type {
   AgentSession,
+  DaemonActions,
   PermissionAnswer,
   PermissionRequest,
   PromptContent,
@@ -133,6 +134,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   rewind: ["P44", "P45"],
   "prompt suggestion": ["P47"],
   "idle after a gap stop": ["P48"],
+  "daemon tool": ["P49"],
   "folder trust": ["P34"],
   "stop hooks": ["P42"],
   "settings mode": ["P37"],
@@ -338,8 +340,14 @@ export class Stage {
   }
 
   /** Starts a session; rejects with ResumeRefused when Claude Code will not resume one. */
-  async open(folder: string, over: Partial<ClaudeStartOptions> = {}): Promise<Live> {
-    const live = new Live(await this.backend.start(this.options(folder, over), this.owner));
+  async open(
+    folder: string,
+    over: Partial<ClaudeStartOptions> = {},
+    actions?: DaemonActions,
+  ): Promise<Live> {
+    const live = new Live(
+      await this.backend.start(this.options(folder, over), this.owner, actions),
+    );
     this.lives.push(live);
     return live;
   }
@@ -2773,6 +2781,46 @@ async function idleAfterGap(s: Stage): Promise<Seen> {
 }
 
 /**
+ * P49: the daemon's tool of a session. A session started with a share action is asked to share a
+ * file; the tool is found behind `ToolSearch`, asks the owner in `default` mode (no settings are
+ * read, so the mode is the SDK's own) and runs its handler with the path sent.
+ */
+async function daemonTool(s: Stage): Promise<Seen> {
+  const folder = join(s.root, "daemon-tool");
+  await mkdir(folder);
+  await writeFile(join(folder, "hello.txt"), "hello\n");
+  const paths: string[] = [];
+  const live = await s.open(
+    folder,
+    {},
+    {
+      share: async (path) => {
+        paths.push(path);
+        return `\`${path}\` was shared into the thread.`;
+      },
+    },
+  );
+  const mark = s.owner.asked.length;
+  const turn = await live.turn(
+    "A tool of yours shares a file of the working folder into the chat thread. Find it with " +
+      "ToolSearch and use it to share hello.txt. Then reply: done",
+  );
+  await live.session.close();
+  const tool = "mcp__allaboard__share_file";
+  const asked = s.askedSince(mark);
+  const calls = ofType(turn.events, "call_started").map((event) => event.toolName);
+  const called = asked.includes(tool);
+  const searched = calls.indexOf("ToolSearch");
+  const deferred = searched !== -1 && searched < calls.indexOf(tool);
+  const ran = paths.length === 1 && paths[0] === "hello.txt";
+  let detail = "";
+  if (!called) detail = `permission requests: ${asked.join(", ") || "none"}`;
+  else if (!deferred) detail = `calls: ${calls.join(", ")}`;
+  else if (!ran) detail = `handler paths: ${s.scrubbed(paths.join(", ") || "none")}`;
+  return { P49: observation(called, deferred && ran, detail) };
+}
+
+/**
  * P45: the cut the back end makes for `rewindTo`. Two turns each give a codeword; the session is
  * closed and started again with `rewindTo` the second prompt (which the back end guards with
  * `resumeDropsTurn`); asked for the codewords it names the first alone, under the same session
@@ -3052,6 +3100,7 @@ export async function runScenes(
       ["rewind", async () => ({ ...(await fileCheckpoints(s)), ...(await conversationCut(s)) })],
       ["prompt suggestion", () => promptSuggestion(s)],
       ["idle after a gap stop", () => idleAfterGap(s)],
+      ["daemon tool", () => daemonTool(s)],
       ["folder trust", () => folderTrust(s)],
       ["stop hooks", () => stopHooks(s)],
       ["settings mode", () => settingsMode(s)],

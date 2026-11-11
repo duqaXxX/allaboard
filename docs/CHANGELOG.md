@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Claude can share a file of the session's folder into the thread by itself, with the tool
+  `mcp__allaboard__share_file` of an in-process MCP server the session is started with (#93). The
+  core allows it when the chat can upload a file (`DaemonActions.share`,
+  `Capabilities.daemonActions`), and the file goes through the upload `!open` uses. In a mode that
+  asks for every tool call, each call asks in the thread; allaboard adds no allow rule. `zod` is a
+  direct dependency now (4.6.7), since the SDK's `tool` takes a zod shape. Probe claim P49 checks
+  the tool is offered, deferred, asked about in `default` mode and run.
+
 ### Changed
 
 - `!open` shares a file of up to 30 MB, and `!diff` a diff of up to 30 MB, where both stopped at

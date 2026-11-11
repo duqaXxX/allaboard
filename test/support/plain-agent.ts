@@ -37,6 +37,7 @@ import type {
   ClosedReport,
   CommandInfo,
   ContextUsage,
+  DaemonActions,
   FileChange,
   FilesRestore,
   ForeignTurn,
@@ -148,6 +149,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   advisor: false,
   loadedContext: false,
   nextPrompts: false,
+  daemonActions: false,
 });
 
 /** The two commands of the agent, run by a prompt `:echo text` and `:count text`. */
@@ -189,6 +191,7 @@ export type PlainStep =
   | { readonly saved: SavedMessage }
   | { readonly jobs: readonly ScheduledJob[] }
   | { readonly suggest: string }
+  | { readonly share: string }
   | { readonly hold: true }
   | { readonly die: true };
 
@@ -278,6 +281,15 @@ export function scheduledJobs(jobs: readonly ScheduledJob[]): PlainStep {
  */
 export function suggest(text: string): PlainStep {
   return { suggest: text };
+}
+
+/**
+ * The model asks the daemon to share `path` into the thread, as an agent that declares
+ * `daemonActions` does through its tool; the line the daemon answers with is kept in
+ * `PlainSession.shared`. It needs an agent started with the option of that name.
+ */
+export function share(path: string): PlainStep {
+  return { share: path };
 }
 
 /** The turn waits here until `interrupt()` (it ends as `interrupted`) or `release()`. */
@@ -572,6 +584,8 @@ export interface PlainSessionContext {
   readonly promptDuringTurn: boolean;
   /** The agent says `idle` by the seam's contract (`declaredState`). */
   readonly declaredState: boolean;
+  /** What the daemon let the session ask of it (`daemonActions`); none when absent. */
+  readonly actions?: DaemonActions;
 }
 
 export class PlainSession implements AgentSession {
@@ -582,6 +596,8 @@ export class PlainSession implements AgentSession {
   readonly rewindToken?: string;
   /** Every prompt sent, in order. */
   readonly prompts: Prompt[] = [];
+  /** The line each `share` step got from the daemon, in order. */
+  readonly shared: string[] = [];
   /** Every name the session was given, in order. */
   readonly renames: string[] = [];
   /** A rename waits for this to resolve; a test holds it to keep a rename in flight. */
@@ -600,6 +616,8 @@ export class PlainSession implements AgentSession {
   readonly #context: PlainSessionContext;
   #chain: Promise<void> = Promise.resolve();
   #turn: AbortController | null = null;
+  /** Aborted when the session ends: the signal an action gets, as the seam documents it. */
+  readonly #life = new AbortController();
   #released: (() => void) | null = null;
   #sequence = 0;
   #cut = false;
@@ -696,6 +714,7 @@ export class PlainSession implements AgentSession {
   kill(): void {
     if (this.closed || this.lost) return;
     this.lost = true;
+    this.#life.abort();
     this.#turn?.abort();
     this.#queue.push({ type: "process_lost", reason: "the plain process exited" });
     this.#queue.end();
@@ -763,6 +782,7 @@ export class PlainSession implements AgentSession {
     this.closeCalls.push(options);
     if (!this.closed) {
       this.closed = true;
+      this.#life.abort();
       this.#turn?.abort();
       this.#queue.end();
     }
@@ -893,6 +913,11 @@ export class PlainSession implements AgentSession {
         this.#push({ type: "scheduled_jobs", jobs: step.jobs });
       } else if ("suggest" in step) {
         turn.suggestion = step.suggest;
+      } else if ("share" in step) {
+        const share = this.#context.actions?.share;
+        this.shared.push(
+          share === undefined ? "no action" : await share(step.share, this.#life.signal),
+        );
       } else if ("hold" in step) {
         await orAborted(
           new Promise<void>((resolve) => {
@@ -1048,6 +1073,8 @@ export interface PlainAgentOptions {
    * reads the turns another one wrote (`foreignTurns`, from `foreign`), both set by the test.
    */
   readonly terminal?: true;
+  /** The agent declares `daemonActions`: `start` takes the actions, and a `share` step may use them. */
+  readonly daemonActions?: true;
   /** The agent declares `nextPrompts`; a turn's `suggest` step then reaches the core. */
   readonly suggestions?: true;
   /** What each live session has loaded (`loadedContext`), as `!memory` and `!skills` list it. */
@@ -1111,6 +1138,8 @@ export class PlainAgent implements AgentBackend {
   readonly sessions: PlainSession[] = [];
   /** Every start asked of the agent, in order, a failed one too. */
   readonly starts: StartOptions[] = [];
+  /** The actions each start was given (`daemonActions`), undefined when none; a failed start too. */
+  readonly startedWith: (DaemonActions | undefined)[] = [];
   readonly #startFailures: Error[] = [];
   closed = false;
   /** What `sessionHolders` answers, per session id; none listed when absent. */
@@ -1181,6 +1210,9 @@ export class PlainAgent implements AgentBackend {
         prompt: plainShellPrompt,
       };
     }
+    if (options.daemonActions === true) {
+      this.capabilities = Object.freeze({ ...this.capabilities, daemonActions: true });
+    }
     if (options.suggestions) {
       this.capabilities = Object.freeze({ ...this.capabilities, nextPrompts: true });
     }
@@ -1219,8 +1251,13 @@ export class PlainAgent implements AgentBackend {
     return this.sessions.filter((session) => !session.closed && !session.lost);
   }
 
-  async start(options: StartOptions, requests: RequestHandler): Promise<AgentSession> {
+  async start(
+    options: StartOptions,
+    requests: RequestHandler,
+    actions?: DaemonActions,
+  ): Promise<AgentSession> {
     this.starts.push(options);
+    this.startedWith.push(actions);
     const failure = this.#startFailures.shift();
     if (failure !== undefined) throw failure;
     if (options.resume !== null && !this.store.has(options.folder, options.resume)) {
@@ -1247,6 +1284,7 @@ export class PlainAgent implements AgentBackend {
       firstUncuttable: this.#rewind?.firstUncuttable === true,
       promptDuringTurn: this.capabilities.promptDuringTurn,
       declaredState: this.capabilities.declaredState,
+      ...(this.capabilities.daemonActions && actions !== undefined && { actions }),
     });
     if (this.#rewind?.files === true) {
       session.restoreFiles = async (promptId, preview) =>
