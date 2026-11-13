@@ -339,6 +339,8 @@ const NO_FACTS = new Set([
   "P43",
   // The lifecycle records and the title are the whole check.
   "P46",
+  // The tool offered, asked for and run is the whole check.
+  "P49",
   // Limit claims: each holds on a constant the page states, or a name that is there or not.
   "L1",
   "L2",

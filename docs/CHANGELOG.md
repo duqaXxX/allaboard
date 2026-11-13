@@ -24,6 +24,12 @@ All notable changes to this project are documented here. The format follows
   snippet type, and Slack typed one of 1.8 MB as TypeScript by itself. The upload of a shared
   file's bytes waits 90 seconds (`clients.UPLOAD_TIMEOUT_MS`) where every Slack call waits 30, so
   that a file of 30 MB uploads in time from about 2.8 Mbit/s.
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.323, which bundles Claude Code 2.1.323. The
+  release probe certified it on 2026-11-13 against 0.3.322: the SDK surface table holds and no
+  claim changed. Twelve stream shapes the fixtures do not hold were accepted, most from the first
+  run of the `share_file` scene, none read by the source. Of two runs, the second was not offered
+  `/send-to-project` and `/ultrareview` while the first was, so the recorded commands stay as they
+  are (#286).
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.322, which bundles Claude Code 2.1.322. The
   release probe certified it on 2026-11-11 against 0.3.321: the SDK surface table holds, no claim
   changed, the session is offered the same commands and the run produced no new stream shape
