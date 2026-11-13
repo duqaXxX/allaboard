@@ -64,6 +64,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A message with a pasted table or card is read from the words the owner typed, rebuilt from the
+  composer's block with their code, bold, italic and strikethrough marks. Slack's text for such a
+  message ends with `, with interactive elements` and moves a code span's trailing space outside
+  its backticks (measured 2026-11-12): a `!word` in inline code was sent to the session as a
+  prompt, a plain one showed those words in the suggestion's field, and every such prompt
+  reached the session with them. Words that hold a link, an emoji, a mention or a run in two
+  styles are still read from Slack's text.
 - After a switch of the Claude Code login, a thread's footer no longer shows the old account's
   email beside the new account's limits. With limits, the footer and `!status` name the account
   the limits were read for. The usage probe starts and closes a session for each read, and takes
