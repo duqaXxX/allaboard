@@ -30,7 +30,7 @@ import {
 import { mrkdwnEscape } from "../reply/escape.ts";
 import * as slackTexts from "../texts.ts";
 import type { Answers, AppParts } from "./answers.ts";
-import { unwrittenText } from "./pasted.ts";
+import { withPasted } from "./pasted.ts";
 import { items, type Payload, str, text } from "./wire.ts";
 
 // Slack sends a link as <url|label> or <url> (message formatting reference, read 2026-09-25).
@@ -251,8 +251,7 @@ export function inboundMessage(
   const sent = slackUnescape(text(event.text) ?? "");
   const files = filesOf(event);
   // What the fallback text leaves out of the blocks reaches the agent after it (#120).
-  const unwritten = unwrittenText(event.blocks);
-  const prompt = unwritten === "" ? sent : `${sent}\n\n${unwritten}`;
+  const prompt = withPasted(sent, event.blocks);
   return {
     ref: { channel, thread: threadTs },
     id: ts,

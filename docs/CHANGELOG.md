@@ -54,6 +54,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- In a thread, the text sent from the field of a suggestion for a mistyped `!word` now carries
+  the table or the card pasted under the word, read back from Slack when the field is sent; it
+  carried the field's text alone (#275).
 - After a switch of the Claude Code login, a thread's footer no longer shows the old account's
   email beside the new account's limits. With limits, the footer and `!status` name the account
   the limits were read for. The usage probe starts and closes a session for each read, and takes

@@ -83,3 +83,9 @@ export function unwrittenText(blocks: unknown): string {
     .filter((part) => part !== "")
     .join("\n\n");
 }
+
+/** The prompt of a message whose text is `sent`: what its `blocks` hold beyond it follows it. */
+export function withPasted(sent: string, blocks: unknown): string {
+  const unwritten = unwrittenText(blocks);
+  return unwritten === "" ? sent : `${sent}\n\n${unwritten}`;
+}
