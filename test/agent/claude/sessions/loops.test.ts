@@ -181,6 +181,53 @@ test("runs share one message that the latest run rewrites, and open no reply of 
   assert.ok(session.scheduledJobs.length === 1);
 });
 
+// Claude Code 2.1.322 starts each run with a `command_lifecycle` `started` that carries
+// `wakeup_source` (recorded in `scheduled-run.jsonl`, #270): the run's end is then the agent's.
+const WOKEN = sdkMessages("scheduled-run").find((item) => {
+  const record = recordOf(item);
+  return record?.type === "command_lifecycle" && typeof record.wakeup_source === "string";
+}) as Item;
+
+let wakeups = 0;
+
+/** A run as Claude Code 2.1.322 sends it: its wakeup's start, under ids of its own, then the run. */
+function wokenRun(jobs: JsonObject[]): Item[] {
+  wakeups += 1;
+  const started = recordOf(WOKEN) as JsonObject;
+  const id = `00000000-0000-4000-8000-${String(wakeups).padStart(12, "0")}`;
+  return [{ record: { ...started, command_uuid: id, uuid: id } }, ...run(jobs)];
+}
+
+test("runs that say they are wakeups share one card too", async (t) => {
+  const [h, session] = await withLoop(t);
+  const replies = messageCount(h);
+  h.clients[0]?.inject(wokenRun([JOB]));
+  await h.until(() => loopMessages(h).length === 1);
+  h.clients[0]?.inject(wokenRun([JOB]));
+  await h.until(() => loopMessages(h)[0]?.includes("run 2") === true);
+  assert.equal(messageCount(h), replies + 1, "the next run edits the card");
+  assert.ok(session.scheduledJobs.length === 1);
+});
+
+test("a message sent while a woken run goes gets its own reply", async (t) => {
+  const h = harnessFor(t)({
+    turns: [
+      withStopHook(sdkMessages("tools"), WITH_JOB),
+      withStopHook(sdkMessages("tools"), WITH_JOB),
+    ],
+  });
+  const session = h.session();
+  await (await session.submit("/loop 1m check the build")).done.wait();
+  const turn = wokenRun([JOB]);
+  h.clients[0]?.inject(turn.slice(0, -1));
+  await h.until(() => session.busy);
+  const asked = await session.submit("and now this");
+  h.clients[0]?.inject(turn.slice(-1));
+  await asked.done.wait();
+  await h.until(() => loopMessages(h).length === 1);
+  assert.equal(messageCount(h), 3, "the first reply, the card, the message's own reply");
+});
+
 test("a turn another session's message opens is no run of the loop", async (t) => {
   // Recorded on SDK 0.3.312 (`peer-message.jsonl`): the message opens the turn from idle.
   const [h] = await withLoop(t);

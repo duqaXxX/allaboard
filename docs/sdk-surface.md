@@ -388,8 +388,9 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SessionStoreEntry.hookInfos[]` | `command` | key | goals.ts: stopHookSummary | measured | P42 |
 | `SessionStoreEntry.hookInfos[].command` | `"callback"` | value | goals.ts: stopHookSummary | measured | P42 |
 | `command_lifecycle` | `command_uuid` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
-| `command_lifecycle` | `state` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
+| `command_lifecycle` | `state` | key | session.ts: ClaudeSession.#readCommand; translate.ts: commandLifecycle | measured | P28 |
 | `command_lifecycle` | `type` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
+| `command_lifecycle` | `wakeup_source` | key | translate.ts: commandLifecycle | measured | none |
 | `CanUseTool.toolName` | `"AskUserQuestion"` | value | requests.ts: QUESTION_TOOL | measured | none |
 | `EffortLevel` | `"high"` | value | capabilities.ts: CAPABILITIES | package | none |
 | `EffortLevel` | `"low"` | value | capabilities.ts: CAPABILITIES | package | none |
@@ -471,6 +472,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.type` | `"user"` | value | translate.ts: HANDLERS; prompt.ts: userMessage | reference | none |
 | `command_lifecycle.state` | `"cancelled"` | value | session.ts: ClaudeSession.#readCommand | measured | none |
 | `command_lifecycle.state` | `"completed"` | value | session.ts: ClaudeSession.#readCommand | measured | P28 |
+| `command_lifecycle.state` | `"started"` | value | translate.ts: commandLifecycle | measured | none |
 | `command_lifecycle.type` | `"command_lifecycle"` | value | session.ts: ClaudeSession.#readCommand | measured | P28 |
 
 ## Types the daemon does not read
@@ -482,7 +484,7 @@ union, none of which any recording carries.
 
 ### Recorded and left unread
 
-- `command_lifecycle`: in no declaration of `sdk.d.ts`; the queue of a prompt sent while a turn runs (the translator leaves it unread; `ClaudeSession.#readCommand` reads it to end the hidden model command and the rename, rows above)
+- `command_lifecycle`: in no declaration of `sdk.d.ts`; the queue of a prompt sent while a turn runs (it gives no event; the translator's `commandLifecycle` reads a `started` and its `wakeup_source`, which marks a scheduled task's run, measured 2026-11-13; `ClaudeSession.#readCommand` reads it to end the hidden model command and the rename, rows above)
 - `conversation_reset`: `SDKConversationResetMessage`
 - `stream_event:content_block_stop`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`
 - `stream_event:message_delta`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`

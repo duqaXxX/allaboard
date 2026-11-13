@@ -1509,7 +1509,9 @@ closed when the start returns (`ThreadSession.connect`).
   cuts at its start is still the turn of the first message sent, in doubt or not, when its end
   names that message among those it answered (`turn_ended.answers`): a scheduled run that fails
   before its first step names none, and the message stays in doubt for the wait to drop. Such a
-  turn goes to the next message owed, if any, which its end then tells not sent.
+  turn is guessed to be the next message owed, if any; when its end says the agent started it
+  (`turn_ended.startedBy`, which the Claude module reads from the run's start, #270), the message
+  is never told not sent (`ThreadSession.cutAtStart`) and gets its own turn back (`settle`).
 - A task a subagent started and left running (`ThreadSession.ownedBySubagent`, a command
   promoted through `TurnRenderer.takePromoted`, or one whose `parentTaskId` is a subagent the
   session knows) gets no end line: its end is told to the subagent, whose own end is the one the
@@ -1602,9 +1604,10 @@ The order of replays, the cases above and what is released when are in the doc c
 ### Scheduled runs and the loop card
 
 - A turn the agent opens with no owner prompt behind it and no task end to report, while a
-  scheduled job is believed (`ThreadSession.opensRun`), is a scheduled run. The agent marks it
-  nowhere (`origin` is absent, measured 2026-10-19), so nothing else tells it from an owner's
-  turn. It runs through the same start and end of a turn as any other, with a `LoopReply`
+  scheduled job is believed (`ThreadSession.opensRun`), is a scheduled run. Nothing marks its
+  start for the core; Claude Code marks it on a record the SDK does not declare
+  (`command_lifecycle` `started` with `wakeup_source`, measured 2026-11-13), from which the Claude
+  module reports the run's end as the agent's (`turn_ended.startedBy`). It runs through the same start and end of a turn as any other, with a `LoopReply`
   (`core/reply/loop-card.ts`) as its reply: the renderer feeds it, it keeps the words and drops
   the calls, and it writes them with `ThreadChat.showLoop` when the turn's body ends. A run moves
   no status reaction, owes no footer of its own and starts no timing of work, and its end releases

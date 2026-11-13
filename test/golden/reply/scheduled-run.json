@@ -1,0 +1,204 @@
+{
+ "recording": "scheduled-run",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01M4wXxNGYyzchDmEEKhsLpn",
+      "message": false,
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "ToolSearch: select:CronCreate"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01M4wXxNGYyzchDmEEKhsLpn",
+      "message": false,
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "ToolSearch: select:CronCreate"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01Benf7vkgUAhiQSn9eeYePn",
+      "message": false,
+      "name": "CronCreate",
+      "output": null,
+      "preview": null,
+      "startedAt": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "CronCreate: * * * * *"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01Benf7vkgUAhiQSn9eeYePn",
+      "message": false,
+      "name": "CronCreate",
+      "output": "Scheduled recurring job cafea5eb (Every minute). Next run: Nov 13 8:10am. Session-only (not written to disk, dies when Claude exits). Auto-expires after 7 days. Use CronDelete to cancel sooner.",
+      "preview": null,
+      "startedAt": null,
+      "status": "complete",
+      "task": false,
+      "title": "CronCreate: * * * * *"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "OK",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "CRONRUN",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01M4wXxNGYyzchDmEEKhsLpn",
+     "message": false,
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "ToolSearch: select:CronCreate"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01M4wXxNGYyzchDmEEKhsLpn",
+     "message": false,
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "complete",
+     "task": false,
+     "title": "ToolSearch: select:CronCreate"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01Benf7vkgUAhiQSn9eeYePn",
+     "message": false,
+     "name": "CronCreate",
+     "output": null,
+     "preview": null,
+     "startedAt": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "CronCreate: * * * * *"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01Benf7vkgUAhiQSn9eeYePn",
+     "message": false,
+     "name": "CronCreate",
+     "output": "Scheduled recurring job cafea5eb (Every minute). Next run: Nov 13 8:10am. Session-only (not written to disk, dies when Claude exits). Auto-expires after 7 days. Use CronDelete to cancel sooner.",
+     "preview": null,
+     "startedAt": null,
+     "status": "complete",
+     "task": false,
+     "title": "CronCreate: * * * * *"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "OK",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nCRONRUN",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

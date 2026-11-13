@@ -934,6 +934,47 @@ test("!stop twice in the gap: a turn the agent starts that ends with no step nev
   assert.equal(world.shown(ref).filter(notSentOf("third")).length, 1, "told once");
 });
 
+test("!stop twice in the gap, then a prompt: a turn the agent starts with no step never tells that prompt not sent (#270)", async (t) => {
+  const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
+  const plain = agent.sessions[0];
+  assert.ok(plain);
+  plain.autoIdle = false;
+  open();
+  await settledTurn();
+  plain.playGate = null;
+  await session.stop();
+  await settledTurn();
+  // The owner writes after the second stop; the prompt waits behind the agent's own turn.
+  let release!: () => void;
+  plain.playGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await session.submit("fifth");
+  await until("the fifth was sent", () => sent(agent).length === 4);
+  // A scheduled run that fails before its first word, which the agent says it started.
+  plain.emit({
+    type: "turn_ended",
+    sessionId: world.state.thread(ref.channel, ref.thread)?.sessionId ?? "",
+    startedBy: "agent",
+    finalText: "",
+    ending: "error",
+    steps: 0,
+    answers: [],
+    tokens: {},
+  });
+  await settledTurn();
+  release();
+  // The plain agent plays the answers queued in order: the fifth's turn shows the third's.
+  await until("the fifth ran", () =>
+    world.shown(ref).some((line) => line.startsWith("third answer")),
+  );
+  await settledTurn();
+  plain.emit({ type: "state_changed", state: "idle" });
+  await until("idle", () => !session.busy);
+  await settledTurn();
+  assert.ok(!world.shown(ref).some(notSentOf("fifth")), "the fifth ran: never told not sent");
+});
+
 test("!stop twice in the gap: a turn that names no prompt and ends with no step never takes the prompt in doubt", async (t) => {
   const { world, session, ref, open, agent } = await twoInTheGap(t, false, true);
   const plain = agent.sessions[0];
