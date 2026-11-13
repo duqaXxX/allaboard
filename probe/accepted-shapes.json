@@ -26,7 +26,14 @@
       "usage_report.session.model_usage.*:object": "2.1.310",
       "message.input_transformations[].path:string": "2.1.318",
       "message.input_transformations[].reason:string": "2.1.318",
-      "message.input_transformations[].type:string": "2.1.318"
+      "message.input_transformations[].type:string": "2.1.318",
+      "message.content[].input.path:string": "2.1.323",
+      "tool_use_meta:array": "2.1.323",
+      "tool_use_meta[].display_name:string": "2.1.323",
+      "tool_use_meta[].id:string": "2.1.323",
+      "tool_use_meta[].server_display_name:string": "2.1.323",
+      "tool_use_meta[].tool_name:string": "2.1.323",
+      "wire_tool_inputs.*.path:string": "2.1.323"
     },
     "rate_limit_event": {
       "rate_limit_info.unifiedWindows.five_hour.status:string": "2.1.310",
@@ -86,7 +93,8 @@
       "event.usage.fallback_credit:null": "2.1.304",
       "event.usage.server_tool_use.web_fetch_requests:number": "2.1.304",
       "event.usage.server_tool_use.web_search_requests:number": "2.1.304",
-      "event.usage.server_tool_use:object": "2.1.304"
+      "event.usage.server_tool_use:object": "2.1.304",
+      "event.delta.safeguard_results[].status.tool_uses.*.cited_rule:null": "2.1.323"
     },
     "stream_event/message_stop": {
       "abandoned_blocks.api_message_id:string": "2.1.312",
@@ -130,12 +138,16 @@
       "tool_use_result.sections[].rows[].ref:string": "2.1.319",
       "tool_use_result.sections[].rows[].status:string": "2.1.319",
       "tool_use_result.sections[].rows[].type:string": "2.1.319",
-      "tool_use_result.sections[].total:number": "2.1.319"
+      "tool_use_result.sections[].total:number": "2.1.319",
+      "tool_use_result:array": "2.1.323",
+      "tool_use_result[].text:string": "2.1.323",
+      "tool_use_result[].type:string": "2.1.323"
     },
     "stream_event/message_start": {
       "event.message.input_transformations[].path:string": "2.1.318",
       "event.message.input_transformations[].reason:string": "2.1.318",
-      "event.message.input_transformations[].type:string": "2.1.318"
+      "event.message.input_transformations[].type:string": "2.1.318",
+      "owed_rows:array": "2.1.323"
     }
   },
   "tools": {

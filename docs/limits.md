@@ -149,7 +149,8 @@ Code 2.1.296) on 2026-10-12, with the same answer, and the commands the table li
 (Claude Code 2.1.310) on 2026-10-24, 0.3.312 (Claude Code 2.1.312) on 2026-10-27 and 0.3.316
 (Claude Code 2.1.316) on 2026-11-01; the seventeen it lists now through 0.3.318 (Claude Code
 2.1.318) on 2026-11-04, 0.3.319 (Claude Code 2.1.319) on 2026-11-07, 0.3.321 (Claude Code
-2.1.321) on 2026-11-10 and 0.3.322 (Claude Code 2.1.322) on 2026-11-11.
+2.1.321) on 2026-11-10, 0.3.322 (Claude Code 2.1.322) on 2026-11-11 and 0.3.323 (Claude Code
+2.1.323) on 2026-11-13.
 Computer use was absent from the session's servers although it was switched on for the folder,
 on the Python SDK 0.2.164 (Claude Code 2.1.292, 2026-10-09) and again on the TypeScript SDK
 0.3.296 (Claude Code 2.1.296, 2026-10-12), 0.3.300 (Claude Code 2.1.300, 2026-10-14), 0.3.301
@@ -158,7 +159,8 @@ on the Python SDK 0.2.164 (Claude Code 2.1.292, 2026-10-09) and again on the Typ
 (Claude Code 2.1.309, 2026-10-24), 0.3.310 (Claude Code 2.1.310, 2026-10-24), 0.3.312
 (Claude Code 2.1.312, 2026-10-27), 0.3.316 (Claude Code 2.1.316, 2026-11-01), 0.3.318
 (Claude Code 2.1.318, 2026-11-04), 0.3.319 (Claude Code 2.1.319, 2026-11-07), 0.3.321
-(Claude Code 2.1.321, 2026-11-10) and 0.3.322 (Claude Code 2.1.322, 2026-11-11). The
+(Claude Code 2.1.321, 2026-11-10), 0.3.322 (Claude Code 2.1.322, 2026-11-11) and 0.3.323
+(Claude Code 2.1.323, 2026-11-13). The
 same session started with `--chrome` listed
 Claude in Chrome as connected, which is a different server.
 
