@@ -78,6 +78,12 @@ interface Memory {
   readonly runs: Map<string, string>;
   /** The subagents started in the background: their notification says their words. */
   readonly agents: Set<string>;
+  /**
+   * The id of the wakeup Claude Code started last and has not ended (a scheduled task's run), null
+   * when the last command it started was no wakeup: a result while it runs is the agent's when it
+   * names no prompt the daemon sent (#270).
+   */
+  woken: string | null;
 }
 
 // Runs remembered for a notification that may never be folded (one a turn of its own reports).
@@ -649,22 +655,47 @@ function result(memory: Memory, record: WireRecord): SessionEvent[] {
   memory.unnamed = false;
   memory.compacting = false;
   // Claude Code started the turn itself (a task notification, say) when the origin names
-  // anything but the owner: none or `human` is the owner's own prompt.
+  // anything but the owner: none or `human` is the owner's own prompt. A scheduled run's result
+  // carries no origin; its start said it was a wakeup, and it names no prompt unless it took one
+  // in, which keeps it the owner's.
   const origin = isRecord(record.origin) ? string(record.origin.kind) : null;
+  const answers = answersOf(record);
+  const woken = memory.woken !== null && !answers.some((id) => memory.sent.has(id));
   return [
     ...effortChanged(record),
     {
       type: "turn_ended",
       sessionId: words(record.session_id),
-      startedBy: origin === null || origin === "human" ? "owner" : "agent",
+      startedBy: (origin === null || origin === "human") && !woken ? "owner" : "agent",
       finalText: string(record.result),
       ending: endingOf(record),
       // 0 for the turn a task's notification gets once its report was already handed back.
       steps: typeof record.num_turns === "number" ? record.num_turns : null,
-      answers: answersOf(record),
+      answers,
       tokens: tokensOf(record.modelUsage),
     },
   ];
+}
+
+/**
+ * Each command Claude Code starts says whether it is a wakeup it ran by itself: a scheduled
+ * task's run carries `wakeup_source` (`schedule_wakeup` for a CronCreate job), a prompt none
+ * (recorded 2026-11-13, Claude Code 2.1.322, `scheduled-run.jsonl`; the record is in no
+ * declaration of `sdk.d.ts`, whose declared markers of a scheduled run never arrive). Every start
+ * overwrites what the last one said, and the wakeup's own end forgets it: not its result, which
+ * may come after the start of the next command. It gives no event: the kind stays in
+ * `UNREAD_KINDS`.
+ */
+function commandLifecycle(memory: Memory, record: WireRecord): void {
+  const id = string(record.command_uuid);
+  if (record.state === "started") {
+    memory.woken = (string(record.wakeup_source) ?? "") !== "" ? id : null;
+  } else if (
+    (record.state === "completed" || record.state === "cancelled") &&
+    id === memory.woken
+  ) {
+    memory.woken = null;
+  }
 }
 
 const HANDLERS = {
@@ -693,12 +724,14 @@ const HANDLERS = {
 export const TRANSLATED_KINDS: readonly string[] = Object.keys(HANDLERS);
 
 /**
- * The recorded kinds the daemon does not read: nothing in the reply or in the session depends
- * on them. A kind in neither list is new, and `test/agent/claude/translate.test.ts` fails on the
+ * The recorded kinds that give no event: nothing in the reply depends on them, and only
+ * `command_lifecycle` is read, for the memory of the result that follows. A kind in neither list
+ * is new, and `test/agent/claude/translate.test.ts` fails on the
  * recording that carries it.
  */
 export const UNREAD_KINDS: readonly string[] = [
-  // The queue of a prompt sent while a turn runs; absent from the SDK's union of messages.
+  // The queue of a prompt sent while a turn runs; absent from the SDK's union of messages. No
+  // event: its start only tells the result that follows whose it is (`commandLifecycle`).
   "command_lifecycle",
   // `/clear`: the new session id comes with the `init` that follows.
   "conversation_reset",
@@ -743,6 +776,7 @@ export class Translator {
     compacting: false,
     runs: new Map(),
     agents: new Set(),
+    woken: null,
   };
 
   /** The daemon is sending a prompt under `promptId`: its replay will be `prompt_taken`. */
@@ -755,6 +789,9 @@ export class Translator {
    * daemon does not read, or of none it knows, gives none.
    */
   translate(record: unknown): SessionEvent[] {
+    if (isRecord(record) && kindOf(record) === "command_lifecycle") {
+      commandLifecycle(this.#memory, record);
+    }
     const handler = handlerOf(kindOf(record));
     return handler !== null && isRecord(record) ? handler(this.#memory, record) : [];
   }

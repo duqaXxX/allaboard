@@ -64,6 +64,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A scheduled run that arrives while a message of yours waits no longer takes that message: the
+  message gets its own turn and reply after the run, where it was marked answered by the run, and
+  after a second `!stop` it is not told `was not sent because you stopped it`. The run's words
+  show in the reply first opened for the message. Claude Code marks the start of such a run with
+  `wakeup_source` on its `command_lifecycle` record, which `sdk.d.ts` does not declare (measured
+  2026-11-13); the translator reports the run's end as the agent's (#270).
 - `!diff` lists an untracked text file over 1 MB with its lines and a **Diff** button, where it
   showed it as `binary`: its lines are counted a chunk at a time (`read.scanOpenable`) and its
   diff is read up to the chat's file limit, 30 MB in Slack, as a tracked file's is. An untracked

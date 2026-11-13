@@ -3362,8 +3362,8 @@ export class ThreadSession {
       // prompt started it: it is the turn of the prompt at the head of `sent`, in doubt or not,
       // since the agent runs its prompts in the order sent (a second stop can cut a prompt the
       // first cut left in doubt). One the agent started itself never takes a prompt in doubt, nor
-      // one whose end does not name that prompt among those it answered: a scheduled run reads as
-      // the owner's and names none. With no name the prompt stays in doubt for the wait to drop,
+      // one whose end does not name that prompt among those it answered (a scheduled run's end
+      // names none, and says the agent started it where the agent can tell). With no name the prompt stays in doubt for the wait to drop,
       // and the turn goes to the next prompt owed: a real cut that names none (no such result was
       // seen, 2026-11-10) then tells that prompt not sent, which no thread is left stuck for.
       const head = this.sent[0];
@@ -4203,9 +4203,10 @@ export class ThreadSession {
 
   /**
    * Whether the turn that starts now is a scheduled run: the agent opens it with no owner prompt
-   * behind it and no task end to report, while a scheduled job is believed. The agent marks a run
-   * nowhere (no `origin`, measured 2026-10-19), so this is all there is to tell it by; a run that
-   * comes while an owner prompt is queued is that prompt's turn. A prompt replayed since the last
+   * behind it and no task end to report, while a scheduled job is believed. Nothing marks a run's
+   * start, so this is all there is to tell it by; a run that comes while an owner prompt is queued
+   * is guessed to be that prompt's turn, and its end corrects the guess (`settle`) when it says the
+   * agent started it. A prompt replayed since the last
    * turn, a task still running and a report given up on all say the turn may be another's (an
    * owner's, a Monitor's event, a report that came late): it is then an ordinary reply, which
    * is the safe way to be wrong. Only where the chat has the loop card.
@@ -4802,10 +4803,13 @@ export class ThreadSession {
   /**
    * The stop cut the turn the moment it began: it took no step, was not a replay, is not a command
    * (whose turn takes no step and whose replay is not measured under a stop: never told unsent
-   * when it may have run) and no turn had taken it in.
+   * when it may have run) and no turn had taken it in. A turn the agent says it started itself is
+   * no prompt's cut (a scheduled run that failed at once, #270): the prompt it was guessed to be
+   * still runs, and `settle` gives it back its turn.
    */
   private cutAtStart(active: ActiveTurn, result: TurnEnded): boolean {
     return (
+      result.startedBy === "owner" &&
       active.afterStop &&
       !active.replayed &&
       active.turn !== null &&

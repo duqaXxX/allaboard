@@ -184,6 +184,86 @@ test("a turn the agent starts to report a task says so", () => {
   );
 });
 
+// A CronCreate job and its first run (recorded 2026-11-13, SDK 0.3.322, #270): the run's
+// `command_lifecycle` `started` carries `wakeup_source`, and its result names no prompt.
+test("a scheduled run's turn is the agent's, the turn that scheduled it the owner's", () => {
+  assert.deepEqual(
+    of(events("scheduled-run"), "turn_ended").map((event) => event.startedBy),
+    ["owner", "agent"],
+  );
+});
+
+/** The records of the scheduled run alone, from its `started` to its `completed`. */
+function runRecords(): JsonObject[] {
+  const all = sdkRecords("scheduled-run");
+  const from = all.findIndex((wire) => wire.type === "command_lifecycle" && wire.wakeup_source);
+  assert.ok(from > 0);
+  return all.slice(from);
+}
+
+test("a woken turn whose result names a prompt the daemon sent stays the owner's", () => {
+  const records = runRecords().map((wire) =>
+    wire.type === "result" ? { ...wire, user_message_uuid: "prompt-1" } : wire,
+  );
+  const translator = new Translator();
+  translator.promptSent("prompt-1");
+  assert.deepEqual(
+    of(translated(records, translator), "turn_ended").map((event) => event.startedBy),
+    ["owner"],
+  );
+});
+
+test("a woken turn whose result names only an id the daemon never sent is the agent's", () => {
+  const records = runRecords().map((wire) =>
+    wire.type === "result" ? { ...wire, user_message_uuid: "wakeup-own-id" } : wire,
+  );
+  assert.deepEqual(
+    of(translated(records), "turn_ended").map((event) => event.startedBy),
+    ["agent"],
+  );
+});
+
+test("a wakeup started before the running turn's result marks the run, not that turn", () => {
+  const all = sdkRecords("scheduled-run");
+  const firstResult = all.findIndex((wire) => wire.type === "result");
+  const woken = all.find((wire) => wire.type === "command_lifecycle" && wire.wakeup_source);
+  assert.ok(woken && firstResult > 0);
+  const run = runRecords().slice(1);
+  const crossed = [...all.slice(0, firstResult), woken, all[firstResult], ...run];
+  const translator = new Translator();
+  const replayed = all.find((wire) => wire.type === "user" && wire.isReplay === true);
+  if (replayed) translator.promptSent(replayed.uuid as string);
+  assert.deepEqual(
+    of(translated(crossed, translator), "turn_ended").map((event) => event.startedBy),
+    ["owner", "agent"],
+  );
+});
+
+test("a start with no wakeup after a woken one makes the next result the owner's again", () => {
+  const [started, ...rest] = runRecords();
+  assert.ok(started);
+  const owner = { ...started, wakeup_source: undefined, command_uuid: "prompt-2" };
+  delete owner.wakeup_source;
+  assert.deepEqual(
+    of(translated([started, owner, ...rest]), "turn_ended").map((event) => event.startedBy),
+    ["owner"],
+  );
+});
+
+test("a woken run's result leaves nothing behind for the next turn", () => {
+  const records = runRecords();
+  const next = records.map((wire) => (wire.type === "command_lifecycle" ? null : wire));
+  const translator = new Translator();
+  const ends = of(
+    translated([...records, ...next.filter((wire) => wire !== null)], translator),
+    "turn_ended",
+  );
+  assert.deepEqual(
+    ends.map((event) => event.startedBy),
+    ["agent", "owner"],
+  );
+});
+
 test("an interrupted turn ends as interrupted, with no last text", () => {
   const [ended] = of(events("interrupt"), "turn_ended");
   assert.equal(ended?.ending, "interrupted");
