@@ -1691,6 +1691,22 @@ reapplied on every reconnect, so it survives an idle close and a restart of alla
 with `!model` needs no such help, since Claude Code's own resume keeps it by itself. `!status`
 writes the same value on its `Effort` line.
 
+### Claude shares a file into the thread
+
+Where `!open` has you pick a file, Claude can share one itself: ask for it in plain words ("show me
+the file that builds the footer") and Claude finds the file, then calls its tool
+`mcp__allaboard__share_file`. The file appears in the thread as `!open` shows it, and a `.ts` file
+opens as the same snippet. The tool takes an absolute path or a path relative to the folder Claude
+works in (which `cd` or a worktree may have moved), and the file must lie inside the session's
+folder: a path outside it (a link out of it included), a file over the chat's limit and an empty file
+are refused, and Claude is told which. The file is titled with its path from the session's folder. Nothing is posted for the owner on success.
+
+The tool follows the permission mode like any other tool. With `defaultMode` set to `default` in
+your Claude Code settings, every call asks in the thread, and you can add
+`mcp__allaboard__share_file` to your own `permissions.allow` to stop that. allaboard adds no allow
+rule of its own. With bypass on, or bypass off in `auto` mode, the call runs without a question.
+It is offered only when the chat can upload a file.
+
 ### Notifications
 
 A reply, an approval request and a question post inside the session's own thread, and Slack

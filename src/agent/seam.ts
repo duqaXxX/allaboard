@@ -193,6 +193,11 @@ export interface Capabilities {
   readonly loadedContext: boolean;
   /** `next_prompt`: the agent guesses the next prompt after a turn. Without it `!next` is not offered. */
   readonly nextPrompts: boolean;
+  /**
+   * The model may ask the daemon to do something (`DaemonActions`): the agent offers it a tool for
+   * each action present. Without it the third argument of `start` is ignored.
+   */
+  readonly daemonActions: boolean;
 }
 
 /** A process that holds a session open, as `AgentBackend.sessionHolders` lists it. */
@@ -1121,6 +1126,20 @@ export interface UsageLimit {
   readonly resetsAt: number | null;
 }
 
+/**
+ * What a session's model may ask the daemon to do, passed to `AgentBackend.start` beside the
+ * `RequestHandler`; a back end offers the model one tool for each member present. English
+ * product text is the core's: the line each member resolves with is what the model reads.
+ */
+export interface DaemonActions {
+  /**
+   * Shares `path` (relative to the session's folder) into its thread; resolves with the line for
+   * the model, a refusal too. `signal` aborts when the session closes. Present only when the chat
+   * can upload a file.
+   */
+  share?(path: string, signal: AbortSignal): Promise<string>;
+}
+
 export interface AgentBackend {
   /** The agent's name as the daemon's texts say it. */
   readonly name: string;
@@ -1135,7 +1154,11 @@ export interface AgentBackend {
    * to check first (`folderTrusted`). What the owner set in the agent for every session it
    * starts (the Chrome integration in Claude Code) is read by the back end at each start.
    */
-  start(options: StartOptions, requests: RequestHandler): Promise<AgentSession>;
+  start(
+    options: StartOptions,
+    requests: RequestHandler,
+    actions?: DaemonActions,
+  ): Promise<AgentSession>;
   /**
    * The sessions of `folder` alone, newest first by the time their record last changed. Present
    * with `sessionListing`.

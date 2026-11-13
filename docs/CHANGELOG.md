@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Claude can share a file of the session's folder into the thread by itself, with the tool
+  `mcp__allaboard__share_file` of an in-process MCP server the session is started with (#93). The
+  core allows it when the chat can upload a file (`DaemonActions.share`,
+  `Capabilities.daemonActions`), and the file goes through the upload `!open` uses. In a mode that
+  asks for every tool call, each call asks in the thread; allaboard adds no allow rule. `zod` is a
+  direct dependency now (4.6.7), since the SDK's `tool` takes a zod shape. Probe claim P49 checks
+  the tool is offered, deferred, asked about in `default` mode and run.
+
 ### Changed
 
 - `!open` shares a file of up to 30 MB, and `!diff` a diff of up to 30 MB, where both stopped at
@@ -57,6 +67,13 @@ All notable changes to this project are documented here. The format follows
 - In a thread, the text sent from the field of a suggestion for a mistyped `!word` now carries
   the table or the card pasted under the word, read back from Slack when the field is sent; it
   carried the field's text alone (#275).
+- A message with a pasted table or card is read from the words the owner typed, rebuilt from the
+  composer's block with their code, bold, italic and strikethrough marks. Slack's text for such a
+  message ends with `, with interactive elements` and moves a code span's trailing space outside
+  its backticks (measured 2026-11-12): a `!word` in inline code was sent to the session as a
+  prompt, a plain one showed those words in the suggestion's field, and every such prompt
+  reached the session with them. Words that hold a link, an emoji, a mention or a run in two
+  styles are still read from Slack's text.
 - After a switch of the Claude Code login, a thread's footer no longer shows the old account's
   email beside the new account's limits. With limits, the footer and `!status` name the account
   the limits were read for. The usage probe starts and closes a session for each read, and takes

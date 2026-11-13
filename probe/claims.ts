@@ -555,6 +555,18 @@ export const CLAIMS: readonly Claim[] = [
       "the order of `idle` changed: read the seam's contract on `declaredState`",
   ),
   claim(
+    "P49",
+    "model",
+    "a session started with a share action (`mcpServers` of one `allaboard` server) is offered " +
+      "the tool `mcp__allaboard__share_file` deferred behind `ToolSearch`, and in `default` mode " +
+      "a call to it reaches `canUseTool` and then runs its handler with the path the model sent",
+    "src/agent/claude/daemon-tools.ts#daemonServer",
+    "in a thread of a session whose `defaultMode` is `default`, ask Claude to show you a file of " +
+      "the folder: it searches for the tool, an approval for `mcp__allaboard__share_file` " +
+      "comes, and the file appears in the thread. If no approval comes or the file does not, " +
+      "read `docs/sdk-surface.md` for the rows of `createSdkMcpServer` and `tool`",
+  ),
+  claim(
     "L1",
     "limit",
     "the Bash tool of a session started as the daemon starts it, with no `BASH_DEFAULT_TIMEOUT_MS`, " +

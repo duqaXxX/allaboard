@@ -59,4 +59,6 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   loadedContext: true,
   // The SDK's `promptSuggestions` option and its `prompt_suggestion` message.
   nextPrompts: true,
+  // `daemon-tools.ts`: an in-process MCP server of the session's own.
+  daemonActions: true,
 });

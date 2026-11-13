@@ -1272,6 +1272,21 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       },
     );
 
+    // Daemon actions.
+
+    check(
+      "a session starts with the daemon's actions, with none, and with an empty set",
+      LIMIT,
+      async (world) => {
+        // A back end without `daemonActions` ignores the third argument: it never fails a start.
+        const given = [{ share: async () => "done" }, {}, undefined];
+        for (const actions of given) {
+          const session = await world.backend.start(startOptions(world), new Requests(), actions);
+          await session.close();
+        }
+      },
+    );
+
     // Trust.
 
     check(
