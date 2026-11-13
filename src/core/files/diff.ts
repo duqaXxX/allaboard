@@ -11,16 +11,20 @@ import type { FileChange, Repository } from "../../agent/seam.ts";
 import { type Clock, monotonicClock } from "../../clock.ts";
 import { compareCodePoints, strip } from "../../text.ts";
 import { GIT_TIMEOUT, runGit } from "../footer.ts";
-import { NotAFile, readOpenable, TooLarge } from "./read.ts";
+import { NotAFile, readOpenable, scanOpenable, TooLarge } from "./read.ts";
 import { TIMED_OUT, within } from "./waiting.ts";
 
-/** One changed file: its path from the repository's root, and its lines added and removed. */
+/**
+ * One changed file: its path from the repository's root, and its lines added and removed.
+ * `large`: an untracked file over the limit asked for, whose lines are not counted.
+ */
 export interface DiffStat {
   readonly path: string;
   readonly added: number;
   readonly removed: number;
   /** Git (or the first bytes of an untracked file) takes it for binary: it has no text diff. */
   readonly binary: boolean;
+  readonly large?: boolean;
 }
 
 /**
@@ -33,8 +37,8 @@ export interface DiffPatch {
   readonly large: boolean;
 }
 
-/** The most an untracked file is read for, in bytes: a larger one is listed as having no text diff. */
-export const UNTRACKED_LIMIT = 1_048_576;
+// Git's own test for binary content reads this many bytes.
+const BINARY_PROBE = 8000;
 
 // Variables of an outer git are removed by `runGit`; these are git's own safe-reading flags.
 const LITERAL = ["--literal-pathspecs", "--no-optional-locks"];
@@ -74,10 +78,17 @@ async function untrackedPaths(
   return out === null ? null : out.split("\0").filter((name) => name !== "");
 }
 
-/** The content of an untracked file, or null when it is no regular file or too large to read. */
-async function contentOf(repository: Repository, path: string): Promise<Buffer | "large" | null> {
+/**
+ * The content of an untracked file, at most `limit` bytes: `large` over it, null when it is no
+ * regular file.
+ */
+async function contentOf(
+  repository: Repository,
+  path: string,
+  limit: number,
+): Promise<Buffer | "large" | null> {
   try {
-    return await readOpenable(repository.root, path, UNTRACKED_LIMIT);
+    return await readOpenable(repository.root, path, limit);
   } catch (error) {
     if (error instanceof TooLarge) return "large";
     if (error instanceof NotAFile) return null;
@@ -85,9 +96,50 @@ async function contentOf(repository: Repository, path: string): Promise<Buffer |
   }
 }
 
+/**
+ * Whether an untracked file is binary and how many lines its new-file patch adds, read a chunk at
+ * a time (#282); `large` once more than `limit` bytes of text were read, since a diff over the
+ * limit is never shared and reading on would hold the list up to its timeout; null when it is no
+ * regular file. Once `signal` aborts the count stops short: the caller drops the list then. The
+ * lines are those `linesOf` gives: the newlines, and one more for a last line with none.
+ */
+async function countOf(
+  repository: Repository,
+  path: string,
+  limit: number,
+  signal: AbortSignal,
+): Promise<{ binary: boolean; lines: number; large: boolean } | null> {
+  let read = 0;
+  let probed = 0;
+  let binary = false;
+  let newlines = 0;
+  let last = -1;
+  try {
+    await scanOpenable(repository.root, path, (chunk) => {
+      if (probed < BINARY_PROBE) {
+        binary ||= chunk.subarray(0, BINARY_PROBE - probed).includes(0);
+        probed += Math.min(chunk.length, BINARY_PROBE - probed);
+      }
+      // A binary file's lines are never shown.
+      if (binary) return false;
+      read += chunk.length;
+      if (read > limit) return false;
+      for (let at = chunk.indexOf(10); at !== -1; at = chunk.indexOf(10, at + 1)) newlines += 1;
+      last = chunk[chunk.length - 1] ?? last;
+      // A list given up on is not finished.
+      return !signal.aborted;
+    });
+  } catch (error) {
+    if (error instanceof NotAFile) return null;
+    throw error;
+  }
+  const large = !binary && read > limit;
+  return { binary, large, lines: last === -1 || last === 10 ? newlines : newlines + 1 };
+}
+
 /** Git's own test for binary content: a NUL byte in the first 8000 bytes. */
 export function looksBinary(content: Buffer): boolean {
-  return content.subarray(0, 8000).includes(0);
+  return content.subarray(0, BINARY_PROBE).includes(0);
 }
 
 function linesOf(content: Buffer): string[] {
@@ -113,7 +165,11 @@ function newFilePatch(path: string, content: Buffer): string {
   return `${[...head, ...body].join("\n")}\n`;
 }
 
-async function statsOf(repository: Repository, signal: AbortSignal): Promise<DiffStat[] | null> {
+async function statsOf(
+  repository: Repository,
+  limit: number,
+  signal: AbortSignal,
+): Promise<DiffStat[] | null> {
   const base = await baseOf(repository, signal);
   if (base === null) return null;
   const numstat = await runGit(
@@ -150,12 +206,16 @@ async function statsOf(repository: Repository, signal: AbortSignal): Promise<Dif
   if (untracked === null) return null;
   for (const path of untracked) {
     if (signal.aborted) return null;
-    const content = await contentOf(repository, path);
-    if (content === null) continue;
-    if (content === "large" || looksBinary(content)) {
-      kept.push({ path, added: 0, removed: 0, binary: true });
-    } else {
-      kept.push({ path, added: linesOf(content).length, removed: 0, binary: false });
+    const counted = await countOf(repository, path, limit, signal);
+    if (counted === null) continue;
+    if (counted.large) kept.push({ path, added: 0, removed: 0, binary: false, large: true });
+    else {
+      kept.push({
+        path,
+        added: counted.binary ? 0 : counted.lines,
+        removed: 0,
+        binary: counted.binary,
+      });
     }
   }
   return kept.sort((a, b) => compareCodePoints(a.path, b.path));
@@ -178,13 +238,17 @@ async function patchOf(
 
 /**
  * The files of `repository` that differ from HEAD in the work tree, as paths from its root, sorted
- * by path. Null when git fails or runs over `GIT_TIMEOUT`.
+ * by path. An untracked text file over `limit` bytes (what the chat takes as one file) is `large`,
+ * its lines not counted. Null when git fails or runs over `GIT_TIMEOUT`.
  */
 export async function diffStats(
   repository: Repository,
+  limit: number,
   clock: Clock = monotonicClock,
 ): Promise<DiffStat[] | null> {
-  const found = await within(clock, GIT_TIMEOUT / 1000, (signal) => statsOf(repository, signal));
+  const found = await within(clock, GIT_TIMEOUT / 1000, (signal) =>
+    statsOf(repository, limit, signal),
+  );
   return found === TIMED_OUT ? null : found;
 }
 
@@ -210,9 +274,11 @@ async function patchFor(
   const untracked = await untrackedPaths(repository, signal, path);
   if (untracked === null) return null;
   if (!untracked.includes(path)) return none;
-  const content = await contentOf(repository, path);
+  // A file over the limit has a patch over it too: the patch holds every byte, and more.
+  const content = await contentOf(repository, path, limit);
   if (content === null) return none;
-  if (content === "large" || looksBinary(content)) return { ...none, binary: true };
+  if (content === "large") return { ...none, large: true };
+  if (looksBinary(content)) return { ...none, binary: true };
   const made = newFilePatch(path, content);
   return Buffer.byteLength(made) > limit ? { ...none, large: true } : { ...none, text: made };
 }

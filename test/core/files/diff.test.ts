@@ -34,7 +34,7 @@ test("an edit, a new file, a deletion and a binary file are listed with their co
   writeFileSync(join(root, "bin.dat"), Buffer.from([0, 1, 2, 3, 0]));
   write(root, "src/new.ts", "a\nb\nc\nd\n");
   write(root, "blob.bin", "p\0q");
-  const found = await diffStats(await plainRepository(root), new FakeClock());
+  const found = await diffStats(await plainRepository(root), LIMIT, new FakeClock());
   assert.deepEqual(found, [
     { path: "README", added: 2, removed: 0, binary: false },
     { path: "bin.dat", added: 0, removed: 0, binary: true },
@@ -50,7 +50,7 @@ test("a staged new file counts, and the ignored file is left out", async () => {
   write(root, "skip.log", "noise\n");
   write(root, "staged.txt", "s\n");
   git(root, "add", "staged.txt");
-  const found = await diffStats(await plainRepository(root), new FakeClock());
+  const found = await diffStats(await plainRepository(root), LIMIT, new FakeClock());
   assert.deepEqual(
     found?.map((row) => row.path),
     [".gitignore", "staged.txt"],
@@ -61,7 +61,7 @@ test("a file touched with no change in content is dropped", async () => {
   const root = app();
   const later = new Date(Date.now() + 60_000);
   utimesSync(join(root, "README"), later, later);
-  assert.deepEqual(await diffStats(await plainRepository(root), new FakeClock()), []);
+  assert.deepEqual(await diffStats(await plainRepository(root), LIMIT, new FakeClock()), []);
 });
 
 test("a repository with no commit lists every file as added", async () => {
@@ -70,7 +70,7 @@ test("a repository with no commit lists every file as added", async () => {
   write(root, "a.txt", "1\n2\n");
   git(root, "add", "a.txt");
   write(root, "b.txt", "3\n");
-  const found = await diffStats(await plainRepository(root), new FakeClock());
+  const found = await diffStats(await plainRepository(root), LIMIT, new FakeClock());
   assert.deepEqual(found, [
     { path: "a.txt", added: 2, removed: 0, binary: false },
     { path: "b.txt", added: 1, removed: 0, binary: false },
@@ -85,7 +85,7 @@ test("the totals equal what the footer reports for the same tree", async () => {
   write(root, "README", "");
   write(root, "added.txt", "q\nr\n");
   git(root, "add", "added.txt");
-  const rows = await diffStats(await plainRepository(root), new FakeClock());
+  const rows = await diffStats(await plainRepository(root), LIMIT, new FakeClock());
   const added = rows?.reduce((sum, row) => sum + row.added, 0);
   const removed = rows?.reduce((sum, row) => sum + row.removed, 0);
   const [, changes] = await gitState(root, repositoryAt);
@@ -96,7 +96,7 @@ test("no index lock is left behind, and the index is not rewritten", async () =>
   const root = app();
   write(root, "README", "two\n");
   write(root, "other.txt", "o\n");
-  await diffStats(await plainRepository(root), new FakeClock());
+  await diffStats(await plainRepository(root), LIMIT, new FakeClock());
   await diffPatch(await plainRepository(root), "README", LIMIT, new FakeClock());
   assert.equal(existsSync(join(root, ".git", "index.lock")), false);
 });
@@ -268,7 +268,7 @@ test("a dirty submodule runs none of its filters and adds no row", async () => {
   );
   write(inside, "f.txt", "changed\n");
   const repository = await plainRepository(root);
-  assert.deepEqual(await diffStats(repository, new FakeClock()), []);
+  assert.deepEqual(await diffStats(repository, LIMIT, new FakeClock()), []);
   assert.deepEqual(await diffPatch(repository, "vendor", LIMIT, new FakeClock()), {
     binary: false,
     text: "",
@@ -309,6 +309,65 @@ test("a file edited and then written again shares both, and its counts are the p
     patch,
     /^diff --git a\/a.ts b\/a.ts\n--- a\/a.ts\n\+\+\+ b\/a.ts\n@@ -1,1 \+1,1 @@\n-o\n\+n\n@@ -0,0 \+1,1 @@\n\+z\n$/,
   );
+});
+
+test("an untracked text file over 1 MB is listed with its lines, never as binary (#282)", async () => {
+  const root = app();
+  // 2.5 MB of text, the last line with no newline; then a binary file of the same size.
+  write(root, "big.json", `${"0123456789abcdef\n".repeat(150_000)}tail`);
+  write(root, "big.bin", `\0${"x".repeat(2_500_000)}`);
+  const repository = await plainRepository(root);
+  const stats = await diffStats(repository, 30 * LIMIT, new FakeClock());
+  assert.deepEqual(
+    stats?.filter((file) => file.path.startsWith("big.")),
+    [
+      { path: "big.bin", added: 0, removed: 0, binary: true },
+      { path: "big.json", added: 150_001, removed: 0, binary: false },
+    ],
+  );
+  // Over the limit the text is not counted on: its diff could not be shared anyway (#282).
+  const capped = await diffStats(repository, LIMIT, new FakeClock());
+  assert.deepEqual(
+    capped?.filter((file) => file.path.startsWith("big.")),
+    [
+      { path: "big.bin", added: 0, removed: 0, binary: true },
+      { path: "big.json", added: 0, removed: 0, binary: false, large: true },
+    ],
+  );
+});
+
+test("an untracked file's lines are counted as its patch counts them", async () => {
+  const root = app();
+  const cases: Record<string, string> = {
+    "empty.txt": "",
+    "newline.txt": "\n",
+    "one.txt": "a\n",
+    "open.txt": "a\nb",
+    "blank-lines.txt": "\n\n\n",
+  };
+  for (const [name, content] of Object.entries(cases)) write(root, name, content);
+  const repository = await plainRepository(root);
+  const stats = await diffStats(repository, LIMIT, new FakeClock());
+  for (const name of Object.keys(cases)) {
+    const patch = await diffPatch(repository, name, LIMIT, new FakeClock());
+    const pluses = (patch?.text ?? "").split("\n").filter((line) => /^\+(?!\+\+ )/.test(line));
+    assert.equal(stats?.find((file) => file.path === name)?.added, pluses.length, name);
+  }
+});
+
+test("the patch of an untracked text file is read up to the limit asked for (#282)", async () => {
+  const root = app();
+  write(root, "big.json", "0123456789abcdef\n".repeat(150_000));
+  const repository = await plainRepository(root);
+  const found = await diffPatch(repository, "big.json", 30 * LIMIT, new FakeClock());
+  assert.equal(found?.binary, false);
+  assert.equal(found?.large, false);
+  assert.match(found?.text ?? "", /^@@ -0,0 \+1,150000 @@$/m);
+  assert.deepEqual(await diffPatch(repository, "big.json", LIMIT, new FakeClock()), {
+    binary: false,
+    text: "",
+    large: true,
+  });
 });
 
 test("a patch over the limit is not collected, and says so", async () => {

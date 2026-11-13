@@ -54,6 +54,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `!diff` lists an untracked text file over 1 MB with its lines and a **Diff** button, where it
+  showed it as `binary`: its lines are counted a chunk at a time (`read.scanOpenable`) and its
+  diff is read up to the chat's file limit, 30 MB in Slack, as a tracked file's is. An untracked
+  text file over that limit is listed as `too large`, with no button (#282).
 - After a switch of the Claude Code login, a thread's footer no longer shows the old account's
   email beside the new account's limits. With limits, the footer and `!status` name the account
   the limits were read for. The usage probe starts and closes a session for each read, and takes

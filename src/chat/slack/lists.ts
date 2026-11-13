@@ -117,7 +117,11 @@ export type DiffBlock = ContextBlock | DiffSection | ViewSelect | ShownDiff;
 const LIST_TEXT_LIMIT = MESSAGE_LIMIT;
 
 function row(list: DiffList, file: DiffRow, index: number): DiffSection {
-  const counts = file.binary ? slackTexts.DIFF_BINARY : `+${file.added} −${file.removed}`;
+  const counts = file.large
+    ? slackTexts.DIFF_LARGE
+    : file.binary
+      ? slackTexts.DIFF_BINARY
+      : `+${file.added} −${file.removed}`;
   const block: DiffSection = {
     type: "section",
     // An index, not the path: a block_id is capped at 255 characters.
@@ -128,7 +132,7 @@ function row(list: DiffList, file: DiffRow, index: number): DiffSection {
     },
   };
   const value = fileValue(list.session, list.view, file.path);
-  if (!file.binary && value.length <= BUTTON_VALUE_LIMIT) {
+  if (!file.binary && !file.large && value.length <= BUTTON_VALUE_LIMIT) {
     block.accessory = {
       type: "button",
       action_id: DIFF_FILE_ACTION,

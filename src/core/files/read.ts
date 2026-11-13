@@ -10,6 +10,8 @@ import { basename, dirname, isAbsolute, join, posix, sep } from "node:path";
 import { compareCodePoints } from "../../text.ts";
 import { relativeTo } from "./paths.ts";
 
+// What `scanOpenable` reads at a time.
+const CHUNK = 1 << 16;
 // Windows has neither flag; the descriptor check below still holds there.
 const OPEN_FLAGS = constants.O_RDONLY | (constants.O_NONBLOCK ?? 0) | (constants.O_NOFOLLOW ?? 0);
 
@@ -161,6 +163,46 @@ export async function readOpenable(
 ): Promise<Buffer> {
   const { target } = await locate(await realpathLoose(folder), relative);
   return readOnce(target, limit);
+}
+
+/**
+ * Hands each chunk of the file `relative` names under `folder` to `take`, in order, through one
+ * buffer of `CHUNK` bytes whatever the file's size: a chunk is valid only during its call, and
+ * the read stops at the end or when `take` answers false. The file is found and opened as
+ * `readOpenable` does it. Throws `NotAFile`, or what `take` throws.
+ */
+export async function scanOpenable(
+  folder: string,
+  relative: string,
+  take: (chunk: Buffer) => boolean,
+): Promise<void> {
+  const { target } = await locate(await realpathLoose(folder), relative);
+  let handle: Opened;
+  try {
+    handle = await open(target, OPEN_FLAGS);
+  } catch (error) {
+    throw new NotAFile({ cause: error });
+  }
+  const buffer = Buffer.allocUnsafe(CHUNK);
+  /** The next chunk's length, 0 at the end; a failed read is `NotAFile`. */
+  const next = async (): Promise<number> => {
+    try {
+      return (await handle.read(buffer, 0, CHUNK, null)).bytesRead;
+    } catch (error) {
+      throw new NotAFile({ cause: error });
+    }
+  };
+  try {
+    const found = await handle.stat().catch((error: unknown) => {
+      throw new NotAFile({ cause: error });
+    });
+    if (!found.isFile()) throw new NotAFile();
+    for (let read = await next(); read > 0; read = await next()) {
+      if (!take(buffer.subarray(0, read))) break;
+    }
+  } finally {
+    await handle.close().catch(() => {});
+  }
 }
 
 /**

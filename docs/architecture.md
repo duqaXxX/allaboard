@@ -1802,8 +1802,9 @@ agent's own line (`AgentWords.trust`).
 - **The list.** `files/diff.diffStats` compares the work tree with `HEAD` (the empty tree while the
   repository has no commit) with `diff-index --numstat -z --no-renames --no-ext-diff
   --no-textconv`, and adds the untracked files that `ls-files --others --exclude-standard` names,
-  counted from their content (`readOpenable`, at most 1 MiB; a larger one or one with a NUL byte
-  in its first 8,000 bytes is `binary`). Paths are from the repository's root, so the totals agree
+  counted from their content a chunk at a time (`read.scanOpenable`: one with a NUL byte in its
+  first 8,000 bytes is `binary`, one with more text than the chat's `fileLimit` is `large` and
+  not counted on, so that a log of several GB cannot hold the list up to its timeout). Paths are from the repository's root, so the totals agree
   with the footer's. Every command runs through `runGit`, under `GIT_TIMEOUT`, with
   `--no-optional-locks` and `--literal-pathspecs`, and none writes the index.
 - **The patch.** `files/diff.diffPatch` runs `diff-index -p` for one literal path; an untracked
