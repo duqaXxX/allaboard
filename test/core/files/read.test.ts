@@ -12,6 +12,7 @@ import {
   readOpenable,
   realpathLoose,
   regularFiles,
+  scanOpenable,
   TooLarge,
   titleOf,
 } from "../../../src/core/files/read.ts";
@@ -64,6 +65,37 @@ test("a symlink that leaves the folder is refused after it is resolved", POSIX, 
   }
   // A link that stays inside the folder is a file.
   assert.deepEqual(await readOpenable(folder, "alias.txt", CAP), Buffer.from("inside\n"));
+});
+
+/** Every chunk `scanOpenable` hands over, joined; `stopAfter` chunks then stop. */
+async function scanned(folder: string, relative: string, stopAfter = Infinity): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  await scanOpenable(folder, relative, (chunk) => {
+    chunks.push(Buffer.from(chunk));
+    return chunks.length < stopAfter;
+  });
+  return Buffer.concat(chunks);
+}
+
+test("scanOpenable hands a file of any size over in chunks, and stops when asked", async () => {
+  const folder = app();
+  const content = Buffer.alloc(3 * CAP + 7, "ab\n");
+  writeFileSync(join(folder, "big.txt"), content);
+  assert.deepEqual(await scanned(folder, "big.txt"), content);
+  assert.ok((await scanned(folder, "big.txt", 1)).length < content.length);
+  assert.deepEqual(await scanned(folder, "empty.txt").catch(() => "refused"), "refused");
+  write(folder, "empty.txt", "");
+  assert.deepEqual(await scanned(folder, "empty.txt"), Buffer.alloc(0));
+});
+
+test("scanOpenable refuses what readOpenable refuses", POSIX, async () => {
+  const folder = app();
+  const outside = write(tmp.dir, "outside/secret.txt");
+  symlinkSync(outside, join(folder, "scan-link.txt"));
+  write(folder, "docs/a.md");
+  for (const relative of ["", "..", "docs", "scan-link.txt", outside, "a\0b"]) {
+    await assert.rejects(scanned(folder, relative), NotAFile, relative);
+  }
 });
 
 test("a path swapped for a link after it was resolved is not followed", POSIX, async () => {

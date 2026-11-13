@@ -317,7 +317,11 @@ function listText(list: ThreadList, title: string): string {
   }
   if (list.type === "suggestion") return [title, list.text].join("\n");
   const rows = list.files.map((file) =>
-    file.binary ? `${file.path} binary` : `${file.path} +${file.added} -${file.removed}`,
+    file.large
+      ? `${file.path} large`
+      : file.binary
+        ? `${file.path} binary`
+        : `${file.path} +${file.added} -${file.removed}`,
   );
   const views = list.views.map((view) => (view.id === list.view ? `[${view.label}]` : view.label));
   const shown = list.shown === undefined ? [] : [`shown ${list.shown.path}`, list.shown.text];

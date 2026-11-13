@@ -58,6 +58,13 @@ test("a row shows the path and its counts, with a button that carries the sessio
   assert.equal(second?.accessory, undefined, "a binary file has no text diff to share");
 });
 
+test("a file over the chat's file limit says so, with no button (#282)", () => {
+  const files = [{ path: "dump.sql", added: 0, removed: 0, binary: false, large: true }];
+  const [, row] = diffBlocks({ ...LIST, files }, "Changed files") as Json[];
+  assert.equal(row?.text.text, "`dump.sql` · too large");
+  assert.equal(row?.accessory, undefined, "its diff could not be shared");
+});
+
 test("one view draws no selector, several draw one with the current view selected", () => {
   assert.equal(
     (diffBlocks(LIST, "t") as Json[]).some((block) => block.type === "actions"),

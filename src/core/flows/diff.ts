@@ -143,7 +143,7 @@ export function diffFlow(deps: FlowDeps, talk: Talk): DiffFlow {
     const turns = await turnsOf(ref, repository);
     let files: readonly DiffStat[] | null;
     if (view === CURRENT_VIEW) {
-      files = await diffStats(repository, clock);
+      files = await diffStats(repository, chat.fileLimit ?? 0, clock);
     } else {
       const turn = turns.find((candidate) => candidate.id === view);
       if (turn === undefined) {
@@ -226,7 +226,7 @@ export function diffFlow(deps: FlowDeps, talk: Talk): DiffFlow {
     if (pick.view === CURRENT_VIEW) {
       // The path comes back from the chat: only a file the tree lists now is read, so that a
       // directory or a pattern the list never held shares nothing.
-      const stats = await diffStats(repository, clock);
+      const stats = await diffStats(repository, limit, clock);
       if (stats === null) {
         await talk.tell(ref, fill(texts.DIFF_FILE_FAILED, { path }));
         return null;

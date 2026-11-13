@@ -682,6 +682,8 @@ export interface DiffRow {
   readonly removed: number;
   /** It has no text diff: the row shows its counts as unknown and offers no control. */
   readonly binary: boolean;
+  /** Its diff is over the chat's `fileLimit`: the row says so in place of counts and offers no control. */
+  readonly large?: boolean;
 }
 
 /** A prompt of a session the owner can go back to (`!rewind`): the id it was sent under and its text. */

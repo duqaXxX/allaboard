@@ -64,6 +64,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `!diff` lists an untracked text file over 1 MB with its lines and a **Diff** button, where it
+  showed it as `binary`: its lines are counted a chunk at a time (`read.scanOpenable`) and its
+  diff is read up to the chat's file limit, 30 MB in Slack, as a tracked file's is. An untracked
+  text file over that limit is listed as `too large`, with no button (#282).
 - In a thread, the text sent from the field of a suggestion for a mistyped `!word` now carries
   the table or the card pasted under the word, read back from Slack when the field is sent; it
   carried the field's text alone (#275).

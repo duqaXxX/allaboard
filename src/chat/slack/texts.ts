@@ -168,6 +168,7 @@ export const RESUME_OPEN_MANY = "{count} more are open in their own threads.";
 export const DIFF_BUTTON = "Diff";
 export const DIFF_VIEW_PLACEHOLDER = "View";
 export const DIFF_BINARY = "binary";
+export const DIFF_LARGE = "too large";
 export const DIFF_MORE = "Only the first {rows} of {count} files are shown.";
 // A rewind list (`!rewind`): a selector of prompts, then a button per action.
 export const REWIND_PLACEHOLDER = "Pick a prompt";
