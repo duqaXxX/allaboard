@@ -13,12 +13,16 @@
  * `response_url` showed the new one in the channel too (seen 2026-10-21, desktop).
  */
 import { randomUUID } from "node:crypto";
+import { fill } from "../../../core/port.ts";
 import type { CommandSuggestion, InboundMessage } from "../../seam.ts";
+import { readMessage } from "../fold.ts";
+import { describe } from "../reply/errors.ts";
 import { parsePick, SUGGEST_EDIT, suggestionBlocks, typedMessage } from "../suggest.ts";
 import * as slackTexts from "../texts.ts";
-import type { Answers, AppParts } from "./answers.ts";
+import { type Answers, type AppParts, logger } from "./answers.ts";
 import { interactionActor } from "./guards.ts";
 import type { ChannelOrder } from "./order.ts";
+import { withPasted } from "./pasted.ts";
 import {
   type Ack,
   clickThread,
@@ -145,7 +149,9 @@ export class Suggestions {
       const oldest = this.consumed.values().next().value;
       if (this.consumed.size > KEPT * 10 && oldest !== undefined) this.consumed.delete(oldest);
       withdrawn = this.answers.takeBack(respond, "a command suggestion");
-      handed = this.parts.inbound.message(typedIn(channel, threadTs, typed, sent));
+      handed = this.parts.inbound.message(
+        typedIn(channel, threadTs, typed, sent, () => this.typedNow(channel, threadTs, typed)),
+      );
     } finally {
       // The place is left only after its turn: a rejected `ack()` above would otherwise release
       // the next place while an earlier one is still held.
@@ -154,6 +160,28 @@ export class Suggestions {
       if (refused !== null) await refused;
     }
     await Promise.all([handed, withdrawn]);
+  }
+
+  /**
+   * The typed message `id` as Slack holds it now, null when it is gone; undefined, after telling
+   * the owner why, when it cannot be read: the text is then not sent without what it held.
+   */
+  private async typedNow(
+    channel: string,
+    threadTs: string,
+    id: string,
+  ): Promise<Readonly<Record<string, unknown>> | null | undefined> {
+    try {
+      return await readMessage(this.parts.slack, channel, threadTs, id);
+    } catch (error) {
+      logger.warning(`could not read back message ${id} in ${channel}: ${describe(error)}`);
+      await this.answers.tellOwner(
+        channel,
+        threadTs,
+        fill(slackTexts.SUGGEST_UNREAD, { error: describe(error) }),
+      );
+      return undefined;
+    }
   }
 
   /** A button or the menu: the command goes in the field, which the owner edits and sends. */
@@ -180,9 +208,19 @@ export class Suggestions {
  * The text sent from the field, as the message that typed the word: the same id, so that what the
  * core marks or withdraws is the owner's own message. It is a message of the thread whatever the
  * typed one was, since the thread exists by now. `sent` is raw: a field's value is not
- * Slack-escaped, and it is read as a word, not as a literal.
+ * Slack-escaped, and it is read as a word, not as a literal. What the typed message holds beyond
+ * its text (a table or a card pasted under the word: the field holds the text alone) follows the
+ * field's text in the prompt, as it followed the typed text (#120, #275). It is read back from
+ * Slack when the message's turn comes, so a restart loses nothing; a message deleted since adds
+ * nothing, and a failed read sends nothing and tells the owner why.
  */
-function typedIn(channel: string, threadTs: string, id: string, sent: string): InboundMessage {
+function typedIn(
+  channel: string,
+  threadTs: string,
+  id: string,
+  sent: string,
+  typedNow: () => Promise<Readonly<Record<string, unknown>> | null | undefined>,
+): InboundMessage {
   return {
     ref: { channel, thread: threadTs },
     id,
@@ -191,6 +229,9 @@ function typedIn(channel: string, threadTs: string, id: string, sent: string): I
     plain: sent,
     bare: sent,
     literal: false,
-    content: async () => sent,
+    content: async () => {
+      const now = await typedNow();
+      return now === undefined ? null : withPasted(sent, now?.blocks);
+    },
   };
 }

@@ -75,8 +75,8 @@ export function fitted(text: string): string {
   return `${take(text, CARD_TEXT_LIMIT - [...marker].length - 1)}\n${marker}`;
 }
 
-/** The messages `ts` of a thread, or null when Slack returns none such. */
-async function read(
+/** The message `ts` of a thread, or null when Slack returns none such. */
+export async function readMessage(
   slack: WebClient,
   channel: string,
   thread: string,
@@ -107,7 +107,7 @@ export async function foldMessage(
   ts: string,
   title: string,
 ): Promise<boolean> {
-  const message = await read(slack, channel, thread, ts);
+  const message = await readMessage(slack, channel, thread, ts);
   if (message === null) return false;
   const card = cardBlock({
     id: `folded-${ts}`,
