@@ -1,0 +1,316 @@
+{
+ "_source": "Two messages the owner sent on 2026-11-12 on the dev instance (desktop), each a mistyped !word over a reply's pasted table, read back with conversations.replies: shapes as recorded, words replaced with synthetic English. With a table Slack's text moves the code span's trailing space outside its backticks and ends with ', with interactive elements'.",
+ "code": {
+  "text": "`!importnt why does row 2 differ?` , with interactive elements",
+  "blocks": [
+   {
+    "type": "rich_text",
+    "block_id": "3xRsN",
+    "elements": [
+     {
+      "type": "rich_text_section",
+      "elements": [
+       {
+        "type": "text",
+        "text": "!importnt why does row 2 differ? ",
+        "style": {
+         "code": true
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "table",
+    "block_id": "oaj2a",
+    "rows": [
+     [
+      {
+       "type": "rich_text",
+       "block_id": "zl/aQK",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Fruit"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "GqmXos",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Colour"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "type": "rich_text",
+       "block_id": "+n33Jh",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Banana"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "fsji8F",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Yellow"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "type": "rich_text",
+       "block_id": "p21CFB",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Strawberry"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "wb5g6L",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Red"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "type": "rich_text",
+       "block_id": "kQFyVH",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Green apple"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "l7oU6g",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Green"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    ],
+    "column_settings": []
+   }
+  ]
+ },
+ "plain": {
+  "text": "!importnt why does row 2 differ?, with interactive elements",
+  "blocks": [
+   {
+    "type": "rich_text",
+    "block_id": "zJOrs",
+    "elements": [
+     {
+      "type": "rich_text_section",
+      "elements": [
+       {
+        "type": "text",
+        "text": "!importnt why does row 2 differ?"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "table",
+    "block_id": "oaj2a",
+    "rows": [
+     [
+      {
+       "type": "rich_text",
+       "block_id": "zl/aQK",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Fruit"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "GqmXos",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Colour"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "type": "rich_text",
+       "block_id": "+n33Jh",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Banana"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "fsji8F",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Yellow"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "type": "rich_text",
+       "block_id": "p21CFB",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Strawberry"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "wb5g6L",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Red"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "type": "rich_text",
+       "block_id": "kQFyVH",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Green apple"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "rich_text",
+       "block_id": "l7oU6g",
+       "elements": [
+        {
+         "type": "rich_text_section",
+         "elements": [
+          {
+           "type": "text",
+           "text": "Green"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    ],
+    "column_settings": []
+   }
+  ]
+ }
+}

@@ -6,6 +6,7 @@
  * Bolt's `respond` posts is caught at the global `fetch` (`respondedTo`).
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 import {
@@ -89,6 +90,31 @@ test("an unknown word in a thread posts the field, holding what was typed, and t
   assert.ok(buttons.some((button) => button.text.text === "!model opus"));
   assert.deepEqual(world.queries(), [], "nothing reached the agent");
 });
+
+// A mistyped !word over a pasted table, in inline code and as plain text (recorded 2026-11-12).
+const UNDER_WORD = JSON.parse(
+  readFileSync(
+    new URL("../../../fixtures/slack/301-replies-pasted-table-under-word.json", import.meta.url),
+    "utf8",
+  ),
+);
+
+for (const kind of ["code", "plain"] as const) {
+  test(`a mistyped word over a pasted table opens the field with the words alone [${kind}]`, async (t) => {
+    const world = worldOf(t);
+    threadWithSession(world);
+    const { text, blocks } = UNDER_WORD[kind];
+    await world.dispatch(reply(text, THREAD, { blocks }));
+    await world.settle();
+    const [post] = suggestions(world);
+    assert.ok(post, "the word is read as a word, not sent");
+    assert.equal(
+      parts(post).field.element.initial_value.trim(),
+      "!importnt why does row 2 differ?",
+    );
+    assert.deepEqual(world.queries(), []);
+  });
+}
 
 test("! alone lists every command: the words of allaboard as rows, the session's in one menu", async (t) => {
   const world = worldOf(t);
