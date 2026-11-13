@@ -159,10 +159,11 @@ const pasted = JSON.parse(
 test("a pasted table reaches the agent as a markdown table after the text", async () => {
   const { text, blocks } = pasted.table;
   const message = inbound(text, blocks);
-  assert.equal(message.text, text);
+  // Slack's fallback words are left out: the owner did not type them.
+  assert.equal(message.text, "a pasted table");
   assert.equal(
     await message.content(),
-    `${text}\n\n| Word | With space |\n| --- | --- |\n| one,two | \`code\` |`,
+    `a pasted table\n\n| Word | With space |\n| --- | --- |\n| one,two | \`code\` |`,
   );
 });
 
@@ -185,6 +186,60 @@ test("a pasted card reaches the agent with its details", async () => {
 test("a message with no table or card is sent as typed", async () => {
   const message = inbound("hello", richText(part([leaf("hello")])));
   assert.equal(await message.content(), "hello");
+});
+
+// A mistyped !word over a pasted table, in inline code and as plain text, read back on 2026-11-12:
+// with a table Slack's `text` moves the code span's trailing space outside its backticks and ends
+// with `, with interactive elements`, so it no longer lines up with the composer's run.
+const underWord = JSON.parse(
+  readFileSync(
+    new URL("../../../fixtures/slack/301-replies-pasted-table-under-word.json", import.meta.url),
+    "utf8",
+  ),
+);
+
+test("a !word in inline code over a pasted table is read from the composer's block", async () => {
+  const { text, blocks } = underWord.code;
+  const message = inbound(text, blocks);
+  assert.equal(message.plain, "!importnt why does row 2 differ? ");
+  assert.equal(message.bare, "!importnt why does row 2 differ? ");
+  assert.equal(message.text, "`!importnt why does row 2 differ? `", "no fallback words");
+  assert.match((await message.content()) as string, /\| Fruit \| Colour \|/);
+});
+
+test("a plain !word over a pasted table is read without Slack's fallback words", () => {
+  const { text, blocks } = underWord.plain;
+  const message = inbound(text, blocks);
+  assert.equal(message.plain, "!importnt why does row 2 differ?");
+  assert.equal(message.bare, "!importnt why does row 2 differ?");
+  assert.equal(message.text, "!importnt why does row 2 differ?");
+});
+
+test("a pasted table first and the words after are read from the words' block", async () => {
+  const { text, blocks } = pasted.table;
+  const message = inbound(text, blocks);
+  assert.equal(message.plain, "a pasted table");
+  assert.match((await message.content()) as string, /^a pasted table\n\n\| Word/);
+});
+
+test("a command over a pasted table keeps its inline code, and an unmeasured element keeps Slack's text", () => {
+  const table = underWord.code.blocks[1];
+  const shell = inbound("`!!echo` `whoami` , with interactive elements", [
+    richText(part([leaf("!!echo ", { code: false }), leaf("whoami", { code: true })]))[0],
+    table,
+  ]);
+  assert.equal(shell.text, "!!echo `whoami`");
+  const bold = inbound("*!importnt* x, with interactive elements", [
+    richText(part([leaf("!importnt", { bold: true }), leaf(" x")]))[0],
+    table,
+  ]);
+  assert.equal(bold.plain, "!importnt x");
+  const sent = "two styles, with interactive elements";
+  const both = inbound(sent, [
+    richText(part([leaf("two styles", { bold: true, italic: true })]))[0],
+    table,
+  ]);
+  assert.equal(both.text, sent, "a run in two styles is not rebuilt");
 });
 
 test("unwrittenText keeps a table's columns when a cell holds a pipe or a line break", () => {

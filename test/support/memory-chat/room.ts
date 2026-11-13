@@ -280,6 +280,8 @@ export class Room {
 
   /** The thread chat has no `unshare`: set before the chat is built. */
   noUnshare = false;
+  /** The thread chat has no `share`: set before the chat is built. */
+  noShare = false;
   /** What the provider names as its control that runs the cleanup at once; none when null. */
   cleanupControl: string | null = null;
   /** `ThreadChat.offer` rejects with a `ChatError` for a diff list that holds a `shown` diff. */

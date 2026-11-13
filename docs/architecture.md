@@ -1791,6 +1791,32 @@ The search reads the folder from disk, and the changed files come from git:
 The commands, their measurements (git 2.54.0, 2026-10-05 and 2026-10-06) and each rule above are
 in the doc comments of `src/core/files/listing.ts` and `src/core/files/changed.ts`.
 
+## Claude sharing a file, `DaemonActions`
+
+What a session's model may ask the daemon to do crosses the agent seam as `DaemonActions`, the
+third argument of `AgentBackend.start`, present when the agent declares `Capabilities.daemonActions`.
+The tool is the agent module's, what it does is the core's, and the upload is the chat's:
+
+- **The core** builds the actions in `ThreadSession` (`daemonActions`) and passes them only when
+  the agent declares the capability and the chat declares `fileUpload` with a `fileLimit` and
+  offers `ThreadChat.share`. Its
+  `share` (`src/core/sessions/share.ts`) joins a relative path onto the folder the session works
+  in (`ThreadSession.workingDirectory`, else the bound folder) and reads it with
+  `files.read.readOpenable` under the bound folder (the rule of `!open`), titling it with its path
+  from the real bound folder, refuses an empty file, checks the abort signal, then
+  calls `ThreadChat.share`. It resolves with a line for the model from `texts.SHARE_*`, naming no
+  tool and no chat, and sets the thread's activity line again, as `!open` does after an upload.
+- **The Claude module** (`src/agent/claude/daemon-tools.ts`) builds one in-process MCP server named
+  `allaboard` for each `ClaudeSession`, with one tool for each member present, and adds it to
+  `Options.mcpServers`; a `bare` session builds none. The tool is deferred behind tool search and
+  carries no annotation. A handler that throws returns an error result with a generic line, and the
+  log keeps the error's name alone. The signal an action receives aborts when the session closes.
+- **The chat** shares the bytes through the one upload function `ThreadChat.share` and `!open` both
+  use, so a file shared by the tool is typed as `!open` types it.
+
+A call is an ordinary tool call to the permission flow: `ClaudeSession`'s `canUseTool` decides
+nothing on the tool's name.
+
 ## Changed files of `!diff`
 
 `!diff` is the core's (`src/core/flows/diff.ts`); the chat draws a list and shares a file

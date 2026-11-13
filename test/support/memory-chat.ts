@@ -62,6 +62,8 @@ export interface MemoryChatOptions {
   readonly fits?: number;
   /** With `files`: the thread chat has no `unshare` (`false`). */
   readonly unshare?: boolean;
+  /** With `files`: the thread chat has no `share`, though the provider declares `fileUpload` (`false`). */
+  readonly share?: boolean;
   /** With `files`: the most bytes the provider takes as one shared file (1 MiB when absent). */
   readonly fileLimit?: number;
   /**
@@ -153,5 +155,6 @@ export function memoryChat(options: MemoryChatOptions = {}): MemoryChat {
     options.fits,
   );
   chat.noUnshare = options.unshare === false;
+  chat.noShare = options.share === false;
   return chat;
 }

@@ -128,6 +128,53 @@ export function bareText(blocks: unknown): string {
   return line;
 }
 
+/**
+ * The composer's block of a message that also holds pasted blocks: its one `rich_text` block,
+ * wherever the pasted ones stand; none when it has no such block or several.
+ */
+function composerBlocks(blocks: unknown): unknown[] {
+  const typed = Array.isArray(blocks)
+    ? blocks.filter((block) => firstOf([block]).type === "rich_text")
+    : [];
+  return typed.length === 1 ? typed : [];
+}
+
+// The mark Slack's text puts around a run in each style (`MARKS`), one style at a time.
+const STYLE_MARKS: Readonly<Record<string, string>> = {
+  code: "`",
+  bold: "*",
+  italic: "_",
+  strike: "~",
+};
+
+/**
+ * The text Slack writes for a composer block of one section of text runs, each in at most one
+ * style, with that style's marks around it; empty for any other block (a link, an emoji, a
+ * mention, two styles on one run, a second section), whose text was not measured.
+ */
+function typedText(block: unknown): string {
+  const record = firstOf([block]);
+  if (record.type !== "rich_text" || !Array.isArray(record.elements)) return "";
+  if (record.elements.length !== 1) return "";
+  const section = firstOf(record.elements);
+  if (section.type !== "rich_text_section" || !Array.isArray(section.elements)) return "";
+  let line = "";
+  for (const leaf of section.elements as unknown[]) {
+    const element = firstOf([leaf]);
+    if (element.type !== "text" || typeof element.text !== "string") return "";
+    const style = typeof element.style === "object" && element.style !== null ? element.style : {};
+    const on = Object.entries(style).filter(([, value]) => value === true);
+    if (on.length === 0) {
+      line += element.text;
+      continue;
+    }
+    const mark = on.length === 1 ? STYLE_MARKS[on[0]?.[0] ?? ""] : undefined;
+    if (mark === undefined) return "";
+    line += `${mark}${element.text}${mark}`;
+  }
+  return line;
+}
+
 /** A Slack file object of a message: wire data, read field by field. */
 type SlackFile = Readonly<Record<string, unknown>>;
 
@@ -252,16 +299,24 @@ export function inboundMessage(
   const files = filesOf(event);
   // What the fallback text leaves out of the blocks reaches the agent after it (#120).
   const unwritten = unwrittenText(event.blocks);
-  const prompt = unwritten === "" ? sent : `${sent}\n\n${unwritten}`;
+  // With a table or a card pasted in, Slack's text ends with its fallback words and moves a code
+  // span's trailing space outside the backticks (measured 2026-11-12), so it no longer lines up
+  // with the composer's run: the text is rebuilt from the composer's own block instead.
+  const composer = unwritten === "" ? [] : composerBlocks(event.blocks);
+  const rebuilt = composer.length === 0 ? "" : typedText(composer[0]);
+  const typed = rebuilt || sent;
+  const blocks = rebuilt === "" ? event.blocks : composer;
+  const prompt = unwritten === "" ? typed : `${typed}\n\n${unwritten}`;
   return {
     ref: { channel, thread: threadTs },
     id: ts,
     topLevel: threadTs === ts,
-    text: sent,
+    // Without Slack's fallback words when something was pasted in: the owner did not type them.
+    text: typed,
     // The composer's blocks tell a mark around a `!` from the text alone.
-    plain: unformatted(sent, event.blocks) || sent,
+    plain: unformatted(typed, blocks) || typed,
     // A name, an id or a path is read without the inline code the composer gave it.
-    bare: bareText(event.blocks) || sent,
+    bare: bareText(blocks) || typed,
     literal: files.length > 0 || (options.spoken ?? false),
     content: async () =>
       files.length > 0

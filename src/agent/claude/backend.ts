@@ -16,6 +16,7 @@ import type {
   AgentBackend,
   AgentSession,
   AgentWords,
+  DaemonActions,
   ForeignTurn,
   ForeignTurns,
   ListedSession,
@@ -210,7 +211,11 @@ export class ClaudeBackend implements AgentBackend {
    * refuses to resume `options.resume`, and with the failure itself when it cannot start.
    * Whether the owner trusted the folder is the caller's to check first (`folderTrusted`).
    */
-  async start(options: ClaudeStartOptions, requests: RequestHandler): Promise<ClaudeSession> {
+  async start(
+    options: ClaudeStartOptions,
+    requests: RequestHandler,
+    actions?: DaemonActions,
+  ): Promise<ClaudeSession> {
     // Read at every start, so a change in `/chrome` holds from a session's next start.
     const chrome = await chromeEnabled(this.#home, this.#configDir);
     const rewind = await this.#rewindStart(options);
@@ -228,6 +233,7 @@ export class ClaudeBackend implements AgentBackend {
         settingsSources: options.settingsSources ?? THREAD_SETTINGS_SOURCES,
         chrome,
         variables: this.#variables,
+        ...(actions !== undefined && { actions }),
       },
       requests,
       this.#query,

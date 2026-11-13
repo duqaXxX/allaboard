@@ -49,6 +49,7 @@ import type {
   ClosedReport,
   CommandInfo,
   ContextUsage,
+  DaemonActions,
   ForeignTurn,
   ForeignTurns,
   LoadedContext,
@@ -146,6 +147,7 @@ import {
 import { cadenceOf, promptOf } from "./loops.ts";
 import { quoted } from "./quote.ts";
 import { RewindMemory } from "./rewind-memory.ts";
+import { shareFile } from "./share.ts";
 import { Cancelled, cancellable, Event, Mutex, Queue, Task } from "./tasks.ts";
 import { ThreadTitle } from "./title.ts";
 import { type ActiveTurn, notSent, Turn, takenNote } from "./turn.ts";
@@ -2654,6 +2656,7 @@ export class ThreadSession {
             this.answering(request, signal) as Promise<PermissionAnswer>,
           question: (request, signal) => this.answering(request, signal) as Promise<QuestionAnswer>,
         },
+        this.daemonActions(),
       );
     const cut = sessionId === null ? null : this.rewinds.cutAt;
     const starting = cut === null ? start(null, null) : this.startCut(cut, start);
@@ -2675,6 +2678,32 @@ export class ThreadSession {
       }
       throw error;
     }
+  }
+
+  /**
+   * What the model may ask the daemon to do: only when the agent declares it, and a member only
+   * when the chat can serve it. Undefined when no member is present, so no tool is offered empty.
+   */
+  private daemonActions(): DaemonActions | undefined {
+    if (!this.deps.agent.capabilities.daemonActions) return undefined;
+    const limit = this.deps.chat.fileLimit;
+    const { share } = this.thread;
+    if (!this.deps.chat.capabilities.fileUpload || limit === undefined || share === undefined) {
+      return undefined;
+    }
+    const target = { share: share.bind(this.thread), written: () => this.thread.written() };
+    return {
+      // Read at the call: `folder_changed` moves the working folder.
+      share: (path, signal) =>
+        shareFile(
+          this.directory,
+          this.workingDirectory ?? this.directory,
+          target,
+          limit,
+          path,
+          signal,
+        ),
+    };
   }
 
   /** No cut waits any more: it was kept, or it can no longer be asked for. */

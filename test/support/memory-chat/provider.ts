@@ -397,7 +397,7 @@ class MemoryThread implements ThreadChat {
     if (lists && fits !== undefined) {
       this.fitsList = (list) => list.type !== "diff" || (list.shown?.text.length ?? 0) <= fits;
     }
-    if (files) {
+    if (files && !room.noShare) {
       this.share = async (file) =>
         room.addShared({
           ref,
