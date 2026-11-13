@@ -30,7 +30,7 @@ import {
 import { mrkdwnEscape } from "../reply/escape.ts";
 import * as slackTexts from "../texts.ts";
 import type { Answers, AppParts } from "./answers.ts";
-import { unwrittenText } from "./pasted.ts";
+import { unwrittenText, withPasted } from "./pasted.ts";
 import { items, type Payload, str, text } from "./wire.ts";
 
 // Slack sends a link as <url|label> or <url> (message formatting reference, read 2026-09-25).
@@ -306,7 +306,7 @@ export function inboundMessage(
   const rebuilt = composer.length === 0 ? "" : typedText(composer[0]);
   const typed = rebuilt || sent;
   const blocks = rebuilt === "" ? event.blocks : composer;
-  const prompt = unwritten === "" ? typed : `${typed}\n\n${unwritten}`;
+  const prompt = withPasted(typed, event.blocks);
   return {
     ref: { channel, thread: threadTs },
     id: ts,

@@ -64,6 +64,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- In a thread, the text sent from the field of a suggestion for a mistyped `!word` now carries
+  the table or the card pasted under the word, read back from Slack when the field is sent; it
+  carried the field's text alone (#275).
 - A message with a pasted table or card is read from the words the owner typed, rebuilt from the
   composer's block with their code, bold, italic and strikethrough marks. Slack's text for such a
   message ends with `, with interactive elements` and moves a code span's trailing space outside

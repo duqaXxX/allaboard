@@ -25,6 +25,7 @@ import { BOT, CHANNEL, OWNER, STRANGER, THREAD } from "../../../support/fake-sla
 import { NAMES } from "../../../support/names.ts";
 import {
   type Body,
+  composed,
   ephemeralPick,
   fieldEnter,
   fieldSend,
@@ -208,6 +209,86 @@ test("Send with no text for its field in the click does nothing", async (t) => {
   await world.settle();
   assert.deepEqual(world.queries(), []);
   assert.deepEqual(responses, []);
+});
+
+// A reply's table pasted under the typed word, as `conversations.replies` read it back on
+// 2026-11-10 (#120): the fallback `text` drops the cells.
+const PASTED = JSON.parse(
+  readFileSync(
+    new URL("../../../fixtures/slack/300-replies-pasted-table-and-card.json", import.meta.url),
+    "utf8",
+  ),
+);
+const TABLE = PASTED.table.blocks.find((block: Body) => block.type === "table") as Body;
+const TABLE_TEXT = "| Word | With space |\n| --- | --- |\n| one,two | `code` |";
+
+/** The typed message with the table pasted under it, and the thread that reads it back. */
+async function suggestedWithTable(world: World, typedText: string): Promise<string> {
+  threadWithSession(world);
+  const typed = reply(`${typedText}, with interactive elements`, THREAD);
+  typed.event.blocks = [TABLE, ...composed(typedText)];
+  world.slack.responses["conversations.replies"] = (args) =>
+    args.oldest === typed.event.ts && args.latest === typed.event.ts && args.inclusive === true
+      ? { ok: true, messages: [{ ...typed.event, user: OWNER }], has_more: false }
+      : { ok: true, messages: [], has_more: false };
+  await world.dispatch(typed);
+  await world.settle();
+  const [post] = suggestions(world);
+  assert.ok(post);
+  return parts(post).field.block_id;
+}
+
+test("Enter sends the table pasted under the mistyped word after the field's text (#275)", async (t) => {
+  respondedTo(t);
+  const world = worldOf(t);
+  const blockId = await suggestedWithTable(world, "!importnt why does row 2 differ?");
+  await world.dispatch(fieldEnter(SUGGEST_EDIT, blockId, "why does row 2 differ?", THREAD));
+  await world.until(() => world.queries().length > 0);
+  assert.deepEqual(world.queries(), [`why does row 2 differ?\n\n${TABLE_TEXT}`]);
+});
+
+test("Send of an edited field sends the pasted table too (#275)", async (t) => {
+  respondedTo(t);
+  const world = worldOf(t);
+  const blockId = await suggestedWithTable(world, "!importnt why does row 2 differ?");
+  await world.dispatch(
+    fieldSend(SUGGEST_SEND, blockId, SUGGEST_EDIT, "why is row 2 different?", THREAD),
+  );
+  await world.until(() => world.queries().length > 0);
+  assert.deepEqual(world.queries(), [`why is row 2 different?\n\n${TABLE_TEXT}`]);
+});
+
+test("Enter sends the field's text alone when the typed message is gone", async (t) => {
+  respondedTo(t);
+  const world = worldOf(t);
+  const blockId = await suggestedWithTable(world, "!importnt why does row 2 differ?");
+  world.slack.responses["conversations.replies"] = { ok: true, messages: [], has_more: false };
+  await world.dispatch(fieldEnter(SUGGEST_EDIT, blockId, "why does row 2 differ?", THREAD));
+  await world.until(() => world.queries().length > 0);
+  assert.deepEqual(world.queries(), ["why does row 2 differ?"]);
+});
+
+test("Enter sends nothing and says so when the typed message cannot be read back", async (t) => {
+  respondedTo(t);
+  const world = worldOf(t);
+  const blockId = await suggestedWithTable(world, "!importnt why does row 2 differ?");
+  world.slack.responses["conversations.replies"] = { ok: false, error: "ratelimited" };
+  const before = world.slack.callsTo("chat.postMessage").length;
+  await world.dispatch(fieldEnter(SUGGEST_EDIT, blockId, "why does row 2 differ?", THREAD));
+  await world.settle();
+  assert.deepEqual(world.queries(), [], "no prompt without what was pasted");
+  const told = [
+    ...world.slack
+      .callsTo("chat.postMessage")
+      .slice(before)
+      .map((args) => String(args.text)),
+    ...world.ephemerals(),
+  ];
+  assert.ok(
+    told.includes(fill(slackTexts.SUGGEST_UNREAD, { error: "ratelimited" })),
+    JSON.stringify(told),
+  );
+  assert.ok(!told.some((text) => text.includes("reported an error")), "no failure of the agent's");
 });
 
 test("Enter then Send on the same field hands the text over once", async (t) => {

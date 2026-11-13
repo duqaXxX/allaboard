@@ -335,3 +335,5 @@ export const SUGGEST_DAEMON = "*allaboard*";
 export const SUGGEST_AGENT = naming("*{agent}*");
 export const SUGGEST_MENU = "Choose or type to filter";
 export const SUGGEST_EXPIRED = "That list of commands is out of date: type the command again.";
+export const SUGGEST_UNREAD =
+  "Not sent: your message could not be read back from Slack ({error}). Send it again.";
